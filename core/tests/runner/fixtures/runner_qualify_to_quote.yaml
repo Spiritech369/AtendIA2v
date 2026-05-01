@@ -1,0 +1,13 @@
+nlu_results:
+  - intent: ask_info
+    entities:
+      interes_producto: { value: "150Z", confidence: 0.95, source_turn: 1 }
+      ciudad: { value: "CDMX", confidence: 0.95, source_turn: 1 }
+    sentiment: neutral
+    confidence: 0.95
+    ambiguities: []
+  - intent: ask_price
+    entities: {}
+    sentiment: neutral
+    confidence: 0.95
+    ambiguities: []

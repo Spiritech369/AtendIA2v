@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atendia.io/contracts/message.schema.json",
+  "title": "Message",
+  "description": "A message exchanged in a conversation, inbound or outbound.",
+  "type": "object",
+  "required": ["id", "conversation_id", "tenant_id", "direction", "text", "sent_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "conversation_id": { "type": "string" },
+    "tenant_id": { "type": "string" },
+    "direction": { "type": "string", "enum": ["inbound", "outbound", "system"] },
+    "text": { "type": "string" },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "channel_message_id": { "type": ["string", "null"] },
+    "delivery_status": {
+      "type": ["string", "null"],
+      "enum": [null, "queued", "sent", "delivered", "read", "failed"]
+    },
+    "metadata": { "type": "object" }
+  }
+}

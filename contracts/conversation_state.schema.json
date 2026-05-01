@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atendia.io/contracts/conversation_state.schema.json",
+  "title": "ConversationState",
+  "type": "object",
+  "required": [
+    "conversation_id", "tenant_id", "current_stage",
+    "extracted_data", "stage_entered_at",
+    "followups_sent_count", "total_cost_usd"
+  ],
+  "properties": {
+    "conversation_id": { "type": "string" },
+    "tenant_id": { "type": "string" },
+    "current_stage": { "type": "string" },
+    "extracted_data": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/ExtractedField" }
+    },
+    "pending_confirmation": { "type": ["string", "null"] },
+    "last_intent": { "type": ["string", "null"] },
+    "stage_entered_at": { "type": "string", "format": "date-time" },
+    "followups_sent_count": { "type": "integer", "minimum": 0 },
+    "total_cost_usd": { "type": "string" }
+  },
+  "$defs": {
+    "ExtractedField": {
+      "type": "object",
+      "required": ["value", "confidence", "source_turn"],
+      "properties": {
+        "value": {},
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "source_turn": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

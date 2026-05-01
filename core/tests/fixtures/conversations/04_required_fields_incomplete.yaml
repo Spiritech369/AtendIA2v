@@ -1,0 +1,30 @@
+name: required_fields_incomplete
+description: Cliente pide precio sin dar ciudad. Stage queda en qualify (faltan campos).
+tenant:
+  name: dinamomotos_t40_incomplete
+pipeline:
+  version: 1
+  stages:
+    - id: qualify
+      required_fields: [interes_producto, ciudad]
+      actions_allowed: [ask_field, lookup_faq, ask_clarification]
+      transitions:
+        - to: quote
+          when: "all_required_fields_present AND intent == ask_price"
+    - id: quote
+      actions_allowed: [quote]
+      transitions: []
+  tone: { register: informal_mexicano }
+  fallback: escalate_to_human
+catalog: []
+turns:
+  - inbound: "cuánto cuesta la 150Z"
+    nlu:
+      intent: ask_price
+      entities:
+        interes_producto: { value: "150Z", confidence: 0.95, source_turn: 1 }
+      sentiment: neutral
+      confidence: 0.95
+      ambiguities: []
+    expected:
+      next_stage: qualify

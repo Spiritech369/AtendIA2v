@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atendia.io/contracts/event.schema.json",
+  "title": "Event",
+  "type": "object",
+  "required": ["id", "conversation_id", "tenant_id", "type", "payload", "occurred_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "conversation_id": { "type": "string" },
+    "tenant_id": { "type": "string" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "message_received",
+        "message_sent",
+        "stage_entered",
+        "stage_exited",
+        "field_extracted",
+        "tool_called",
+        "human_handoff_requested",
+        "followup_scheduled",
+        "error_occurred"
+      ]
+    },
+    "payload": { "type": "object" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "trace_id": { "type": ["string", "null"] }
+  }
+}

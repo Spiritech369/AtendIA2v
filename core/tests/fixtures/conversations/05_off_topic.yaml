@@ -1,0 +1,29 @@
+name: off_topic
+description: Pregunta off-topic en qualify dispara lookup_faq, no transiciona.
+tenant:
+  name: dinamomotos_t40_offtopic
+pipeline:
+  version: 1
+  stages:
+    - id: qualify
+      required_fields: [interes_producto, ciudad]
+      actions_allowed: [ask_field, lookup_faq, ask_clarification]
+      transitions:
+        - to: quote
+          when: "all_required_fields_present AND intent == ask_price"
+    - id: quote
+      actions_allowed: [quote]
+      transitions: []
+  tone: { register: informal_mexicano }
+  fallback: escalate_to_human
+catalog: []
+turns:
+  - inbound: "ustedes hacen entregas a domicilio?"
+    nlu:
+      intent: off_topic
+      entities: {}
+      sentiment: neutral
+      confidence: 0.85
+      ambiguities: []
+    expected:
+      next_stage: qualify

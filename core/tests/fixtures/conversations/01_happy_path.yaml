@@ -1,0 +1,69 @@
+name: happy_path
+description: Cliente saluda, pregunta info, da datos, pide precio, compra.
+tenant:
+  name: dinamomotos_t40_happy
+pipeline:
+  version: 1
+  stages:
+    - id: greeting
+      actions_allowed: [greet, ask_field]
+      transitions:
+        - to: qualify
+          when: "intent in [ask_info, ask_price]"
+    - id: qualify
+      required_fields: [interes_producto, ciudad]
+      actions_allowed: [ask_field, lookup_faq, ask_clarification]
+      transitions:
+        - to: quote
+          when: "all_required_fields_present AND intent == ask_price"
+    - id: quote
+      actions_allowed: [quote, ask_clarification]
+      transitions:
+        - to: close
+          when: "intent == buy"
+    - id: close
+      actions_allowed: [close]
+      transitions: []
+  tone: { register: informal_mexicano }
+  fallback: escalate_to_human
+catalog:
+  - { sku: M150Z, name: "Italika 150Z", attrs: { price_mxn: 28500 } }
+turns:
+  - inbound: "hola"
+    nlu:
+      intent: greeting
+      entities: {}
+      sentiment: neutral
+      confidence: 0.95
+      ambiguities: []
+    expected:
+      next_stage: greeting
+  - inbound: "info de la 150Z, soy de CDMX"
+    nlu:
+      intent: ask_info
+      entities:
+        interes_producto: { value: "150Z", confidence: 0.95, source_turn: 1 }
+        ciudad: { value: "CDMX", confidence: 0.95, source_turn: 1 }
+      sentiment: neutral
+      confidence: 0.95
+      ambiguities: []
+    expected:
+      next_stage: qualify
+  - inbound: "cuánto cuesta?"
+    nlu:
+      intent: ask_price
+      entities: {}
+      sentiment: neutral
+      confidence: 0.95
+      ambiguities: []
+    expected:
+      next_stage: quote
+  - inbound: "la quiero"
+    nlu:
+      intent: buy
+      entities: {}
+      sentiment: positive
+      confidence: 0.95
+      ambiguities: []
+    expected:
+      next_stage: close

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atendia.io/contracts/pipeline_definition.schema.json",
+  "title": "PipelineDefinition",
+  "type": "object",
+  "required": ["version", "stages", "tone", "fallback"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/StageDefinition" }
+    },
+    "tone": { "type": "object" },
+    "fallback": { "type": "string" }
+  },
+  "$defs": {
+    "StageDefinition": {
+      "type": "object",
+      "required": ["id", "actions_allowed", "transitions"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "required_fields": { "type": "array", "items": { "type": "string" } },
+        "actions_allowed": { "type": "array", "items": { "type": "string" } },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/Transition" } },
+        "timeout_hours": { "type": ["integer", "null"], "minimum": 1 },
+        "timeout_action": { "type": ["string", "null"] }
+      }
+    },
+    "Transition": {
+      "type": "object",
+      "required": ["to", "when"],
+      "properties": {
+        "to": { "type": "string" },
+        "when": { "type": "string" }
+      }
+    }
+  }
+}

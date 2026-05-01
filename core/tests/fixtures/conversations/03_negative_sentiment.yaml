@@ -1,0 +1,56 @@
+name: negative_sentiment
+description: Sentiment negativo sostenido en qualify dispara escalate.
+tenant:
+  name: dinamomotos_t40_neg
+pipeline:
+  version: 1
+  stages:
+    - id: qualify
+      required_fields: [interes_producto, ciudad]
+      actions_allowed: [ask_field, lookup_faq, ask_clarification]
+      transitions:
+        - to: escalate
+          when: "sentiment == negative AND turn_count >= 3"
+    - id: escalate
+      actions_allowed: [escalate_to_human]
+      transitions: []
+  tone: { register: informal_mexicano }
+  fallback: escalate_to_human
+catalog: []
+turns:
+  - inbound: "qué mal servicio"
+    nlu:
+      intent: complain
+      entities: {}
+      sentiment: negative
+      confidence: 0.9
+      ambiguities: []
+    expected:
+      next_stage: qualify
+  - inbound: "siempre los mismos problemas"
+    nlu:
+      intent: complain
+      entities: {}
+      sentiment: negative
+      confidence: 0.9
+      ambiguities: []
+    expected:
+      next_stage: qualify
+  - inbound: "horrible"
+    nlu:
+      intent: complain
+      entities: {}
+      sentiment: negative
+      confidence: 0.9
+      ambiguities: []
+    expected:
+      next_stage: qualify
+  - inbound: "no me responden"
+    nlu:
+      intent: complain
+      entities: {}
+      sentiment: negative
+      confidence: 0.9
+      ambiguities: []
+    expected:
+      next_stage: escalate

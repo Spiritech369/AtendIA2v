@@ -1,0 +1,12 @@
+nlu_results:
+  - intent: greeting
+    entities: {}
+    sentiment: neutral
+    confidence: 0.95
+    ambiguities: []
+  - intent: ask_price
+    entities:
+      interes_producto: { value: "150Z", confidence: 0.9, source_turn: 1 }
+    sentiment: neutral
+    confidence: 0.9
+    ambiguities: []
