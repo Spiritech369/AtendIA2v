@@ -149,3 +149,13 @@ def test_stage_rejects_field_in_both_required_and_optional():
             "actions_allowed": [],
             "transitions": [],
         })
+
+
+def test_field_spec_description_max_length_enforced():
+    """Canonical schema caps description at 200 chars; Pydantic must match."""
+    long_desc = "x" * 201
+    with pytest.raises(ValidationError):
+        FieldSpec(name="ciudad", description=long_desc)
+    # Edge: exactly 200 is OK
+    f = FieldSpec(name="ciudad", description="y" * 200)
+    assert len(f.description) == 200

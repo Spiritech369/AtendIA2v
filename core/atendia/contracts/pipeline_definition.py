@@ -8,7 +8,7 @@ _FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 class FieldSpec(BaseModel):
     name: str
-    description: str = ""
+    description: str = Field(default="", max_length=200)
 
     @field_validator("name")
     @classmethod
