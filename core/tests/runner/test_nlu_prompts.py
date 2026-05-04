@@ -119,6 +119,30 @@ def test_build_prompt_field_with_empty_description_renders_placeholder():
 
 
 def test_system_prompt_snapshot_qualify():
+    """Byte-equality snapshot guard for the qualify-stage system prompt.
+
+    Intentional edits to SYSTEM_PROMPT_TEMPLATE / OUTPUT_INSTRUCTIONS / _render_fields
+    will fail this test. To regenerate the fixture after a deliberate change, run from
+    the `core/` directory:
+
+        uv run python -c "
+        from pathlib import Path
+        from atendia.contracts.pipeline_definition import FieldSpec
+        from atendia.runner.nlu_prompts import build_prompt
+        m = build_prompt(
+            text='dummy', current_stage='qualify',
+            required_fields=[
+                FieldSpec(name='interes_producto', description='Modelo de moto'),
+                FieldSpec(name='ciudad', description='Ciudad del cliente'),
+            ],
+            optional_fields=[FieldSpec(name='nombre', description='Nombre del cliente')],
+            history=[],
+        )
+        Path('tests/fixtures/nlu/qualify_system.txt').write_text(
+            m[0]['content'], encoding='utf-8', newline=''
+        )
+        "
+    """
     expected = (_FIXTURES / "qualify_system.txt").read_text(encoding="utf-8")
     messages = build_prompt(
         text="dummy",
