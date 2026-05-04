@@ -13,7 +13,7 @@ class FieldSpec(BaseModel):
     @field_validator("name")
     @classmethod
     def _name_pattern(cls, v: str) -> str:
-        if not _FIELD_NAME_RE.match(v):
+        if not _FIELD_NAME_RE.fullmatch(v):
             raise ValueError(
                 f"invalid field name {v!r} — must match {_FIELD_NAME_RE.pattern}"
             )

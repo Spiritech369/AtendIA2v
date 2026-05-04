@@ -74,6 +74,10 @@ def test_field_spec_from_dict():
 
 
 def test_field_spec_rejects_invalid_name():
-    import pytest
     with pytest.raises(ValueError):
         FieldSpec.model_validate({"name": "BadName!", "description": ""})
+
+
+def test_field_spec_rejects_trailing_newline():
+    with pytest.raises(ValueError):
+        FieldSpec.model_validate("ciudad\n")
