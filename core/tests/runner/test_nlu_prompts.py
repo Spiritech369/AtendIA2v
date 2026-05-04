@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from atendia.contracts.pipeline_definition import FieldSpec
@@ -5,6 +7,8 @@ from atendia.runner.nlu_prompts import (
     HISTORY_FORMAT, OUTPUT_INSTRUCTIONS, ROLE_LABELS,
     SYSTEM_PROMPT_TEMPLATE, build_prompt, render_template,
 )
+
+_FIXTURES = Path(__file__).parent.parent / "fixtures" / "nlu"
 
 
 def test_render_substitutes_placeholders():
@@ -112,3 +116,18 @@ def test_build_prompt_field_with_empty_description_renders_placeholder():
         optional_fields=[], history=[],
     )
     assert "ciudad: (sin descripción)" in messages[0]["content"]
+
+
+def test_system_prompt_snapshot_qualify():
+    expected = (_FIXTURES / "qualify_system.txt").read_text(encoding="utf-8")
+    messages = build_prompt(
+        text="dummy",
+        current_stage="qualify",
+        required_fields=[
+            FieldSpec(name="interes_producto", description="Modelo de moto"),
+            FieldSpec(name="ciudad", description="Ciudad del cliente"),
+        ],
+        optional_fields=[FieldSpec(name="nombre", description="Nombre del cliente")],
+        history=[],
+    )
+    assert messages[0]["content"] == expected
