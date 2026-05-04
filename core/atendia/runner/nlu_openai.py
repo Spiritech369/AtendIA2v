@@ -13,18 +13,50 @@ from atendia.runner.nlu_prompts import build_prompt
 from atendia.runner.nlu_protocol import UsageMetadata
 
 
+_ANY_VALUE_SCHEMA = {
+    "anyOf": [
+        {"type": "string"},
+        {"type": "number"},
+        {"type": "integer"},
+        {"type": "boolean"},
+        {"type": "null"},
+    ]
+}
+
+
+def _is_typed(node: dict) -> bool:
+    """Return True if a property schema declares a type or a discriminator."""
+    return any(k in node for k in ("type", "$ref", "anyOf", "oneOf", "allOf", "enum"))
+
+
 def _build_json_schema() -> dict:
     """Strict JSON schema for OpenAI structured outputs.
 
-    OpenAI requires `additionalProperties: false` on every nested object.
-    Pydantic doesn't add it by default, so we recurse and inject it.
+    OpenAI requires:
+    - additionalProperties: false on every object.
+    - required must list every property key.
+    - every leaf must declare a type (no untyped Any).
     """
     schema = NLUResult.model_json_schema()
 
     def _walk(node):
         if isinstance(node, dict):
+            # Patch untyped properties (e.g., ExtractedField.value: Any)
+            props = node.get("properties")
+            if isinstance(props, dict):
+                for k, v in list(props.items()):
+                    if isinstance(v, dict) and not _is_typed(v):
+                        # Preserve title if present, replace body with the union
+                        title = v.get("title")
+                        replacement = dict(_ANY_VALUE_SCHEMA)
+                        if title:
+                            replacement["title"] = title
+                        props[k] = replacement
+            # Strict-mode object hygiene
             if node.get("type") == "object":
-                node.setdefault("additionalProperties", False)
+                node["additionalProperties"] = False
+                if isinstance(props, dict):
+                    node["required"] = list(props.keys())
             for v in node.values():
                 _walk(v)
         elif isinstance(node, list):
