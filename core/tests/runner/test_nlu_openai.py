@@ -184,3 +184,117 @@ async def test_classify_drops_null_entity_values_before_validation():
     assert "presupuesto_max" not in result.entities
     assert result.entities["interes_producto"].value == "150Z"
     assert usage is not None
+
+
+@respx.mock
+async def test_classify_retries_on_503_then_succeeds():
+    """T16: transient error gets retried; 2nd attempt succeeds."""
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        side_effect=[
+            Response(503, json={"error": {"message": "boom"}}),
+            _ok_response(),
+        ]
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(50,))
+    result, usage = await nlu.classify(
+        text="hola", current_stage="greeting",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert route.call_count == 2
+    assert result.intent == Intent.ASK_INFO  # default in _ok_response
+    assert usage is not None
+    assert usage.cost_usd > Decimal("0")
+
+
+@respx.mock
+async def test_classify_returns_unclear_when_all_retries_fail():
+    """T17: exhausted retries -> unclear with nlu_error ambiguity."""
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(503, json={"error": {"message": "down"}})
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, usage = await nlu.classify(
+        text="hola", current_stage="greeting",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert result.intent == Intent.UNCLEAR
+    assert result.confidence == 0.0
+    assert any(a.startswith("nlu_error:InternalServerError") for a in result.ambiguities)
+    assert usage is not None
+    assert usage.tokens_in == 0
+    assert usage.cost_usd == Decimal("0")
+
+
+@respx.mock
+async def test_classify_retries_on_429_rate_limit():
+    """T17 (variant): RateLimitError is retried, not fail-fast."""
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(429, json={"error": {"message": "rate limit"}})
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, _ = await nlu.classify(
+        text="x", current_stage="x",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert result.intent == Intent.UNCLEAR
+    assert any("RateLimitError" in a for a in result.ambiguities)
+
+
+@respx.mock
+async def test_classify_does_not_retry_on_401():
+    """T18: AuthenticationError fails fast - no retry."""
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(401, json={"error": {"message": "bad key"}})
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, _ = await nlu.classify(
+        text="x", current_stage="x",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert route.call_count == 1
+    assert result.intent == Intent.UNCLEAR
+    assert any("AuthenticationError" in a for a in result.ambiguities)
+
+
+@respx.mock
+async def test_classify_does_not_retry_on_400():
+    """T18: BadRequestError fails fast - no retry."""
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(400, json={"error": {"message": "bad schema"}})
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, _ = await nlu.classify(
+        text="x", current_stage="x",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert route.call_count == 1
+    assert any("BadRequestError" in a for a in result.ambiguities)
+
+
+@respx.mock
+async def test_classify_treats_malformed_json_as_validation_error():
+    """T19: a 200 with content that doesn't satisfy NLUResult triggers retry; exhaustion -> unclear."""
+    bad = Response(
+        200,
+        json={
+            "id": "x", "object": "chat.completion", "created": 0,
+            "model": "gpt-4o-mini",
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": '{"intent": "FAKE"}'},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+    )
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        side_effect=[bad, bad, bad]
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, _ = await nlu.classify(
+        text="x", current_stage="x",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert route.call_count == 3
+    assert result.intent == Intent.UNCLEAR
+    assert any("ValidationError" in a for a in result.ambiguities)

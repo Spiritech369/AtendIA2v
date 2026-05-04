@@ -1,13 +1,24 @@
 """OpenAI gpt-4o-mini classifier with structured outputs.
 
-T15 implements only the happy path. T16+ adds retries and error handling.
+T15: happy path. T16+: retries and error handling.
 """
+import asyncio
 import json
 import time
+from decimal import Decimal
 
-from openai import AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    InternalServerError,
+    RateLimitError,
+)
+from pydantic import ValidationError
 
-from atendia.contracts.nlu_result import NLUResult
+from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.nlu.pricing import compute_cost
 from atendia.runner.nlu_prompts import build_prompt
@@ -83,8 +94,18 @@ def _build_strict_schema(field_names: list[str]) -> dict:
     return {"name": "nlu_result", "strict": True, "schema": schema}
 
 
+_RETRIABLE = (
+    APITimeoutError,
+    APIConnectionError,
+    RateLimitError,
+    InternalServerError,
+    ValidationError,
+)
+_NON_RETRIABLE = (AuthenticationError, BadRequestError)
+
+
 class OpenAINLU:
-    """gpt-4o-mini classifier with strict structured outputs (no retry yet — T16)."""
+    """gpt-4o-mini classifier with strict structured outputs and retry."""
 
     def __init__(
         self,
@@ -92,9 +113,11 @@ class OpenAINLU:
         api_key: str,
         model: str = "gpt-4o-mini",
         timeout_s: float = 8.0,
+        retry_delays_ms: tuple[int, ...] = (500, 2000),
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key, max_retries=0, timeout=timeout_s)
         self._model = model
+        self._delays = (0, *retry_delays_ms)
 
     async def classify(
         self,
@@ -116,25 +139,58 @@ class OpenAINLU:
         json_schema = _build_strict_schema(field_names)
 
         t0 = time.perf_counter()
-        resp = await self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            response_format={"type": "json_schema", "json_schema": json_schema},
-            temperature=0,
+        last_exc: Exception | None = None
+
+        for delay_ms in self._delays:
+            if delay_ms:
+                await asyncio.sleep(delay_ms / 1000)
+            try:
+                resp = await self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,
+                    response_format={"type": "json_schema", "json_schema": json_schema},
+                    temperature=0,
+                )
+                raw = json.loads(resp.choices[0].message.content)
+                # OpenAI strict mode requires every entity field as a key with anyOf [..., null].
+                # Drop nulls before validating against the narrower NLUResult contract.
+                if isinstance(raw.get("entities"), dict):
+                    raw["entities"] = {k: v for k, v in raw["entities"].items() if v is not None}
+                result = NLUResult.model_validate(raw)
+                usage = UsageMetadata(
+                    model=resp.model,
+                    tokens_in=resp.usage.prompt_tokens,
+                    tokens_out=resp.usage.completion_tokens,
+                    cost_usd=compute_cost(
+                        resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                    ),
+                    latency_ms=int((time.perf_counter() - t0) * 1000),
+                )
+                return result, usage
+            except _NON_RETRIABLE as e:
+                last_exc = e
+                break
+            except _RETRIABLE as e:
+                last_exc = e
+                continue
+
+        return self._error_result(last_exc), self._zero_usage(t0)
+
+    def _error_result(self, exc: Exception | None) -> NLUResult:
+        name = type(exc).__name__ if exc else "Unknown"
+        return NLUResult(
+            intent=Intent.UNCLEAR,
+            entities={},
+            sentiment=Sentiment.NEUTRAL,
+            confidence=0.0,
+            ambiguities=[f"nlu_error:{name}"],
         )
-        raw = json.loads(resp.choices[0].message.content)
-        # OpenAI strict mode requires every entity field as a key with anyOf [..., null].
-        # Drop nulls before validating against the narrower NLUResult contract.
-        if isinstance(raw.get("entities"), dict):
-            raw["entities"] = {k: v for k, v in raw["entities"].items() if v is not None}
-        result = NLUResult.model_validate(raw)
-        usage = UsageMetadata(
-            model=resp.model,
-            tokens_in=resp.usage.prompt_tokens,
-            tokens_out=resp.usage.completion_tokens,
-            cost_usd=compute_cost(
-                resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens
-            ),
+
+    def _zero_usage(self, t0: float) -> UsageMetadata:
+        return UsageMetadata(
+            model=self._model,
+            tokens_in=0,
+            tokens_out=0,
+            cost_usd=Decimal("0"),
             latency_ms=int((time.perf_counter() - t0) * 1000),
         )
-        return result, usage
