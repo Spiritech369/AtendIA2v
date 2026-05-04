@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from atendia.contracts.pipeline_definition import (
+    FieldSpec,
     PipelineDefinition,
     StageDefinition,
     Transition,
@@ -58,3 +59,21 @@ def test_transition_to_unknown_stage_raises():
             tone={},
             fallback="escalate_to_human",
         )
+
+
+def test_field_spec_from_string():
+    f = FieldSpec.model_validate("ciudad")
+    assert f.name == "ciudad"
+    assert f.description == ""
+
+
+def test_field_spec_from_dict():
+    f = FieldSpec.model_validate({"name": "ciudad", "description": "Ciudad del cliente"})
+    assert f.name == "ciudad"
+    assert f.description == "Ciudad del cliente"
+
+
+def test_field_spec_rejects_invalid_name():
+    import pytest
+    with pytest.raises(ValueError):
+        FieldSpec.model_validate({"name": "BadName!", "description": ""})

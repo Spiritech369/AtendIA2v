@@ -1,4 +1,30 @@
-from pydantic import BaseModel, Field, model_validator
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+_FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+class FieldSpec(BaseModel):
+    name: str
+    description: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _name_pattern(cls, v: str) -> str:
+        if not _FIELD_NAME_RE.match(v):
+            raise ValueError(
+                f"invalid field name {v!r} — must match {_FIELD_NAME_RE.pattern}"
+            )
+        return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_string(cls, data):
+        if isinstance(data, str):
+            return {"name": data, "description": ""}
+        return data
 
 
 class Transition(BaseModel):
