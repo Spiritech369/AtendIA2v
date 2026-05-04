@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from openai import (
     APIConnectionError,
+    APIStatusError,
     APITimeoutError,
     AsyncOpenAI,
     AuthenticationError,
@@ -99,9 +100,13 @@ _RETRIABLE = (
     APIConnectionError,
     RateLimitError,
     InternalServerError,
-    ValidationError,
 )
-_NON_RETRIABLE = (AuthenticationError, BadRequestError)
+_NON_RETRIABLE = (
+    AuthenticationError,
+    BadRequestError,
+    ValidationError,
+    APIStatusError,  # catchall for 403/404/409/422 etc; specific subclasses above are documentation
+)
 
 
 class OpenAINLU:
@@ -167,12 +172,12 @@ class OpenAINLU:
                     latency_ms=int((time.perf_counter() - t0) * 1000),
                 )
                 return result, usage
-            except _NON_RETRIABLE as e:
-                last_exc = e
-                break
             except _RETRIABLE as e:
                 last_exc = e
                 continue
+            except _NON_RETRIABLE as e:
+                last_exc = e
+                break
 
         return self._error_result(last_exc), self._zero_usage(t0)
 

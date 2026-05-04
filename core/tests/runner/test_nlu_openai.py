@@ -273,7 +273,8 @@ async def test_classify_does_not_retry_on_400():
 
 @respx.mock
 async def test_classify_treats_malformed_json_as_validation_error():
-    """T19: a 200 with content that doesn't satisfy NLUResult triggers retry; exhaustion -> unclear."""
+    """Malformed structured-output JSON is non-retriable (temperature=0 -> identical retry = waste).
+    Single attempt, fail fast, fall back to unclear."""
     bad = Response(
         200,
         json={
@@ -288,13 +289,31 @@ async def test_classify_treats_malformed_json_as_validation_error():
         }
     )
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        side_effect=[bad, bad, bad]
+        return_value=bad
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
         text="x", current_stage="x",
         required_fields=[], optional_fields=[], history=[],
     )
-    assert route.call_count == 3
+    assert route.call_count == 1
     assert result.intent == Intent.UNCLEAR
     assert any("ValidationError" in a for a in result.ambiguities)
+
+
+@respx.mock
+async def test_classify_does_not_retry_on_422_unprocessable():
+    """T16-19 fix: APIStatusError catchall covers unmapped statuses (e.g., 422)."""
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(422, json={"error": {"message": "unprocessable"}})
+    )
+    nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
+    result, _ = await nlu.classify(
+        text="x", current_stage="x",
+        required_fields=[], optional_fields=[], history=[],
+    )
+    assert route.call_count == 1
+    assert result.intent == Intent.UNCLEAR
+    # The class name will be UnprocessableEntityError (or similar APIStatusError subclass)
+    # — assert ambiguity tag is well-formed and starts with the expected prefix.
+    assert any(a.startswith("nlu_error:") for a in result.ambiguities)
