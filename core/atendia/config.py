@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,11 @@ class Settings(BaseSettings):
     meta_access_token: str = Field(default="")
     meta_api_version: str = Field(default="v21.0")
     meta_base_url: str = Field(default="https://graph.facebook.com")
+    openai_api_key: str = Field(default="")
+    nlu_model: str = Field(default="gpt-4o-mini")
+    nlu_provider: Literal["openai", "keyword"] = Field(default="keyword")
+    nlu_timeout_s: float = Field(default=8.0)
+    nlu_retry_delays_ms: list[int] = Field(default_factory=lambda: [500, 2000])
 
 
 @lru_cache
