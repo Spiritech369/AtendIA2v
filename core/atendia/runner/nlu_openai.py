@@ -29,30 +29,45 @@ def _is_typed(node: dict) -> bool:
     return any(k in node for k in ("type", "$ref", "anyOf", "oneOf", "allOf", "enum"))
 
 
-def _build_json_schema() -> dict:
-    """Strict JSON schema for OpenAI structured outputs.
+def _entities_schema(field_names: list[str]) -> dict:
+    """Build the strict-mode-compliant `entities` object schema.
 
-    OpenAI requires:
-    - additionalProperties: false on every object.
-    - required must list every property key.
-    - every leaf must declare a type (no untyped Any).
+    OpenAI strict mode rejects open-ended `additionalProperties: <schema>`.
+    We list every extractable field by name; each is `anyOf [ExtractedField, null]`
+    so the LLM can omit a value while still satisfying `required`.
+    """
+    return {
+        "type": "object",
+        "properties": {
+            name: {"anyOf": [{"$ref": "#/$defs/ExtractedField"}, {"type": "null"}]}
+            for name in field_names
+        },
+        "required": list(field_names),
+        "additionalProperties": False,
+    }
+
+
+def _build_strict_schema(field_names: list[str]) -> dict:
+    """Generate a per-call JSON schema for OpenAI strict structured outputs.
+
+    The returned dict is the value of `response_format.json_schema`.
     """
     schema = NLUResult.model_json_schema()
 
+    # Override `entities` with a strict-mode-compatible explicit object.
+    schema["properties"]["entities"] = _entities_schema(field_names)
+
     def _walk(node):
         if isinstance(node, dict):
-            # Patch untyped properties (e.g., ExtractedField.value: Any)
             props = node.get("properties")
             if isinstance(props, dict):
                 for k, v in list(props.items()):
                     if isinstance(v, dict) and not _is_typed(v):
-                        # Preserve title if present, replace body with the union
                         title = v.get("title")
                         replacement = dict(_ANY_VALUE_SCHEMA)
                         if title:
                             replacement["title"] = title
                         props[k] = replacement
-            # Strict-mode object hygiene
             if node.get("type") == "object":
                 node["additionalProperties"] = False
                 if isinstance(props, dict):
@@ -67,11 +82,8 @@ def _build_json_schema() -> dict:
     return {"name": "nlu_result", "strict": True, "schema": schema}
 
 
-_NLU_JSON_SCHEMA = _build_json_schema()
-
-
 class OpenAINLU:
-    """gpt-4o-mini classifier with structured outputs (no retry yet — T16)."""
+    """gpt-4o-mini classifier with strict structured outputs (no retry yet — T16)."""
 
     def __init__(
         self,
@@ -99,11 +111,14 @@ class OpenAINLU:
             optional_fields=optional_fields,
             history=history,
         )
+        field_names = [f.name for f in required_fields] + [f.name for f in optional_fields]
+        json_schema = _build_strict_schema(field_names)
+
         t0 = time.perf_counter()
         resp = await self._client.chat.completions.create(
             model=self._model,
             messages=messages,
-            response_format={"type": "json_schema", "json_schema": _NLU_JSON_SCHEMA},
+            response_format={"type": "json_schema", "json_schema": json_schema},
             temperature=0,
         )
         result = NLUResult.model_validate_json(resp.choices[0].message.content)

@@ -71,7 +71,9 @@ async def test_classify_happy_path_returns_result_and_usage():
 
 def test_strict_schema_required_matches_properties():
     """OpenAI strict mode requires `required` to list every key in `properties`."""
-    from atendia.runner.nlu_openai import _NLU_JSON_SCHEMA
+    from atendia.runner.nlu_openai import _build_strict_schema
+
+    schema = _build_strict_schema(["ciudad", "interes_producto"])
 
     def check_object(node):
         if not isinstance(node, dict):
@@ -80,20 +82,22 @@ def test_strict_schema_required_matches_properties():
             props = node.get("properties", {})
             req = node.get("required", [])
             assert set(req) == set(props.keys()), (
-                f"required {sorted(req)} != properties {sorted(props.keys())} on {node.get('title', '<unnamed>')}"
+                f"required {sorted(req)} != properties {sorted(props.keys())} "
+                f"on {node.get('title', '<unnamed>')}"
             )
-            assert node.get("additionalProperties") is False, (
-                f"object missing additionalProperties: false on {node.get('title', '<unnamed>')}"
-            )
-        for v in node.values() if isinstance(node, dict) else []:
-            check_object(v)
+            assert node.get("additionalProperties") is False
+        if isinstance(node, dict):
+            for v in node.values():
+                check_object(v)
 
-    check_object(_NLU_JSON_SCHEMA["schema"])
+    check_object(schema["schema"])
 
 
 def test_strict_schema_all_leaves_have_type():
-    """No untyped Any-leaves (OpenAI strict mode rejects {'title': 'X'} with no type)."""
-    from atendia.runner.nlu_openai import _NLU_JSON_SCHEMA
+    """No untyped Any-leaves."""
+    from atendia.runner.nlu_openai import _build_strict_schema
+
+    schema = _build_strict_schema(["ciudad"])
 
     def check_typed(node, path="root"):
         if not isinstance(node, dict):
@@ -101,10 +105,11 @@ def test_strict_schema_all_leaves_have_type():
         if node.get("type") == "object":
             for k, v in node.get("properties", {}).items():
                 if isinstance(v, dict):
-                    has_disc = any(d in v for d in ("type", "$ref", "anyOf", "oneOf", "allOf", "enum"))
+                    has_disc = any(
+                        d in v for d in ("type", "$ref", "anyOf", "oneOf", "allOf", "enum")
+                    )
                     assert has_disc, f"{path}.{k} has no type discriminator: {v}"
                     check_typed(v, f"{path}.{k}")
-        # Walk all dict values in case of nested $defs etc.
         for k, v in node.items():
             if isinstance(v, dict):
                 check_typed(v, f"{path}/{k}")
@@ -112,4 +117,36 @@ def test_strict_schema_all_leaves_have_type():
                 for item in v:
                     check_typed(item, f"{path}/{k}[]")
 
-    check_typed(_NLU_JSON_SCHEMA["schema"])
+    check_typed(schema["schema"])
+
+
+def test_entities_schema_has_one_property_per_field():
+    from atendia.runner.nlu_openai import _build_strict_schema
+
+    schema = _build_strict_schema(["ciudad", "interes_producto", "nombre"])
+    entities = schema["schema"]["properties"]["entities"]
+    assert set(entities["properties"].keys()) == {"ciudad", "interes_producto", "nombre"}
+    assert set(entities["required"]) == {"ciudad", "interes_producto", "nombre"}
+    assert entities["additionalProperties"] is False
+
+
+def test_entities_schema_each_field_is_nullable_extractedfield():
+    from atendia.runner.nlu_openai import _build_strict_schema
+
+    schema = _build_strict_schema(["ciudad"])
+    field_schema = schema["schema"]["properties"]["entities"]["properties"]["ciudad"]
+    types = field_schema["anyOf"]
+    has_ref = any(t.get("$ref") == "#/$defs/ExtractedField" for t in types)
+    has_null = any(t.get("type") == "null" for t in types)
+    assert has_ref and has_null
+
+
+def test_entities_schema_with_no_fields():
+    from atendia.runner.nlu_openai import _build_strict_schema
+
+    schema = _build_strict_schema([])
+    entities = schema["schema"]["properties"]["entities"]
+    assert entities["type"] == "object"
+    assert entities["properties"] == {}
+    assert entities["required"] == []
+    assert entities["additionalProperties"] is False
