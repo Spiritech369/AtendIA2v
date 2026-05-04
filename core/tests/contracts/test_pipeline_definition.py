@@ -129,3 +129,23 @@ def test_pipeline_default_nlu_block():
         "fallback": "x",
     })
     assert p.nlu.history_turns == 2
+
+
+def test_stage_default_optional_fields_is_empty():
+    s = StageDefinition.model_validate({
+        "id": "qualify",
+        "actions_allowed": [],
+        "transitions": [],
+    })
+    assert s.optional_fields == []
+
+
+def test_stage_rejects_field_in_both_required_and_optional():
+    with pytest.raises(ValidationError):
+        StageDefinition.model_validate({
+            "id": "qualify",
+            "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
+            "optional_fields": ["ciudad"],
+            "actions_allowed": [],
+            "transitions": [],
+        })

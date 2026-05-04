@@ -45,6 +45,17 @@ class StageDefinition(BaseModel):
     timeout_hours: int | None = None
     timeout_action: str | None = None
 
+    @model_validator(mode="after")
+    def _no_duplicate_field_names(self) -> "StageDefinition":
+        req = {f.name for f in self.required_fields}
+        opt = {f.name for f in self.optional_fields}
+        overlap = req & opt
+        if overlap:
+            raise ValueError(
+                f"fields appear in both required and optional: {sorted(overlap)}"
+            )
+        return self
+
 
 class PipelineDefinition(BaseModel):
     version: int = Field(ge=1)
