@@ -27,6 +27,10 @@ class FieldSpec(BaseModel):
         return data
 
 
+class NLUConfig(BaseModel):
+    history_turns: int = Field(default=2, ge=0, le=10)
+
+
 class Transition(BaseModel):
     to: str
     when: str
@@ -34,7 +38,8 @@ class Transition(BaseModel):
 
 class StageDefinition(BaseModel):
     id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
-    required_fields: list[str] = Field(default_factory=list)
+    required_fields: list[FieldSpec] = Field(default_factory=list)
+    optional_fields: list[FieldSpec] = Field(default_factory=list)
     actions_allowed: list[str] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
     timeout_hours: int | None = None
@@ -43,6 +48,7 @@ class StageDefinition(BaseModel):
 
 class PipelineDefinition(BaseModel):
     version: int = Field(ge=1)
+    nlu: NLUConfig = Field(default_factory=NLUConfig)
     stages: list[StageDefinition] = Field(min_length=1)
     tone: dict
     fallback: str

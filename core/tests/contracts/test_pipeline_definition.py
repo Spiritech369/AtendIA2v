@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from atendia.contracts.pipeline_definition import (
     FieldSpec,
+    NLUConfig,
     PipelineDefinition,
     StageDefinition,
     Transition,
@@ -29,7 +30,7 @@ def test_pipeline_minimal_valid():
         fallback="escalate_to_human",
     )
     assert p.stages[0].id == "greeting"
-    assert p.stages[1].required_fields == ["interes_producto", "ciudad"]
+    assert [f.name for f in p.stages[1].required_fields] == ["interes_producto", "ciudad"]
 
 
 def test_pipeline_duplicate_stage_id_raises():
@@ -81,3 +82,50 @@ def test_field_spec_rejects_invalid_name():
 def test_field_spec_rejects_trailing_newline():
     with pytest.raises(ValueError):
         FieldSpec.model_validate("ciudad\n")
+
+
+def test_nlu_config_defaults():
+    cfg = NLUConfig()
+    assert cfg.history_turns == 2
+
+
+def test_nlu_config_validates_range():
+    with pytest.raises(ValidationError):
+        NLUConfig(history_turns=11)
+    with pytest.raises(ValidationError):
+        NLUConfig(history_turns=-1)
+
+
+def test_stage_with_optional_fields_and_field_specs():
+    s = StageDefinition.model_validate({
+        "id": "qualify",
+        "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
+        "optional_fields": ["nombre"],
+        "actions_allowed": ["ask_field"],
+        "transitions": [],
+    })
+    assert s.required_fields[0].name == "ciudad"
+    assert s.required_fields[0].description == "Ciudad"
+    assert s.optional_fields[0].name == "nombre"
+    assert s.optional_fields[0].description == ""
+
+
+def test_pipeline_with_nlu_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "nlu": {"history_turns": 4},
+        "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
+        "tone": {},
+        "fallback": "x",
+    })
+    assert p.nlu.history_turns == 4
+
+
+def test_pipeline_default_nlu_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
+        "tone": {},
+        "fallback": "x",
+    })
+    assert p.nlu.history_turns == 2
