@@ -95,6 +95,7 @@ class ConversationRunner:
             pending_confirmation=pending_confirmation,
         )
 
+        # TODO(T20): replace with `await self._nlu.classify(...)` per NLUProvider Protocol.
         nlu = self._nlu.next()
 
         decision = process_turn(pipeline, state_obj, nlu, turn_number)

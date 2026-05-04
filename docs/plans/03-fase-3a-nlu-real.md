@@ -916,7 +916,7 @@ Expected: PASS.
 cd core && uv run pytest -x -q
 ```
 
-Si algún test consume `CannedNLU.next()`, actualizarlo a `await classify(...)`. Si rompe `ConversationRunner`, **se arregla en Task 13** — por ahora dejarlo roto si solo afecta a la integración del runner.
+Si algún test consume `CannedNLU.next()`, actualizarlo a `await classify(...)`. Si rompe `ConversationRunner`, **se arregla en Task 20** (T13 es `build_prompt`, no el refactor del runner) — por ahora dejarlo roto si solo afecta a la integración del runner.
 
 **Step 6: Commit**
 
