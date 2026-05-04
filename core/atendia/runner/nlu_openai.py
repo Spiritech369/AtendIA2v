@@ -2,6 +2,7 @@
 
 T15 implements only the happy path. T16+ adds retries and error handling.
 """
+import json
 import time
 
 from openai import AsyncOpenAI
@@ -121,7 +122,12 @@ class OpenAINLU:
             response_format={"type": "json_schema", "json_schema": json_schema},
             temperature=0,
         )
-        result = NLUResult.model_validate_json(resp.choices[0].message.content)
+        raw = json.loads(resp.choices[0].message.content)
+        # OpenAI strict mode requires every entity field as a key with anyOf [..., null].
+        # Drop nulls before validating against the narrower NLUResult contract.
+        if isinstance(raw.get("entities"), dict):
+            raw["entities"] = {k: v for k, v in raw["entities"].items() if v is not None}
+        result = NLUResult.model_validate(raw)
         usage = UsageMetadata(
             model=resp.model,
             tokens_in=resp.usage.prompt_tokens,

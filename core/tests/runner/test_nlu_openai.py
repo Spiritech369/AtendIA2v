@@ -150,3 +150,37 @@ def test_entities_schema_with_no_fields():
     assert entities["properties"] == {}
     assert entities["required"] == []
     assert entities["additionalProperties"] is False
+
+
+@respx.mock
+async def test_classify_drops_null_entity_values_before_validation():
+    """OpenAI strict mode emits `null` for fields the LLM can't extract.
+    Adapter must drop these nulls before NLUResult.model_validate to avoid
+    a Pydantic ValidationError."""
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=_ok_response(
+            intent="ask_info",
+            entities={
+                "interes_producto": {"value": "150Z", "confidence": 0.9, "source_turn": 0},
+                "ciudad": None,  # LLM had nothing — strict-mode-forced null
+                "presupuesto_max": None,  # ditto
+            },
+        )
+    )
+    nlu = OpenAINLU(api_key="sk-test")
+    result, usage = await nlu.classify(
+        text="me interesa la 150Z",
+        current_stage="qualify",
+        required_fields=[
+            FieldSpec(name="interes_producto", description="Modelo"),
+            FieldSpec(name="ciudad", description="Ciudad"),
+        ],
+        optional_fields=[FieldSpec(name="presupuesto_max", description="Tope")],
+        history=[],
+    )
+    # Only the non-null entity survives.
+    assert "interes_producto" in result.entities
+    assert "ciudad" not in result.entities
+    assert "presupuesto_max" not in result.entities
+    assert result.entities["interes_producto"].value == "150Z"
+    assert usage is not None
