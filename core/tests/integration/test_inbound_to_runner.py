@@ -2,9 +2,12 @@ import asyncio
 import hashlib
 import hmac
 import json
+from decimal import Decimal
 
 import pytest
+import respx
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -182,3 +185,147 @@ def test_subsequent_inbound_advances_turn_number(setup_tenant_with_pipeline):
     assert traces[1][0] == 2
     # ask_info intent should transition greeting→qualify
     assert traces[1][1]["current_stage"] == "qualify"
+
+
+def _ok_openai_response(intent="ask_info", entities=None, confidence=0.9,
+                        sentiment="neutral", ambiguities=None,
+                        model="gpt-4o-mini", tokens_in=480, tokens_out=80):
+    """Helper: build a canonical OpenAI chat completion response."""
+    payload = {
+        "intent": intent,
+        "entities": entities or {},
+        "confidence": confidence,
+        "sentiment": sentiment,
+        "ambiguities": ambiguities or [],
+    }
+    return Response(
+        200,
+        json={
+            "id": "chatcmpl-int",
+            "object": "chat.completion",
+            "created": 0,
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": json.dumps(payload)},
+                "finish_reason": "stop",
+            }],
+            "usage": {
+                "prompt_tokens": tokens_in,
+                "completion_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        },
+    )
+
+
+def _read_latest_trace(tid):
+    async def _do():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            row = (await conn.execute(
+                text("""SELECT nlu_model, nlu_cost_usd, nlu_tokens_in, nlu_tokens_out, nlu_output
+                        FROM turn_traces WHERE tenant_id = :t
+                        ORDER BY created_at DESC LIMIT 1"""),
+                {"t": tid},
+            )).fetchone()
+        await engine.dispose()
+        return row
+    return asyncio.run(_do())
+
+
+def _read_latest_error_event(tid):
+    async def _do():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            row = (await conn.execute(
+                text("""SELECT payload FROM events
+                        WHERE tenant_id = :t AND type = 'error_occurred'
+                        ORDER BY created_at DESC LIMIT 1"""),
+                {"t": tid},
+            )).fetchone()
+        await engine.dispose()
+        return row
+    return asyncio.run(_do())
+
+
+@respx.mock
+def test_inbound_with_openai_nlu_mocked(monkeypatch, setup_tenant_with_pipeline):
+    """T22: full inbound flow with OpenAI mocked.
+
+    Asserts the resulting turn_trace has populated nlu_model + nlu_cost_usd."""
+    monkeypatch.setenv("ATENDIA_V2_NLU_PROVIDER", "openai")
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test")
+    get_settings.cache_clear()
+
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=_ok_openai_response(intent="ask_price")
+    )
+
+    tid = setup_tenant_with_pipeline
+    asyncio.run(_redis_clear_dedup("wamid.T22_OPENAI_OK"))
+
+    body = json.dumps(_payload("wamid.T22_OPENAI_OK", "cuánto cuesta la 150Z?")).encode()
+    sig = _sign(body)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/webhooks/meta/{tid}",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
+        )
+    assert resp.status_code == 200
+
+    row = _read_latest_trace(tid)
+    assert row is not None
+    nlu_model, cost, tin, tout, nlu_output = row
+    assert nlu_model == "gpt-4o-mini"
+    assert cost is not None and cost > 0
+    assert tin == 480
+    assert tout == 80
+    assert nlu_output["intent"] == "ask_price"
+
+
+@respx.mock
+def test_inbound_when_openai_fails_emits_error_event_and_clarification(
+    monkeypatch, setup_tenant_with_pipeline
+):
+    """T24: when OpenAI returns 503 on all retries, the runner falls back to
+    intent=unclear. The webhook should:
+      - Not crash (HTTP 200).
+      - Emit an ERROR_OCCURRED event with payload.where == 'nlu'.
+      - Persist a turn_trace row with cost = 0 and intent = unclear.
+    """
+    monkeypatch.setenv("ATENDIA_V2_NLU_PROVIDER", "openai")
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ATENDIA_V2_NLU_RETRY_DELAYS_MS", "[10,20]")
+    get_settings.cache_clear()
+
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=Response(503, json={"error": {"message": "down"}})
+    )
+
+    tid = setup_tenant_with_pipeline
+    asyncio.run(_redis_clear_dedup("wamid.T24_OPENAI_FAIL"))
+
+    body = json.dumps(_payload("wamid.T24_OPENAI_FAIL", "hola")).encode()
+    sig = _sign(body)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/webhooks/meta/{tid}",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
+        )
+    assert resp.status_code == 200
+
+    trace_row = _read_latest_trace(tid)
+    assert trace_row is not None
+    _model, cost, _tin, _tout, nlu_output = trace_row
+    assert cost == 0 or cost is None or cost == Decimal("0")
+    assert nlu_output["intent"] == "unclear"
+    assert any(a.startswith("nlu_error:") for a in nlu_output["ambiguities"])
+
+    event_row = _read_latest_error_event(tid)
+    assert event_row is not None
+    assert event_row[0]["where"] == "nlu"

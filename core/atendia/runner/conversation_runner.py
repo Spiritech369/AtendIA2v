@@ -117,6 +117,16 @@ class ConversationRunner:
             history=history,
         )
 
+        # Surface NLU-level errors as ERROR_OCCURRED events for observability.
+        nlu_errors = [a for a in nlu.ambiguities if a.startswith("nlu_error:")]
+        if nlu_errors:
+            await self._emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.ERROR_OCCURRED,
+                payload={"where": "nlu", "ambiguities": nlu_errors},
+            )
+
         decision = process_turn(pipeline, state_obj, nlu, turn_number)
 
         # Merge NLU entities into extracted_data (overwrite same keys)
