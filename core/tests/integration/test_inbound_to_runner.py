@@ -12,9 +12,6 @@ from atendia.config import get_settings
 from atendia.main import app
 
 
-pytestmark = pytest.mark.skip(reason="awaiting T23 factory + T20 runner refactor: meta_routes.py uses removed KeywordNLU.feed()/next()")
-
-
 APP_SECRET = "secret_for_t25_inb"
 
 
