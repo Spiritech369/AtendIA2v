@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -89,7 +89,7 @@ class ConversationRunner:
             current_stage=current_stage,
             extracted_data=state_obj_extracted,
             last_intent=last_intent,
-            stage_entered_at=stage_entered_at or datetime.now(timezone.utc),
+            stage_entered_at=stage_entered_at or datetime.now(UTC),
             followups_sent_count=followups_sent_count or 0,
             total_cost_usd=total_cost_usd or Decimal("0"),
             pending_confirmation=pending_confirmation,
@@ -141,7 +141,7 @@ class ConversationRunner:
         previous_stage = current_stage
         next_stage_id = decision.next_stage
         new_stage_entered_at = (
-            datetime.now(timezone.utc)
+            datetime.now(UTC)
             if next_stage_id != previous_stage
             else stage_entered_at
         )

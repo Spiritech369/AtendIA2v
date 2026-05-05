@@ -12,7 +12,6 @@ import re
 
 from atendia.contracts.pipeline_definition import FieldSpec
 
-
 # ============================================================
 # 1. SYSTEM PROMPT — instrucciones generales
 # ============================================================

@@ -25,7 +25,6 @@ from atendia.runner.nlu.pricing import compute_cost
 from atendia.runner.nlu_prompts import build_prompt
 from atendia.runner.nlu_protocol import UsageMetadata
 
-
 _ANY_VALUE_SCHEMA = {
     "anyOf": [
         {"type": "string"},
@@ -150,7 +149,7 @@ class OpenAINLU:
             if delay_ms:
                 await asyncio.sleep(delay_ms / 1000)
             try:
-                resp = await self._client.chat.completions.create(
+                resp = await self._client.chat.completions.create(  # type: ignore[call-overload]
                     model=self._model,
                     messages=messages,
                     response_format={"type": "json_schema", "json_schema": json_schema},
