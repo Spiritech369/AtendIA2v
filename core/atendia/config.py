@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     nlu_provider: Literal["openai", "keyword"] = Field(default="keyword")
     nlu_timeout_s: float = Field(default=8.0)
     nlu_retry_delays_ms: list[int] = Field(default_factory=lambda: [500, 2000])
+    composer_provider: Literal["openai", "canned"] = Field(default="canned")
+    composer_model: str = Field(default="gpt-4o")
+    composer_timeout_s: float = Field(default=8.0)
+    composer_retry_delays_ms: list[int] = Field(default_factory=lambda: [500, 2000])
+    composer_max_messages: int = Field(default=2, ge=1, le=3)
 
 
 @lru_cache
