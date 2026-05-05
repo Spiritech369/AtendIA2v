@@ -150,6 +150,15 @@ class ConversationRunner:
                 "cid": conversation_id,
             },
         )
+        # Accumulate per-turn LLM cost into conversation_state.total_cost_usd
+        # (skipped if the provider didn't produce usage metadata, e.g. KeywordNLU/CannedNLU).
+        if usage is not None and usage.cost_usd > 0:
+            await self._session.execute(
+                text("""UPDATE conversation_state
+                        SET total_cost_usd = total_cost_usd + :c
+                        WHERE conversation_id = :cid"""),
+                {"c": usage.cost_usd, "cid": conversation_id},
+            )
         await self._session.execute(
             text("UPDATE conversations SET current_stage = :s, last_activity_at = NOW() WHERE id = :cid"),
             {"s": next_stage_id, "cid": conversation_id},

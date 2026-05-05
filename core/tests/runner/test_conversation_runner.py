@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -7,8 +8,11 @@ import pytest
 from sqlalchemy import text
 
 from atendia.contracts.message import Message, MessageDirection
+from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
+from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
+from atendia.runner.nlu_protocol import UsageMetadata
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -121,6 +125,102 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
         {"c": conv_id},
     )).scalar()
     assert trace_count == 2
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+class _FakeNLUWithCost:
+    """Stub NLUProvider returning deterministic NLUResult + non-zero UsageMetadata.
+
+    Used to exercise the cost accumulation path in ConversationRunner: every
+    call to classify() yields the same cost_usd value, so a test running N
+    turns can assert total_cost_usd == N * cost_per_turn.
+    """
+
+    def __init__(self, cost: Decimal) -> None:
+        self._cost = cost
+
+    async def classify(
+        self,
+        *,
+        text: str,
+        current_stage: str,
+        required_fields: list[FieldSpec],
+        optional_fields: list[FieldSpec],
+        history: list[tuple[str, str]],
+    ) -> tuple[NLUResult, UsageMetadata | None]:
+        return (
+            NLUResult(
+                intent=Intent.GREETING,
+                sentiment=Sentiment.NEUTRAL,
+                confidence=0.95,
+            ),
+            UsageMetadata(
+                model="gpt-4o-mini",
+                tokens_in=100,
+                tokens_out=50,
+                cost_usd=self._cost,
+                latency_ms=200,
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_total_cost_accumulates_across_turns(db_session):
+    """Two consecutive turns with non-zero usage cost.
+
+    conversation_state.total_cost_usd should reflect the sum of all
+    UsageMetadata.cost_usd from the runner's turns.
+    """
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_cost")
+
+    nlu_provider = _FakeNLUWithCost(Decimal("0.000050"))
+    runner = ConversationRunner(db_session, nlu_provider)
+
+    # Turn 1
+    inbound1 = _make_inbound(conv_id, tid, "hola")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound1, turn_number=1,
+    )
+    await db_session.commit()
+
+    # Turn 2
+    inbound2 = _make_inbound(conv_id, tid, "qué tal")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound2, turn_number=2,
+    )
+    await db_session.commit()
+
+    total = (await db_session.execute(
+        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert total == Decimal("0.000100")
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_total_cost_not_modified_when_usage_is_none(db_session):
+    """CannedNLU returns usage=None — total_cost_usd must remain 0."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_no_cost")
+
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    total = (await db_session.execute(
+        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert total == Decimal("0")
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
