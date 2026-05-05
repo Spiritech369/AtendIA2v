@@ -120,7 +120,6 @@ def _count_arq_jobs():
     return asyncio.run(_do())
 
 
-@pytest.mark.skip(reason="awaiting T26 Composer wiring (Phase 3b T20 removed dispatch_outbound)")
 def test_inbound_greeting_enqueues_outbound_greet_text(setup_tenant):
     tid = setup_tenant
     asyncio.run(_redis_clear("wamid.T26_GREET"))

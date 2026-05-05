@@ -15,6 +15,9 @@ from atendia.channels.tenant_config import (
 )
 from atendia.config import get_settings
 from atendia.db.session import get_db_session
+from atendia.runner.composer_canned import CannedComposer
+from atendia.runner.composer_openai import OpenAIComposer
+from atendia.runner.composer_protocol import ComposerProvider
 from atendia.runner.nlu_keywords import KeywordNLU
 from atendia.runner.nlu_openai import OpenAINLU
 from atendia.runner.nlu_protocol import NLUProvider
@@ -37,6 +40,22 @@ def build_nlu(settings) -> NLUProvider:
             retry_delays_ms=tuple(settings.nlu_retry_delays_ms),
         )
     return KeywordNLU()
+
+
+def build_composer(settings) -> ComposerProvider:
+    """Construct the Composer provider based on settings.composer_provider.
+
+    "canned" -> CannedComposer (Phase 2 hardcoded text behavior, default fallback).
+    "openai" -> OpenAIComposer (gpt-4o real LLM). Requires openai_api_key.
+    """
+    if settings.composer_provider == "openai":
+        return OpenAIComposer(
+            api_key=settings.openai_api_key,
+            model=settings.composer_model,
+            timeout_s=settings.composer_timeout_s,
+            retry_delays_ms=tuple(settings.composer_retry_delays_ms),
+        )
+    return CannedComposer()
 
 
 @router.get("/webhooks/meta/{tenant_id}", response_class=PlainTextResponse)
@@ -217,8 +236,8 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
 
     settings = get_settings()
     nlu = build_nlu(settings)
-    from atendia.runner.composer_canned import CannedComposer
-    runner = ConversationRunner(session, nlu, CannedComposer())
+    composer = build_composer(settings)
+    runner = ConversationRunner(session, nlu, composer)
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),
         conversation_id=str(conv_id),
@@ -227,18 +246,20 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
         text=m.text or "",
         sent_at=_dt.now(_tz.utc),
     )
+
+    # Build an arq pool so the runner can enqueue outbound messages.
+    from arq.connections import RedisSettings, create_pool
+    arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
         trace = await runner.run_turn(
             conversation_id=conv_id,
             tenant_id=tenant_id,
             inbound=inbound_canonical,
             turn_number=next_turn,
+            arq_pool=arq_pool,
+            to_phone_e164=m.from_phone_e164,
         )
-        # TODO(T26): replaced by Composer + enqueue_messages.
-        # Phase 3b T20 removed dispatch/text_for_action from outbound_dispatcher;
-        # T26 will re-wire this block to call the Composer and then
-        # enqueue_messages(...) with the produced texts.
-        _ = trace  # silence unused-trace lint until T26 re-wires this
+        _ = trace  # silence unused-trace lint
     except Exception:
         # Don't crash the webhook handler if the runner fails — just log via event.
         # In production this would also bubble to monitoring.
@@ -249,6 +270,8 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             event_type=EventType.ERROR_OCCURRED,
             payload={"where": "conversation_runner", "message": "run_turn failed"},
         )
+    finally:
+        await arq_pool.aclose()
 
 
 async def _update_status(session: AsyncSession, r) -> None:
