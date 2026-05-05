@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from atendia.contracts.tone import Tone
 from atendia.runner.composer_prompts import (
     ACTION_GUIDANCE,

@@ -2,7 +2,6 @@
 import json
 from decimal import Decimal
 
-import pytest
 import respx
 from httpx import Response
 
@@ -87,7 +86,7 @@ async def test_compose_retries_on_503_then_succeeds():
         ]
     )
     composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(50,))
-    out, usage = await composer.compose(input=ComposerInput(
+    _out, usage = await composer.compose(input=ComposerInput(
         action="greet", current_stage="greeting", tone=Tone(),
     ))
     assert route.call_count == 2
@@ -123,7 +122,7 @@ async def test_compose_does_not_retry_on_401():
         return_value=Response(401, json={"error": {"message": "bad key"}})
     )
     composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
-    out, usage = await composer.compose(input=ComposerInput(
+    _out, usage = await composer.compose(input=ComposerInput(
         action="greet", current_stage="greeting", tone=Tone(),
     ))
     assert route.call_count == 1
@@ -164,7 +163,8 @@ async def test_compose_treats_malformed_json_as_validation_error():
         "model": "gpt-4o",
         "choices": [{
             "index": 0,
-            "message": {"role": "assistant", "content": '{"messages": []}'},  # empty list violates min_length
+            # empty list violates min_length
+            "message": {"role": "assistant", "content": '{"messages": []}'},
             "finish_reason": "stop",
         }],
         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},

@@ -10,7 +10,10 @@ from atendia.runner._openai_errors import _NON_RETRIABLE, _RETRIABLE
 from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.composer_prompts import build_composer_prompt
 from atendia.runner.composer_protocol import (
-    ComposerInput, ComposerOutput, ComposerProvider, UsageMetadata,
+    ComposerInput,
+    ComposerOutput,
+    ComposerProvider,
+    UsageMetadata,
 )
 from atendia.runner.nlu.pricing import compute_cost
 
@@ -59,13 +62,12 @@ class OpenAIComposer:
         messages = build_composer_prompt(input)
         json_schema = _composer_schema(input.max_messages)
         t0 = time.perf_counter()
-        last_exc: Exception | None = None
 
         for delay_ms in self._delays:
             if delay_ms:
                 await asyncio.sleep(delay_ms / 1000)
             try:
-                resp = await self._client.chat.completions.create(
+                resp = await self._client.chat.completions.create(  # type: ignore[call-overload]
                     model=self._model,
                     messages=messages,
                     response_format={"type": "json_schema", "json_schema": json_schema},
@@ -84,11 +86,9 @@ class OpenAIComposer:
                     fallback_used=False,
                 )
                 return output, usage
-            except _RETRIABLE as e:
-                last_exc = e
+            except _RETRIABLE:
                 continue
-            except _NON_RETRIABLE as e:
-                last_exc = e
+            except _NON_RETRIABLE:
                 break
 
         # Exhausted or non-retriable: fall back to canned, signal via fallback_used.

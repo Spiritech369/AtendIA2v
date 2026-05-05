@@ -10,7 +10,6 @@ from arq.connections import ArqRedis
 from atendia.channels.base import OutboundMessage
 from atendia.queue.enqueue import enqueue_outbound
 
-
 COMPOSED_ACTIONS: set[str] = {
     "greet", "ask_field", "lookup_faq", "ask_clarification",
     "quote", "explain_payment_options", "close",

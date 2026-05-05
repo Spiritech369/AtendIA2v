@@ -17,7 +17,6 @@ from atendia.runner._template_helpers import (
 )
 from atendia.runner.composer_protocol import ComposerInput
 
-
 # ============================================================
 # 1. SYSTEM PROMPT
 # ============================================================

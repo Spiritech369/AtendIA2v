@@ -1,5 +1,5 @@
 import time
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -253,7 +253,7 @@ class ConversationRunner:
         )).scalar()
         inside_24h = (
             last_activity_at is None
-            or (datetime.now(timezone.utc) - last_activity_at) < timedelta(hours=24)
+            or (datetime.now(UTC) - last_activity_at) < timedelta(hours=24)
         )
 
         composer_input: ComposerInput | None = None
@@ -346,7 +346,6 @@ class ConversationRunner:
 
         # Persist turn_trace
         latency_ms = int((time.perf_counter() - started) * 1000)
-        inbound_msg_uuid = _maybe_uuid(inbound.id)
         trace = TurnTrace(
             id=uuid4(),
             conversation_id=conversation_id,

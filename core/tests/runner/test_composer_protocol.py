@@ -3,7 +3,9 @@ from pydantic import ValidationError
 
 from atendia.contracts.tone import Tone
 from atendia.runner.composer_protocol import (
-    ComposerInput, ComposerOutput, ComposerProvider,
+    ComposerInput,
+    ComposerOutput,
+    ComposerProvider,
 )
 
 

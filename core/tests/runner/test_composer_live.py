@@ -16,7 +16,6 @@ from atendia.contracts.tone import Tone
 from atendia.runner.composer_openai import OpenAIComposer
 from atendia.runner.composer_protocol import ComposerInput
 
-
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LIVE_LLM_TESTS") != "1",
     reason="Set RUN_LIVE_LLM_TESTS=1 to run real OpenAI calls",
