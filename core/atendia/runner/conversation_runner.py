@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.contracts.event import EventType
 from atendia.contracts.message import Message
 from atendia.db.models import TurnTrace
-from atendia.runner.nlu_canned import CannedNLU
+from atendia.runner.nlu_protocol import NLUProvider
 from atendia.state_machine.event_emitter import EventEmitter
 from atendia.state_machine.orchestrator import process_turn
 from atendia.state_machine.pipeline_loader import load_active_pipeline
@@ -34,7 +34,7 @@ def _maybe_uuid(s: str) -> UUID | None:
 
 
 class ConversationRunner:
-    def __init__(self, session: AsyncSession, nlu_provider: CannedNLU) -> None:
+    def __init__(self, session: AsyncSession, nlu_provider: NLUProvider) -> None:
         self._session = session
         self._nlu = nlu_provider
         self._emitter = EventEmitter(session)
@@ -95,8 +95,27 @@ class ConversationRunner:
             pending_confirmation=pending_confirmation,
         )
 
-        # TODO(T20): replace with `await self._nlu.classify(...)` per NLUProvider Protocol.
-        nlu = self._nlu.next()
+        # Fetch the last N (inbound + outbound) messages for NLU context.
+        history_turns = pipeline.nlu.history_turns
+        history_rows = (await self._session.execute(
+            text("""SELECT direction, text FROM messages
+                    WHERE conversation_id = :cid
+                    ORDER BY sent_at DESC
+                    LIMIT :n"""),
+            {"cid": conversation_id, "n": history_turns * 2},
+        )).fetchall()
+        # Reverse so oldest is first; rows come back newest-first.
+        history: list[tuple[str, str]] = [(r[0], r[1]) for r in reversed(history_rows)]
+
+        current_stage_def = next(s for s in pipeline.stages if s.id == current_stage)
+
+        nlu, usage = await self._nlu.classify(
+            text=inbound.text,
+            current_stage=current_stage,
+            required_fields=current_stage_def.required_fields,
+            optional_fields=current_stage_def.optional_fields,
+            history=history,
+        )
 
         decision = process_turn(pipeline, state_obj, nlu, turn_number)
 
@@ -172,8 +191,13 @@ class ConversationRunner:
             turn_number=turn_number,
             inbound_message_id=None,  # phase 1: messages table not populated yet
             inbound_text=inbound.text,
-            nlu_input={"text": inbound.text},
+            nlu_input={"text": inbound.text, "history": history},
             nlu_output=_jsonable(nlu.model_dump(mode="json")),
+            nlu_model=usage.model if usage else None,
+            nlu_tokens_in=usage.tokens_in if usage else None,
+            nlu_tokens_out=usage.tokens_out if usage else None,
+            nlu_cost_usd=usage.cost_usd if usage else None,
+            nlu_latency_ms=usage.latency_ms if usage else None,
             state_before=_jsonable(state_before),
             state_after=_jsonable(state_after),
             stage_transition=(

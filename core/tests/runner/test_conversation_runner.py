@@ -74,7 +74,6 @@ def _make_inbound(conversation_id, tenant_id, txt: str) -> Message:
     )
 
 
-@pytest.mark.skip(reason="awaiting T20 runner refactor: CannedNLU.next() → await classify()")
 @pytest.mark.asyncio
 async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t37_main")
