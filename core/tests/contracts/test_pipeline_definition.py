@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from atendia.contracts.pipeline_definition import (
+    ComposerConfig,
     FieldSpec,
     NLUConfig,
     PipelineDefinition,
@@ -176,3 +177,34 @@ def test_pipeline_definition_ignores_legacy_tone_input():
     })
     assert "tone" not in PipelineDefinition.model_fields
     assert "tone" not in p.model_dump()  # legacy keys don't survive serialization
+
+
+def test_composer_config_defaults():
+    cfg = ComposerConfig()
+    assert cfg.history_turns == 2
+
+
+def test_composer_config_validates_range():
+    with pytest.raises(ValidationError):
+        ComposerConfig(history_turns=11)
+    with pytest.raises(ValidationError):
+        ComposerConfig(history_turns=-1)
+
+
+def test_pipeline_with_composer_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "composer": {"history_turns": 4},
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert p.composer.history_turns == 4
+
+
+def test_pipeline_default_composer_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert p.composer.history_turns == 2
