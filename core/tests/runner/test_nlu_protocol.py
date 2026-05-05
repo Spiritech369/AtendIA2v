@@ -54,3 +54,19 @@ def test_usage_metadata_rejects_negative_tokens():
     with pytest.raises(ValidationError):
         UsageMetadata(model="x", tokens_in=0, tokens_out=0,
                       cost_usd=Decimal("0"), latency_ms=-1)
+
+
+def test_usage_metadata_fallback_used_default_false():
+    u = UsageMetadata(
+        model="x", tokens_in=0, tokens_out=0,
+        cost_usd=Decimal("0"), latency_ms=0,
+    )
+    assert u.fallback_used is False
+
+
+def test_usage_metadata_negative_cost_rejected():
+    with pytest.raises(ValidationError):
+        UsageMetadata(
+            model="x", tokens_in=0, tokens_out=0,
+            cost_usd=Decimal("-0.01"), latency_ms=0,
+        )
