@@ -217,7 +217,8 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
 
     settings = get_settings()
     nlu = build_nlu(settings)
-    runner = ConversationRunner(session, nlu)
+    from atendia.runner.composer_canned import CannedComposer
+    runner = ConversationRunner(session, nlu, CannedComposer())
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),
         conversation_id=str(conv_id),

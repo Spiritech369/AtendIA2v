@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -10,6 +10,11 @@ from sqlalchemy import text
 from atendia.contracts.message import Message, MessageDirection
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
+from atendia.runner.composer_canned import CannedComposer
+from atendia.runner.composer_protocol import (
+    ComposerInput,
+    ComposerOutput,
+)
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
 from atendia.runner.nlu_protocol import UsageMetadata
@@ -83,7 +88,7 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t37_main")
 
     nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
-    runner = ConversationRunner(db_session, nlu_provider)
+    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
 
     # Turn 1: client gives info → fields extracted, stays in qualify
     inbound1 = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
@@ -166,6 +171,31 @@ class _FakeNLUWithCost:
         )
 
 
+class _RecordingComposer:
+    """Composer that records the last input and returns canned text + optional usage.
+
+    Useful for asserting tone propagation, history, and cost accumulation.
+    """
+
+    def __init__(
+        self,
+        *,
+        usage: UsageMetadata | None = None,
+        messages: list[str] | None = None,
+    ) -> None:
+        self.usage = usage
+        self.messages = messages or ["test_response"]
+        self.last_input: ComposerInput | None = None
+        self.call_count: int = 0
+
+    async def compose(
+        self, *, input: ComposerInput,
+    ) -> tuple[ComposerOutput, UsageMetadata | None]:
+        self.last_input = input
+        self.call_count += 1
+        return ComposerOutput(messages=list(self.messages)), self.usage
+
+
 @pytest.mark.asyncio
 async def test_total_cost_accumulates_across_turns(db_session):
     """Two consecutive turns with non-zero usage cost.
@@ -176,7 +206,7 @@ async def test_total_cost_accumulates_across_turns(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_cost")
 
     nlu_provider = _FakeNLUWithCost(Decimal("0.000050"))
-    runner = ConversationRunner(db_session, nlu_provider)
+    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
 
     # Turn 1
     inbound1 = _make_inbound(conv_id, tid, "hola")
@@ -208,7 +238,7 @@ async def test_total_cost_not_modified_when_usage_is_none(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_no_cost")
 
     nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
-    runner = ConversationRunner(db_session, nlu_provider)
+    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     await runner.run_turn(
@@ -221,6 +251,240 @@ async def test_total_cost_not_modified_when_usage_is_none(db_session):
         {"c": conv_id},
     )).scalar()
     assert total == Decimal("0")
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# T22: tone loaded from tenant_branding.voice
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_loads_tone_from_tenant_branding(db_session):
+    """T22: voice JSONB is loaded into a Tone and passed to the composer."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t22_tone")
+    voice = {
+        "register": "informal_mexicano",
+        "use_emojis": "frequent",
+        "max_words_per_message": 30,
+        "bot_name": "Dinamo",
+    }
+    await db_session.execute(
+        text(
+            "INSERT INTO tenant_branding (tenant_id, bot_name, voice) "
+            "VALUES (:t, :bn, :v\\:\\:jsonb)"
+        ),
+        {"t": tid, "bn": "Dinamo", "v": json.dumps(voice)},
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer()
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    # The CannedNLU yields intent=ask_info, no fields are missing relative to
+    # what NLU extracted, so action could be ask_field/lookup_faq/clarification.
+    # Either way action ∈ COMPOSED_ACTIONS so the composer must have been called.
+    assert composer.call_count == 1
+    assert composer.last_input is not None
+    assert composer.last_input.tone.bot_name == "Dinamo"
+    assert composer.last_input.tone.register == "informal_mexicano"
+    assert composer.last_input.tone.use_emojis == "frequent"
+    assert composer.last_input.tone.max_words_per_message == 30
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# T23: composer is invoked for COMPOSED_ACTIONS inside 24h
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_invokes_composer_for_composed_action(db_session):
+    """T23: when action is in COMPOSED_ACTIONS and inside 24h, composer is called."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t23_compose")
+
+    composer = _RecordingComposer(messages=["hola desde el composer"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    trace = await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 1
+    # Turn-trace columns should reflect the composer's input/output.
+    assert trace.composer_input is not None
+    assert trace.composer_output == {"messages": ["hola desde el composer"]}
+    assert trace.outbound_messages == ["hola desde el composer"]
+    # The composer received the per-turn extracted_data (from NLU).
+    assert composer.last_input is not None
+    assert "interes_producto" in composer.last_input.extracted_data
+
+    # No human handoff was created.
+    handoff_count = (await db_session.execute(
+        text("SELECT COUNT(*) FROM human_handoffs WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert handoff_count == 0
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# T23 + T24: outside 24h → no compose, handoff row, HUMAN_HANDOFF_REQUESTED
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_24h_handoff_creates_row_no_compose(db_session):
+    """T23+T24: last_activity_at = now-25h → no compose; HUMAN_HANDOFF_REQUESTED."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t24_24h")
+
+    # Backdate last_activity_at to 25h ago.
+    twenty_five_hours_ago = datetime.now(timezone.utc) - timedelta(hours=25)
+    await db_session.execute(
+        text("UPDATE conversations SET last_activity_at = :ts WHERE id = :cid"),
+        {"ts": twenty_five_hours_ago, "cid": conv_id},
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer()
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    trace = await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    # Composer must NOT have been called.
+    assert composer.call_count == 0
+    # Trace has no composer fields.
+    assert trace.composer_input is None
+    assert trace.composer_output is None
+    assert trace.outbound_messages is None
+
+    # human_handoffs row created with reason='outside_24h_window'.
+    rows = (await db_session.execute(
+        text(
+            "SELECT reason, status FROM human_handoffs "
+            "WHERE conversation_id = :c"
+        ),
+        {"c": conv_id},
+    )).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == "outside_24h_window"
+    assert rows[0][1] == "pending"
+
+    # HUMAN_HANDOFF_REQUESTED event emitted.
+    event_payload = (await db_session.execute(
+        text(
+            "SELECT payload FROM events "
+            "WHERE conversation_id = :c AND type = 'human_handoff_requested'"
+        ),
+        {"c": conv_id},
+    )).scalar()
+    assert event_payload is not None
+    assert event_payload["reason"] == "outside_24h_window"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# T23: composer fallback → handoff with reason='composer_failed'
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_composer_fallback_creates_handoff(db_session):
+    """T23: composer_usage.fallback_used=True → human_handoff with reason='composer_failed'."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t23_fallback")
+
+    fallback_usage = UsageMetadata(
+        model="gpt-4o",
+        tokens_in=200,
+        tokens_out=20,
+        cost_usd=Decimal("0.000200"),
+        latency_ms=500,
+        fallback_used=True,
+    )
+    composer = _RecordingComposer(usage=fallback_usage, messages=["[canned fallback]"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    rows = (await db_session.execute(
+        text(
+            "SELECT reason, status FROM human_handoffs "
+            "WHERE conversation_id = :c"
+        ),
+        {"c": conv_id},
+    )).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == "composer_failed"
+    assert rows[0][1] == "pending"
+
+    # ERROR_OCCURRED event should have payload {"where":"composer", "fallback":"canned"}.
+    event_payload = (await db_session.execute(
+        text(
+            "SELECT payload FROM events "
+            "WHERE conversation_id = :c AND type = 'error_occurred' "
+            "ORDER BY occurred_at DESC LIMIT 1"
+        ),
+        {"c": conv_id},
+    )).scalar()
+    assert event_payload is not None
+    assert event_payload["where"] == "composer"
+    assert event_payload["fallback"] == "canned"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# T23: total_cost_usd accumulates BOTH nlu and composer cost
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_total_cost_includes_composer(db_session):
+    """T23: conversation_state.total_cost_usd accumulates both nlu+composer."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t23_cost")
+
+    composer_usage = UsageMetadata(
+        model="gpt-4o",
+        tokens_in=300,
+        tokens_out=80,
+        cost_usd=Decimal("0.000300"),
+        latency_ms=400,
+    )
+    composer = _RecordingComposer(usage=composer_usage)
+    nlu_provider = _FakeNLUWithCost(Decimal("0.000050"))
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "hola")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    total = (await db_session.execute(
+        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    # 0.000050 (nlu) + 0.000300 (composer) = 0.000350
+    assert total == Decimal("0.000350")
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()

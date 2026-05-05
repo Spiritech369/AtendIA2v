@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.contracts.message import Message, MessageDirection
 from atendia.db.session import get_db_session
+from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
 
@@ -38,7 +39,7 @@ async def run_turn(
     if not fp.exists():
         raise HTTPException(status_code=404, detail=f"fixture not found: {fp}")
 
-    runner = ConversationRunner(session, CannedNLU(fp))
+    runner = ConversationRunner(session, CannedNLU(fp), CannedComposer())
     inbound = Message(
         id=str(uuid4()),
         conversation_id=str(req.conversation_id),

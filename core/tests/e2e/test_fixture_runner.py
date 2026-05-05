@@ -78,7 +78,8 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     inline_path = tmp_path / f"{fixture_path.stem}.nlu.yaml"
     inline_path.write_text(yaml.safe_dump(inline_nlu), encoding="utf-8")
 
-    runner = ConversationRunner(db_session, CannedNLU(inline_path))
+    from atendia.runner.composer_canned import CannedComposer
+    runner = ConversationRunner(db_session, CannedNLU(inline_path), CannedComposer())
 
     for i, turn in enumerate(spec["turns"]):
         msg = Message(
