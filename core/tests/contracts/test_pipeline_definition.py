@@ -163,12 +163,7 @@ def test_field_spec_description_max_length_enforced():
 
 def test_pipeline_definition_does_not_have_tone_field():
     """Phase 3b: tone moved to tenant_branding.voice; pipeline.tone removed."""
-    p = PipelineDefinition(
-        version=4,
-        stages=[StageDefinition(id="x", actions_allowed=[], transitions=[])],
-        fallback="x",
-    )
-    assert "tone" not in p.model_fields
+    assert "tone" not in PipelineDefinition.model_fields
 
 
 def test_pipeline_definition_ignores_legacy_tone_input():
@@ -179,4 +174,5 @@ def test_pipeline_definition_ignores_legacy_tone_input():
         "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
         "fallback": "x",
     })
-    assert "tone" not in p.model_fields
+    assert "tone" not in PipelineDefinition.model_fields
+    assert "tone" not in p.model_dump()  # legacy keys don't survive serialization
