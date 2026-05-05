@@ -131,7 +131,8 @@ async def main() -> int:
 
         print(f"Tenant {tenant_name} ({tid}) seeded with 4-stage pipeline")
 
-        runner = ConversationRunner(session, CannedNLU(fixture_path))
+        from atendia.runner.composer_canned import CannedComposer
+        runner = ConversationRunner(session, CannedNLU(fixture_path), CannedComposer())
         for i, text_msg in enumerate(TURN_TEXTS, start=1):
             inbound = Message(
                 id=str(uuid4()),

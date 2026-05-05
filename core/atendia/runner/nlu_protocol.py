@@ -20,8 +20,9 @@ class UsageMetadata(BaseModel):
     model: str
     tokens_in: int = Field(ge=0)
     tokens_out: int = Field(ge=0)
-    cost_usd: Decimal
+    cost_usd: Decimal = Field(ge=0)
     latency_ms: int = Field(ge=0)
+    fallback_used: bool = False
 
 
 class NLUProvider(Protocol):

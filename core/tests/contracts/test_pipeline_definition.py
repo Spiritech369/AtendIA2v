@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from atendia.contracts.pipeline_definition import (
+    ComposerConfig,
     FieldSpec,
     NLUConfig,
     PipelineDefinition,
@@ -159,3 +160,51 @@ def test_field_spec_description_max_length_enforced():
     # Edge: exactly 200 is OK
     f = FieldSpec(name="ciudad", description="y" * 200)
     assert len(f.description) == 200
+
+
+def test_pipeline_definition_does_not_have_tone_field():
+    """Phase 3b: tone moved to tenant_branding.voice; pipeline.tone removed."""
+    assert "tone" not in PipelineDefinition.model_fields
+
+
+def test_pipeline_definition_ignores_legacy_tone_input():
+    """Backward compat: old pipelines with tone:{} still parse, field is dropped."""
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "tone": {"register": "informal"},  # legacy
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert "tone" not in PipelineDefinition.model_fields
+    assert "tone" not in p.model_dump()  # legacy keys don't survive serialization
+
+
+def test_composer_config_defaults():
+    cfg = ComposerConfig()
+    assert cfg.history_turns == 2
+
+
+def test_composer_config_validates_range():
+    with pytest.raises(ValidationError):
+        ComposerConfig(history_turns=11)
+    with pytest.raises(ValidationError):
+        ComposerConfig(history_turns=-1)
+
+
+def test_pipeline_with_composer_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "composer": {"history_turns": 4},
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert p.composer.history_turns == 4
+
+
+def test_pipeline_default_composer_block():
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert p.composer.history_turns == 2

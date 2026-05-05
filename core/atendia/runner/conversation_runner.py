@@ -1,19 +1,28 @@
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from arq.connections import ArqRedis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.contracts.event import EventType
 from atendia.contracts.message import Message
+from atendia.contracts.tone import Tone
 from atendia.db.models import TurnTrace
+from atendia.runner.composer_protocol import (
+    ComposerInput,
+    ComposerOutput,
+    ComposerProvider,
+)
 from atendia.runner.nlu_protocol import NLUProvider
+from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
 from atendia.state_machine.event_emitter import EventEmitter
 from atendia.state_machine.orchestrator import process_turn
 from atendia.state_machine.pipeline_loader import load_active_pipeline
+from atendia.tools.base import ToolNoDataResult
 
 
 def _jsonable(obj: Any) -> Any:
@@ -34,9 +43,15 @@ def _maybe_uuid(s: str) -> UUID | None:
 
 
 class ConversationRunner:
-    def __init__(self, session: AsyncSession, nlu_provider: NLUProvider) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        nlu_provider: NLUProvider,
+        composer_provider: ComposerProvider,
+    ) -> None:
         self._session = session
         self._nlu = nlu_provider
+        self._composer = composer_provider
         self._emitter = EventEmitter(session)
 
     async def run_turn(
@@ -46,6 +61,8 @@ class ConversationRunner:
         tenant_id: UUID,
         inbound: Message,
         turn_number: int,
+        arq_pool: ArqRedis | None = None,
+        to_phone_e164: str | None = None,
     ) -> TurnTrace:
         started = time.perf_counter()
 
@@ -169,8 +186,10 @@ class ConversationRunner:
                         WHERE conversation_id = :cid"""),
                 {"c": usage.cost_usd, "cid": conversation_id},
             )
+        # NOTE: we DO NOT update conversations.last_activity_at yet; the 24h
+        # check below must read the value as it stood when the inbound arrived.
         await self._session.execute(
-            text("UPDATE conversations SET current_stage = :s, last_activity_at = NOW() WHERE id = :cid"),
+            text("UPDATE conversations SET current_stage = :s WHERE id = :cid"),
             {"s": next_stage_id, "cid": conversation_id},
         )
 
@@ -189,6 +208,131 @@ class ConversationRunner:
                 payload={"to": next_stage_id},
             )
 
+        # ===== Phase 3b: tone, tools, 24h check, Composer =====
+
+        # Load tone from tenant_branding.voice (defaults if missing).
+        voice_row = (await self._session.execute(
+            text("SELECT voice FROM tenant_branding WHERE tenant_id = :t"),
+            {"t": tenant_id},
+        )).fetchone()
+        tone = Tone.model_validate(voice_row[0] if voice_row else {})
+
+        # Invoke tool stubs to build action_payload.
+        action_payload: dict = {}
+        if decision.action == "quote":
+            action_payload = ToolNoDataResult(
+                hint="catalog not connected; cannot quote yet"
+            ).model_dump()
+        elif decision.action == "lookup_faq":
+            action_payload = ToolNoDataResult(
+                hint="faqs not connected; redirect"
+            ).model_dump()
+        elif decision.action == "search_catalog":
+            action_payload = ToolNoDataResult(
+                hint="catalog not connected; redirect"
+            ).model_dump()
+        elif decision.action == "ask_field":
+            extracted_keys = set(merged_extracted.keys())
+            missing = next(
+                (f for f in current_stage_def.required_fields
+                 if f.name not in extracted_keys),
+                None,
+            )
+            if missing:
+                action_payload = {
+                    "field_name": missing.name,
+                    "field_description": missing.description,
+                }
+        elif decision.action == "close":
+            action_payload = {"payment_link": None}
+
+        # 24h window check.
+        last_activity_at = (await self._session.execute(
+            text("SELECT last_activity_at FROM conversations WHERE id = :cid"),
+            {"cid": conversation_id},
+        )).scalar()
+        inside_24h = (
+            last_activity_at is None
+            or (datetime.now(UTC) - last_activity_at) < timedelta(hours=24)
+        )
+
+        composer_input: ComposerInput | None = None
+        composer_output: ComposerOutput | None = None
+        composer_usage = None
+
+        if not inside_24h and decision.action in COMPOSED_ACTIONS:
+            # Outside 24h: no compose, no enqueue. Create handoff for visibility.
+            await self._session.execute(
+                text(
+                    "INSERT INTO human_handoffs "
+                    "(conversation_id, tenant_id, reason, status) "
+                    "VALUES (:cid, :tid, 'outside_24h_window', 'pending')"
+                ),
+                {"cid": conversation_id, "tid": tenant_id},
+            )
+            await self._emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+                payload={"reason": "outside_24h_window"},
+            )
+        elif decision.action in COMPOSED_ACTIONS:
+            # Inside 24h, action produces text: invoke Composer.
+            composer_history_turns = pipeline.composer.history_turns
+            history_for_composer = (
+                history[-composer_history_turns * 2:]
+                if composer_history_turns > 0
+                else []
+            )
+            composer_input = ComposerInput(
+                action=decision.action,
+                action_payload=action_payload,
+                current_stage=next_stage_id,
+                last_intent=nlu.intent.value,
+                extracted_data={k: v.value for k, v in state_obj.extracted_data.items()}
+                | {k: v["value"] for k, v in merged_extracted.items()},
+                history=history_for_composer,
+                tone=tone,
+                max_messages=2,
+            )
+            composer_output, composer_usage = await self._composer.compose(
+                input=composer_input,
+            )
+
+            if composer_usage is not None and composer_usage.fallback_used:
+                await self._session.execute(
+                    text(
+                        "INSERT INTO human_handoffs "
+                        "(conversation_id, tenant_id, reason, status) "
+                        "VALUES (:cid, :tid, 'composer_failed', 'pending')"
+                    ),
+                    {"cid": conversation_id, "tid": tenant_id},
+                )
+                await self._emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.ERROR_OCCURRED,
+                    payload={"where": "composer", "fallback": "canned"},
+                )
+
+        # Now that we have processed the turn, bump last_activity_at so the
+        # next turn's 24h check sees a fresh value.
+        await self._session.execute(
+            text("UPDATE conversations SET last_activity_at = NOW() WHERE id = :cid"),
+            {"cid": conversation_id},
+        )
+
+        # Accumulate composer cost into conversation_state.
+        if composer_usage is not None and composer_usage.cost_usd > 0:
+            await self._session.execute(
+                text(
+                    "UPDATE conversation_state "
+                    "SET total_cost_usd = total_cost_usd + :c "
+                    "WHERE conversation_id = :cid"
+                ),
+                {"c": composer_usage.cost_usd, "cid": conversation_id},
+            )
+
         # Build state_after snapshot
         state_after = {
             "current_stage": next_stage_id,
@@ -202,7 +346,6 @@ class ConversationRunner:
 
         # Persist turn_trace
         latency_ms = int((time.perf_counter() - started) * 1000)
-        inbound_msg_uuid = _maybe_uuid(inbound.id)
         trace = TurnTrace(
             id=uuid4(),
             conversation_id=conversation_id,
@@ -224,9 +367,43 @@ class ConversationRunner:
                 if next_stage_id != previous_stage
                 else None
             ),
-            outbound_messages=None,
+            composer_input=(
+                _jsonable(composer_input.model_dump(mode="json"))
+                if composer_input is not None
+                else None
+            ),
+            composer_output=(
+                _jsonable(composer_output.model_dump(mode="json"))
+                if composer_output is not None
+                else None
+            ),
+            composer_model=(composer_usage.model if composer_usage else None),
+            composer_tokens_in=(composer_usage.tokens_in if composer_usage else None),
+            composer_tokens_out=(composer_usage.tokens_out if composer_usage else None),
+            composer_cost_usd=(composer_usage.cost_usd if composer_usage else None),
+            composer_latency_ms=(composer_usage.latency_ms if composer_usage else None),
+            outbound_messages=(
+                composer_output.messages if composer_output is not None else None
+            ),
             total_latency_ms=latency_ms,
         )
         self._session.add(trace)
         await self._session.flush()
+
+        # Enqueue outbound messages onto arq if we have a queue and recipient.
+        if (
+            composer_output is not None
+            and arq_pool is not None
+            and to_phone_e164 is not None
+        ):
+            await enqueue_messages(
+                arq_pool,
+                messages=composer_output.messages,
+                tenant_id=tenant_id,
+                to_phone_e164=to_phone_e164,
+                conversation_id=conversation_id,
+                turn_number=turn_number,
+                action=decision.action,
+            )
+
         return trace

@@ -329,3 +329,155 @@ def test_inbound_when_openai_fails_emits_error_event_and_clarification(
     event_row = _read_latest_error_event(tid)
     assert event_row is not None
     assert event_row[0]["where"] == "nlu"
+
+
+def _ok_composer_response(messages, model="gpt-4o", tokens_in=450, tokens_out=80):
+    """Composer mocked completion response."""
+    return Response(
+        200,
+        json={
+            "id": "chatcmpl-cmp",
+            "object": "chat.completion",
+            "created": 0,
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps({"messages": messages}),
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {
+                "prompt_tokens": tokens_in,
+                "completion_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+            },
+        },
+    )
+
+
+@respx.mock
+def test_inbound_with_openai_composer_mocked(monkeypatch, setup_tenant_with_pipeline):
+    """Phase 3b T27: full inbound -> NLU + Composer both mocked -> outbound enqueued.
+
+    Asserts the resulting turn_trace has populated nlu_* AND composer_* columns,
+    AND the composer_output reflects what the Composer produced.
+    """
+    monkeypatch.setenv("ATENDIA_V2_NLU_PROVIDER", "openai")
+    monkeypatch.setenv("ATENDIA_V2_COMPOSER_PROVIDER", "openai")
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test")
+    get_settings.cache_clear()
+
+    # Mock both calls — NLU first, then Composer.
+    respx.post("https://api.openai.com/v1/chat/completions").mock(side_effect=[
+        _ok_openai_response(intent="greeting"),
+        _ok_composer_response(
+            messages=["¡Qué onda, Frank!", "¿Te ayudo con tu moto?"]
+        ),
+    ])
+
+    tid = setup_tenant_with_pipeline
+    asyncio.run(_redis_clear_dedup("wamid.T27_CMP_OK"))
+
+    body = json.dumps(_payload("wamid.T27_CMP_OK", "hola")).encode("utf-8")
+    sig = _sign(body)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/webhooks/meta/{tid}",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
+        )
+    assert resp.status_code == 200
+
+    # Verify trace has composer_* populated.
+    async def _check():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            row = (await conn.execute(
+                text("""SELECT composer_model, composer_cost_usd, composer_output
+                        FROM turn_traces WHERE tenant_id = :t
+                        ORDER BY created_at DESC LIMIT 1"""),
+                {"t": tid},
+            )).fetchone()
+            assert row is not None
+            model, cost, composer_output = row
+            assert model == "gpt-4o"
+            assert cost is not None and cost > 0
+            assert composer_output["messages"] == [
+                "¡Qué onda, Frank!",
+                "¿Te ayudo con tu moto?",
+            ]
+        await engine.dispose()
+
+    asyncio.run(_check())
+
+
+def test_inbound_outside_24h_creates_handoff_no_outbound(setup_tenant_with_pipeline):
+    """Phase 3b T27: last_activity_at = now-25h -> no compose, handoff created,
+    HUMAN_HANDOFF_REQUESTED event emitted."""
+    from datetime import datetime, timedelta, timezone
+
+    tid = setup_tenant_with_pipeline
+
+    # Step 1: send an initial inbound to establish the conversation.
+    asyncio.run(_redis_clear_dedup("wamid.T27_HND_1"))
+    initial_body = json.dumps(_payload("wamid.T27_HND_1", "first contact")).encode()
+    initial_sig = _sign(initial_body)
+    with TestClient(app) as client:
+        r1 = client.post(
+            f"/webhooks/meta/{tid}",
+            content=initial_body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": initial_sig},
+        )
+        assert r1.status_code == 200
+
+    # Step 2: backdate the conversation's last_activity_at to 25 hours ago.
+    backdated = datetime.now(timezone.utc) - timedelta(hours=25)
+
+    async def _backdate():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE conversations SET last_activity_at = :t WHERE tenant_id = :tid"),
+                {"t": backdated, "tid": tid},
+            )
+        await engine.dispose()
+
+    asyncio.run(_backdate())
+
+    # Step 3: send a second inbound. Runner should detect outside-24h and
+    # create a handoff instead of composing.
+    asyncio.run(_redis_clear_dedup("wamid.T27_HND_2"))
+    second_body = json.dumps(_payload("wamid.T27_HND_2", "tardio")).encode()
+    second_sig = _sign(second_body)
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/webhooks/meta/{tid}",
+            content=second_body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": second_sig},
+        )
+        assert resp.status_code == 200
+
+    async def _check():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            handoff = (await conn.execute(
+                text("""SELECT reason FROM human_handoffs
+                        WHERE tenant_id = :t ORDER BY requested_at DESC LIMIT 1"""),
+                {"t": tid},
+            )).fetchone()
+            assert handoff is not None
+            assert handoff[0] == "outside_24h_window"
+
+            event = (await conn.execute(
+                text("""SELECT type FROM events
+                        WHERE tenant_id = :t AND type = 'human_handoff_requested'
+                        ORDER BY occurred_at DESC LIMIT 1"""),
+                {"t": tid},
+            )).fetchone()
+            assert event is not None
+        await engine.dispose()
+
+    asyncio.run(_check())

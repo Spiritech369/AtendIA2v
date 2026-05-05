@@ -48,11 +48,16 @@ Environment variables (loaded from `core/.env`):
 | `ATENDIA_V2_DATABASE_URL`         | `postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2`         |
 | `ATENDIA_V2_REDIS_URL`            | `redis://localhost:6380/0`                                               |
 | `ATENDIA_V2_LOG_LEVEL`            | `INFO`                                                                   |
-| `ATENDIA_V2_OPENAI_API_KEY`       | _(empty — set to enable real NLU)_                                       |
+| `ATENDIA_V2_OPENAI_API_KEY`       | _(empty — set to enable real NLU/Composer)_                              |
 | `ATENDIA_V2_NLU_PROVIDER`         | `keyword` (set to `openai` to use `gpt-4o-mini`)                         |
 | `ATENDIA_V2_NLU_MODEL`            | `gpt-4o-mini`                                                            |
 | `ATENDIA_V2_NLU_TIMEOUT_S`        | `8.0`                                                                    |
 | `ATENDIA_V2_NLU_RETRY_DELAYS_MS`  | `[500, 2000]`                                                            |
+| `ATENDIA_V2_COMPOSER_PROVIDER`    | `canned` (set to `openai` to enable real Composer)                       |
+| `ATENDIA_V2_COMPOSER_MODEL`       | `gpt-4o`                                                                 |
+| `ATENDIA_V2_COMPOSER_TIMEOUT_S`   | `8.0`                                                                    |
+| `ATENDIA_V2_COMPOSER_RETRY_DELAYS_MS` | `[500, 2000]`                                                        |
+| `ATENDIA_V2_COMPOSER_MAX_MESSAGES`| `2`                                                                      |
 
 Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.)
 
@@ -307,7 +312,14 @@ errors, and per-turn cost/latency tracking persisted in `turn_traces`. Toggled b
 `ATENDIA_V2_NLU_PROVIDER` (`keyword` → `openai`). Live OpenAI smoke test gated by
 `RUN_LIVE_LLM_TESTS=1`.
 
-**Phase 3b** — Composer real (`gpt-4o`) replaces the canned action-text dispatcher.
+**Phase 3b (done)** — Composer real (`gpt-4o`) replaces the canned action-text dispatcher.
+Returns `list[str]` (1–3 messages) via OpenAI strict structured outputs, applies the per-tenant
+`Tone` from `tenant_branding.voice` (register, emojis, forbidden / signature phrases, max words),
+respects the 24h Meta session window (escalates to human handoff outside of it), and falls back
+to canned text on retry exhaustion. Toggled by `ATENDIA_V2_COMPOSER_PROVIDER` (`canned` → `openai`).
+Rollout: run `seed_dinamo_voice` + `alembic upgrade head` (drops legacy `pipeline.tone`) before
+flipping the flag. Live OpenAI smoke test (including a no-invent-price assertion) gated by
+`RUN_LIVE_LLM_TESTS=1`.
 
 **Phase 3c** — Migración de pipeline / catálogo / FAQs de Dinamo a DB con embeddings.
 

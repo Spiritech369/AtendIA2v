@@ -7,20 +7,11 @@ import json
 import time
 from decimal import Decimal
 
-from openai import (
-    APIConnectionError,
-    APIStatusError,
-    APITimeoutError,
-    AsyncOpenAI,
-    AuthenticationError,
-    BadRequestError,
-    InternalServerError,
-    RateLimitError,
-)
-from pydantic import ValidationError
+from openai import AsyncOpenAI
 
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
+from atendia.runner._openai_errors import _NON_RETRIABLE, _RETRIABLE
 from atendia.runner.nlu.pricing import compute_cost
 from atendia.runner.nlu_prompts import build_prompt
 from atendia.runner.nlu_protocol import UsageMetadata
@@ -92,20 +83,6 @@ def _build_strict_schema(field_names: list[str]) -> dict:
 
     _walk(schema)
     return {"name": "nlu_result", "strict": True, "schema": schema}
-
-
-_RETRIABLE = (
-    APITimeoutError,
-    APIConnectionError,
-    RateLimitError,
-    InternalServerError,
-)
-_NON_RETRIABLE = (
-    AuthenticationError,
-    BadRequestError,
-    ValidationError,
-    APIStatusError,  # catchall for 403/404/409/422 etc; specific subclasses above are documentation
-)
 
 
 class OpenAINLU:

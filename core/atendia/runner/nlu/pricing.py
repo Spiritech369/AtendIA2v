@@ -6,9 +6,11 @@ Update when OpenAI announces price changes.
 from decimal import Decimal
 
 MODEL_PRICING: dict[str, tuple[Decimal, Decimal]] = {
-    # (input_price_per_1M, output_price_per_1M)
+    # USD per 1M tokens (input, output) — verified at 2026-05.
     "gpt-4o-mini":            (Decimal("0.150"), Decimal("0.600")),
     "gpt-4o-mini-2024-07-18": (Decimal("0.150"), Decimal("0.600")),
+    "gpt-4o":                 (Decimal("2.500"), Decimal("10.000")),
+    "gpt-4o-2024-08-06":      (Decimal("2.500"), Decimal("10.000")),
 }
 
 

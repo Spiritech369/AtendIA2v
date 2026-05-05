@@ -31,6 +31,10 @@ class NLUConfig(BaseModel):
     history_turns: int = Field(default=2, ge=0, le=10)
 
 
+class ComposerConfig(BaseModel):
+    history_turns: int = Field(default=2, ge=0, le=10)
+
+
 class Transition(BaseModel):
     to: str
     when: str
@@ -60,8 +64,9 @@ class StageDefinition(BaseModel):
 class PipelineDefinition(BaseModel):
     version: int = Field(ge=1)
     nlu: NLUConfig = Field(default_factory=NLUConfig)
+    composer: ComposerConfig = Field(default_factory=ComposerConfig)
     stages: list[StageDefinition] = Field(min_length=1)
-    tone: dict
+    # tone field removed in Phase 3b — moved to tenant_branding.voice
     fallback: str
 
     @model_validator(mode="after")
