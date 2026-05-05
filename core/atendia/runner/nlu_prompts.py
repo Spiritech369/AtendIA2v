@@ -8,9 +8,12 @@ Aquí editas:
 
 Los placeholders entre {{ }} se sustituyen al construir la request.
 """
-import re
-
 from atendia.contracts.pipeline_definition import FieldSpec
+from atendia.runner._template_helpers import (
+    ROLE_LABELS,
+    _render_history,
+    render_template,
+)
 
 # ============================================================
 # 1. SYSTEM PROMPT — instrucciones generales
@@ -38,11 +41,6 @@ Campos opcionales (extrae si aparecen; no los inventes si no aparecen):
 # ============================================================
 HISTORY_FORMAT = "[{{role}}] {{text}}"
 
-ROLE_LABELS = {
-    "inbound": "cliente",
-    "outbound": "asistente",
-}
-
 
 # ============================================================
 # 3. OUTPUT INSTRUCTIONS
@@ -60,25 +58,6 @@ Reglas de salida:
 """
 
 
-_PLACEHOLDER_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
-
-
-def render_template(template: str, **vars: str) -> str:
-    """Substitute {{name}} placeholders. Raise if any remain unfilled.
-
-    Extra vars are ignored. Missing vars raise RuntimeError so a typo never
-    silently leaves a placeholder in the prompt sent to the LLM.
-    """
-    def _sub(m: re.Match[str]) -> str:
-        key = m.group(1)
-        if key not in vars:
-            raise RuntimeError(
-                f"unsubstituted placeholder {{{{ {key} }}}} in template"
-            )
-        return str(vars[key])
-    return _PLACEHOLDER_RE.sub(_sub, template)
-
-
 def _render_fields(fields: list[FieldSpec]) -> str:
     if not fields:
         return "(ninguno)"
@@ -86,21 +65,6 @@ def _render_fields(fields: list[FieldSpec]) -> str:
         f"- {f.name}: {f.description or '(sin descripción)'}"
         for f in fields
     )
-
-
-def _render_history(history: list[tuple[str, str]]) -> list[dict[str, str]]:
-    """Convert [(direction, text), ...] into chat messages.
-
-    inbound → role 'user', outbound → role 'assistant'. The bracketed label
-    inside the content uses ROLE_LABELS for transparency.
-    """
-    out: list[dict[str, str]] = []
-    for direction, text in history:
-        role = "user" if direction == "inbound" else "assistant"
-        label = ROLE_LABELS.get(direction, direction)
-        rendered = render_template(HISTORY_FORMAT, role=label, text=text)
-        out.append({"role": role, "content": rendered})
-    return out
 
 
 def build_prompt(
@@ -121,6 +85,6 @@ def build_prompt(
     )
     return [
         {"role": "system", "content": system_content},
-        *_render_history(history),
+        *_render_history(history, history_format=HISTORY_FORMAT),
         {"role": "user", "content": text},
     ]
