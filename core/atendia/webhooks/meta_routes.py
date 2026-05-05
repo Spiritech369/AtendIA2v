@@ -233,34 +233,11 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             inbound=inbound_canonical,
             turn_number=next_turn,
         )
-        # Dispatch outbound (T26)
-        from atendia.runner.outbound_dispatcher import dispatch as dispatch_outbound
-        from arq.connections import RedisSettings, create_pool
-        # Build a fresh arq pool per request — small overhead, simple lifecycle.
-        arq_pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
-        try:
-            from atendia.state_machine.action_resolver import resolve_action
-            from atendia.contracts.nlu_result import Intent
-            from atendia.state_machine.pipeline_loader import load_active_pipeline
-            pipeline = await load_active_pipeline(session, tenant_id)
-            target_stage_id = trace.state_after["current_stage"]
-            target_stage = next(s for s in pipeline.stages if s.id == target_stage_id)
-            try:
-                action = resolve_action(
-                    target_stage,
-                    Intent(trace.state_after.get("last_intent") or "greeting"),
-                )
-            except Exception:
-                action = "ask_clarification"
-            await dispatch_outbound(
-                arq_pool,
-                action=action,
-                tenant_id=tenant_id,
-                to_phone_e164=m.from_phone_e164,
-                conversation_id=conv_id,
-            )
-        finally:
-            await arq_pool.aclose()
+        # TODO(T26): replaced by Composer + enqueue_messages.
+        # Phase 3b T20 removed dispatch/text_for_action from outbound_dispatcher;
+        # T26 will re-wire this block to call the Composer and then
+        # enqueue_messages(...) with the produced texts.
+        _ = trace  # silence unused-trace lint until T26 re-wires this
     except Exception:
         # Don't crash the webhook handler if the runner fails — just log via event.
         # In production this would also bubble to monitoring.
