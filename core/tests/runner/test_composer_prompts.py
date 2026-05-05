@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from atendia.contracts.tone import Tone
@@ -8,6 +10,8 @@ from atendia.runner.composer_prompts import (
     build_composer_prompt,
 )
 from atendia.runner.composer_protocol import ComposerInput
+
+_FIXTURES = Path(__file__).parent.parent / "fixtures" / "composer"
 
 
 # ============================================================
@@ -105,3 +109,48 @@ def test_build_composer_prompt_no_history_no_user_message():
     ))
     assert len(msgs) == 1
     assert msgs[0]["role"] == "system"
+
+
+# ============================================================
+# T13 — snapshot test
+# ============================================================
+
+def test_composer_system_prompt_snapshot_greet_dinamo():
+    """Byte-equality snapshot guard for the Dinamo greet system prompt.
+
+    Intentional edits to SYSTEM_PROMPT_TEMPLATE / ACTION_GUIDANCE / output
+    instructions will fail this test. Regenerate the fixture via:
+
+        uv run python -c "
+        from pathlib import Path
+        from atendia.contracts.tone import Tone
+        from atendia.runner.composer_prompts import build_composer_prompt
+        from atendia.runner.composer_protocol import ComposerInput
+        m = build_composer_prompt(ComposerInput(
+            action='greet', current_stage='greeting',
+            tone=Tone(
+                register='informal_mexicano', use_emojis='sparingly',
+                max_words_per_message=40, bot_name='Dinamo',
+                forbidden_phrases=['estimado cliente', 'le saluda atentamente'],
+                signature_phrases=['¡qué onda!', 'te paso'],
+            ),
+        ))
+        Path('tests/fixtures/composer/greet_dinamo_system.txt').write_text(
+            m[0]['content'], encoding='utf-8', newline='',
+        )
+        "
+    """
+    expected = (_FIXTURES / "greet_dinamo_system.txt").read_text(encoding="utf-8")
+    msgs = build_composer_prompt(ComposerInput(
+        action="greet",
+        current_stage="greeting",
+        tone=Tone(
+            register="informal_mexicano",
+            use_emojis="sparingly",
+            max_words_per_message=40,
+            bot_name="Dinamo",
+            forbidden_phrases=["estimado cliente", "le saluda atentamente"],
+            signature_phrases=["¡qué onda!", "te paso"],
+        ),
+    ))
+    assert msgs[0]["content"] == expected
