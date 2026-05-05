@@ -3,7 +3,7 @@
   "$id": "https://atendia.io/contracts/pipeline_definition.schema.json",
   "title": "PipelineDefinition",
   "type": "object",
-  "required": ["version", "stages", "tone", "fallback"],
+  "required": ["version", "stages", "fallback"],
   "properties": {
     "version": { "type": "integer", "minimum": 1 },
     "nlu": { "$ref": "#/$defs/NLUConfig" },
@@ -12,7 +12,6 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/StageDefinition" }
     },
-    "tone": { "type": "object" },
     "fallback": { "type": "string" }
   },
   "$defs": {

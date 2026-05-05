@@ -61,7 +61,7 @@ class PipelineDefinition(BaseModel):
     version: int = Field(ge=1)
     nlu: NLUConfig = Field(default_factory=NLUConfig)
     stages: list[StageDefinition] = Field(min_length=1)
-    tone: dict
+    # tone field removed in Phase 3b — moved to tenant_branding.voice
     fallback: str
 
     @model_validator(mode="after")

@@ -159,3 +159,24 @@ def test_field_spec_description_max_length_enforced():
     # Edge: exactly 200 is OK
     f = FieldSpec(name="ciudad", description="y" * 200)
     assert len(f.description) == 200
+
+
+def test_pipeline_definition_does_not_have_tone_field():
+    """Phase 3b: tone moved to tenant_branding.voice; pipeline.tone removed."""
+    p = PipelineDefinition(
+        version=4,
+        stages=[StageDefinition(id="x", actions_allowed=[], transitions=[])],
+        fallback="x",
+    )
+    assert "tone" not in p.model_fields
+
+
+def test_pipeline_definition_ignores_legacy_tone_input():
+    """Backward compat: old pipelines with tone:{} still parse, field is dropped."""
+    p = PipelineDefinition.model_validate({
+        "version": 4,
+        "tone": {"register": "informal"},  # legacy
+        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+        "fallback": "x",
+    })
+    assert "tone" not in p.model_fields
