@@ -21,7 +21,8 @@ def next_stage(
     ctx = EvaluationContext(
         nlu=nlu,
         extracted_data=extracted_data,
-        required_fields=stage.required_fields,
+        # Flatten FieldSpec list to bare names for runtime evaluation (keeps conditions.py unaware of FieldSpec).
+        required_fields=[f.name for f in stage.required_fields],
         turn_count=turn_count,
     )
     for t in stage.transitions:

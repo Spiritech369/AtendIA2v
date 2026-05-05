@@ -15,9 +15,28 @@ from atendia.channels.tenant_config import (
 )
 from atendia.config import get_settings
 from atendia.db.session import get_db_session
+from atendia.runner.nlu_keywords import KeywordNLU
+from atendia.runner.nlu_openai import OpenAINLU
+from atendia.runner.nlu_protocol import NLUProvider
 from atendia.webhooks.deduplication import is_duplicate
 
 router = APIRouter()
+
+
+def build_nlu(settings) -> NLUProvider:
+    """Construct the NLU provider based on settings.nlu_provider.
+
+    "keyword" -> in-memory keyword matcher (default fallback).
+    "openai"  -> real LLM call via OpenAINLU. Requires openai_api_key.
+    """
+    if settings.nlu_provider == "openai":
+        return OpenAINLU(
+            api_key=settings.openai_api_key,
+            model=settings.nlu_model,
+            timeout_s=settings.nlu_timeout_s,
+            retry_delays_ms=tuple(settings.nlu_retry_delays_ms),
+        )
+    return KeywordNLU()
 
 
 @router.get("/webhooks/meta/{tenant_id}", response_class=PlainTextResponse)
@@ -183,9 +202,8 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
     finally:
         await redis_client.aclose()
 
-    # Run conversation turn (T25): drives the state machine using KeywordNLU.
+    # Run conversation turn (T25): drives the state machine using the configured NLU.
     from atendia.runner.conversation_runner import ConversationRunner
-    from atendia.runner.nlu_keywords import KeywordNLU
     from atendia.contracts.message import Message as CanonicalMessage, MessageDirection
     from datetime import datetime as _dt, timezone as _tz
     from uuid import uuid4 as _uuid4
@@ -197,8 +215,8 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
         {"c": conv_id},
     )).scalar()
 
-    nlu = KeywordNLU()
-    nlu.feed(m.text or "")
+    settings = get_settings()
+    nlu = build_nlu(settings)
     runner = ConversationRunner(session, nlu)
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),

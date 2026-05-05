@@ -1,9 +1,11 @@
-"""Keyword-based NLU fallback for Phase 2 (no LLM yet).
+"""Keyword-based NLU fallback for dev/tests when OpenAI is off.
 
-Replaces `CannedNLU` for production use during Phase 2. Phase 3 will replace
-this with a real `gpt-4o-mini` extractor — same `next()` API contract.
+Phase 3a substitutes this with `OpenAINLU` for production. KeywordNLU stays
+available via the `nlu_provider="keyword"` Settings toggle as a kill-switch.
 """
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
+from atendia.contracts.pipeline_definition import FieldSpec
+from atendia.runner.nlu_protocol import UsageMetadata
 
 
 # Keyword tables — order = priority. First match wins.
@@ -21,19 +23,18 @@ _NEGATIVE_KEYWORDS = ["mal", "horrible", "terrible", "fatal", "pésimo"]
 
 
 class KeywordNLU:
-    """Stateful keyword-based NLU. Feed text, then call next() to get NLUResult."""
+    """Stateless keyword-based NLU. Conforms to NLUProvider Protocol."""
 
-    def __init__(self) -> None:
-        self._queue: list[NLUResult] = []
-
-    def feed(self, text: str) -> None:
-        """Classify a text and queue the result for `next()`."""
-        self._queue.append(self._classify(text))
-
-    def next(self) -> NLUResult:
-        if not self._queue:
-            raise IndexError("no NLU result available; call feed() first")
-        return self._queue.pop(0)
+    async def classify(
+        self,
+        *,
+        text: str,
+        current_stage: str,
+        required_fields: list[FieldSpec],
+        optional_fields: list[FieldSpec],
+        history: list[tuple[str, str]],
+    ) -> tuple[NLUResult, UsageMetadata | None]:
+        return self._classify(text), None
 
     def _classify(self, text: str) -> NLUResult:
         lowered = text.lower()

@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "arq>=0.28.0",
     "pyjwt>=2.12.1",
+    "openai>=1.50.0",
 ]
 
 [dependency-groups]
@@ -29,6 +30,7 @@ dev = [
     "datamodel-code-generator>=0.26.0",
     "httpx>=0.28.1",
     "respx>=0.23.1",
+    "jsonschema>=4.23.0",
 ]
 
 [tool.ruff]

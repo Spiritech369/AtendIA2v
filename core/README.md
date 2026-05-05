@@ -43,13 +43,25 @@ uv run uvicorn atendia.main:app --reload --port 8001
 
 Environment variables (loaded from `core/.env`):
 
-| Variable                     | Default                                                                  |
-|------------------------------|--------------------------------------------------------------------------|
-| `ATENDIA_V2_DATABASE_URL`    | `postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2`         |
-| `ATENDIA_V2_REDIS_URL`       | `redis://localhost:6380/0`                                               |
-| `ATENDIA_V2_LOG_LEVEL`       | `INFO`                                                                   |
+| Variable                          | Default                                                                  |
+|-----------------------------------|--------------------------------------------------------------------------|
+| `ATENDIA_V2_DATABASE_URL`         | `postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2`         |
+| `ATENDIA_V2_REDIS_URL`            | `redis://localhost:6380/0`                                               |
+| `ATENDIA_V2_LOG_LEVEL`            | `INFO`                                                                   |
+| `ATENDIA_V2_OPENAI_API_KEY`       | _(empty — set to enable real NLU)_                                       |
+| `ATENDIA_V2_NLU_PROVIDER`         | `keyword` (set to `openai` to use `gpt-4o-mini`)                         |
+| `ATENDIA_V2_NLU_MODEL`            | `gpt-4o-mini`                                                            |
+| `ATENDIA_V2_NLU_TIMEOUT_S`        | `8.0`                                                                    |
+| `ATENDIA_V2_NLU_RETRY_DELAYS_MS`  | `[500, 2000]`                                                            |
 
 Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.)
+
+### NLU rollout sequence (Phase 3a)
+
+1. Deploy with `ATENDIA_V2_NLU_PROVIDER=keyword` (default). Behavior matches Phase 2.
+2. Provision the OpenAI key in env (`ATENDIA_V2_OPENAI_API_KEY=sk-...`).
+3. Flip `ATENDIA_V2_NLU_PROVIDER=openai` to enable the real classifier. The runner switches over without restart-only-code-changes.
+4. Watch `turn_traces.nlu_cost_usd` and `nlu_latency_ms` for cost/quality monitoring.
 
 ## Running the outbound worker
 
@@ -121,6 +133,10 @@ core/
     runner/
       conversation_runner.py  Orchestrates one turn end-to-end
       nlu_canned.py           YAML-fixture-backed NLU for tests
+      nlu_keywords.py         Keyword-matching NLU (Phase 2 default)
+      nlu_openai.py           gpt-4o-mini structured-output NLU (Phase 3a)
+      nlu_prompts.py          System/user prompt builder for the LLM
+      nlu/pricing.py          Per-token cost computation
     state_machine/
       pipeline_loader.py  Loads + validates active tenant pipeline
       conditions.py       Tiny DSL: intent, sentiment, confidence, in, AND/OR
@@ -139,7 +155,7 @@ core/
     main.py             FastAPI app entry point
   scripts/
     smoke_test_phase1.py  End-to-end smoke against the live v2 DB
-  tests/                  pytest-asyncio suite (196 tests, 95.32% coverage)
+  tests/                  pytest-asyncio suite (139 tests in Phase 3a scope, 85.52% coverage)
     fixtures/conversations/  5 YAML conversation scenarios
 ```
 
@@ -286,10 +302,17 @@ Not in Phase 2 (deliberate):
 - Phase 1 plan (state machine): [`../docs/plans/01-nucleo-conversacional.md`](../docs/plans/01-nucleo-conversacional.md)
 - Phase 2 plan (WhatsApp transport): [`../docs/plans/02-transporte-whatsapp.md`](../docs/plans/02-transporte-whatsapp.md)
 
-**Phase 3** — wire the real LLM: NLU extractor (`gpt-4o-mini`, JSON mode) replaces
-the keyword classifier; Composer (`gpt-4o`) replaces the canned action-text dispatcher.
-The state machine, transport, queue, and realtime layer stay unchanged — only the
-two LLM-touched components swap in.
+**Phase 3a (done)** — NLU real (`gpt-4o-mini`) with structured outputs, retry on transient
+errors, and per-turn cost/latency tracking persisted in `turn_traces`. Toggled by
+`ATENDIA_V2_NLU_PROVIDER` (`keyword` → `openai`). Live OpenAI smoke test gated by
+`RUN_LIVE_LLM_TESTS=1`.
+
+**Phase 3b** — Composer real (`gpt-4o`) replaces the canned action-text dispatcher.
+
+**Phase 3c** — Migración de pipeline / catálogo / FAQs de Dinamo a DB con embeddings.
+
+The state machine, transport, queue, and realtime layer stay unchanged across 3a–3c — only
+the LLM-touched components swap in.
 
 **Phase 4** — frontend debug panel + tenant config UI consuming the realtime WebSocket.
 
