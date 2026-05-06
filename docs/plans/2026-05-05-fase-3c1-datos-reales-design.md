@@ -39,7 +39,8 @@ Phase 3a sustituyó `KeywordNLU` por `OpenAINLU` (gpt-4o-mini con structured out
 | 12 | Cost tracking embeddings | **Nueva columna `tool_cost_usd` en `turn_traces`** | sumar en `nlu_cost_usd` (semánticamente incorrecto); sin tracking |
 | 13 | Idempotency keys ingestion | **`(tenant_id, sku)` en catálogo, `(tenant_id, question)` en FAQs** | timestamp; UUID nuevo cada vez |
 | 14 | HNSW index params | **`m=16, ef_construction=64`** (defaults pgvector) | IVFFlat; valores agresivos |
-| 15 | Distance metric | **Cosine** (`vector_cosine_ops`) | L2; inner product |
+| 15 | Distance metric | **Cosine** (`halfvec_cosine_ops`) | L2; inner product |
+| 16 | Vector type | **`halfvec(3072)`** (half-precision) — necesario porque pgvector limita HNSW a 2000 dims con `vector` estándar; `halfvec` permite hasta 4000 dims, ahorra ~50% storage, <0.5% pérdida de recall | `vector(3072)` (rompe HNSW); `vector(2000)` con `dimensions=2000` (pierde representación); ivfflat (mismo cap) |
 
 ---
 
