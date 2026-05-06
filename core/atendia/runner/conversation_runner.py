@@ -144,9 +144,14 @@ class ConversationRunner:
                 payload={"where": "nlu", "ambiguities": nlu_errors},
             )
 
+        # Merge NLU entities into state_obj BEFORE process_turn so the transition
+        # check (e.g. all_required_fields_present) sees fields just extracted.
+        for k, field in nlu.entities.items():
+            state_obj.extracted_data[k] = field
+
         decision = process_turn(pipeline, state_obj, nlu, turn_number)
 
-        # Merge NLU entities into extracted_data (overwrite same keys)
+        # Build the JSONB shape from the now-up-to-date state_obj for persistence.
         merged_extracted = dict(extracted_jsonb or {})
         for k, field in nlu.entities.items():
             merged_extracted[k] = {

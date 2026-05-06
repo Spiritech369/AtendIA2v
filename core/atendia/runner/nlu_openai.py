@@ -135,8 +135,18 @@ class OpenAINLU:
                 raw = json.loads(resp.choices[0].message.content)
                 # OpenAI strict mode requires every entity field as a key with anyOf [..., null].
                 # Drop nulls before validating against the narrower NLUResult contract.
+                # Two cases to drop:
+                #   1. The entity itself is null (LLM correctly used the null branch).
+                #   2. The entity is an ExtractedField object but with value=null inside
+                #      (gpt-4o-mini sometimes does this instead of using the null branch).
+                #      Treat this as "no value extracted" so it doesn't pollute extracted_data
+                #      with low-confidence entries that trigger the ambiguity check downstream.
                 if isinstance(raw.get("entities"), dict):
-                    raw["entities"] = {k: v for k, v in raw["entities"].items() if v is not None}
+                    raw["entities"] = {
+                        k: v for k, v in raw["entities"].items()
+                        if v is not None
+                        and not (isinstance(v, dict) and v.get("value") is None)
+                    }
                 result = NLUResult.model_validate(raw)
                 usage = UsageMetadata(
                     model=resp.model,

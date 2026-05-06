@@ -187,6 +187,41 @@ async def test_classify_drops_null_entity_values_before_validation():
 
 
 @respx.mock
+async def test_classify_drops_extracted_field_with_inner_null_value():
+    """gpt-4o-mini sometimes emits {value: null, confidence: 0, source_turn: N} INSIDE the
+    ExtractedField shape instead of using the null branch. Adapter must treat that as
+    'no value extracted' so empty entities don't trigger the downstream ambiguity check
+    via field.confidence < threshold."""
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=_ok_response(
+            intent="ask_price",
+            entities={
+                "interes_producto": {"value": "150Z", "confidence": 0.9, "source_turn": 0},
+                # The case discovered in production live smoke: LLM populates the
+                # ExtractedField shape even when it has nothing.
+                "ciudad": {"value": None, "confidence": 0.0, "source_turn": 0},
+                "presupuesto_max": {"value": None, "confidence": 0.0, "source_turn": 0},
+            },
+        )
+    )
+    nlu = OpenAINLU(api_key="sk-test")
+    result, _ = await nlu.classify(
+        text="cuanto cuesta la 150Z?",
+        current_stage="qualify",
+        required_fields=[
+            FieldSpec(name="interes_producto", description="Modelo"),
+            FieldSpec(name="ciudad", description="Ciudad"),
+        ],
+        optional_fields=[FieldSpec(name="presupuesto_max", description="Tope")],
+        history=[],
+    )
+    assert set(result.entities.keys()) == {"interes_producto"}, (
+        f"expected only interes_producto, got {sorted(result.entities.keys())}"
+    )
+    assert result.entities["interes_producto"].value == "150Z"
+
+
+@respx.mock
 async def test_classify_retries_on_503_then_succeeds():
     """T16: transient error gets retried; 2nd attempt succeeds."""
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(

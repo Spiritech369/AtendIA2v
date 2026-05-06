@@ -65,16 +65,24 @@ ACTION_GUIDANCE: dict[str, str] = {
         "brevemente y pregunta cuál prefiere."
     ),
     "lookup_faq": (
-        "Acción: BUSCAR EN FAQ. NO TIENES BASE DE FAQS CONECTADA todavía. "
-        "Redirige diciendo que lo consultas y le respondes en breve. "
-        "NO inventes ninguna respuesta. Mensaje sugerido tipo: "
-        "'Déjame revisar y te confirmo en un momento.'"
+        "Acción: BUSCAR EN FAQ y REDIRIGIR. La base de FAQs aún no está conectada, "
+        "así que NO tienes la respuesta exacta. NO digas 'no entendí' — el cliente "
+        "SÍ se entendió, simplemente no tienes el dato. Tu trabajo es prometer "
+        "consultarlo y volver con la respuesta. DEBES decir literalmente algo como:\n"
+        "  - 'Déjame revisar y te confirmo en un momento.'\n"
+        "  - 'Ahí va, déjame chequear y te paso la info.'\n"
+        "  - 'Te confirmo en un ratito, déjame verificar.'\n"
+        "NO inventes datos. NO pidas reformular. Solo redirige."
     ),
     "quote": (
-        "Acción: COTIZAR. NO TIENES CATÁLOGO DE PRECIOS CONECTADO todavía. "
-        "Redirige diciendo que vas a consultar el precio exacto y se lo pasas. "
-        "NO INVENTES PRECIOS. NUNCA des una cifra. Mensaje sugerido tipo: "
-        "'Déjame consultar el precio exacto y te lo paso en un momentito.'"
+        "Acción: COTIZAR y REDIRIGIR. El catálogo de precios aún no está conectado, "
+        "así que NO tienes el precio exacto. NO digas 'no entendí' — el cliente "
+        "SÍ se entendió, simplemente no tienes la cifra. Tu trabajo es prometer "
+        "consultar el precio y volver con él. DEBES decir literalmente algo como:\n"
+        "  - 'Déjame consultar el precio exacto y te lo paso en un momentito.'\n"
+        "  - 'Te paso el costo en un ratito, déjame verificar el modelo.'\n"
+        "  - 'Ahí va, déjame chequear el precio y te lo confirmo.'\n"
+        "NO INVENTES PRECIOS. NUNCA des una cifra. NO pidas reformular. Solo redirige."
     ),
     "close": (
         "Acción: CERRAR. El cliente acordó comprar. Pasa al siguiente paso "
