@@ -130,3 +130,59 @@ def test_embedding_text_handles_missing_ficha_fields() -> None:
     text = _embedding_text_for_catalog_item(item)
     assert "Spartan" in text
     assert "10000" in text
+
+
+# ----- T14: helpers added alongside _main ---------------------------------
+
+from atendia.scripts.ingest_dinamo_data import (
+    _embedding_text_for_faq,
+    _vec_to_pg_text,
+)
+
+
+def test_embedding_text_for_faq_concatenates_q_and_a() -> None:
+    """The text we embed must include both question and answer."""
+    text = _embedding_text_for_faq({
+        "pregunta": "¿Cuánto es el enganche?",
+        "respuesta": "Depende del plan.",
+    })
+    assert "¿Cuánto es el enganche?" in text
+    assert "Depende del plan." in text
+
+
+def test_embedding_text_for_faq_includes_detalle_per_plan() -> None:
+    """`detalle_por_plan` keys/values are flattened into the embedded text."""
+    text = _embedding_text_for_faq({
+        "pregunta": "¿Cuánto es el enganche?",
+        "respuesta": "Depende del plan.",
+        "detalle_por_plan": {"nomina_tarjeta": "10%", "sin_comprobar": "20%"},
+    })
+    assert "nomina_tarjeta: 10%" in text
+    assert "sin_comprobar: 20%" in text
+
+
+def test_embedding_text_for_faq_includes_documentos_list() -> None:
+    """`documentos` list members are appended (one keyword per item)."""
+    text = _embedding_text_for_faq({
+        "pregunta": "¿Qué requisitos?",
+        "respuesta": "Estos:",
+        "documentos": ["INE vigente", "Comprobante de domicilio"],
+    })
+    assert "INE vigente" in text
+    assert "Comprobante de domicilio" in text
+
+
+def test_vec_to_pg_text_format() -> None:
+    """Output must be the bracketed comma-separated form pgvector parses."""
+    out = _vec_to_pg_text([0.1, -0.5, 1.0])
+    # Brackets, no spaces (minimal), correct values.
+    assert out.startswith("[")
+    assert out.endswith("]")
+    assert "0.1" in out
+    assert "-0.5" in out
+    assert "1.0" in out
+
+
+def test_vec_to_pg_text_empty() -> None:
+    """Edge: empty list still produces valid text (`[]`)."""
+    assert _vec_to_pg_text([]) == "[]"
