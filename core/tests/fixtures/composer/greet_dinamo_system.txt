@@ -13,6 +13,10 @@ Estado de la conversación:
 - Última intent del cliente: (ninguna)
 - Datos extraídos hasta ahora: (ninguno todavía)
 
+Datos de la acción (action_payload — única fuente de verdad para precios,
+respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
+{}
+
 Acción: SALUDAR. Saluda brevemente y ofrece ayuda. NO preguntes datos todavía.
 
 Reglas de salida:

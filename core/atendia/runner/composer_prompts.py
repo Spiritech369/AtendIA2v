@@ -9,6 +9,7 @@ Editas:
 
 Helpers (render_template, _render_history) viven en _template_helpers.
 """
+import json
 import re
 
 from atendia.runner._template_helpers import (
@@ -35,6 +36,10 @@ Estado de la conversación:
 - Stage actual: {{stage}}
 - Última intent del cliente: {{last_intent}}
 - Datos extraídos hasta ahora: {{extracted_data}}
+
+Datos de la acción (action_payload — única fuente de verdad para precios,
+respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
+{{action_payload}}
 
 {{action_guidance}}
 
@@ -145,6 +150,23 @@ def _render_extracted(extracted: dict) -> str:
     return ", ".join(f"{k}={v}" for k, v in extracted.items())
 
 
+def _render_action_payload(payload: dict) -> str:
+    """Serialise action_payload into pretty JSON for the prompt.
+
+    The Composer's anti-hallucination contract is "use only what's in
+    action_payload" — but for that to work, action_payload must actually
+    appear in the prompt. JSON is the right format because it preserves
+    keys/values verbatim (no risk of the model inferring values from
+    rephrased English).
+
+    Empty dict prints as `{}` — Composer guidance branches on
+    payload keys, not on its presence/absence.
+    """
+    if not payload:
+        return "{}"
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
 def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
     """Assemble the chat-completions message list for gpt-4o."""
     guidance_template = ACTION_GUIDANCE.get(
@@ -183,6 +205,7 @@ def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
         stage=input.current_stage,
         last_intent=input.last_intent or "(ninguna)",
         extracted_data=_render_extracted(input.extracted_data),
+        action_payload=_render_action_payload(input.action_payload),
         action_guidance=guidance,
         output_instructions=output_instructions,
     )

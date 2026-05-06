@@ -13,6 +13,27 @@ Estado de la conversación:
 - Última intent del cliente: (ninguna)
 - Datos extraídos hasta ahora: interes_producto=Adventure, ciudad=CDMX
 
+Datos de la acción (action_payload — única fuente de verdad para precios,
+respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
+{
+  "status": "ok",
+  "sku": "adventure-150-cc",
+  "name": "Adventure 150 CC",
+  "category": "Motoneta",
+  "price_lista_mxn": "31395",
+  "price_contado_mxn": "29900",
+  "planes_credito": {
+    "plan_10": {
+      "enganche": 3140,
+      "pago_quincenal": 1247,
+      "quincenas": 72
+    }
+  },
+  "ficha_tecnica": {
+    "motor_cc": 150
+  }
+}
+
 Acción: COTIZAR. El sistema te pasa los datos REALES en action_payload:
   - status='ok': hay precio. Campos disponibles: name, category,     price_lista_mxn, price_contado_mxn, planes_credito (dict de     planes 10/15/20/30 con enganche y pago_quincenal), ficha_tecnica     (motor_cc, potencia_hp, etc.).
   - status='no_data': el modelo no se encontró. Pregúntale al     cliente cuál modelo le interesa (sin inventar uno).
