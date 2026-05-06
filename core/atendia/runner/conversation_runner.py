@@ -8,6 +8,7 @@ from arq.connections import ArqRedis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.config import get_settings
 from atendia.contracts.event import EventType
 from atendia.contracts.message import Message
 from atendia.contracts.tone import Tone
@@ -23,6 +24,10 @@ from atendia.state_machine.event_emitter import EventEmitter
 from atendia.state_machine.orchestrator import process_turn
 from atendia.state_machine.pipeline_loader import load_active_pipeline
 from atendia.tools.base import ToolNoDataResult
+from atendia.tools.embeddings import generate_embedding
+from atendia.tools.lookup_faq import lookup_faq
+from atendia.tools.quote import quote
+from atendia.tools.search_catalog import search_catalog
 
 
 def _jsonable(obj: Any) -> Any:
@@ -222,20 +227,99 @@ class ConversationRunner:
         )).fetchone()
         tone = Tone.model_validate(voice_row[0] if voice_row else {})
 
-        # Invoke tool stubs to build action_payload.
+        # ===== Phase 3c.1: real-data tool dispatch =====
+        # quote / lookup_faq / search_catalog now hit the real catalog/FAQ
+        # tables. Embedding-driven paths (lookup_faq, semantic search_catalog
+        # fallback) accumulate cost into `tool_cost_usd`, which is persisted
+        # both into turn_traces.tool_cost_usd and rolled into
+        # conversation_state.total_cost_usd alongside NLU + Composer cost.
         action_payload: dict = {}
+        tool_cost_usd: Decimal = Decimal("0")
+        settings = get_settings()
+
         if decision.action == "quote":
-            action_payload = ToolNoDataResult(
-                hint="catalog not connected; cannot quote yet"
-            ).model_dump()
+            interes = state_obj.extracted_data.get("interes_producto")
+            interes_value = interes.value if interes is not None else None
+            if interes_value:
+                # Step 1: alias-keyword resolve (no embedding cost).
+                catalog_hits = await search_catalog(
+                    session=self._session, tenant_id=tenant_id,
+                    query=str(interes_value), embedding=None, limit=1,
+                )
+                if isinstance(catalog_hits, list) and catalog_hits:
+                    quote_result = await quote(
+                        session=self._session, tenant_id=tenant_id,
+                        sku=catalog_hits[0].sku,
+                    )
+                    action_payload = quote_result.model_dump(mode="json")
+                else:
+                    action_payload = ToolNoDataResult(
+                        hint=f"no catalog match for {interes_value!r}",
+                    ).model_dump(mode="json")
+            else:
+                action_payload = ToolNoDataResult(
+                    hint="no interes_producto extracted yet",
+                ).model_dump(mode="json")
+
         elif decision.action == "lookup_faq":
-            action_payload = ToolNoDataResult(
-                hint="faqs not connected; redirect"
-            ).model_dump()
+            if settings.openai_api_key:
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(api_key=settings.openai_api_key)
+                embedding, _, emb_cost = await generate_embedding(
+                    client=client, text=inbound.text,
+                )
+                tool_cost_usd += emb_cost
+                faq_result = await lookup_faq(
+                    session=self._session, tenant_id=tenant_id,
+                    embedding=embedding, top_k=3,
+                )
+                if isinstance(faq_result, list):
+                    action_payload = {
+                        "matches": [m.model_dump(mode="json") for m in faq_result],
+                    }
+                else:
+                    action_payload = faq_result.model_dump(mode="json")
+            else:
+                action_payload = ToolNoDataResult(
+                    hint="openai api key missing; cannot embed query",
+                ).model_dump(mode="json")
+
         elif decision.action == "search_catalog":
-            action_payload = ToolNoDataResult(
-                hint="catalog not connected; redirect"
-            ).model_dump()
+            interes = state_obj.extracted_data.get("interes_producto")
+            interes_value = interes.value if interes is not None else None
+            query_text = str(interes_value) if interes_value else inbound.text
+            # Path 1: alias-keyword (free).
+            keyword_hits = await search_catalog(
+                session=self._session, tenant_id=tenant_id,
+                query=query_text, embedding=None,
+            )
+            if isinstance(keyword_hits, list) and keyword_hits:
+                action_payload = {
+                    "results": [r.model_dump(mode="json") for r in keyword_hits],
+                }
+            elif settings.openai_api_key:
+                # Path 2: semantic fallback (embedding cost).
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(api_key=settings.openai_api_key)
+                embedding, _, emb_cost = await generate_embedding(
+                    client=client, text=query_text,
+                )
+                tool_cost_usd += emb_cost
+                semantic_hits = await search_catalog(
+                    session=self._session, tenant_id=tenant_id,
+                    query=query_text, embedding=embedding,
+                )
+                if isinstance(semantic_hits, list):
+                    action_payload = {
+                        "results": [r.model_dump(mode="json") for r in semantic_hits],
+                    }
+                else:
+                    action_payload = semantic_hits.model_dump(mode="json")
+            else:
+                action_payload = ToolNoDataResult(
+                    hint=f"no alias match for {query_text!r}; openai key missing for semantic",
+                ).model_dump(mode="json")
+
         elif decision.action == "ask_field":
             extracted_keys = set(merged_extracted.keys())
             missing = next(
@@ -338,6 +422,17 @@ class ConversationRunner:
                 {"c": composer_usage.cost_usd, "cid": conversation_id},
             )
 
+        # Phase 3c.1 — accumulate tool cost (embeddings) into conversation_state.
+        if tool_cost_usd > 0:
+            await self._session.execute(
+                text(
+                    "UPDATE conversation_state "
+                    "SET total_cost_usd = total_cost_usd + :c "
+                    "WHERE conversation_id = :cid"
+                ),
+                {"c": tool_cost_usd, "cid": conversation_id},
+            )
+
         # Build state_after snapshot
         state_after = {
             "current_stage": next_stage_id,
@@ -387,6 +482,7 @@ class ConversationRunner:
             composer_tokens_out=(composer_usage.tokens_out if composer_usage else None),
             composer_cost_usd=(composer_usage.cost_usd if composer_usage else None),
             composer_latency_ms=(composer_usage.latency_ms if composer_usage else None),
+            tool_cost_usd=tool_cost_usd if tool_cost_usd > 0 else None,
             outbound_messages=(
                 composer_output.messages if composer_output is not None else None
             ),

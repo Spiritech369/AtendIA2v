@@ -42,6 +42,10 @@ class TurnTrace(Base):
     composer_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
     composer_latency_ms: Mapped[int | None] = mapped_column(Integer)
 
+    # Phase 3c.1: per-turn tool cost (initially OpenAI Embeddings spent
+    # inside lookup_faq / search_catalog). Migration 014.
+    tool_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+
     outbound_messages: Mapped[list | None] = mapped_column(JSONB)
 
     total_cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=Decimal("0"))
