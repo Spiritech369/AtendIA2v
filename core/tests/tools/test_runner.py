@@ -46,7 +46,9 @@ async def test_run_tool_persists_tool_call_with_latency(db_session):
     )
     await db_session.commit()
 
-    assert output == {"results": []}
+    # Phase 3c.1: SearchCatalogTool's wrapper now returns the
+    # ToolNoDataResult shape when no alias match and no embedding.
+    assert output["status"] == "no_data"
 
     rows = (await db_session.execute(
         text("SELECT tool_name, input, output, latency_ms, error "
@@ -56,7 +58,7 @@ async def test_run_tool_persists_tool_call_with_latency(db_session):
     assert len(rows) == 1
     assert rows[0][0] == "search_catalog"
     assert rows[0][1] == inputs
-    assert rows[0][2] == {"results": []}
+    assert rows[0][2]["status"] == "no_data"
     assert rows[0][3] is not None and rows[0][3] >= 0
     assert rows[0][4] is None  # no error
 
