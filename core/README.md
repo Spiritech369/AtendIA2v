@@ -59,7 +59,23 @@ Environment variables (loaded from `core/.env`):
 | `ATENDIA_V2_COMPOSER_RETRY_DELAYS_MS` | `[500, 2000]`                                                        |
 | `ATENDIA_V2_COMPOSER_MAX_MESSAGES`| `2`                                                                      |
 
-Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.)
+Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.) The Postgres image is **`pgvector/pgvector:0.8.2-pg15`** — Phase 3c.1 added an `halfvec(3072)` column on `tenant_catalogs` and `tenant_faqs` for semantic search, and the `vector` extension comes pre-compiled in that image.
+
+### Ingesting Dinamo data (Phase 3c.1)
+
+Once the tenant + branding rows exist, populate the catalog + FAQs + plans
+from the canonical JSONs in `docs/`:
+
+```bash
+cd core
+PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.ingest_dinamo_data \
+    --tenant-id <UUID> --docs-dir ../docs [--dry-run]
+```
+
+`--dry-run` reports how many tokens + dollars an ingestion would cost
+without writing to the DB. A full Dinamo ingestion (34 catalog items + 26
+FAQs) costs roughly **$0.0004** at text-embedding-3-large pricing.
+Idempotent: re-runs UPDATE in place via ON CONFLICT.
 
 ### NLU rollout sequence (Phase 3a)
 

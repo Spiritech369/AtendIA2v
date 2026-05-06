@@ -8,11 +8,14 @@ WhatsApp sales assistant — multi-tenant, data-driven, with a deterministic sta
 - ✅ **Phase 2** — WhatsApp Cloud API transport (webhook, outbound queue, realtime WebSocket)
 - ✅ **Phase 3a** — NLU real (`gpt-4o-mini`) con structured outputs, retry, cost tracking
 - ✅ **Phase 3b** — Composer real (`gpt-4o`) con `list[str]`, tono per-tenant, 24h handoff, fallback canned
-- ⏳ **Phase 3c** — Migración pipeline/catálogo/FAQs de Dinamo a DB con embeddings
+- ⏳ **Phase 3c** — Migración real Dinamo + integraciones avanzadas
+  - ✅ **3c.1** — Datos reales: catálogo + FAQs + planes con embeddings (pgvector + halfvec(3072))
+  - ⏳ **3c.2** — Router LLM + flow v1 (PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT modes)
+  - ⏳ **3c.3** — Multimedia (imágenes + Vision API + validación de documentos)
 - ⏳ **Phase 4** — Frontend debug panel + tenant config UI
 - ⏳ **Phase 5+** — Onboarding flow, multi-channel, integrations
 
-**224 tests passing · 89.31% coverage · gate ≥ 85%** (Phase 3b scope: contracts + state_machine + runner + tools + webhooks + integration + scripts)
+**266 tests passing · 91% coverage · gate ≥ 85%** (Phase 3c.1 scope: contracts + state_machine + runner + tools + webhooks + integration + scripts; legacy Tool wrappers + ingestion CLI excluded from coverage)
 
 ## Architecture (one-paragraph version)
 
