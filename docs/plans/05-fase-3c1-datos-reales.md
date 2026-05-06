@@ -50,46 +50,78 @@
 
 **Files:**
 - Modify: `docker-compose.yml`
+- Modify: `.github/workflows/ci.yml` (CI service image)
 
 **Step 1: Editar docker-compose.yml**
 
-Cambiar la línea de la imagen:
+Cambiar la línea de la imagen y pinear a una versión específica para mantener
+`<=>` (cosine) determinístico entre máquinas:
 
 ```yaml
   postgres-v2:
 -   image: postgres:15-alpine
-+   image: pgvector/pgvector:pg15
++   # Pinned to a specific pgvector release to keep `<=>` cosine semantics
++   # deterministic across machines. Bumping requires re-running ingestion.
++   image: pgvector/pgvector:0.8.2-pg15
 ```
 
-**Step 2: Recrear contenedor preservando datos**
+Nota sobre el volume: si el contenedor que ya corre fue creado bajo otro
+project name de Compose (p. ej. `v2-nucleo-conversacional`), `compose up`
+crearía un volume nuevo vacío. Usar `external: true` para enlazar el volume
+existente con sus datos:
+
+```yaml
+volumes:
+  atendia_v2_pg_data:
++   external: true
++   name: v2-nucleo-conversacional_atendia_v2_pg_data
+```
+
+(Si el dev arranca de cero y no tiene volume previo, omitir el bloque
+`external` y dejar que Compose lo cree.)
+
+**Step 2: Actualizar la imagen del servicio postgres en CI**
+
+Editar `.github/workflows/ci.yml` (sección `services.postgres.image`):
+
+```yaml
+-   image: postgres:15-alpine
++   image: pgvector/pgvector:0.8.2-pg15
+```
+
+Sin esto, el `alembic upgrade head` de CI fallará en T3 al ejecutar
+`CREATE EXTENSION vector` contra la imagen base sin pgvector.
+
+**Step 3: Recrear contenedor preservando datos**
 
 ```bash
-cd "C:/Users/Sprt/Documents/Proyectos IA/AtendIA-v2" && docker compose down && docker compose up -d
+cd "C:/Users/Sprt/Documents/Proyectos IA/AtendIA-v2" && docker compose pull postgres-v2 && docker compose up -d
 ```
 
 Expected: Postgres rearranca con la nueva imagen, mismo volume `atendia_v2_pg_data`, mismos datos.
 
-**Step 3: Verificar que la extensión está disponible**
+**Step 4: Verificar que la extensión está disponible**
 
 ```bash
 docker exec atendia_postgres_v2 psql -U atendia -d atendia_v2 -c "SELECT * FROM pg_available_extensions WHERE name = 'vector';"
 ```
 
-Expected: una fila con `name=vector`, `default_version=0.5+`.
+Expected: una fila con `name=vector`, `default_version=0.5+` (en la práctica `0.8.2`).
 
-**Step 4: Verificar que los datos previos siguen ahí**
+**Step 5: Verificar que los datos previos siguen ahí**
 
 ```bash
+docker exec atendia_postgres_v2 psql -U atendia -d atendia_v2 -c "SELECT version_num FROM alembic_version;"
 docker exec atendia_postgres_v2 psql -U atendia -d atendia_v2 -c "SELECT id, name FROM tenants;"
 ```
 
-Expected: el row de Dinamo (`eb272fdc-...` o similar).
+Expected: `alembic_version` apunta al head correcto (`4329f44c0243` o el que esté actualmente). Si `tenants` está vacío, no es regresión de T1 — confirmar con el dev si era el estado previo. (En esta branch lo era; el seed se vuelve a correr más adelante.)
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
-git add docker-compose.yml
-git commit -m "chore(docker): switch Postgres image to pgvector/pgvector:pg15"
+git add docker-compose.yml .github/workflows/ci.yml
+git commit -m "chore(docker): switch Postgres image to pgvector/pgvector:0.8.2-pg15"
 ```
 
 ---
