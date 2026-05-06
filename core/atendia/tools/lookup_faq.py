@@ -1,44 +1,102 @@
+"""Phase 3c.1 — semantic FAQ lookup using cosine similarity (pgvector).
+
+`lookup_faq(session, tenant_id, embedding, top_k=3, score_threshold=0.5)`
+is the function-style interface the runner (T18) calls directly. The
+caller is responsible for generating `embedding` (typically via
+`generate_embedding(text=user_message)`) and for accumulating its cost
+into `turn_traces.tool_cost_usd`.
+
+Cosine similarity is computed via pgvector's `<=>` operator (cosine
+distance, in [0, 2]). We expose `score = 1 - distance` in [-1, 1] but in
+practice it lives in [0, 1] for normalized embeddings. The default
+threshold 0.5 (design doc decision #10) keeps spurious matches out of
+the Composer prompt — when the best FAQ is too far, we'd rather redirect
+than answer the wrong question.
+
+A legacy `LookupFAQTool(Tool)` wrapper is preserved at the bottom for
+`register_all_tools()` compat. It generates a one-off embedding on the
+fly using the user's question text — useful for callers that don't have
+an embedding pipeline yet, but the runner path (T18) doesn't take it.
+"""
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.db.models import TenantFAQ
-from atendia.tools.base import Tool
+from atendia.tools.base import FAQMatch, Tool, ToolNoDataResult
 
 
-class LookupFAQInput(BaseModel):
-    tenant_id: UUID
-    question: str
-    top_k: int = 3
+async def lookup_faq(
+    *,
+    session: AsyncSession,
+    tenant_id: UUID,
+    embedding: list[float],
+    top_k: int = 3,
+    score_threshold: float = 0.5,
+) -> list[FAQMatch] | ToolNoDataResult:
+    """Return the top-k FAQs whose embedding is closest to `embedding`.
 
+    Filters to rows whose cosine similarity score >= `score_threshold`.
+    If no row clears the threshold (or the tenant has no embedded FAQs),
+    returns `ToolNoDataResult` so the Composer can redirect.
 
-class FAQMatch(BaseModel):
-    question: str
-    answer: str
+    Rows with `embedding IS NULL` are excluded — the partial-ingestion
+    case where some FAQs aren't embedded yet shouldn't break ranking.
+    """
+    distance = TenantFAQ.embedding.cosine_distance(embedding)
+    stmt = (
+        select(TenantFAQ, (1 - distance).label("score"))
+        .where(
+            TenantFAQ.tenant_id == tenant_id,
+            TenantFAQ.embedding.is_not(None),
+        )
+        .order_by(distance)
+        .limit(top_k)
+    )
+    rows = (await session.execute(stmt)).all()
+    matches = [
+        FAQMatch(pregunta=faq.question, respuesta=faq.answer, score=float(score))
+        for faq, score in rows
+        if float(score) >= score_threshold
+    ]
+    if not matches:
+        return ToolNoDataResult(
+            hint=f"no FAQ above similarity threshold {score_threshold}"
+        )
+    return matches
 
 
 class LookupFAQTool(Tool):
+    """Legacy registry wrapper — accepts a `question` text and embeds it inline.
+
+    Phase 3c.1's runner (T18) calls `lookup_faq()` directly with a
+    pre-computed embedding (so the cost is tracked separately). This
+    wrapper exists only so `register_all_tools()` keeps the same six
+    tool names; new code paths import the function.
+    """
+
     name = "lookup_faq"
 
     async def run(self, session: AsyncSession, **kwargs: Any) -> dict:
-        params = LookupFAQInput.model_validate(kwargs)
-        query_pattern = f"%{params.question}%"
-        stmt = (
-            select(TenantFAQ)
-            .where(TenantFAQ.tenant_id == params.tenant_id)
-            .where(or_(
-                TenantFAQ.question.ilike(query_pattern),
-                TenantFAQ.answer.ilike(query_pattern),
-            ))
-            .limit(params.top_k)
+        # The legacy class-based API takes a `question` string. Generating
+        # an embedding here would couple this method to the OpenAI client
+        # configuration, so we expect callers to pass `embedding` directly.
+        # If they don't, return ToolNoDataResult so the action_resolver
+        # path doesn't crash on a missing key.
+        embedding = kwargs.get("embedding")
+        if not embedding:
+            return ToolNoDataResult(
+                hint="lookup_faq requires `embedding` kwarg in Phase 3c.1+",
+            ).model_dump(mode="json")
+        result = await lookup_faq(
+            session=session,
+            tenant_id=kwargs["tenant_id"],
+            embedding=embedding,
+            top_k=kwargs.get("top_k", 3),
+            score_threshold=kwargs.get("score_threshold", 0.5),
         )
-        rows = (await session.execute(stmt)).scalars().all()
-        return {
-            "matches": [
-                FAQMatch(question=r.question, answer=r.answer).model_dump()
-                for r in rows
-            ]
-        }
+        if isinstance(result, ToolNoDataResult):
+            return result.model_dump(mode="json")
+        return {"matches": [m.model_dump(mode="json") for m in result]}
