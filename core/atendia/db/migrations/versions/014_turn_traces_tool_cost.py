@@ -16,17 +16,16 @@ Decision rationale (design doc decision #12): a separate column
 keeps the cost decomposition meaningful in dashboards (NLU vs
 Composer vs Tools) instead of co-mingling under nlu_cost_usd.
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c7d3762b4881'
-down_revision: Union[str, Sequence[str], None] = 'de4463588cea'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'de4463588cea'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

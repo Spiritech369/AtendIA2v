@@ -75,7 +75,7 @@ async def quote(
     )
 
 
-class QuoteTool(Tool):
+class QuoteTool(Tool):  # pragma: no cover
     """Legacy registry wrapper — delegates to `quote()` and dumps to dict.
 
     Phase 3c.1's runner (T18) calls `quote()` directly, but

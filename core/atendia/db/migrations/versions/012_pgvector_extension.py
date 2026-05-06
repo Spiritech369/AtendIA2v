@@ -15,16 +15,15 @@ column declared with the `vector` type, which we don't want during
 a migration rollback. Operators should drop the columns first
 (migrations 013+) and only then drop the extension manually.
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision: str = 'c9c3bfbc5157'
-down_revision: Union[str, Sequence[str], None] = '4329f44c0243'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '4329f44c0243'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

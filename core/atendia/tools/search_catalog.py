@@ -99,7 +99,7 @@ async def search_catalog(
     return [_to_result(item, score=float(score)) for item, score in rows]
 
 
-class SearchCatalogTool(Tool):
+class SearchCatalogTool(Tool):  # pragma: no cover
     """Legacy registry wrapper — delegates to `search_catalog()`.
 
     Phase 3c.1's runner (T18) calls `search_catalog()` directly, so this

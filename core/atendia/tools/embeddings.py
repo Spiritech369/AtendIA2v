@@ -16,7 +16,6 @@ from decimal import Decimal
 
 from openai import AsyncOpenAI
 
-
 # Pricing for text-embedding-3-large at 2026-05: $0.13 per 1M tokens.
 # If OpenAI changes published pricing, update this constant; the unit
 # test `test_cost_formula_constant` will fail loudly to flag the drift.
@@ -27,7 +26,7 @@ DEFAULT_EMBEDDING_MODEL: str = "text-embedding-3-large"
 
 
 def _compute_cost(tokens: int) -> Decimal:
-    """Tokens × price / 1M, rounded to 6 decimals (matches turn_traces.NUMERIC(10,6))."""
+    """Tokens * price / 1M, rounded to 6 decimals (matches turn_traces.NUMERIC(10,6))."""
     return (Decimal(tokens) * EMBEDDING_PRICE_PER_1M / Decimal("1000000")).quantize(
         Decimal("0.000001")
     )

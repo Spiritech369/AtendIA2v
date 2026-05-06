@@ -33,18 +33,17 @@ type with an explicit cast.
 HNSW params m=16 / ef_construction=64 are pgvector defaults — well-suited to
 small corpora and cheap to rebuild if we tune later.
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-from pgvector.sqlalchemy import HALFVEC
-
+from alembic import op
+from pgvector.sqlalchemy import HALFVEC  # type: ignore[import-untyped]
 
 # revision identifiers, used by Alembic.
 revision: str = 'de4463588cea'
-down_revision: Union[str, Sequence[str], None] = 'c9c3bfbc5157'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'c9c3bfbc5157'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 _HNSW_PARAMS: dict[str, int] = {"m": 16, "ef_construction": 64}

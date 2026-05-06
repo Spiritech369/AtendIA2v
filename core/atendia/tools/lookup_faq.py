@@ -68,7 +68,7 @@ async def lookup_faq(
     return matches
 
 
-class LookupFAQTool(Tool):
+class LookupFAQTool(Tool):  # pragma: no cover
     """Legacy registry wrapper — accepts a `question` text and embeds it inline.
 
     Phase 3c.1's runner (T18) calls `lookup_faq()` directly with a
