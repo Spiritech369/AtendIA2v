@@ -530,13 +530,24 @@ class ConversationRunner:
 
         if not inside_24h and decision.action in COMPOSED_ACTIONS:
             # Outside 24h: no compose, no enqueue. Create handoff for visibility.
-            await self._session.execute(
-                text(
-                    "INSERT INTO human_handoffs "
-                    "(conversation_id, tenant_id, reason, status) "
-                    "VALUES (:cid, :tid, 'outside_24h_window', 'pending')"
+            from atendia.contracts.handoff_summary import HandoffReason
+            from atendia.runner.handoff_helper import (
+                build_handoff_summary,
+                persist_handoff,
+            )
+            await persist_handoff(
+                session=self._session,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                summary=build_handoff_summary(
+                    reason=HandoffReason.OUTSIDE_24H_WINDOW,
+                    extracted=ext_fields,
+                    last_inbound_text=inbound.text,
+                    suggested_next_action=(
+                        "Contactar al cliente fuera del 24h window."
+                    ),
+                    docs_per_plan=pipeline.docs_per_plan,
                 ),
-                {"cid": conversation_id, "tid": tenant_id},
             )
             await self._emitter.emit(
                 conversation_id=conversation_id,
@@ -587,13 +598,24 @@ class ConversationRunner:
                 )
 
             if composer_usage is not None and composer_usage.fallback_used:
-                await self._session.execute(
-                    text(
-                        "INSERT INTO human_handoffs "
-                        "(conversation_id, tenant_id, reason, status) "
-                        "VALUES (:cid, :tid, 'composer_failed', 'pending')"
+                from atendia.contracts.handoff_summary import HandoffReason
+                from atendia.runner.handoff_helper import (
+                    build_handoff_summary,
+                    persist_handoff,
+                )
+                await persist_handoff(
+                    session=self._session,
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    summary=build_handoff_summary(
+                        reason=HandoffReason.COMPOSER_FAILED,
+                        extracted=ext_fields,
+                        last_inbound_text=inbound.text,
+                        suggested_next_action=(
+                            "Composer agotó retries; el cliente sigue esperando."
+                        ),
+                        docs_per_plan=pipeline.docs_per_plan,
                     ),
-                    {"cid": conversation_id, "tid": tenant_id},
                 )
                 await self._emitter.emit(
                     conversation_id=conversation_id,
