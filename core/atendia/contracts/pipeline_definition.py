@@ -2,8 +2,23 @@ import re
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from atendia.contracts.flow_mode import FlowMode
+from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule
 
 _FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _default_flow_mode_rules() -> list[FlowModeRule]:
+    """Phase 3c.2 — minimal fallback so the router never raises on a tenant
+    that hasn't authored explicit rules. Routes everything to SUPPORT;
+    legacy 3a/3b tenants keep their FAQ-style behavior."""
+    return [
+        FlowModeRule(
+            id="default_always_support",
+            trigger=AlwaysTrigger(),
+            mode=FlowMode.SUPPORT,
+        ),
+    ]
 
 
 class FieldSpec(BaseModel):
@@ -68,6 +83,11 @@ class PipelineDefinition(BaseModel):
     stages: list[StageDefinition] = Field(min_length=1)
     # tone field removed in Phase 3b — moved to tenant_branding.voice
     fallback: str
+    # Phase 3c.2 — deterministic flow router config:
+    flow_mode_rules: list[FlowModeRule] = Field(
+        default_factory=_default_flow_mode_rules,
+    )
+    docs_per_plan: dict[str, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_stage_ids_unique(self) -> "PipelineDefinition":

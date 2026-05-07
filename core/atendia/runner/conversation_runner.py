@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -12,6 +13,7 @@ from atendia.config import get_settings
 from atendia.contracts.event import EventType
 from atendia.contracts.message import Message
 from atendia.contracts.tone import Tone
+from atendia.contracts.vision_result import VisionResult
 from atendia.db.models import TurnTrace
 from atendia.runner.composer_protocol import (
     ComposerInput,
@@ -28,6 +30,7 @@ from atendia.tools.embeddings import generate_embedding
 from atendia.tools.lookup_faq import lookup_faq
 from atendia.tools.quote import quote
 from atendia.tools.search_catalog import search_catalog
+from atendia.tools.vision import classify_image
 
 
 def _jsonable(obj: Any) -> Any:
@@ -131,13 +134,57 @@ class ConversationRunner:
 
         current_stage_def = next(s for s in pipeline.stages if s.id == current_stage)
 
-        nlu, usage = await self._nlu.classify(
+        # Phase 3c.2 — run NLU and (optionally) Vision in parallel. Vision
+        # only fires when the inbound carries an image attachment with a
+        # resolved URL AND OpenAI is configured. Errors in either branch
+        # are caught individually so a flaky Vision call cannot wipe out
+        # the NLU result that drives state.
+        settings = get_settings()
+        nlu_task = self._nlu.classify(
             text=inbound.text,
             current_stage=current_stage,
             required_fields=current_stage_def.required_fields,
             optional_fields=current_stage_def.optional_fields,
             history=history,
         )
+
+        vision_result: VisionResult | None = None
+        vision_cost_usd: Decimal = Decimal("0")
+        vision_latency_ms: int | None = None
+        first_image = next(
+            (a for a in inbound.attachments if a.mime_type.startswith("image/")),
+            None,
+        )
+
+        if first_image and first_image.url and settings.openai_api_key:
+            from openai import AsyncOpenAI
+            vision_client = AsyncOpenAI(api_key=settings.openai_api_key)
+            vision_task = classify_image(
+                client=vision_client, image_url=first_image.url,
+            )
+            nlu_outcome, vision_outcome = await asyncio.gather(
+                nlu_task, vision_task, return_exceptions=True,
+            )
+            if isinstance(nlu_outcome, BaseException):
+                raise nlu_outcome
+            nlu, usage = nlu_outcome
+            if isinstance(vision_outcome, BaseException):
+                await self._emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.ERROR_OCCURRED,
+                    payload={
+                        "where": "vision",
+                        "exception": type(vision_outcome).__name__,
+                        "message": str(vision_outcome)[:200],
+                    },
+                )
+            else:
+                # vision_result is consumed by mode-specific dispatch in T21.
+                (vision_result, _tokens_in, _tokens_out,  # noqa: RUF059
+                 vision_cost_usd, vision_latency_ms) = vision_outcome
+        else:
+            nlu, usage = await nlu_task
 
         # Surface NLU-level errors as ERROR_OCCURRED events for observability.
         nlu_errors = [a for a in nlu.ambiguities if a.startswith("nlu_error:")]
@@ -235,7 +282,6 @@ class ConversationRunner:
         # conversation_state.total_cost_usd alongside NLU + Composer cost.
         action_payload: dict = {}
         tool_cost_usd: Decimal = Decimal("0")
-        settings = get_settings()
 
         if decision.action == "quote":
             interes = state_obj.extracted_data.get("interes_producto")
@@ -411,26 +457,20 @@ class ConversationRunner:
             {"cid": conversation_id},
         )
 
-        # Accumulate composer cost into conversation_state.
-        if composer_usage is not None and composer_usage.cost_usd > 0:
+        # Accumulate every cost source for this turn into conversation_state in
+        # a single UPDATE. Composer + tools (3c.1) + Vision (3c.2). The same
+        # values are also written individually onto turn_traces below; this
+        # row keeps the conversation-wide running total.
+        composer_cost = composer_usage.cost_usd if composer_usage else Decimal("0")
+        turn_cost = composer_cost + tool_cost_usd + vision_cost_usd
+        if turn_cost > 0:
             await self._session.execute(
                 text(
                     "UPDATE conversation_state "
                     "SET total_cost_usd = total_cost_usd + :c "
                     "WHERE conversation_id = :cid"
                 ),
-                {"c": composer_usage.cost_usd, "cid": conversation_id},
-            )
-
-        # Phase 3c.1 — accumulate tool cost (embeddings) into conversation_state.
-        if tool_cost_usd > 0:
-            await self._session.execute(
-                text(
-                    "UPDATE conversation_state "
-                    "SET total_cost_usd = total_cost_usd + :c "
-                    "WHERE conversation_id = :cid"
-                ),
-                {"c": tool_cost_usd, "cid": conversation_id},
+                {"c": turn_cost, "cid": conversation_id},
             )
 
         # Build state_after snapshot
@@ -483,6 +523,8 @@ class ConversationRunner:
             composer_cost_usd=(composer_usage.cost_usd if composer_usage else None),
             composer_latency_ms=(composer_usage.latency_ms if composer_usage else None),
             tool_cost_usd=tool_cost_usd if tool_cost_usd > 0 else None,
+            vision_cost_usd=vision_cost_usd if vision_cost_usd > 0 else None,
+            vision_latency_ms=vision_latency_ms,
             outbound_messages=(
                 composer_output.messages if composer_output is not None else None
             ),

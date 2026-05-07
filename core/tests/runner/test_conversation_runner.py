@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -18,7 +18,6 @@ from atendia.runner.composer_protocol import (
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
 from atendia.runner.nlu_protocol import UsageMetadata
-
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -79,7 +78,7 @@ def _make_inbound(conversation_id, tenant_id, txt: str) -> Message:
         tenant_id=str(tenant_id),
         direction=MessageDirection.INBOUND,
         text=txt,
-        sent_at=datetime.now(timezone.utc),
+        sent_at=datetime.now(UTC),
     )
 
 
@@ -349,7 +348,7 @@ async def test_runner_24h_handoff_creates_row_no_compose(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t24_24h")
 
     # Backdate last_activity_at to 25h ago.
-    twenty_five_hours_ago = datetime.now(timezone.utc) - timedelta(hours=25)
+    twenty_five_hours_ago = datetime.now(UTC) - timedelta(hours=25)
     await db_session.execute(
         text("UPDATE conversations SET last_activity_at = :ts WHERE id = :cid"),
         {"ts": twenty_five_hours_ago, "cid": conv_id},
@@ -488,3 +487,160 @@ async def test_runner_total_cost_includes_composer(db_session):
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
+
+
+# ============================================================================
+# Phase 3c.2 — Parallel NLU + Vision integration (T20)
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_runner_runs_vision_in_parallel_when_image_attached(
+    db_session, monkeypatch,
+):
+    """Image attachment with resolved URL + openai_api_key → Vision fires.
+
+    Verifies the asyncio.gather branch:
+      - NLU result still drives state extraction
+      - Vision result populates turn_traces.vision_cost_usd / vision_latency_ms
+      - vision_cost_usd lands in conversation_state.total_cost_usd
+    """
+    import json as _json
+
+    import respx
+    from httpx import Response
+
+    from atendia.contracts.message import Attachment
+
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, "test_t20_vision_parallel",
+    )
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-vision")
+    from atendia.config import get_settings
+    get_settings.cache_clear()
+
+    vision_payload = _json.dumps({
+        "category": "ine",
+        "confidence": 0.92,
+        "metadata": {
+            "ambos_lados": True, "legible": True,
+            "fecha_iso": None, "institucion": None,
+            "modelo": None, "notas": None,
+        },
+    })
+    with respx.mock(assert_all_called=True) as router:
+        router.post("https://api.openai.com/v1/chat/completions").mock(
+            return_value=Response(200, json={
+                "id": "chatcmpl-vision",
+                "choices": [{
+                    "message": {"role": "assistant", "content": vision_payload},
+                    "finish_reason": "stop",
+                }],
+                "usage": {"prompt_tokens": 1500, "completion_tokens": 80,
+                          "total_tokens": 1580},
+            }),
+        )
+
+        runner = ConversationRunner(
+            db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        )
+
+        inbound = _make_inbound(conv_id, tid, "aquí va mi INE")
+        inbound.attachments = [Attachment(
+            media_id="MEDIA_X", mime_type="image/jpeg",
+            url="https://lookaside.fbsbx.com/test_ine",
+        )]
+        trace = await runner.run_turn(
+            conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        )
+        await db_session.commit()
+
+    assert trace.vision_cost_usd is not None
+    assert trace.vision_cost_usd > 0
+    assert trace.vision_latency_ms is not None
+    assert trace.vision_latency_ms >= 0
+
+    total = (await db_session.execute(
+        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert total > Decimal("0.000050")  # NLU 0.000050 + non-zero Vision
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_runner_skips_vision_when_no_image_attachment(db_session, monkeypatch):
+    """Text-only inbound: NLU runs, Vision does NOT — trace has no vision data."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, "test_t20_no_vision",
+    )
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-no-vision")
+    from atendia.config import get_settings
+    get_settings.cache_clear()
+
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+    )
+    inbound = _make_inbound(conv_id, tid, "hola")
+    trace = await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    assert trace.vision_cost_usd is None
+    assert trace.vision_latency_ms is None
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypatch):
+    """Vision endpoint 500s → ERROR_OCCURRED event, NLU result still drives turn."""
+    import respx
+    from httpx import Response
+
+    from atendia.contracts.message import Attachment
+
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, "test_t20_vision_failure",
+    )
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-vision-fail")
+    from atendia.config import get_settings
+    get_settings.cache_clear()
+
+    with respx.mock:
+        respx.post("https://api.openai.com/v1/chat/completions").mock(
+            return_value=Response(500, json={"error": "internal"}),
+        )
+
+        runner = ConversationRunner(
+            db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        )
+        inbound = _make_inbound(conv_id, tid, "aquí va")
+        inbound.attachments = [Attachment(
+            media_id="MEDIA_FAIL", mime_type="image/jpeg",
+            url="https://lookaside.fbsbx.com/will_500",
+        )]
+        trace = await runner.run_turn(
+            conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        )
+        await db_session.commit()
+
+    assert trace.nlu_cost_usd == Decimal("0.000050")
+    assert trace.vision_cost_usd is None
+
+    err_rows = (await db_session.execute(
+        text("SELECT payload FROM events "
+             "WHERE conversation_id = :c AND type = 'error_occurred'"),
+        {"c": conv_id},
+    )).fetchall()
+    payloads = [r[0] for r in err_rows]
+    assert any(p.get("where") == "vision" for p in payloads)
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+    get_settings.cache_clear()
