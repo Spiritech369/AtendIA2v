@@ -1,258 +1,220 @@
-from pathlib import Path
+"""Unit tests for composer_prompts (Phase 3c.2: mode-based dispatch).
 
+Snapshot tests for the 6 modes x key states live in T17 alongside
+their fixtures. This file covers the structural invariants:
+  * SYSTEM_PROMPT_TEMPLATE has all required placeholders.
+  * MODE_PROMPTS has all 6 modes.
+  * build_composer_prompt dispatches by flow_mode and renders helpers.
+  * brand_facts pre-pass resolves dotted refs and raises on missing keys.
+"""
+import pytest
+
+from atendia.contracts.flow_mode import FlowMode
 from atendia.contracts.tone import Tone
 from atendia.runner.composer_prompts import (
-    ACTION_GUIDANCE,
+    MODE_PROMPTS,
     OUTPUT_INSTRUCTIONS,
     SYSTEM_PROMPT_TEMPLATE,
+    _resolve_brand_facts_in_block,
     build_composer_prompt,
 )
 from atendia.runner.composer_protocol import ComposerInput
 
-_FIXTURES = Path(__file__).parent.parent / "fixtures" / "composer"
-
-
 # ============================================================
-# T11 — templates editable constants
+# Template / constant invariants
 # ============================================================
 
-def test_system_prompt_has_required_placeholders():
+def test_system_prompt_has_required_placeholders() -> None:
     for ph in [
         "{{bot_name}}", "{{register}}", "{{use_emojis}}", "{{max_words}}",
-        "{{forbidden_phrases}}", "{{signature_phrases}}", "{{stage}}",
-        "{{last_intent}}", "{{extracted_data}}", "{{action_guidance}}",
+        "{{forbidden_phrases}}", "{{signature_phrases}}",
+        "{{turn_number}}", "{{stage}}", "{{last_intent}}", "{{extracted_data}}",
+        "{{action_payload}}", "{{brand_facts_block}}", "{{mode_guidance}}",
         "{{output_instructions}}",
     ]:
         assert ph in SYSTEM_PROMPT_TEMPLATE
 
 
-def test_action_guidance_has_all_7_actions():
-    expected = {
-        "greet", "ask_field", "lookup_faq", "ask_clarification",
-        "quote", "explain_payment_options", "close",
-    }
-    assert expected.issubset(ACTION_GUIDANCE.keys())
+def test_mode_prompts_has_all_six_modes() -> None:
+    assert set(MODE_PROMPTS.keys()) == set(FlowMode)
 
 
-def test_action_guidance_quote_says_no_inventes():
-    assert "NO INVENTES PRECIOS" in ACTION_GUIDANCE["quote"].upper()
+def test_mode_prompts_plan_says_no_inventes_precios() -> None:
+    assert "NO inventes precios" in MODE_PROMPTS[FlowMode.PLAN]
 
 
-def test_action_guidance_lookup_faq_redirects():
-    assert "redirige" in ACTION_GUIDANCE["lookup_faq"].lower()
+def test_mode_prompts_sales_says_no_inventes_precios() -> None:
+    assert "NO INVENTES precios" in MODE_PROMPTS[FlowMode.SALES]
 
 
-def test_output_instructions_mentions_messages_format():
+def test_mode_prompts_doc_says_no_inventes() -> None:
+    assert "NO inventes" in MODE_PROMPTS[FlowMode.DOC]
+
+
+def test_mode_prompts_retention_carries_attempt_marker() -> None:
+    assert "retention_attempt" in MODE_PROMPTS[FlowMode.RETENTION]
+
+
+def test_output_instructions_mentions_messages_format() -> None:
     assert "messages" in OUTPUT_INSTRUCTIONS
     assert "{{max_messages}}" in OUTPUT_INSTRUCTIONS
     assert "{{max_words}}" in OUTPUT_INSTRUCTIONS
 
 
 # ============================================================
-# T12 — build_composer_prompt
+# build_composer_prompt — structural
 # ============================================================
 
-def test_build_composer_prompt_basic_structure():
+def test_build_composer_prompt_basic_structure() -> None:
     msgs = build_composer_prompt(ComposerInput(
-        action="greet",
-        current_stage="greeting",
+        action="unused", flow_mode=FlowMode.RETENTION,
+        current_stage="sales",
         tone=Tone(bot_name="Dinamo", register="informal_mexicano"),
         history=[("inbound", "hola"), ("outbound", "qué onda")],
     ))
     assert msgs[0]["role"] == "system"
     assert "Dinamo" in msgs[0]["content"]
     assert "informal_mexicano" in msgs[0]["content"]
-    assert "SALUDAR" in msgs[0]["content"]
-    # History rendered as user/assistant chat messages (NO user message at end)
+    assert "RETENTION MODE" in msgs[0]["content"]
+    # History rendered as user/assistant chat messages
     assert any(m["role"] == "user" and "hola" in m["content"] for m in msgs)
     assert any(m["role"] == "assistant" and "qué onda" in m["content"] for m in msgs)
 
 
-def test_build_composer_prompt_quote_includes_no_inventes():
+def test_build_composer_prompt_renders_turn_number() -> None:
     msgs = build_composer_prompt(ComposerInput(
-        action="quote",
-        current_stage="quote",
-        tone=Tone(),
+        action="unused", flow_mode=FlowMode.RETENTION,
+        current_stage="sales", turn_number=7, tone=Tone(),
     ))
-    assert "NO INVENTES PRECIOS" in msgs[0]["content"]
+    assert "Turno actual: 7" in msgs[0]["content"]
 
 
-def test_build_composer_prompt_ask_field_substitutes_field_name():
+def test_build_composer_prompt_no_history_no_user_message() -> None:
+    """Composer prompt does NOT append a user message at the end."""
     msgs = build_composer_prompt(ComposerInput(
-        action="ask_field",
-        action_payload={
-            "field_name": "ciudad",
-            "field_description": "Ciudad del cliente",
-        },
-        current_stage="qualify",
-        tone=Tone(),
-    ))
-    assert "ciudad" in msgs[0]["content"]
-    assert "Ciudad del cliente" in msgs[0]["content"]
-
-
-def test_build_composer_prompt_renders_forbidden_phrases():
-    msgs = build_composer_prompt(ComposerInput(
-        action="greet", current_stage="greeting",
-        tone=Tone(forbidden_phrases=["estimado cliente"]),
-    ))
-    assert "estimado cliente" in msgs[0]["content"]
-
-
-def test_build_composer_prompt_no_history_no_user_message():
-    """Composer prompt does NOT append a user message at the end (NLU does;
-    Composer doesn't need one because the action IS the prompt)."""
-    msgs = build_composer_prompt(ComposerInput(
-        action="greet", current_stage="greeting", tone=Tone(),
+        action="unused", flow_mode=FlowMode.RETENTION,
+        current_stage="sales", tone=Tone(),
     ))
     assert len(msgs) == 1
     assert msgs[0]["role"] == "system"
 
 
-# ============================================================
-# T13 — snapshot test
-# ============================================================
-
-def test_composer_system_prompt_snapshot_greet_dinamo():
-    """Byte-equality snapshot guard for the Dinamo greet system prompt.
-
-    Intentional edits to SYSTEM_PROMPT_TEMPLATE / ACTION_GUIDANCE / output
-    instructions will fail this test. Regenerate the fixture via:
-
-        uv run python -c "
-        from pathlib import Path
-        from atendia.contracts.tone import Tone
-        from atendia.runner.composer_prompts import build_composer_prompt
-        from atendia.runner.composer_protocol import ComposerInput
-        m = build_composer_prompt(ComposerInput(
-            action='greet', current_stage='greeting',
-            tone=Tone(
-                register='informal_mexicano', use_emojis='sparingly',
-                max_words_per_message=40, bot_name='Dinamo',
-                forbidden_phrases=['estimado cliente', 'le saluda atentamente'],
-                signature_phrases=['¡qué onda!', 'te paso'],
-            ),
-        ))
-        Path('tests/fixtures/composer/greet_dinamo_system.txt').write_text(
-            m[0]['content'], encoding='utf-8', newline='',
-        )
-        "
-    """
-    expected = (_FIXTURES / "greet_dinamo_system.txt").read_text(encoding="utf-8")
+def test_build_composer_prompt_renders_forbidden_phrases() -> None:
     msgs = build_composer_prompt(ComposerInput(
-        action="greet",
-        current_stage="greeting",
-        tone=Tone(
-            register="informal_mexicano",
-            use_emojis="sparingly",
-            max_words_per_message=40,
-            bot_name="Dinamo",
-            forbidden_phrases=["estimado cliente", "le saluda atentamente"],
-            signature_phrases=["¡qué onda!", "te paso"],
-        ),
+        action="unused", flow_mode=FlowMode.RETENTION,
+        current_stage="sales",
+        tone=Tone(forbidden_phrases=["estimado cliente"]),
     ))
-    assert msgs[0]["content"] == expected
+    assert "estimado cliente" in msgs[0]["content"]
 
 
 # ============================================================
-# T16 — Phase 3c.1 ACTION_GUIDANCE updates
+# build_composer_prompt — mode dispatch
 # ============================================================
 
-def test_action_guidance_quote_handles_status_ok() -> None:
-    """For ok payload, prompt instructs to give real price + popular plan."""
-    g = ACTION_GUIDANCE["quote"]
-    assert "status='ok'" in g
-    assert "price_contado_mxn" in g
-    # Plan instruction (either literal plan_10 or the descriptive phrase)
-    assert "plan_10" in g or "plan más popular" in g.lower()
+def test_dispatch_picks_mode_specific_block() -> None:
+    """SALES mode → SALES guidance, not PLAN guidance.
 
-
-def test_action_guidance_quote_handles_status_no_data() -> None:
-    """For no_data payload, prompt instructs to ask for the model (no inventing)."""
-    g = ACTION_GUIDANCE["quote"]
-    assert "status='no_data'" in g
-    assert "sin inventar" in g.lower() or "no inventar" in g.lower()
-
-
-def test_action_guidance_lookup_faq_handles_matches_field() -> None:
-    """Composer must know matches lives in action_payload.matches."""
-    g = ACTION_GUIDANCE["lookup_faq"]
-    assert "matches" in g
-
-
-def test_action_guidance_search_catalog_present_with_results_field() -> None:
-    """search_catalog wasn't in ACTION_GUIDANCE in Phase 3b — added in 3c.1."""
-    assert "search_catalog" in ACTION_GUIDANCE
-    g = ACTION_GUIDANCE["search_catalog"]
-    assert "results" in g
-    assert "no inventes" in g.lower() or "NO INVENTES" in g
-
-
-# ============================================================
-# T17 — snapshot: quote prompt with real action_payload
-# ============================================================
-
-def test_composer_quote_with_data_snapshot() -> None:
-    """Byte-equality guard for the quote prompt with real action_payload.
-
-    Regenerate the fixture if intended:
-        PYTHONIOENCODING=utf-8 uv run python -c "
-        from pathlib import Path
-        from atendia.contracts.tone import Tone
-        from atendia.runner.composer_prompts import build_composer_prompt
-        from atendia.runner.composer_protocol import ComposerInput
-        m = build_composer_prompt(ComposerInput(
-            action='quote',
-            action_payload={
-                'status': 'ok',
-                'sku': 'adventure-150-cc',
-                'name': 'Adventure 150 CC',
-                'category': 'Motoneta',
-                'price_lista_mxn': '31395',
-                'price_contado_mxn': '29900',
-                'planes_credito': {'plan_10': {'enganche': 3140,
-                                                'pago_quincenal': 1247,
-                                                'quincenas': 72}},
-                'ficha_tecnica': {'motor_cc': 150},
-            },
-            current_stage='quote',
-            extracted_data={'interes_producto': 'Adventure', 'ciudad': 'CDMX'},
-            tone=Tone(
-                register='informal_mexicano', use_emojis='sparingly',
-                max_words_per_message=40, bot_name='Dinamo',
-                forbidden_phrases=['estimado cliente', 'le saluda atentamente'],
-                signature_phrases=['¡qué onda!', 'te paso'],
-            ),
-        ))
-        Path('tests/fixtures/composer/quote_dinamo_with_data_system.txt').write_text(
-            m[0]['content'], encoding='utf-8', newline='',
-        )
-        "
+    Uses markers that are unique to each mode's body (not cross-references —
+    PLAN's prompt mentions "SALES MODE" inside its prohibido section).
     """
-    expected = (_FIXTURES / "quote_dinamo_with_data_system.txt").read_text(encoding="utf-8")
+    sales_msgs = build_composer_prompt(ComposerInput(
+        action="unused", flow_mode=FlowMode.SALES,
+        current_stage="sales",
+        action_payload={"status": "ok", "name": "Adventure",
+                        "price_contado_mxn": "29900"},
+        brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil"},
+        tone=Tone(),
+    ))
+    plan_msgs = build_composer_prompt(ComposerInput(
+        action="unused", flow_mode=FlowMode.PLAN,
+        current_stage="plan",
+        brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil",
+                     "post_completion_form": "https://y"},
+        tone=Tone(),
+    ))
+    # SALES has the price reasoning + objection handling; PLAN does not.
+    assert "Puedes liquidar antes sin penalización" in sales_msgs[0]["content"]
+    assert "Puedes liquidar antes sin penalización" not in plan_msgs[0]["content"]
+    # PLAN has the credit-type menu; SALES does not.
+    assert "Me depositan nómina en tarjeta" in plan_msgs[0]["content"]
+    assert "Me depositan nómina en tarjeta" not in sales_msgs[0]["content"]
+
+
+def test_brand_facts_block_omitted_for_retention() -> None:
+    """RETENTION + OBSTACLE skip brand_facts injection (token-bloat avoidance)."""
     msgs = build_composer_prompt(ComposerInput(
-        action="quote",
-        action_payload={
-            "status": "ok",
-            "sku": "adventure-150-cc",
-            "name": "Adventure 150 CC",
-            "category": "Motoneta",
-            "price_lista_mxn": "31395",
-            "price_contado_mxn": "29900",
-            "planes_credito": {
-                "plan_10": {"enganche": 3140, "pago_quincenal": 1247, "quincenas": 72},
-            },
-            "ficha_tecnica": {"motor_cc": 150},
+        action="unused", flow_mode=FlowMode.RETENTION,
+        current_stage="sales",
+        brand_facts={"catalog_url": "https://x"},
+        tone=Tone(),
+    ))
+    assert "Brand facts" not in msgs[0]["content"]
+
+
+def test_brand_facts_block_present_for_support() -> None:
+    msgs = build_composer_prompt(ComposerInput(
+        action="unused", flow_mode=FlowMode.SUPPORT,
+        current_stage="plan",
+        brand_facts={
+            "address": "Benito Juárez 801",
+            "human_agent_name": "Francisco",
+            "buro_max_amount": "$50 mil",
+            "approval_time_hours": "24",
+            "delivery_time_days": "3-7",
         },
-        current_stage="quote",
-        extracted_data={"interes_producto": "Adventure", "ciudad": "CDMX"},
-        tone=Tone(
-            register="informal_mexicano",
-            use_emojis="sparingly",
-            max_words_per_message=40,
-            bot_name="Dinamo",
-            forbidden_phrases=["estimado cliente", "le saluda atentamente"],
-            signature_phrases=["¡qué onda!", "te paso"],
-        ),
+        tone=Tone(),
     ))
-    assert msgs[0]["content"] == expected
+    assert "Brand facts" in msgs[0]["content"]
+    assert "Benito Juárez 801" in msgs[0]["content"]
+    # Sorted keys → address comes before human_agent_name
+    assert msgs[0]["content"].index("address") < msgs[0]["content"].index("human_agent_name")
+
+
+# ============================================================
+# brand_facts pre-pass
+# ============================================================
+
+def test_resolve_brand_facts_substitutes_dotted_refs() -> None:
+    block = "Catálogo: {{brand_facts.catalog_url}} y dirección: {{brand_facts.address}}"
+    out = _resolve_brand_facts_in_block(
+        block, {"catalog_url": "https://x", "address": "Calle 1"},
+    )
+    assert out == "Catálogo: https://x y dirección: Calle 1"
+
+
+def test_resolve_brand_facts_raises_on_missing_key() -> None:
+    """Non-empty facts dict missing the referenced key → fail loud."""
+    block = "Catálogo: {{brand_facts.catalog_url}}"
+    with pytest.raises(RuntimeError, match="catalog_url"):
+        _resolve_brand_facts_in_block(block, {"address": "Calle 1"})
+
+
+def test_resolve_brand_facts_empty_dict_leaves_literals() -> None:
+    """Empty facts dict → no-op so callers without brand context still work."""
+    block = "Catálogo: {{brand_facts.catalog_url}}"
+    assert _resolve_brand_facts_in_block(block, {}) == block
+
+
+def test_resolve_brand_facts_leaves_non_dotted_refs_alone() -> None:
+    """Single-level placeholders like {{stage}} are render_template's job."""
+    block = "Stage: {{stage}}, catalog: {{brand_facts.catalog_url}}"
+    out = _resolve_brand_facts_in_block(block, {"catalog_url": "https://x"})
+    assert "{{stage}}" in out
+    assert "https://x" in out
+
+
+def test_build_composer_prompt_substitutes_brand_facts_in_sales() -> None:
+    """SALES mode_block has {{brand_facts.catalog_url}} — must be resolved."""
+    msgs = build_composer_prompt(ComposerInput(
+        action="unused", flow_mode=FlowMode.SALES,
+        current_stage="sales",
+        action_payload={"status": "no_data"},
+        brand_facts={
+            "catalog_url": "https://example.com/cat",
+            "buro_max_amount": "$50 mil",
+        },
+        tone=Tone(),
+    ))
+    assert "https://example.com/cat" in msgs[0]["content"]
+    assert "{{brand_facts.catalog_url}}" not in msgs[0]["content"]

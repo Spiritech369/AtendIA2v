@@ -3,10 +3,9 @@ Prompts del Composer (gpt-4o).
 
 Editas:
   1. SYSTEM_PROMPT_TEMPLATE — instrucciones generales + tono.
-  2. ACTION_GUIDANCE        — bloque condicional por acción (Phase 3c.1).
-  3. MODE_PROMPTS           — bloque por flow_mode (Phase 3c.2).
-  4. HISTORY_FORMAT         — formato de turnos previos.
-  5. OUTPUT_INSTRUCTIONS    — reglas sobre el JSON de salida.
+  2. MODE_PROMPTS           — bloque por flow_mode (6 modos, Phase 3c.2).
+  3. HISTORY_FORMAT         — formato de turnos previos.
+  4. OUTPUT_INSTRUCTIONS    — reglas sobre el JSON de salida.
 
 Helpers (render_template, _render_history) viven en _template_helpers.
 """
@@ -35,6 +34,7 @@ Tono y estilo:
 - Frases típicas que puedes usar cuando encajen naturalmente: {{signature_phrases}}.
 
 Estado de la conversación:
+- Turno actual: {{turn_number}}
 - Stage actual: {{stage}}
 - Última intent del cliente: {{last_intent}}
 - Datos extraídos hasta ahora: {{extracted_data}}
@@ -43,87 +43,16 @@ Datos de la acción (action_payload — única fuente de verdad para precios,
 respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
 {{action_payload}}
 
-{{action_guidance}}
+{{brand_facts_block}}
+
+{{mode_guidance}}
 
 {{output_instructions}}
 """
 
 
 # ============================================================
-# 2. ACTION GUIDANCE — bloque condicional por acción
-# ============================================================
-ACTION_GUIDANCE: dict[str, str] = {
-    "greet": (
-        "Acción: SALUDAR. Saluda brevemente y ofrece ayuda. "
-        "NO preguntes datos todavía."
-    ),
-    "ask_field": (
-        "Acción: PEDIR DATO. Necesitas que el cliente te diga el campo "
-        "'{{missing_field}}' ({{missing_field_description}}). Pregúntalo "
-        "naturalmente, en una sola frase."
-    ),
-    "ask_clarification": (
-        "Acción: PEDIR ACLARACIÓN. El sistema NO entendió bien el último "
-        "mensaje. Pídele al cliente que reformule o aclare. NO inventes contexto."
-    ),
-    "explain_payment_options": (
-        "Acción: EXPLICAR OPCIONES DE PAGO. Las opciones genéricas son "
-        "efectivo, transferencia y crédito (financiamiento). Menciónalas "
-        "brevemente y pregunta cuál prefiere."
-    ),
-    "lookup_faq": (
-        "Acción: RESPONDER FAQ. El sistema te pasa los matches encontrados "
-        "en action_payload.matches (lista de {pregunta, respuesta, score}).\n"
-        "- Si action_payload.matches NO está vacía: usa la PRIMERA match "
-        "  (la de score más alto) para responder. Adapta la respuesta al "
-        "  tono (informal mexicano), pero NO inventes datos extra. Si la "
-        "  respuesta tiene una lista, enuméralala con bullets cortos.\n"
-        "- Si action_payload.status='no_data': el cliente preguntó algo "
-        "  que NO está en la base. Redirige diciendo que lo consultas, "
-        "  NO inventes una respuesta. DEBES decir literalmente algo como:\n"
-        "  - 'Déjame revisar y te confirmo en un momento.'\n"
-        "  - 'Ahí va, déjame chequear y te paso la info.'\n"
-        "  - 'Te confirmo en un ratito, déjame verificar.'"
-    ),
-    "quote": (
-        "Acción: COTIZAR. El sistema te pasa los datos REALES en action_payload:\n"
-        "  - status='ok': hay precio. Campos disponibles: name, category, "
-        "    price_lista_mxn, price_contado_mxn, planes_credito (dict de "
-        "    planes 10/15/20/30 con enganche y pago_quincenal), ficha_tecnica "
-        "    (motor_cc, potencia_hp, etc.).\n"
-        "  - status='no_data': el modelo no se encontró. Pregúntale al "
-        "    cliente cuál modelo le interesa (sin inventar uno).\n"
-        "Si status='ok':\n"
-        "- DA el precio de contado en MXN, formateado con coma de miles "
-        "  (ej: $32,900). NO INVENTES PRECIOS distintos a los del payload.\n"
-        "- Menciona el plan más popular (plan_10 o plan_15) con enganche "
-        "  y pago quincenal (formateados con $).\n"
-        "- Pregunta si quiere financiamiento o contado.\n"
-        "- Máximo 2 mensajes (cap del max_messages). Sé natural."
-    ),
-    "search_catalog": (
-        "Acción: PRESENTAR OPCIONES DE CATÁLOGO. action_payload.results es "
-        "una lista de hasta 5 motos {sku, name, category, price_contado_mxn, "
-        "score}.\n"
-        "- Si results tiene 1 item: presenta esa moto y sugiere ver el "
-        "  precio detallado o financiamiento.\n"
-        "- Si results tiene 2-5 items: lista 3 máximo con nombre + precio "
-        "  (en bullets cortos), pregunta cuál le interesa.\n"
-        "- NO INVENTES motos que no estén en results. NO mezcles datos "
-        "  entre items.\n"
-        "- Si results está vacío o status='no_data': pregunta más detalles "
-        "  del modelo o categoría que busca."
-    ),
-    "close": (
-        "Acción: CERRAR. El cliente acordó comprar. Pasa al siguiente paso "
-        "concreto. Si tienes payment_link en action_payload, inclúyelo. "
-        "Si no, di que en breve le mandas el link."
-    ),
-}
-
-
-# ============================================================
-# 3. MODE PROMPTS — uno por flow_mode (Phase 3c.2)
+# 2. MODE PROMPTS — uno por flow_mode (6 modos, Phase 3c.2)
 # ============================================================
 MODE_PROMPTS: dict[FlowMode, str] = {
     FlowMode.PLAN: """\
@@ -330,13 +259,13 @@ PROHIBIDO:
 
 
 # ============================================================
-# 4. HISTORY FORMAT
+# 3. HISTORY FORMAT
 # ============================================================
 HISTORY_FORMAT = "[{{role}}] {{text}}"
 
 
 # ============================================================
-# 5. OUTPUT INSTRUCTIONS
+# 4. OUTPUT INSTRUCTIONS
 # ============================================================
 OUTPUT_INSTRUCTIONS = """\
 Reglas de salida:
@@ -352,6 +281,18 @@ Reglas de salida:
 # ============================================================
 # build_composer_prompt
 # ============================================================
+
+# Modes that get the brand_facts block injected at the top of the system prompt.
+# RETENTION + OBSTACLE skip it to keep prompts focused (no token bloat).
+_MODES_WITH_BRAND_FACTS: frozenset[FlowMode] = frozenset({
+    FlowMode.PLAN, FlowMode.SALES, FlowMode.DOC, FlowMode.SUPPORT,
+})
+
+# Matches `{{brand_facts.<key>}}` placeholders inside MODE_PROMPTS strings.
+# render_template's stricter regex (`\w+`) does not match dotted access,
+# so we resolve these in a pre-pass before injecting mode_guidance.
+_BRAND_FACT_REF_RE = re.compile(r"\{\{\s*brand_facts\.(\w+)\s*\}\}")
+
 
 def _render_extracted(extracted: dict) -> str:
     if not extracted:
@@ -376,26 +317,62 @@ def _render_action_payload(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
+def _render_brand_facts(facts: dict) -> str:
+    """Render brand_facts JSONB as a labeled block at top of system prompt.
+
+    Empty dict / None returns "" so the block can be safely injected for
+    any mode (the template has `{{brand_facts_block}}` always, but only
+    the four trade-flow modes get a non-empty block per
+    `_MODES_WITH_BRAND_FACTS`).
+
+    Keys are sorted to keep snapshot fixtures deterministic across runs.
+    """
+    if not facts:
+        return ""
+    lines = [f"  - {k}: {v}" for k, v in sorted(facts.items())]
+    return "Brand facts (info verificada del negocio):\n" + "\n".join(lines)
+
+
+def _resolve_brand_facts_in_block(block: str, facts: dict) -> str:
+    """Replace `{{brand_facts.<key>}}` references inside a MODE_PROMPTS block.
+
+    render_template's `\\w+` placeholder regex skips dotted refs entirely,
+    so without this pre-pass the literal `{{brand_facts.catalog_url}}`
+    would reach gpt-4o unsubstituted.
+
+    Empty `facts` (None or {}) → no-op: leave literals in place. This
+    keeps the test surface small (tests that don't exercise brand_facts
+    don't have to construct one). In production, tenant_branding always
+    populates facts.
+
+    Non-empty `facts` with a missing key → raises, matching the fail-loud
+    behaviour of render_template for ordinary placeholders.
+    """
+    if not facts:
+        return block
+
+    def _sub(m: re.Match[str]) -> str:
+        key = m.group(1)
+        if key not in facts:
+            raise RuntimeError(
+                f"unsubstituted brand_facts placeholder {{{{ brand_facts.{key} }}}} "
+                f"in mode prompt (facts keys: {sorted(facts.keys())})"
+            )
+        return str(facts[key])
+    return _BRAND_FACT_REF_RE.sub(_sub, block)
+
+
 def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
-    """Assemble the chat-completions message list for gpt-4o."""
-    guidance_template = ACTION_GUIDANCE.get(
-        input.action, "Acción: " + input.action.upper(),
-    )
-    # Substitute payload fields if the guidance template has placeholders.
-    guidance_vars = {
-        "missing_field": str(input.action_payload.get("field_name", "")),
-        "missing_field_description": str(
-            input.action_payload.get("field_description", ""),
-        ),
-    }
-    needed = set(re.findall(r"\{\{\s*(\w+)\s*\}\}", guidance_template))
-    if not needed:
-        guidance = guidance_template
+    """Assemble the chat-completions message list for gpt-4o.
+
+    Phase 3c.2 dispatches by `input.flow_mode` (not `input.action`).
+    """
+    mode_block = MODE_PROMPTS[input.flow_mode]
+    if input.flow_mode in _MODES_WITH_BRAND_FACTS:
+        mode_block = _resolve_brand_facts_in_block(mode_block, input.brand_facts)
+        brand_facts_block = _render_brand_facts(input.brand_facts)
     else:
-        # Fill any missing keys with "" so render_template doesn't raise.
-        for k in needed:
-            guidance_vars.setdefault(k, "")
-        guidance = render_template(guidance_template, **guidance_vars)
+        brand_facts_block = ""
 
     output_instructions = render_template(
         OUTPUT_INSTRUCTIONS,
@@ -411,11 +388,13 @@ def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
         max_words=str(input.tone.max_words_per_message),
         forbidden_phrases=", ".join(input.tone.forbidden_phrases) or "(ninguna)",
         signature_phrases=", ".join(input.tone.signature_phrases) or "(ninguna)",
+        turn_number=str(input.turn_number),
         stage=input.current_stage,
         last_intent=input.last_intent or "(ninguna)",
         extracted_data=_render_extracted(input.extracted_data),
         action_payload=_render_action_payload(input.action_payload),
-        action_guidance=guidance,
+        brand_facts_block=brand_facts_block,
+        mode_guidance=mode_block,
         output_instructions=output_instructions,
     )
 
