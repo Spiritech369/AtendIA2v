@@ -50,6 +50,76 @@ def _maybe_uuid(s: str) -> UUID | None:
         return None
 
 
+# Phase 3c.2 — pending_confirmation handling
+#
+# The runner only listens for SHORT, UNAMBIGUOUS sí/no replies; long
+# free-form messages fall through to NLU + flow_router, which is the
+# right behaviour ("¿es nómina tarjeta?" -> "Sí pero también..." should
+# go through normal extraction).
+#
+# Mexican Spanish slang adds "simon" (yes) and "nel" (no); we keep the
+# whitelist short on purpose — multi-word phrases need substring rules
+# that we'd rather get wrong loudly than silently.
+_AFFIRMATIVE: frozenset[str] = frozenset({
+    "si", "sí", "claro", "ok", "okay", "yes", "ya", "sip", "simon",
+})
+_NEGATIVE: frozenset[str] = frozenset({"no", "nop", "nada", "nel"})
+
+
+def _confirmation_side_effects(
+    pending_key: str, answer: str,
+) -> dict[str, str]:
+    """Translate a yes/no answer to a pending_confirmation key into
+    extracted-field updates. Returns a dict of {field_name: value} to
+    merge into extracted_data.
+
+    The disambiguations come from PLAN MODE prompt — when the LLM asks
+    a binary question to narrow tipo_credito, it sets one of these keys.
+    """
+    if pending_key == "is_nomina_tarjeta" and answer == "yes":
+        return {"tipo_credito": "Nómina Tarjeta", "plan_credito": "10%"}
+    if pending_key == "is_nomina_recibos" and answer == "yes":
+        return {"tipo_credito": "Nómina Recibos", "plan_credito": "15%"}
+    if pending_key == "is_negocio_sat":
+        if answer == "yes":
+            return {"tipo_credito": "Negocio SAT", "plan_credito": "15%"}
+        return {"tipo_credito": "Sin Comprobantes", "plan_credito": "20%"}
+    return {}
+
+
+def _maybe_apply_confirmation(
+    *,
+    inbound_text: str,
+    pending_confirmation: str | None,
+    extracted_jsonb: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]] | None:
+    """Apply a sí/no answer to the pending slot, returning the new
+    extracted_jsonb or None when no resolution is possible.
+
+    None signals the caller to leave state untouched (no DB write).
+    """
+    if not pending_confirmation:
+        return None
+    normalized = inbound_text.strip().lower()
+    if normalized in _AFFIRMATIVE:
+        answer = "yes"
+    elif normalized in _NEGATIVE:
+        answer = "no"
+    else:
+        return None
+    side_effects = _confirmation_side_effects(pending_confirmation, answer)
+    if not side_effects:
+        return None
+    # ExtractedField.source_turn requires int >= 0; we use 0 to mean
+    # "synthesized by the binary confirmation handler, not by NLU". The
+    # confidence=1.0 + the constant 0 turn make these rows distinguishable
+    # in turn_traces.state_after for analytics.
+    new_extracted = dict(extracted_jsonb)
+    for k, v in side_effects.items():
+        new_extracted[k] = {"value": v, "confidence": 1.0, "source_turn": 0}
+    return new_extracted
+
+
 class ConversationRunner:
     def __init__(
         self,
@@ -133,6 +203,37 @@ class ConversationRunner:
         history: list[tuple[str, str]] = [(r[0], r[1]) for r in reversed(history_rows)]
 
         current_stage_def = next(s for s in pipeline.stages if s.id == current_stage)
+
+        # Phase 3c.2 — resolve any pending sí/no the composer asked last turn.
+        # If the inbound matches an affirmative or negative form AND state has
+        # a pending_confirmation slot set, apply the side-effect to extracted
+        # fields and clear the slot before routing.
+        confirmation_resolved = _maybe_apply_confirmation(
+            inbound_text=inbound.text,
+            pending_confirmation=pending_confirmation,
+            extracted_jsonb=extracted_jsonb or {},
+        )
+        if confirmation_resolved is not None:
+            extracted_jsonb = confirmation_resolved
+            pending_confirmation = None
+            await self._session.execute(
+                text(
+                    "UPDATE conversation_state "
+                    "SET pending_confirmation = NULL, "
+                    "    extracted_data = CAST(:ed AS JSONB) "
+                    "WHERE conversation_id = :cid"
+                ),
+                {
+                    "ed": __import__("json").dumps(extracted_jsonb),
+                    "cid": conversation_id,
+                },
+            )
+            # Refresh state_obj so process_turn sees the just-applied fields.
+            from atendia.contracts.conversation_state import ExtractedField
+            state_obj.extracted_data = {
+                k: ExtractedField(**v) for k, v in extracted_jsonb.items()
+            }
+            state_obj.pending_confirmation = None
 
         # Phase 3c.2 — run NLU and (optionally) Vision in parallel. Vision
         # only fires when the inbound carries an image attachment with a
@@ -470,6 +571,20 @@ class ConversationRunner:
             composer_output, composer_usage = await self._composer.compose(
                 input=composer_input,
             )
+
+            # Phase 3c.2 — write back any binary slot the composer raised.
+            # The next turn's runner will read this in _maybe_apply_confirmation
+            # if the user replies sí/no.
+            if composer_output is not None and composer_output.pending_confirmation_set:
+                pending_confirmation = composer_output.pending_confirmation_set
+                await self._session.execute(
+                    text(
+                        "UPDATE conversation_state "
+                        "SET pending_confirmation = :pc "
+                        "WHERE conversation_id = :cid"
+                    ),
+                    {"pc": pending_confirmation, "cid": conversation_id},
+                )
 
             if composer_usage is not None and composer_usage.fallback_used:
                 await self._session.execute(

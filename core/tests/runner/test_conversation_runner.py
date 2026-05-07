@@ -322,7 +322,12 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
     assert composer.call_count == 1
     # Turn-trace columns should reflect the composer's input/output.
     assert trace.composer_input is not None
-    assert trace.composer_output == {"messages": ["hola desde el composer"]}
+    # composer_output JSONB carries the full ComposerOutput dump; new optional
+    # fields (Phase 3c.2: pending_confirmation_set) appear here as None.
+    assert trace.composer_output == {
+        "messages": ["hola desde el composer"],
+        "pending_confirmation_set": None,
+    }
     assert trace.outbound_messages == ["hola desde el composer"]
     # The composer received the per-turn extracted_data (from NLU).
     assert composer.last_input is not None
@@ -703,6 +708,163 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
     await db_session.commit()
 
     assert trace.flow_mode == "RETENTION"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# Phase 3c.2 — pending_confirmation binary handling (T22)
+# ============================================================================
+
+async def _seed_pending_confirmation(
+    db_session, tenant_name: str, pending_key: str,
+) -> tuple:
+    """Seed a tenant + conversation whose state already has the slot set.
+
+    Mimics the situation post-composer turn N where the LLM raised a binary
+    question; on turn N+1 the user replies sí/no and the runner resolves it.
+    """
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, tenant_name)
+    await db_session.execute(
+        text("UPDATE conversation_state SET pending_confirmation = :pc "
+             "WHERE conversation_id = :cid"),
+        {"pc": pending_key, "cid": conv_id},
+    )
+    await db_session.commit()
+    return tid, cid, conv_id
+
+
+@pytest.mark.asyncio
+async def test_pending_confirmation_si_assigns_tipo_credito(db_session):
+    """User replies 'sí' to is_nomina_tarjeta → fields written, pc cleared."""
+    tid, cid, conv_id = await _seed_pending_confirmation(
+        db_session, "test_t22_si_nomina", "is_nomina_tarjeta",
+    )
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+    )
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "sí"), turn_number=2,
+    )
+    await db_session.commit()
+
+    state = (await db_session.execute(
+        text("SELECT extracted_data, pending_confirmation FROM conversation_state "
+             "WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).fetchone()
+    extracted, pc = state
+    assert pc is None
+    assert extracted["tipo_credito"]["value"] == "Nómina Tarjeta"
+    assert extracted["plan_credito"]["value"] == "10%"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_pending_confirmation_no_to_negocio_sat_assigns_sin_comprobantes(
+    db_session,
+):
+    """is_negocio_sat + 'no' → tipo_credito=Sin Comprobantes, plan_credito=20%.
+
+    The negative branch is the only path that ALSO writes fields (the others
+    leave state alone for the LLM to re-prompt).
+    """
+    tid, cid, conv_id = await _seed_pending_confirmation(
+        db_session, "test_t22_no_negocio", "is_negocio_sat",
+    )
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+    )
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "nel"), turn_number=2,
+    )
+    await db_session.commit()
+
+    state = (await db_session.execute(
+        text("SELECT extracted_data, pending_confirmation FROM conversation_state "
+             "WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).fetchone()
+    extracted, pc = state
+    assert pc is None
+    assert extracted["tipo_credito"]["value"] == "Sin Comprobantes"
+    assert extracted["plan_credito"]["value"] == "20%"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_pending_confirmation_ambiguous_reply_does_not_clear(db_session):
+    """User replies with free text → runner doesn't try to interpret; pc stays.
+
+    'Sí pero también quiero saber otra cosa' is NOT in _AFFIRMATIVE (it's
+    multi-word) so the binary handler punts and the slot is preserved.
+    """
+    tid, cid, conv_id = await _seed_pending_confirmation(
+        db_session, "test_t22_ambiguous", "is_nomina_tarjeta",
+    )
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+    )
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "sí pero también algo más"),
+        turn_number=2,
+    )
+    await db_session.commit()
+
+    pc = (await db_session.execute(
+        text("SELECT pending_confirmation FROM conversation_state "
+             "WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert pc == "is_nomina_tarjeta"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_composer_pending_confirmation_set_persists(db_session):
+    """Composer raises pending_confirmation_set → runner writes it to state."""
+    from atendia.runner.composer_protocol import ComposerOutput
+
+    class _ComposerThatRaisesBinary:
+        async def compose(self, *, input):
+            return (
+                ComposerOutput(
+                    messages=["¿Te dan recibos?"],
+                    pending_confirmation_set="is_nomina_recibos",
+                ),
+                None,
+            )
+
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, "test_t22_composer_set",
+    )
+    runner = ConversationRunner(
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        _ComposerThatRaisesBinary(),
+    )
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "deposito"), turn_number=1,
+    )
+    await db_session.commit()
+
+    pc = (await db_session.execute(
+        text("SELECT pending_confirmation FROM conversation_state "
+             "WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )).scalar()
+    assert pc == "is_nomina_recibos"
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()

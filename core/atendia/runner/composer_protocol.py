@@ -37,6 +37,12 @@ class ComposerInput(BaseModel):
 
 class ComposerOutput(BaseModel):
     messages: list[str] = Field(min_length=1, max_length=3)
+    # Phase 3c.2 — when the composer asks a binary sí/no question
+    # (PLAN MODE disambiguations), it sets this string so the next
+    # turn's runner can apply the answer deterministically. None on
+    # any non-disambiguating turn; snapshot tests treat it as an
+    # additive optional field so existing fixtures stay byte-equal.
+    pending_confirmation_set: str | None = None
 
 
 class ComposerProvider(Protocol):
