@@ -25,7 +25,6 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 # Spec from v1 prompt: only two tiers in the in-window scope.
 FOLLOWUP_KINDS: Final[tuple[str, ...]] = ("3h_silence", "12h_silence")
 _DELAYS: Final[dict[str, timedelta]] = {

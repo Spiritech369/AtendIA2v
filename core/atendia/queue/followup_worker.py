@@ -30,10 +30,9 @@ from atendia.config import get_settings
 from atendia.queue.enqueue import enqueue_outbound
 from atendia.runner.followup_scheduler import render_followup_body
 
-
 # Server-time UTC hours where firing follow-ups is suppressed. 04-13 UTC
-# ≈ 22:00–07:00 America/Mexico_City — the crudely-named quiet window for
-# the Mexican deployment. Tenants in other geos need a per-tenant override
+# is roughly 22:00-07:00 America/Mexico_City - crude quiet window for the
+# Mexican deployment. Tenants in other geos need a per-tenant override
 # (Phase 3d.2).
 _QUIET_HOURS_UTC: frozenset[int] = frozenset({4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
 
@@ -226,8 +225,9 @@ async def poll_followups(ctx: dict) -> dict:
                             body = render_followup_body(
                                 kind=f["kind"], extracted_data=extracted,
                             )
-                            from atendia.channels.base import OutboundMessage
                             from uuid import uuid4
+
+                            from atendia.channels.base import OutboundMessage
                             outbound = OutboundMessage(
                                 tenant_id=str(f["tenant_id"]),
                                 to_phone_e164=phone,
@@ -249,7 +249,7 @@ async def poll_followups(ctx: dict) -> dict:
                                     now=now,
                                 )
                     sent += 1
-                except Exception as exc:  # noqa: BLE001 — fail one row, keep ticking
+                except Exception as exc:
                     failed += 1
                     async with sessionmaker() as err_session:
                         async with err_session.begin():

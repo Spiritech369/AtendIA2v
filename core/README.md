@@ -119,6 +119,42 @@ cd core && RUN_LIVE_LLM_TESTS=1 uv run pytest \
 
 Total cost ~$0.035 USD per pass (defaults skipped in CI).
 
+### Activating Phase 3d.1 — In-window follow-ups
+
+The runner schedules a two-tier silence ladder after every outbound:
+
+| Tier | Run-at | Body |
+|------|--------|------|
+| `3h_silence` | now + 3h | "En lugar de gastar en el camión, puedes invertirlo mejor en tu moto..." |
+| `12h_silence` | now + 12h | "¿sigues en pie con tu [modelo_moto]? Tu plan [plan_credito]% sigue activo..." |
+
+An inbound from the customer cancels every pending row for that
+conversation in a single SQL update — no race vs a cron tick that's
+mid-pick is possible because the worker re-checks `cancelled_at IS NULL`
+inside its `SELECT FOR UPDATE SKIP LOCKED` window.
+
+Run the cron worker (separate process from the outbound queue):
+
+```bash
+cd core
+uv run arq atendia.queue.worker.WorkerSettings
+```
+
+The same `WorkerSettings` registers both `send_outbound` (queue) and
+`poll_followups` (cron, every minute). `poll_followups` is hardened:
+SKIP LOCKED, `enqueued_at` flag for crash-restart idempotency, `LIMIT 50`
+per tick to dodge Meta rate limits, quiet hours UTC 04-13 (≈ MX 22-07),
+and a `tenants.followups_enabled` kill-switch.
+
+**Out of scope for 3d.1, deferred to 3d.2:**
+  * `>24h` follow-ups via WhatsApp Templates (require Meta-approved
+    per-tenant templates; the OutboundMessage contract already supports
+    `type=template` so 3d.2 is mostly registry + parameter binding).
+  * Per-doc 2h/24h reminders for OBSTACLE-mode customers stuck on a
+    specific paper (compromiso INE / comprobante / etc.).
+  * Per-customer timezone (currently quiet hours are server-time UTC
+    tuned to Mexico).
+
 ### NLU rollout sequence (Phase 3a)
 
 1. Deploy with `ATENDIA_V2_NLU_PROVIDER=keyword` (default). Behavior matches Phase 2.

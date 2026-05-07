@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from arq.connections import RedisSettings
@@ -160,7 +160,7 @@ async def _persist_outbound(session, msg: OutboundMessage, message_id: str, rece
             "txt": msg.text or "",
             "cmid": receipt.channel_message_id,
             "st": receipt.status,
-            "ts": datetime.now(timezone.utc),
+            "ts": datetime.now(UTC),
         },
     )
 

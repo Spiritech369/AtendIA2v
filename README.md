@@ -11,11 +11,22 @@ WhatsApp sales assistant — multi-tenant, data-driven, with a deterministic sta
 - ⏳ **Phase 3c** — Migración real Dinamo + integraciones avanzadas
   - ✅ **3c.1** — Datos reales: catálogo + FAQs + planes con embeddings (pgvector + halfvec(3072))
   - ✅ **3c.2** — Router determinístico + flow v1 (PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT) + Vision API
-  - ⏳ **3c.3** — TBD (Vision aterrizó en 3c.2; candidatos: outbound multimedia, blob storage)
+  - ⏭️ **3c.3** — Deprecada (Vision aterrizó en 3c.2)
+- ⏳ **Phase 3d** — Re-engagement + outside-24h + outbound multimedia
+  - ✅ **3d.1** — In-window follow-ups (3h+12h silence reminders, cron worker, cancellation)
+  - ⏳ **3d.2** — WhatsApp Templates (>24h re-engagement) + per-doc OBSTACLE reminders
+  - ⏳ **3d.3** — Outbound multimedia + blob storage (Meta lookaside is 1h TTL)
 - ⏳ **Phase 4** — Frontend debug panel + tenant config UI
 - ⏳ **Phase 5+** — Onboarding flow, multi-channel, integrations
 
-**452 tests passing · 94% coverage · gate ≥ 85%** (Phase 3c.2 scope: contracts + state_machine + runner + tools + webhooks + integration + scripts; live LLM tests gated by `RUN_LIVE_LLM_TESTS=1`, legacy `tests/test_config_meta.py` excluded due to .env leakage)
+**Honesty about Phase 3 status:** 3a/3b/3c.1/3c.2/3d.1 are shipped — the bot
+handles end-to-end real conversations, six flow modes, Vision for documents,
+and re-engagement WHILE THE 24H WHATSAPP WINDOW IS OPEN. **Phase 3 is NOT
+"done" until 3d.2 ships templates** — without them the bot is mute to silent
+customers after one day, which is the exact case follow-ups exist for. 3d.2
+is ~30 commits because every tenant needs Meta-approved per-tenant templates.
+
+**468 tests passing · 94% coverage · gate ≥ 85%** (Phase 3d.1 scope: contracts + state_machine + runner + tools + webhooks + integration + scripts + queue/cron worker; live LLM tests gated by `RUN_LIVE_LLM_TESTS=1`, legacy `tests/test_config_meta.py` excluded due to .env leakage)
 
 ## Architecture (one-paragraph version)
 
