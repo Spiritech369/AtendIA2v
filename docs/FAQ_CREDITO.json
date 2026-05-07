@@ -1,0 +1,123 @@
+{
+  "faq": [
+    {
+      "pregunta": "¿Cuál es el tiempo de aprobación del crédito?",
+      "respuesta": "El tiempo de aprobación es de 24 horas una vez que se entrega la documentación completa y correcta."
+    },
+    {
+      "pregunta": "¿Cuánto es el enganche mínimo?",
+      "respuesta": "El enganche mínimo depende del plan.",
+      "detalle_por_plan": {
+        "nomina_deposito_tarjeta": "10%",
+        "nomina_en_efectivo": "15%",
+        "negocio_con_alta_sat_o_rif": "15%",
+        "sin_comprobar_ingresos": "20%",
+        "personal_de_seguridad_o_policias": "30%"
+      }
+    },
+    {
+      "pregunta": "¿Qué requisitos necesito para iniciar mi trámite?",
+      "respuesta": "Depende del plan, pero los documentos base son:",
+      "documentos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "Para nómina en tarjeta: 2 estados de cuenta y último recibo de nómina",
+        "Para nómina en efectivo: recibos de nómina de los últimos 2 meses",
+        "Para negocio: constancia fiscal SAT o RIF y factura o ticket de insumo"
+      ]
+    },
+    {
+      "pregunta": "¿Puedo adelantar pagos o abonar a capital?",
+      "respuesta": "Sí, no hay penalización por abonar a capital."
+    },
+    {
+      "pregunta": "¿Qué pasa si me atraso en mis pagos?",
+      "respuesta": "Se generan intereses y puede afectar tu historial de crédito. Es importante mantener tus pagos puntuales."
+    },
+    {
+      "pregunta": "¿Cuánto tiempo tengo para pagar?",
+      "respuesta": "Puedes pagar hasta 72 quincenas en todos los planes."
+    },
+    {
+      "pregunta": "¿Cuál es el tiempo de entrega una vez aprobado el crédito?",
+      "respuesta": "La entrega se programa dentro de las 24 horas siguientes a la aprobación del crédito."
+    },
+    {
+      "pregunta": "¿Qué pasa si mi comprobante de domicilio o INE está vencido?",
+      "respuesta": "Debes enviar uno actualizado. De lo contrario el trámite no puede continuar."
+    },
+    {
+      "pregunta": "¿Qué pasa si mis documentos están borrosos o poco legibles?",
+      "respuesta": "Se debe reenviar el documento de nuevo de forma clara y legible."
+    },
+    {
+      "pregunta": "¿Puedo liquidar antes del plazo?",
+      "respuesta": "Sí, puedes liquidar en cualquier momento y se recalculan los intereses hasta la fecha de pago."
+    },
+    {
+      "pregunta": "¿Puedo cambiar el modelo después de iniciar el trámite?",
+      "respuesta": "Sí, siempre y cuando aún no se haya dado el enganche."
+    },
+    {
+      "pregunta": "¿Se puede hacer el trámite si estoy en buró?",
+      "respuesta": "Sí, si debes menos de $50,000 el crédito sí aplica."
+    },
+    {
+      "pregunta": "¿Necesito aval?",
+      "respuesta": "No, los créditos de Dinamo no requieren aval."
+    },
+    {
+      "pregunta": "¿Dónde puedo ver los modelos disponibles?",
+      "respuesta": "En el catálogo oficial de Dinamo Motos Nuevo León.",
+      "enlace": "https://wa.me/c/5218186016492"
+    },
+    {
+      "pregunta": "¿Cuánto tiempo de antigüedad laboral necesito?",
+      "respuesta": "Mínimo 6 meses en tu empleo actual o actividad."
+    },
+    {
+      "pregunta": "¿Qué pasa si trabajo por mi cuenta?",
+      "respuesta": "Puedes aplicar con el plan sin comprobar ingresos del 20%."
+    },
+    {
+      "pregunta": "¿Qué pasa si no tengo comprobantes de ingreso?",
+      "respuesta": "Puedes aplicar con el plan 20% presentando únicamente INE y comprobante de domicilio."
+    },
+    {
+      "pregunta": "¿Cuánto tarda el proceso completo?",
+      "respuesta": "Desde el envío de documentos hasta la entrega de la moto puede tardar de 1 a 7 días dependiendo del flujo de revisión."
+    },
+    {
+      "pregunta": "¿Se pueden hacer pagos semanales?",
+      "respuesta": "No, solo quincenales."
+    },
+    {
+      "pregunta": "¿Dónde puedo pagar mis quincenas?",
+      "respuesta": "En las sucursales autorizadas o en el método que indique el asesor al momento de la entrega."
+    },
+    {
+      "pregunta": "¿Qué pasa si no vivo en Nuevo León?",
+      "respuesta": "El trámite aplica solo para clientes que viven o trabajan en Nuevo León. No se hacen entregas fuera del estado."
+    },
+    {
+      "pregunta": "¿Puedo hacer el trámite si mi INE es de otro estado?",
+      "respuesta": "Sí, se puede aplicar siempre que vivas o trabajes actualmente en Nuevo León y puedas comprobar domicilio dentro del estado."
+    },
+    {
+      "pregunta": "¿Qué pasa si no tengo recibos de nómina en papel?",
+      "respuesta": "Se necesita una nómina oficial emitida por la empresa en la que trabajas."
+    },
+    {
+      "pregunta": "¿Puedo enviar documentos por foto?",
+      "respuesta": "Sí, siempre que sean legibles y completos."
+    },
+    {
+      "pregunta": "¿Puedo iniciar el trámite sin tener todo?",
+      "respuesta": "No, se requiere enviar la documentación completa para proceder con la revisión de buró."
+    },
+    {
+      "pregunta": "¿Dónde puedo contactar para refacciones?",
+      "respuesta": "Comunícate al 8126446579."
+    }
+  ]
+}

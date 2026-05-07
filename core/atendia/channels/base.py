@@ -25,6 +25,35 @@ class OutboundMessage(BaseModel):
         return self
 
 
+class InboundAttachment(BaseModel):
+    """Channel-agnostic image/document/audio/video attachment.
+
+    Carried in InboundMessage.metadata so it round-trips through the
+    inbound persistence path (messages.metadata_json JSONB column) and
+    reaches the runner without bespoke columns.
+
+    `url` is populated only when the channel adapter has a way to resolve
+    it (Meta requires a separate Graph API call after parsing). Lookaside
+    URLs from Meta have a 1-hour TTL — the runner should call Vision
+    promptly, never persist these long-term.
+    """
+
+    media_id: str
+    mime_type: str
+    url: str = ""
+    caption: str | None = None
+
+
+class InboundMessageMetadata(BaseModel):
+    """Typed shape for InboundMessage.metadata.
+
+    Defining this here keeps the JSONB column shape discoverable and
+    validatable; the runner reads back the same model.
+    """
+
+    attachments: list[InboundAttachment] = Field(default_factory=list)
+
+
 class InboundMessage(BaseModel):
     """Channel-agnostic inbound message (parsed from a webhook)."""
 

@@ -18,6 +18,7 @@ dependencies = [
     "arq>=0.28.0",
     "pyjwt>=2.12.1",
     "openai>=1.50.0",
+    "pgvector>=0.2.5",
 ]
 
 [dependency-groups]
@@ -48,6 +49,12 @@ testpaths = ["tests"]
 source = ["atendia"]
 omit = [
     "atendia/db/migrations/**",
+    # One-off operational scripts: exercised manually, not by pytest.
+    # T15 ran ingest_dinamo_data._main against the real OpenAI API +
+    # local DB — that run is the contract test.
+    "atendia/scripts/ingest_dinamo_data.py",
+    "atendia/scripts/seed_dinamo_voice.py",
+    "atendia/scripts/upgrade_dinamo_pipeline_to_v4.py",
 ]
 
 [tool.coverage.report]

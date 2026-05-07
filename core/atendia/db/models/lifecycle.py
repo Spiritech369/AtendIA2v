@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from atendia.db.base import Base
@@ -32,6 +33,8 @@ class HumanHandoff(Base):
     )
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Phase 3c.2 — structured HandoffSummary JSONB; legacy rows are NULL.
+    payload: Mapped[dict | None] = mapped_column(JSONB)
     assigned_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("tenant_users.id"))
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

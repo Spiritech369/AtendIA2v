@@ -1,6 +1,6 @@
 import pytest
 
-from atendia.config import get_settings
+from atendia.config import Settings, get_settings
 
 
 def test_settings_includes_meta_credentials(monkeypatch):
@@ -23,8 +23,8 @@ def test_settings_defaults_for_meta(monkeypatch):
     monkeypatch.delenv("ATENDIA_V2_META_ACCESS_TOKEN", raising=False)
     monkeypatch.delenv("ATENDIA_V2_META_API_VERSION", raising=False)
     monkeypatch.delenv("ATENDIA_V2_META_BASE_URL", raising=False)
-    get_settings.cache_clear()
-    s = get_settings()
+    # Bypass .env so the developer's local secrets don't shadow the defaults.
+    s = Settings(_env_file=None)
     assert s.meta_app_secret == ""  # empty default
     assert s.meta_access_token == ""
     assert s.meta_api_version == "v21.0"  # version default

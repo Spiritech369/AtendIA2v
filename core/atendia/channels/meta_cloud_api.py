@@ -3,10 +3,12 @@ import httpx
 from atendia.channels.base import (
     ChannelAdapter,
     DeliveryReceipt,
+    InboundAttachment,
     InboundMessage,
+    InboundMessageMetadata,
     OutboundMessage,
 )
-from atendia.channels.meta_dto import MetaInboundWebhook
+from atendia.channels.meta_dto import MetaInboundMessage, MetaInboundWebhook
 from atendia.channels.meta_signing import verify_meta_signature
 
 
@@ -113,14 +115,52 @@ class MetaCloudAPIAdapter(ChannelAdapter):
                 msgs = change.value.messages or []
                 for m in msgs:
                     text = m.text.body if m.text else None
+                    attachments = _attachments_from_message(m)
+                    if attachments:
+                        # Image/document/etc. — caption (if any) becomes the
+                        # text payload so downstream NLU has something to read.
+                        text = attachments[0].caption or ""
+                    metadata: dict = {}
+                    if attachments:
+                        metadata = InboundMessageMetadata(
+                            attachments=attachments,
+                        ).model_dump(mode="json")
                     result.append(InboundMessage(
                         tenant_id=tenant_id,
                         from_phone_e164=f"+{m.from_}",
                         channel_message_id=m.id,
                         text=text,
                         received_at=m.timestamp,
+                        metadata=metadata,
                     ))
         return result
+
+    async def fetch_media_url(
+        self,
+        media_id: str,
+        *,
+        timeout_seconds: float = 3.0,
+    ) -> str:
+        """Resolve a Meta media_id to its lookaside download URL.
+
+        Returns "" on any failure (network, 4xx, malformed body) — the
+        webhook handler logs and persists the empty URL so Vision is skipped
+        for that turn rather than crashing the request. The lookaside URL
+        has a ~1h TTL; callers should download / send to Vision promptly.
+        """
+        url = f"{self._base_url}/{self._api_version}/{media_id}"
+        headers = {"Authorization": f"Bearer {self._access_token}"}
+        try:
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                resp = await client.get(url, headers=headers)
+        except httpx.HTTPError:
+            return ""
+        if resp.status_code >= 400:
+            return ""
+        try:
+            return str(resp.json().get("url", "")) or ""
+        except Exception:
+            return ""
 
     def parse_status_callback(self, payload: dict) -> list[DeliveryReceipt]:
         try:
@@ -139,3 +179,22 @@ class MetaCloudAPIAdapter(ChannelAdapter):
                         error=None,
                     ))
         return result
+
+
+def _attachments_from_message(m: MetaInboundMessage) -> list[InboundAttachment]:
+    """Pull image/document/audio/video media nodes off a Meta message.
+
+    A single inbound message carries at most one media node (Meta sends
+    a separate webhook per attachment). The list shape matches the
+    canonical Attachment contract for forward compatibility.
+    """
+    for node in (m.image, m.document, m.audio, m.video):
+        if node is None:
+            continue
+        return [InboundAttachment(
+            media_id=node.id,
+            mime_type=node.mime_type,
+            url="",  # filled in by the webhook handler via fetch_media_url
+            caption=node.caption,
+        )]
+    return []

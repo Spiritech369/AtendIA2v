@@ -1,0 +1,826 @@
+{
+  "catalogo": [
+    {
+      "categoria": "Motoneta",
+      "modelos": [
+        {
+          "modelo": "Adventure Elite 150 CC",
+          "alias": ["adventure", "elite", "adventure150", "adventure elite", "motoneta adventure"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 9,
+            "rendimiento_km_l": "35–40",
+            "peso_kg": 110,
+            "tanque_l": 5.5,
+            "altura_asiento_cm": 76,
+            "transmision": "Automática"
+          },
+          "precios": {
+            "lista": 31395,
+            "contado": 29900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3140, "pago_quincenal": 1247, "quincenas": 72 },
+            "plan_15": { "enganche": 4709, "pago_quincenal": 1230, "quincenas": 72 },
+            "plan_20": { "enganche": 6279, "pago_quincenal": 1017, "quincenas": 72 },
+            "plan_30": { "enganche": 9419, "pago_quincenal": 774,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Alien R 175 CC",
+          "alias": ["alien", "alienr", "alien 175", "alien r", "motoneta alien"],
+          "ficha_tecnica": {
+            "motor_cc": 175,
+            "potencia_hp": 12,
+            "rendimiento_km_l": "30–34",
+            "peso_kg": 120,
+            "tanque_l": 6,
+            "altura_asiento_cm": 77,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 32445,
+            "contado": 30900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3245, "pago_quincenal": 1289, "quincenas": 72 },
+            "plan_15": { "enganche": 4867, "pago_quincenal": 1271, "quincenas": 72 },
+            "plan_20": { "enganche": 6489, "pago_quincenal": 1051, "quincenas": 72 },
+            "plan_30": { "enganche": 9734, "pago_quincenal": 800,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Metro 125 CC",
+          "alias": ["metro", "metro125", "motoneta metro"],
+          "ficha_tecnica": {
+            "motor_cc": 125,
+            "potencia_hp": 9,
+            "rendimiento_km_l": "38–42",
+            "peso_kg": 105,
+            "tanque_l": 4,
+            "altura_asiento_cm": 76,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 31395,
+            "contado": 29900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3140, "pago_quincenal": 1247, "quincenas": 72 },
+            "plan_15": { "enganche": 4709, "pago_quincenal": 1230, "quincenas": 72 },
+            "plan_20": { "enganche": 6279, "pago_quincenal": 1017, "quincenas": 72 },
+            "plan_30": { "enganche": 9419, "pago_quincenal": 774,  "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "Chopper",
+      "modelos": [
+        {
+          "modelo": "Custom 150 CC",
+          "alias": ["custom", "custom150", "chopper custom", "dinamo custom", "moto custom"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 11,
+            "rendimiento_km_l": "30–32",
+            "peso_kg": 135,
+            "tanque_l": 13,
+            "altura_asiento_cm": 70,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 39852,
+            "contado": 36900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3875,  "pago_quincenal": 1539, "quincenas": 72 },
+            "plan_15": { "enganche": 5812,  "pago_quincenal": 1518, "quincenas": 72 },
+            "plan_20": { "enganche": 7749,  "pago_quincenal": 1255, "quincenas": 72 },
+            "plan_30": { "enganche": 11624, "pago_quincenal": 955,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Custom Black 175 CC",
+          "alias": ["custom black", "custom 175", "black 175", "dinamo custom", "chopper custom"],
+          "ficha_tecnica": {
+            "motor_cc": 175,
+            "potencia_hp": 13,
+            "rendimiento_km_l": "28–32",
+            "peso_kg": 145,
+            "tanque_l": 13,
+            "altura_asiento_cm": 72,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 45241,
+            "contado": 41890
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 4398,  "pago_quincenal": 1747, "quincenas": 72 },
+            "plan_15": { "enganche": 6598,  "pago_quincenal": 1724, "quincenas": 72 },
+            "plan_20": { "enganche": 8797,  "pago_quincenal": 1425, "quincenas": 72 },
+            "plan_30": { "enganche": 13195, "pago_quincenal": 1084, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Rayo 175 CC",
+          "alias": ["rayo", "rayo175", "dinamo rayo", "moto rayo", "chopper rayo"],
+          "ficha_tecnica": {
+            "motor_cc": 175,
+            "potencia_hp": 13,
+            "rendimiento_km_l": "28–32",
+            "peso_kg": 140,
+            "tanque_l": 13,
+            "altura_asiento_cm": 71,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 44172,
+            "contado": 40900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 4295,  "pago_quincenal": 1706, "quincenas": 72 },
+            "plan_15": { "enganche": 6442,  "pago_quincenal": 1683, "quincenas": 72 },
+            "plan_20": { "enganche": 8589,  "pago_quincenal": 1391, "quincenas": 72 },
+            "plan_30": { "enganche": 12884, "pago_quincenal": 1058, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Chopper Bobber 250 CC",
+          "alias": ["bobber", "bobber250", "chopper bobber", "dinamo bobber", "moto bobber"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 17,
+            "rendimiento_km_l": "25–28",
+            "peso_kg": 155,
+            "tanque_l": 15,
+            "altura_asiento_cm": 70,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 49572,
+            "contado": 45900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3856,  "pago_quincenal": 1532, "quincenas": 72 },
+            "plan_15": { "enganche": 5783,  "pago_quincenal": 1511, "quincenas": 72 },
+            "plan_20": { "enganche": 7711,  "pago_quincenal": 1249, "quincenas": 72 },
+            "plan_30": { "enganche": 11567, "pago_quincenal": 950,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "KF-Racer 150 CC",
+          "alias": ["kf racer", "kf2", "racer2"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 17,
+            "rendimiento_km_l": "25–28",
+            "peso_kg": 155,
+            "tanque_l": 15,
+            "altura_asiento_cm": 71,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 30132,
+            "contado": 27900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 2197, "pago_quincenal": 873, "quincenas": 72 },
+            "plan_15": { "enganche": 3296, "pago_quincenal": 861, "quincenas": 72 },
+            "plan_20": { "enganche": 4394, "pago_quincenal": 712, "quincenas": 72 },
+            "plan_30": { "enganche": 6591, "pago_quincenal": 542, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Rayo Elite 250 CC",
+          "alias": ["rayo elite", "rayoelite", "rayo 250", "rayo elite 250", "dinamo rayo elite"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "24–27",
+            "peso_kg": 160,
+            "tanque_l": 15,
+            "altura_asiento_cm": 71,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 54313,
+            "contado": 50290
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5280,  "pago_quincenal": 2098, "quincenas": 72 },
+            "plan_15": { "enganche": 7921,  "pago_quincenal": 2069, "quincenas": 72 },
+            "plan_20": { "enganche": 10561, "pago_quincenal": 1710, "quincenas": 72 },
+            "plan_30": { "enganche": 15841, "pago_quincenal": 1301, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Renegada 250 CC",
+          "alias": ["renegada", "renegade", "renegada250", "chopper renegada"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "24–27",
+            "peso_kg": 160,
+            "tanque_l": 15,
+            "altura_asiento_cm": 71,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 53125,
+            "contado": 49190
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5165,  "pago_quincenal": 2052, "quincenas": 72 },
+            "plan_15": { "enganche": 7747,  "pago_quincenal": 2024, "quincenas": 72 },
+            "plan_20": { "enganche": 10330, "pago_quincenal": 1673, "quincenas": 72 },
+            "plan_30": { "enganche": 15495, "pago_quincenal": 1273, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "B52 250 CC",
+          "alias": ["b52", "b52cc", "chopper b52", "moto b52"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "22–25",
+            "peso_kg": 185,
+            "tanque_l": 18,
+            "altura_asiento_cm": 72,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 68145,
+            "contado": 64900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 6815,  "pago_quincenal": 2707, "quincenas": 72 },
+            "plan_15": { "enganche": 10222, "pago_quincenal": 2671, "quincenas": 72 },
+            "plan_20": { "enganche": 13629, "pago_quincenal": 2207, "quincenas": 72 },
+            "plan_30": { "enganche": 20444, "pago_quincenal": 1680, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Bandid 350 CC",
+          "alias": ["bandit", "bandid", "bandido", "bandit350", "dinamo bandit", "chopper bandit"],
+          "ficha_tecnica": {
+            "motor_cc": 350,
+            "potencia_hp": 25,
+            "rendimiento_km_l": "22–24",
+            "peso_kg": 200,
+            "tanque_l": 18,
+            "altura_asiento_cm": 72,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 83895,
+            "contado": 79900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8390,  "pago_quincenal": 3333, "quincenas": 72 },
+            "plan_15": { "enganche": 12584, "pago_quincenal": 3288, "quincenas": 72 },
+            "plan_20": { "enganche": 16779, "pago_quincenal": 2717, "quincenas": 72 },
+            "plan_30": { "enganche": 25169, "pago_quincenal": 2068, "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "Naked-Urbana",
+      "modelos": [
+        {
+          "modelo": "R2 GT 250 CC",
+          "alias": ["r2", "r2gt", "r2 250", "r2gt 250", "dinamo r2", "r2 gt", "naked r2"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 19,
+            "rendimiento_km_l": "26–30",
+            "peso_kg": 150,
+            "tanque_l": 14,
+            "altura_asiento_cm": 78,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 56581,
+            "contado": 52390
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5501,  "pago_quincenal": 2185, "quincenas": 72 },
+            "plan_15": { "enganche": 8251,  "pago_quincenal": 2156, "quincenas": 72 },
+            "plan_20": { "enganche": 11002, "pago_quincenal": 1782, "quincenas": 72 },
+            "plan_30": { "enganche": 16503, "pago_quincenal": 1356, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Speedfire SPDF 250 CC",
+          "alias": ["speedfire", "spdf", "spdf 250", "speedfire250", "dinamo speedfire", "naked speedfire"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 19,
+            "rendimiento_km_l": "26–30",
+            "peso_kg": 150,
+            "tanque_l": 14,
+            "altura_asiento_cm": 78,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 57661,
+            "contado": 53390
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5606,  "pago_quincenal": 2227, "quincenas": 72 },
+            "plan_15": { "enganche": 8409,  "pago_quincenal": 2197, "quincenas": 72 },
+            "plan_20": { "enganche": 11212, "pago_quincenal": 1816, "quincenas": 72 },
+            "plan_30": { "enganche": 16818, "pago_quincenal": 1382, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Comando 400 CC",
+          "alias": ["comando", "comando400", "comando 400", "dinamo comando", "moto comando", "naked comando"],
+          "ficha_tecnica": {
+            "motor_cc": 400,
+            "potencia_hp": 28,
+            "rendimiento_km_l": "20–23",
+            "peso_kg": 190,
+            "tanque_l": 18,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 83895,
+            "contado": 79900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8390,  "pago_quincenal": 3333, "quincenas": 72 },
+            "plan_15": { "enganche": 12584, "pago_quincenal": 3288, "quincenas": 72 },
+            "plan_20": { "enganche": 16779, "pago_quincenal": 2717, "quincenas": 72 },
+            "plan_30": { "enganche": 25169, "pago_quincenal": 2068, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Skeleton 400 CC",
+          "alias": ["skeleton", "skeletor", "esqueleton", "skeleton400", "skeleton 400", "dinamo skeleton"],
+          "ficha_tecnica": {
+            "motor_cc": 400,
+            "potencia_hp": 28,
+            "rendimiento_km_l": "20–23",
+            "peso_kg": 195,
+            "tanque_l": 18,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 83797,
+            "contado": 77590
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8147,  "pago_quincenal": 3236, "quincenas": 72 },
+            "plan_15": { "enganche": 12220, "pago_quincenal": 3193, "quincenas": 72 },
+            "plan_20": { "enganche": 16294, "pago_quincenal": 2639, "quincenas": 72 },
+            "plan_30": { "enganche": 24441, "pago_quincenal": 2008, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "DNM 4 400 CC",
+          "alias": ["dnm 4", "dnm4", "naked dnm4", "dinamo dnm4"],
+          "ficha_tecnica": {
+            "motor_cc": 400,
+            "potencia_hp": 30,
+            "rendimiento_km_l": "22",
+            "peso_kg": 190,
+            "tanque_l": 17,
+            "altura_asiento_cm": 81,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 78073,
+            "contado": 72290
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 7590,  "pago_quincenal": 3015, "quincenas": 72 },
+            "plan_15": { "enganche": 11386, "pago_quincenal": 2975, "quincenas": 72 },
+            "plan_20": { "enganche": 15181, "pago_quincenal": 2459, "quincenas": 72 },
+            "plan_30": { "enganche": 22771, "pago_quincenal": 1871, "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "Deportiva",
+      "modelos": [
+        {
+          "modelo": "R4 250 CC",
+          "alias": ["r4", "r4cc", "r4 250", "r4 250cc", "dinamo r4", "deportiva r4"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 24,
+            "rendimiento_km_l": "23–26",
+            "peso_kg": 165,
+            "tanque_l": 14,
+            "altura_asiento_cm": 78,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 55335,
+            "contado": 52700
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5534,  "pago_quincenal": 2198, "quincenas": 72 },
+            "plan_15": { "enganche": 8300,  "pago_quincenal": 2169, "quincenas": 72 },
+            "plan_20": { "enganche": 11067, "pago_quincenal": 1792, "quincenas": 72 },
+            "plan_30": { "enganche": 16601, "pago_quincenal": 1364, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Super Sport 400 CC",
+          "alias": ["super sport", "supersport", "sport 400", "super sport 400", "dinamo sport", "deportiva sport"],
+          "ficha_tecnica": {
+            "motor_cc": 400,
+            "potencia_hp": 35,
+            "rendimiento_km_l": "18–21",
+            "peso_kg": 195,
+            "tanque_l": 16,
+            "altura_asiento_cm": 82,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 82609,
+            "contado": 76490
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8031,  "pago_quincenal": 3190, "quincenas": 72 },
+            "plan_15": { "enganche": 12047, "pago_quincenal": 3147, "quincenas": 72 },
+            "plan_20": { "enganche": 16063, "pago_quincenal": 2602, "quincenas": 72 },
+            "plan_30": { "enganche": 24094, "pago_quincenal": 1980, "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "MotoCross / Doble Propósito",
+      "modelos": [
+        {
+          "modelo": "Scorpion 200 CC",
+          "alias": ["scorpion", "scorpion200", "doble proposito scorpion", "dinamo scorpion"],
+          "ficha_tecnica": {
+            "motor_cc": 200,
+            "potencia_hp": 15,
+            "rendimiento_km_l": "32–35",
+            "peso_kg": 135,
+            "tanque_l": 10,
+            "altura_asiento_cm": 86,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 40705,
+            "contado": 37690
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3957,  "pago_quincenal": 1572, "quincenas": 72 },
+            "plan_15": { "enganche": 5936,  "pago_quincenal": 1551, "quincenas": 72 },
+            "plan_20": { "enganche": 7915,  "pago_quincenal": 1282, "quincenas": 72 },
+            "plan_30": { "enganche": 11872, "pago_quincenal": 975,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Scorpion XT 250 CC",
+          "alias": ["scorpion xt", "scorpionxt", "scorpion250", "enduro scorpion", "dinamo scorpion xt"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "30–34",
+            "peso_kg": 145,
+            "tanque_l": 12,
+            "altura_asiento_cm": 88,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 41895,
+            "contado": 39900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 4190,  "pago_quincenal": 1664, "quincenas": 72 },
+            "plan_15": { "enganche": 6284,  "pago_quincenal": 1642, "quincenas": 72 },
+            "plan_20": { "enganche": 8379,  "pago_quincenal": 1357, "quincenas": 72 },
+            "plan_30": { "enganche": 12569, "pago_quincenal": 1033, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Cross Country 250 CC",
+          "alias": ["cross country", "cross", "country", "doble proposito"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "30–34",
+            "peso_kg": 145,
+            "tanque_l": 12,
+            "altura_asiento_cm": 88,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 64995,
+            "contado": 61900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5525,  "pago_quincenal": 2195, "quincenas": 72 },
+            "plan_15": { "enganche": 8287,  "pago_quincenal": 2165, "quincenas": 72 },
+            "plan_20": { "enganche": 11049, "pago_quincenal": 1789, "quincenas": 72 },
+            "plan_30": { "enganche": 16574, "pago_quincenal": 1362, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "DNM 2.5 250 CC",
+          "alias": ["dnm", "dnm 2.5", "dnm250", "doble proposito dnm"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "28–32",
+            "peso_kg": 145,
+            "tanque_l": 12,
+            "altura_asiento_cm": 88,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 63277,
+            "contado": 58590
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 6152,  "pago_quincenal": 2444, "quincenas": 72 },
+            "plan_15": { "enganche": 9228,  "pago_quincenal": 2411, "quincenas": 72 },
+            "plan_20": { "enganche": 12304, "pago_quincenal": 1993, "quincenas": 72 },
+            "plan_30": { "enganche": 18456, "pago_quincenal": 1516, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "DNM 3.0 300 CC",
+          "alias": ["dnm 3.0", "dnm300", "enduro dnm", "dinamo dnm"],
+          "ficha_tecnica": {
+            "motor_cc": 300,
+            "potencia_hp": 22,
+            "rendimiento_km_l": "26–30",
+            "peso_kg": 155,
+            "tanque_l": 12,
+            "altura_asiento_cm": 88,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 86065,
+            "contado": 79690
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8367,  "pago_quincenal": 3324, "quincenas": 72 },
+            "plan_15": { "enganche": 12551, "pago_quincenal": 3279, "quincenas": 72 },
+            "plan_20": { "enganche": 16735, "pago_quincenal": 2710, "quincenas": 72 },
+            "plan_30": { "enganche": 25102, "pago_quincenal": 2062, "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "Trabajo",
+      "modelos": [
+        {
+          "modelo": "U2 150 CC",
+          "alias": ["u2", "moto u2", "trabajo u2", "dinamo u2"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 10,
+            "rendimiento_km_l": "40–45",
+            "peso_kg": 115,
+            "tanque_l": 10,
+            "altura_asiento_cm": 78,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 21945,
+            "contado": 20900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 2195, "pago_quincenal": 872, "quincenas": 72 },
+            "plan_15": { "enganche": 3292, "pago_quincenal": 893, "quincenas": 72 },
+            "plan_20": { "enganche": 4389, "pago_quincenal": 711, "quincenas": 72 },
+            "plan_30": { "enganche": 6584, "pago_quincenal": 541, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "U5 150 CC",
+          "alias": ["u5", "moto u5", "trabajo u5", "dinamo u5"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 11,
+            "rendimiento_km_l": "38–42",
+            "peso_kg": 120,
+            "tanque_l": 12,
+            "altura_asiento_cm": 78,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 26145,
+            "contado": 24900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 2615, "pago_quincenal": 1039, "quincenas": 72 },
+            "plan_15": { "enganche": 3922, "pago_quincenal": 1025, "quincenas": 72 },
+            "plan_20": { "enganche": 5229, "pago_quincenal": 847,  "quincenas": 72 },
+            "plan_30": { "enganche": 7844, "pago_quincenal": 644,  "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "MotoCarro",
+      "modelos": [
+        {
+          "modelo": "Heavy-B 150 CC",
+          "alias": ["heavy b", "heavyb", "motocarro heavy", "dinamo heavy b"],
+          "ficha_tecnica": {
+            "motor_cc": 150,
+            "potencia_hp": 12,
+            "rendimiento_km_l": "24–26",
+            "peso_kg": 320,
+            "tanque_l": 12,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 62895,
+            "contado": 59900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 6290,  "pago_quincenal": 2498, "quincenas": 72 },
+            "plan_15": { "enganche": 9434,  "pago_quincenal": 2465, "quincenas": 72 },
+            "plan_20": { "enganche": 12579, "pago_quincenal": 2037, "quincenas": 72 },
+            "plan_30": { "enganche": 18869, "pago_quincenal": 1550, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Heavy Cab-R 200 CC",
+          "alias": ["heavy cab r", "motocarro heavy r", "dinamo heavy cab"],
+          "ficha_tecnica": {
+            "motor_cc": 200,
+            "potencia_hp": 16,
+            "rendimiento_km_l": "23–25",
+            "peso_kg": 350,
+            "tanque_l": 12,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 69195,
+            "contado": 65900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 6920,  "pago_quincenal": 2749, "quincenas": 72 },
+            "plan_15": { "enganche": 10379, "pago_quincenal": 2712, "quincenas": 72 },
+            "plan_20": { "enganche": 13839, "pago_quincenal": 2241, "quincenas": 72 },
+            "plan_30": { "enganche": 20759, "pago_quincenal": 1705, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Heavy Cab 300 CC",
+          "alias": ["heavy cab 300", "heavy300", "motocarro heavy300"],
+          "ficha_tecnica": {
+            "motor_cc": 300,
+            "potencia_hp": 20,
+            "rendimiento_km_l": "22–24",
+            "peso_kg": 380,
+            "tanque_l": 15,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 90195,
+            "contado": 85900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 9020,  "pago_quincenal": 3583, "quincenas": 72 },
+            "plan_15": { "enganche": 13529, "pago_quincenal": 3535, "quincenas": 72 },
+            "plan_20": { "enganche": 18039, "pago_quincenal": 2922, "quincenas": 72 },
+            "plan_30": { "enganche": 27059, "pago_quincenal": 2223, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Heavy Max 250 CC",
+          "alias": ["heavy max", "heavy250", "motocarro heavy max"],
+          "ficha_tecnica": {
+            "motor_cc": 250,
+            "potencia_hp": 18,
+            "rendimiento_km_l": "22–25",
+            "peso_kg": 360,
+            "tanque_l": 15,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 94395,
+            "contado": 89900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 9440,  "pago_quincenal": 3750, "quincenas": 72 },
+            "plan_15": { "enganche": 14159, "pago_quincenal": 3699, "quincenas": 72 },
+            "plan_20": { "enganche": 18879, "pago_quincenal": 3058, "quincenas": 72 },
+            "plan_30": { "enganche": 28319, "pago_quincenal": 2327, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Moto Taxi",
+          "alias": ["tx", "moto tx", "motocarro tx", "dinamo tx", "taxi"],
+          "ficha_tecnica": {
+            "motor_cc": "200–250",
+            "potencia_hp": "16–18",
+            "rendimiento_km_l": "22–25",
+            "peso_kg": 370,
+            "tanque_l": 15,
+            "altura_asiento_cm": 80,
+            "transmision": "Estándar"
+          },
+          "precios": {
+            "lista": 85995,
+            "contado": 81900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 8600,  "pago_quincenal": 3416, "quincenas": 72 },
+            "plan_15": { "enganche": 12899, "pago_quincenal": 3370, "quincenas": 72 },
+            "plan_20": { "enganche": 17199, "pago_quincenal": 2786, "quincenas": 72 },
+            "plan_30": { "enganche": 25799, "pago_quincenal": 2120, "quincenas": 72 }
+          }
+        }
+      ]
+    },
+    {
+      "categoria": "Cuatrimoto / ATV",
+      "modelos": [
+        {
+          "modelo": "Goliat 200 CC",
+          "alias": ["goliat", "goliat200", "cuatrimoto goliat", "dinamo goliat"],
+          "ficha_tecnica": {
+            "motor_cc": 200,
+            "potencia_hp": 15,
+            "rendimiento_km_l": "20–23",
+            "peso_kg": 240,
+            "tanque_l": 15,
+            "altura_asiento_cm": 85,
+            "transmision": "Automática"
+          },
+          "precios": {
+            "lista": 80341,
+            "contado": 74390
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 7811,  "pago_quincenal": 3103, "quincenas": 72 },
+            "plan_15": { "enganche": 11716, "pago_quincenal": 3061, "quincenas": 72 },
+            "plan_20": { "enganche": 15622, "pago_quincenal": 2530, "quincenas": 72 },
+            "plan_30": { "enganche": 23433, "pago_quincenal": 1925, "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Rocky 125 CC",
+          "alias": ["rocky", "rocky125", "cuatrimoto rocky", "dinamo rocky"],
+          "ficha_tecnica": {
+            "motor_cc": 125,
+            "potencia_hp": 9,
+            "rendimiento_km_l": "30–35",
+            "peso_kg": 180,
+            "tanque_l": 9,
+            "altura_asiento_cm": 78,
+            "transmision": "Automática"
+          },
+          "precios": {
+            "lista": 38437,
+            "contado": 35590
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 3737,  "pago_quincenal": 1484, "quincenas": 72 },
+            "plan_15": { "enganche": 5605,  "pago_quincenal": 1464, "quincenas": 72 },
+            "plan_20": { "enganche": 7474,  "pago_quincenal": 1210, "quincenas": 72 },
+            "plan_30": { "enganche": 11211, "pago_quincenal": 921,  "quincenas": 72 }
+          }
+        },
+        {
+          "modelo": "Xtreme RLX 200 CC",
+          "alias": ["xtreme", "rlx", "xtreme rlx", "cuatrimoto xtreme", "atv xtreme"],
+          "ficha_tecnica": {
+            "motor_cc": 200,
+            "potencia_hp": 15,
+            "rendimiento_km_l": "22–25",
+            "peso_kg": 230,
+            "tanque_l": 12,
+            "altura_asiento_cm": 85,
+            "transmision": "Automática"
+          },
+          "precios": {
+            "lista": 57645,
+            "contado": 54900
+          },
+          "planes_credito": {
+            "plan_10": { "enganche": 5765,  "pago_quincenal": 2290, "quincenas": 72 },
+            "plan_15": { "enganche": 8647,  "pago_quincenal": 2259, "quincenas": 72 },
+            "plan_20": { "enganche": 11529, "pago_quincenal": 1867, "quincenas": 72 },
+            "plan_30": { "enganche": 17294, "pago_quincenal": 1421, "quincenas": 72 }
+          }
+        }
+      ]
+    }
+  ]
+}

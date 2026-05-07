@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import HALFVEC  # type: ignore[import-untyped]
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -17,6 +18,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from atendia.db.base import Base
+
+# text-embedding-3-large produces 3072-dim vectors. Stored as halfvec
+# (16-bit floats) so we stay under pgvector's 2000-dim HNSW cap for
+# the standard `vector` type. See migration 013 for the rationale.
+EMBEDDING_DIM: int = 3072
 
 
 class TenantPipeline(Base):
@@ -46,10 +52,16 @@ class TenantCatalogItem(Base):
     attrs: Mapped[dict] = mapped_column(JSONB, default=dict)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Phase 3c.1
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(EMBEDDING_DIM), nullable=True)
 
 
 class TenantFAQ(Base):
     __tablename__ = "tenant_faqs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "question", name="uq_tenant_faqs_tenant_question"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
@@ -57,6 +69,8 @@ class TenantFAQ(Base):
     answer: Mapped[str] = mapped_column(String(2000), nullable=False)
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Phase 3c.1
+    embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(EMBEDDING_DIM), nullable=True)
 
 
 class TenantTemplateMeta(Base):

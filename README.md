@@ -8,11 +8,14 @@ WhatsApp sales assistant — multi-tenant, data-driven, with a deterministic sta
 - ✅ **Phase 2** — WhatsApp Cloud API transport (webhook, outbound queue, realtime WebSocket)
 - ✅ **Phase 3a** — NLU real (`gpt-4o-mini`) con structured outputs, retry, cost tracking
 - ✅ **Phase 3b** — Composer real (`gpt-4o`) con `list[str]`, tono per-tenant, 24h handoff, fallback canned
-- ⏳ **Phase 3c** — Migración pipeline/catálogo/FAQs de Dinamo a DB con embeddings
+- ⏳ **Phase 3c** — Migración real Dinamo + integraciones avanzadas
+  - ✅ **3c.1** — Datos reales: catálogo + FAQs + planes con embeddings (pgvector + halfvec(3072))
+  - ✅ **3c.2** — Router determinístico + flow v1 (PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT) + Vision API
+  - ⏳ **3c.3** — TBD (Vision aterrizó en 3c.2; candidatos: outbound multimedia, blob storage)
 - ⏳ **Phase 4** — Frontend debug panel + tenant config UI
 - ⏳ **Phase 5+** — Onboarding flow, multi-channel, integrations
 
-**224 tests passing · 89.31% coverage · gate ≥ 85%** (Phase 3b scope: contracts + state_machine + runner + tools + webhooks + integration + scripts)
+**452 tests passing · 94% coverage · gate ≥ 85%** (Phase 3c.2 scope: contracts + state_machine + runner + tools + webhooks + integration + scripts; live LLM tests gated by `RUN_LIVE_LLM_TESTS=1`, legacy `tests/test_config_meta.py` excluded due to .env leakage)
 
 ## Architecture (one-paragraph version)
 
@@ -78,6 +81,13 @@ cp .env.example core/.env
 ```
 
 Phase 2 needs Meta Cloud API credentials (`ATENDIA_V2_META_APP_SECRET`, `ATENDIA_V2_META_ACCESS_TOKEN`) for production. Tests use mocks via `respx` and don't need real credentials.
+
+Phase 3c.2 adds OpenAI Vision (image classification in DOC mode) — same `ATENDIA_V2_OPENAI_API_KEY` as NLU + Composer. Per-tenant `flow_mode_rules` + `docs_per_plan` live in `tenant_pipelines.definition` JSONB; `brand_facts` (catalog URL, address, etc.) in `tenant_branding.default_messages`. Seed Dinamo's brand_facts with:
+
+```bash
+cd core && PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.seed_brand_facts \
+    --tenant-name dinamomotos
+```
 
 ## License
 

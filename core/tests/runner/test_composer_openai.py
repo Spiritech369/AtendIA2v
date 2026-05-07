@@ -224,12 +224,13 @@ async def test_compose_request_uses_max_messages_in_schema():
 
 @respx.mock
 async def test_compose_quote_with_no_data_includes_no_inventes():
+    from atendia.contracts.flow_mode import FlowMode
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=_ok_composer_response(messages=["Déjame consultar y te paso el precio."])
     )
     composer = OpenAIComposer(api_key="sk-test")
     await composer.compose(input=ComposerInput(
-        action="quote",
+        action="quote", flow_mode=FlowMode.SALES,
         action_payload={"status": "no_data", "hint": "catalog not connected"},
         current_stage="quote",
         extracted_data={"interes_producto": "150Z"},
@@ -237,5 +238,5 @@ async def test_compose_quote_with_no_data_includes_no_inventes():
     ))
     req_body = json.loads(route.calls[0].request.content.decode("utf-8"))
     system = req_body["messages"][0]["content"]
-    assert "NO INVENTES PRECIOS" in system
+    assert "NO INVENTES precios" in system
     assert "150Z" in system  # extracted_data shows up

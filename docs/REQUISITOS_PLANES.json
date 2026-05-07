@@ -1,0 +1,82 @@
+{
+  "planes": [
+    {
+      "id": "10_nomina_tarjeta",
+      "nombre": "10% Nómina Depósito en Tarjeta",
+      "enganche_porcentaje": 10,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "2 estados de cuenta donde se deposite la nómina",
+        "Recibos de nómina de 1 mes (quincenal: 2 recibos | semanal: 4 recibos)"
+      ],
+      "detalle_nomina": {
+        "quincenal_catorcenal": 2,
+        "semanal": 4
+      },
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    },
+    {
+      "id": "10_pensionados_imss",
+      "nombre": "10% Pensionado IMSS",
+      "enganche_porcentaje": 10,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "2 estados de cuenta donde se vea la pensión",
+        "Carta de Resolución del IMSS"
+      ],
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    },
+    {
+      "id": "15_nomina_efectivo",
+      "nombre": "15% Nómina en Efectivo",
+      "enganche_porcentaje": 15,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "Recibos de nómina de 2 meses (semanal: 8 recibos | quincenal_catorcena: 4 recibos)"
+      ],
+      "detalle_nomina": {
+        "semanal": 8,
+        "quincenal,catorcena": 4
+      },
+      "nota": "Si no se tienen los recibos completos se puede pasar al plan 20% sin comprobantes.",
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    },
+    {
+      "id": "15_negocio_sat",
+      "nombre": "15% Negocio con Alta en SAT o RIF",
+      "enganche_porcentaje": 15,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "Constancia SAT",
+        "Factura de insumo reciente"
+      ],
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    },
+    {
+      "id": "20_sin_comprobantes",
+      "nombre": "20% Sin Comprobantes de Ingresos",
+      "enganche_porcentaje": 20,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses"
+      ],
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    },
+    {
+      "id": "30_seguridad",
+      "nombre": "30% Personal de Seguridad / Policías",
+      "enganche_porcentaje": 30,
+      "requisitos": [
+        "INE vigente por ambos lados",
+        "Comprobante de domicilio menor a 2 meses",
+        "2 estados de cuenta",
+        "Recibos de nómina de 1 mes"
+      ],
+      "validacion_imagen": ["foto completa", "bien iluminada", "texto legible"]
+    }
+  ]
+}

@@ -9,11 +9,29 @@ Tono y estilo:
 - Frases típicas que puedes usar cuando encajen naturalmente: ¡qué onda!, te paso.
 
 Estado de la conversación:
-- Stage actual: greeting
+- Turno actual: 6
+- Stage actual: sales
 - Última intent del cliente: (ninguna)
-- Datos extraídos hasta ahora: (ninguno todavía)
+- Datos extraídos hasta ahora: plan_credito=10%, modelo_moto=Adventure
 
-Acción: SALUDAR. Saluda brevemente y ofrece ayuda. NO preguntes datos todavía.
+Datos de la acción (action_payload — única fuente de verdad para precios,
+respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
+{}
+
+
+
+Acción: RETENTION MODE — el cliente dijo "gracias" pero no confirmó
+desinterés. Intenta retener.
+
+Mensaje fijo (parametrizar tono pero NO cambiar la idea):
+  "Perfecto, para no dejarlo en el aire: normalmente cuando alguien
+   dice 'gracias' es porque quiere revisarlo con calma o tiene una
+   duda que no quiere dejar pasar. ¿Qué parte te gustaría aclarar
+   o prefieres verlo después?"
+
+Marca extracted_data.retention_attempt = true (el composer lo
+registra en su output).
+
 
 Reglas de salida:
 - Devuelve un objeto JSON {"messages": [...]}.

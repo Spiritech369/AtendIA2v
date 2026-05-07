@@ -18,7 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15-alpine
+        # pgvector/pgvector:pg15 is Postgres 15 with the pgvector extension
+        # precompiled. Required for migration 012 (CREATE EXTENSION vector)
+        # and the embedding columns in 013.
+        image: pgvector/pgvector:0.8.2-pg15
         env:
           POSTGRES_USER: atendia
           POSTGRES_PASSWORD: atendia

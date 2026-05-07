@@ -1,5 +1,5 @@
 import json as _json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -90,6 +90,30 @@ async def _get_redis() -> Redis:
     return Redis.from_url(get_settings().redis_url)
 
 
+async def _resolve_attachment_urls(
+    adapter: MetaCloudAPIAdapter,
+    inbound_messages: list,
+) -> None:
+    """Populate InboundMessage.metadata.attachments[*].url via Meta Graph API.
+
+    Best-effort: errors leave the URL as the empty string the parser already
+    set, and the runner downstream skips Vision when url is empty. We do
+    NOT raise — webhook contract is "always 200, retries are Meta's job".
+    """
+    from atendia.channels.base import InboundMessageMetadata
+    for m in inbound_messages:
+        if not m.metadata:
+            continue
+        meta = InboundMessageMetadata.model_validate(m.metadata)
+        if not meta.attachments:
+            continue
+        for att in meta.attachments:
+            if att.url:
+                continue
+            att.url = await adapter.fetch_media_url(att.media_id)
+        m.metadata = meta.model_dump(mode="json")
+
+
 @router.post("/webhooks/meta/{tenant_id}")
 async def receive_inbound(
     tenant_id: UUID,
@@ -120,6 +144,11 @@ async def receive_inbound(
 
     inbound_messages = adapter.parse_webhook(payload, tenant_id=str(tenant_id))
     statuses = adapter.parse_status_callback(payload)
+
+    # Resolve any attachment URLs via the Meta Graph API before we persist
+    # them. fetch_media_url returns "" on failure so a transient Meta hiccup
+    # never 500s the webhook — the runner just skips Vision for that turn.
+    await _resolve_attachment_urls(adapter, inbound_messages)
 
     redis = await _get_redis()
     received_count = 0
@@ -171,19 +200,21 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
             {"c": conv_id},
         )
+    metadata_json = _json.dumps(m.metadata or {})
     await session.execute(
         text(
             "INSERT INTO messages "
             "(conversation_id, tenant_id, direction, text, channel_message_id, "
             "sent_at, metadata_json) "
-            "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, '{}'::jsonb)"
+            "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, CAST(:meta AS JSONB))"
         ),
         {
             "c": conv_id,
             "t": tenant_id,
             "txt": m.text or "",
             "cmid": m.channel_message_id,
-            "ts": datetime.now(timezone.utc),
+            "ts": datetime.now(UTC),
+            "meta": metadata_json,
         },
     )
 
@@ -222,10 +253,20 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
         await redis_client.aclose()
 
     # Run conversation turn (T25): drives the state machine using the configured NLU.
-    from atendia.runner.conversation_runner import ConversationRunner
-    from atendia.contracts.message import Message as CanonicalMessage, MessageDirection
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt
     from uuid import uuid4 as _uuid4
+
+    from atendia.channels.base import InboundMessageMetadata
+    from atendia.contracts.message import (
+        Attachment as CanonicalAttachment,
+    )
+    from atendia.contracts.message import (
+        Message as CanonicalMessage,
+    )
+    from atendia.contracts.message import (
+        MessageDirection,
+    )
+    from atendia.runner.conversation_runner import ConversationRunner
 
     # Find the next turn_number for this conversation
     next_turn = (await session.execute(
@@ -238,13 +279,24 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
     nlu = build_nlu(settings)
     composer = build_composer(settings)
     runner = ConversationRunner(session, nlu, composer)
+    canonical_attachments: list[CanonicalAttachment] = []
+    if m.metadata:
+        meta = InboundMessageMetadata.model_validate(m.metadata)
+        canonical_attachments = [
+            CanonicalAttachment(
+                media_id=a.media_id, mime_type=a.mime_type,
+                url=a.url, caption=a.caption,
+            )
+            for a in meta.attachments
+        ]
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),
         conversation_id=str(conv_id),
         tenant_id=str(tenant_id),
         direction=MessageDirection.INBOUND,
         text=m.text or "",
-        sent_at=_dt.now(_tz.utc),
+        sent_at=_dt.now(UTC),
+        attachments=canonical_attachments,
     )
 
     # Build an arq pool so the runner can enqueue outbound messages.

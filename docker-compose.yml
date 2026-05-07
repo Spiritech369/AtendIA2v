@@ -1,6 +1,8 @@
 services:
   postgres-v2:
-    image: postgres:15-alpine
+    # Pinned to a specific pgvector release to keep `<=>` cosine semantics
+    # deterministic across machines. Bumping requires re-running ingestion.
+    image: pgvector/pgvector:0.8.2-pg15
     container_name: atendia_postgres_v2
     restart: unless-stopped
     environment:
@@ -31,3 +33,5 @@ services:
 
 volumes:
   atendia_v2_pg_data:
+    external: true
+    name: v2-nucleo-conversacional_atendia_v2_pg_data

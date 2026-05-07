@@ -59,7 +59,65 @@ Environment variables (loaded from `core/.env`):
 | `ATENDIA_V2_COMPOSER_RETRY_DELAYS_MS` | `[500, 2000]`                                                        |
 | `ATENDIA_V2_COMPOSER_MAX_MESSAGES`| `2`                                                                      |
 
-Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.)
+Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.) The Postgres image is **`pgvector/pgvector:0.8.2-pg15`** — Phase 3c.1 added an `halfvec(3072)` column on `tenant_catalogs` and `tenant_faqs` for semantic search, and the `vector` extension comes pre-compiled in that image.
+
+### Ingesting Dinamo data (Phase 3c.1)
+
+Once the tenant + branding rows exist, populate the catalog + FAQs + plans
+from the canonical JSONs in `docs/`:
+
+```bash
+cd core
+PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.ingest_dinamo_data \
+    --tenant-id <UUID> --docs-dir ../docs [--dry-run]
+```
+
+`--dry-run` reports how many tokens + dollars an ingestion would cost
+without writing to the DB. A full Dinamo ingestion (34 catalog items + 26
+FAQs) costs roughly **$0.0004** at text-embedding-3-large pricing.
+Idempotent: re-runs UPDATE in place via ON CONFLICT.
+
+### Activating Phase 3c.2 — Router + flow modes
+
+The deterministic `flow_router` picks one of six conversational modes
+(PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT) per turn from a per-tenant
+rule list, then the composer renders the matching `MODE_PROMPTS` block.
+Three things must be configured before the router does anything useful:
+
+1. **`flow_mode_rules`** in `tenant_pipelines.definition` JSONB — list of
+   trigger/mode rules; if missing, defaults to `[always → SUPPORT]` (legacy
+   FAQ behavior preserved). The 8 trigger types are documented in
+   [`atendia/runner/flow_router.py`](atendia/runner/flow_router.py).
+
+2. **`docs_per_plan`** in the same JSONB — `tipo_credito` label → ordered
+   list of doc keys (`["ine", "comprobante", ...]`). Drives DOC mode's
+   `next_pending_doc()` logic and HandoffSummary's docs_recibidos split.
+
+3. **`brand_facts`** in `tenant_branding.default_messages` JSONB — the
+   composer pre-pass substitutes `{{brand_facts.X}}` references inside
+   MODE_PROMPTS with these values. Seed via:
+
+```bash
+cd core
+PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.seed_brand_facts \
+    --tenant-name dinamomotos
+```
+
+The script UPSERTs into `tenant_branding` so a fresh tenant works too.
+Every escalation now writes a structured `HandoffSummary` to
+`human_handoffs.payload` (migration 016) so the operator dashboard
+renders context without parsing free-text reasons.
+
+Vision API runs in parallel with NLU when an inbound carries an image
+attachment; cost lands on `turn_traces.vision_cost_usd` (migration 015).
+Live tests for all six modes:
+
+```bash
+cd core && RUN_LIVE_LLM_TESTS=1 uv run pytest \
+    tests/runner/test_phase3c2_live.py tests/tools/test_vision_live.py
+```
+
+Total cost ~$0.035 USD per pass (defaults skipped in CI).
 
 ### NLU rollout sequence (Phase 3a)
 
