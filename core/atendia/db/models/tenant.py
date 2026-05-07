@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,11 @@ class Tenant(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")
     meta_business_id: Mapped[str | None] = mapped_column(String(80))
     config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Phase 3d — kill-switch for the cron worker. Kept here (not in config
+    # JSONB) so the cron query can join+filter cheaply without parsing JSON.
+    followups_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
