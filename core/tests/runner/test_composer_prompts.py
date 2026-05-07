@@ -1,12 +1,14 @@
 """Unit tests for composer_prompts (Phase 3c.2: mode-based dispatch).
 
-Snapshot tests for the 6 modes x key states live in T17 alongside
-their fixtures. This file covers the structural invariants:
-  * SYSTEM_PROMPT_TEMPLATE has all required placeholders.
-  * MODE_PROMPTS has all 6 modes.
-  * build_composer_prompt dispatches by flow_mode and renders helpers.
-  * brand_facts pre-pass resolves dotted refs and raises on missing keys.
+Two layers:
+  * Structural invariants of SYSTEM_PROMPT_TEMPLATE / MODE_PROMPTS /
+    build_composer_prompt / brand_facts pre-pass (this file's first half).
+  * Byte-equality snapshot tests for 13 mode x state combinations
+    (this file's second half). Regenerate fixtures via
+    ``scripts/regen_mode_fixtures.py`` when prompts intentionally change.
 """
+from pathlib import Path
+
 import pytest
 
 from atendia.contracts.flow_mode import FlowMode
@@ -19,6 +21,8 @@ from atendia.runner.composer_prompts import (
     build_composer_prompt,
 )
 from atendia.runner.composer_protocol import ComposerInput
+
+_FIXTURES = Path(__file__).parent.parent / "fixtures" / "composer"
 
 # ============================================================
 # Template / constant invariants
@@ -218,3 +222,166 @@ def test_build_composer_prompt_substitutes_brand_facts_in_sales() -> None:
     ))
     assert "https://example.com/cat" in msgs[0]["content"]
     assert "{{brand_facts.catalog_url}}" not in msgs[0]["content"]
+
+
+# ============================================================
+# Snapshot fixtures — byte-equality guards (T17)
+#
+# Regenerate after intentional prompt changes:
+#   PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python scripts/regen_mode_fixtures.py
+# ============================================================
+_DINAMO_TONE = Tone(
+    register="informal_mexicano", use_emojis="sparingly",
+    max_words_per_message=40, bot_name="Dinamo",
+    forbidden_phrases=["estimado cliente", "le saluda atentamente"],
+    signature_phrases=["¡qué onda!", "te paso"],
+)
+_BRAND = {
+    "address": "Benito Juárez 801, Centro Monterrey",
+    "approval_time_hours": "24",
+    "buro_max_amount": "$50 mil",
+    "catalog_url": "https://dinamomotos.com/catalogo.html",
+    "delivery_time_days": "3-7",
+    "human_agent_name": "Francisco",
+    "post_completion_form": "https://forms.gle/U1MEueL63vgftiuZ8",
+}
+
+_SNAPSHOT_CASES: list[tuple[str, dict]] = [
+    ("mode_PLAN_state_initial", dict(
+        action="micro_cotizacion", flow_mode=FlowMode.PLAN,
+        current_stage="plan", turn_number=1,
+        extracted_data={}, tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_PLAN_state_antiguedad_set", dict(
+        action="ask_tipo_credito", flow_mode=FlowMode.PLAN,
+        current_stage="plan", turn_number=2,
+        extracted_data={"antigüedad_meses": "24"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_PLAN_state_plan_assigned", dict(
+        action="ask_doc_ine", flow_mode=FlowMode.PLAN,
+        current_stage="plan", turn_number=4,
+        extracted_data={
+            "antigüedad_meses": "24",
+            "tipo_credito": "Nómina Tarjeta",
+            "plan_credito": "10%",
+        },
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_SALES_state_quote_ok", dict(
+        action="quote", flow_mode=FlowMode.SALES,
+        current_stage="sales", turn_number=5,
+        action_payload={
+            "status": "ok",
+            "sku": "adventure-elite-150-cc",
+            "name": "Adventure Elite 150 CC",
+            "category": "Motoneta",
+            "price_lista_mxn": "31395",
+            "price_contado_mxn": "29900",
+            "planes_credito": {"plan_10": {"enganche": 3140,
+                                            "pago_quincenal": 1247,
+                                            "quincenas": 72}},
+            "ficha_tecnica": {"motor_cc": 150},
+        },
+        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_SALES_state_no_data", dict(
+        action="quote", flow_mode=FlowMode.SALES,
+        current_stage="sales", turn_number=5,
+        action_payload={"status": "no_data",
+                        "hint": "no catalog match for 'lambretta'"},
+        extracted_data={"plan_credito": "10%"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_SALES_state_objection_caro", dict(
+        action="quote", flow_mode=FlowMode.SALES,
+        current_stage="sales", turn_number=6,
+        action_payload={"status": "objection", "type": "caro"},
+        extracted_data={"plan_credito": "10%"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_DOC_state_match", dict(
+        action="confirm_doc", flow_mode=FlowMode.DOC,
+        current_stage="doc", turn_number=7,
+        action_payload={
+            "vision_result": {"category": "ine", "confidence": 0.95,
+                              "metadata": {"ambos_lados": True, "legible": True}},
+            "expected_doc": "ine",
+            "pending_after": ["comprobante", "estados_de_cuenta", "nomina"],
+        },
+        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_DOC_state_unrelated_image", dict(
+        action="reject_unrelated", flow_mode=FlowMode.DOC,
+        current_stage="doc", turn_number=7,
+        action_payload={
+            "vision_result": {"category": "moto", "confidence": 0.92,
+                              "metadata": {"modelo": "Adventure 150"}},
+            "expected_doc": "ine",
+            "pending_after": [],
+        },
+        extracted_data={"plan_credito": "10%"},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_DOC_state_papeleria_completa", dict(
+        action="papeleria_completa", flow_mode=FlowMode.DOC,
+        current_stage="doc", turn_number=10,
+        action_payload={
+            "vision_result": {"category": "recibo_nomina", "confidence": 0.93,
+                              "metadata": {"fecha_iso": "2026-04-30"}},
+            "expected_doc": "nomina",
+            "pending_after": [],
+        },
+        extracted_data={
+            "plan_credito": "10%", "modelo_moto": "Adventure",
+            "docs_ine": "true", "docs_comprobante": "true",
+            "docs_estados_de_cuenta": "true",
+        },
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_OBSTACLE_state_initial", dict(
+        action="address_obstacle", flow_mode=FlowMode.OBSTACLE,
+        current_stage="plan", turn_number=8,
+        extracted_data={"plan_credito": "10%"},
+        tone=_DINAMO_TONE, brand_facts={},
+    )),
+    ("mode_RETENTION_state_initial", dict(
+        action="retention_pitch", flow_mode=FlowMode.RETENTION,
+        current_stage="sales", turn_number=6,
+        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+        tone=_DINAMO_TONE, brand_facts={},
+    )),
+    ("mode_SUPPORT_state_buro_question", dict(
+        action="explain_topic", flow_mode=FlowMode.SUPPORT,
+        current_stage="plan", turn_number=2,
+        action_payload={"status": "no_data", "hint": "no FAQ match"},
+        extracted_data={},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+    ("mode_SUPPORT_state_faq_match", dict(
+        action="lookup_faq", flow_mode=FlowMode.SUPPORT,
+        current_stage="plan", turn_number=2,
+        action_payload={
+            "matches": [{
+                "pregunta": "¿Cuál es el tiempo de aprobación?",
+                "respuesta": "24 horas con documentación completa.",
+                "score": 0.93,
+            }],
+        },
+        extracted_data={},
+        tone=_DINAMO_TONE, brand_facts=_BRAND,
+    )),
+]
+
+
+@pytest.mark.parametrize(
+    "fixture_name,kwargs",
+    _SNAPSHOT_CASES,
+    ids=[name for name, _ in _SNAPSHOT_CASES],
+)
+def test_mode_snapshot(fixture_name: str, kwargs: dict) -> None:
+    expected = (_FIXTURES / f"{fixture_name}.txt").read_text(encoding="utf-8")
+    msgs = build_composer_prompt(ComposerInput(**kwargs))
+    assert msgs[0]["content"] == expected
