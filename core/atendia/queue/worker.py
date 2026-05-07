@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from arq.connections import RedisSettings
@@ -160,14 +160,23 @@ async def _persist_outbound(session, msg: OutboundMessage, message_id: str, rece
             "txt": msg.text or "",
             "cmid": receipt.channel_message_id,
             "st": receipt.status,
-            "ts": datetime.now(timezone.utc),
+            "ts": datetime.now(UTC),
         },
     )
 
 
 class WorkerSettings:
     """arq worker settings. Run: `uv run arq atendia.queue.worker.WorkerSettings`."""
+    from arq.cron import cron
+
+    from atendia.queue.followup_worker import poll_followups
+
     functions = [send_outbound]
+    cron_jobs = [
+        # Phase 3d — fires once a minute. unique=True prevents two ticks
+        # from overlapping if a single poll takes >60s under load.
+        cron(poll_followups, second={0}, unique=True, run_at_startup=False),
+    ]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_jobs = 10
     keep_result = 0

@@ -144,6 +144,19 @@ class ConversationRunner:
     ) -> TurnTrace:
         started = time.perf_counter()
 
+        # Phase 3d — inbound arriving cancels any pending follow-ups for
+        # this conversation. Done first so even if the rest of the turn
+        # crashes, the cron worker won't fire a stale 'sigues en pie?'
+        # at a customer who just engaged. Lives in the same transaction as
+        # everything else: caller's commit covers it.
+        from atendia.runner.followup_scheduler import (
+            cancel_pending_followups,
+            schedule_followups_after_outbound,
+        )
+        await cancel_pending_followups(
+            session=self._session, conversation_id=conversation_id,
+        )
+
         pipeline = await load_active_pipeline(self._session, tenant_id)
 
         # Load current state row
@@ -722,6 +735,17 @@ class ConversationRunner:
                 conversation_id=conversation_id,
                 turn_number=turn_number,
                 action=decision.action,
+            )
+            # Phase 3d — schedule the 3h+12h re-engagement ladder. Only
+            # when we actually sent text (composer_output is not None +
+            # we have a queue). The earlier cancel_pending_followups call
+            # cleared any rows from a previous turn; this re-arms with the
+            # current snapshot so the silence clock restarts each turn.
+            await schedule_followups_after_outbound(
+                session=self._session,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                extracted_snapshot=merged_extracted,
             )
 
         return trace
