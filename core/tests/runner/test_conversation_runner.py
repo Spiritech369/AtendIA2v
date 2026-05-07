@@ -598,6 +598,117 @@ async def test_runner_skips_vision_when_no_image_attachment(db_session, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_runner_persists_flow_mode_and_loads_brand_facts(
+    db_session, monkeypatch,
+):
+    """T21 — flow_mode lands on TurnTrace, brand_facts reaches ComposerInput.
+
+    With default pipeline rules (no `flow_mode_rules` authored) every turn
+    should pick FlowMode.SUPPORT via the always-fallback. brand_facts come
+    from tenant_branding.default_messages JSONB.
+    """
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, "test_t21_flow_mode_persist",
+    )
+    # Seed brand_facts the way T23 will eventually populate them.
+    await db_session.execute(
+        text("INSERT INTO tenant_branding (tenant_id, bot_name, voice, default_messages) "
+             "VALUES (:t, 'Dinamo', :v\\:\\:jsonb, :d\\:\\:jsonb)"),
+        {
+            "t": tid,
+            "v": json.dumps({"register": "informal_mexicano"}),
+            "d": json.dumps({"brand_facts": {
+                "address": "Benito Juárez 801",
+                "human_agent_name": "Francisco",
+            }}),
+        },
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer()
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), composer,
+    )
+    inbound = _make_inbound(conv_id, tid, "hola")
+    trace = await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+    )
+    await db_session.commit()
+
+    # Default pipeline rules → SUPPORT.
+    assert trace.flow_mode == "SUPPORT"
+    # Composer received the live brand_facts.
+    assert composer.last_input is not None
+    assert composer.last_input.flow_mode.value == "SUPPORT"
+    assert composer.last_input.brand_facts == {
+        "address": "Benito Juárez 801",
+        "human_agent_name": "Francisco",
+    }
+    assert composer.last_input.turn_number == 1
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_runner_picks_flow_mode_per_authored_rules(db_session):
+    """Tenant authors a custom flow_mode_rules list → router applies it.
+
+    Seeds a pipeline whose definition JSONB includes a flow_mode_rules entry
+    that triggers RETENTION on the keyword 'gracias'. Verifies the runner
+    threads the rules through pick_flow_mode and persists RETENTION.
+    """
+    pipeline_with_rules = {
+        **PIPELINE_QUALIFY_QUOTE,
+        "flow_mode_rules": [
+            {"id": "retain_on_gracias", "trigger": {
+                "type": "keyword_in_text", "list": ["gracias"]},
+                "mode": "RETENTION"},
+            {"id": "always_support", "trigger": {"type": "always"}, "mode": "SUPPORT"},
+        ],
+    }
+    tid = (await db_session.execute(
+        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+        {"n": "test_t21_authored_rules"},
+    )).scalar()
+    await db_session.execute(
+        text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+             "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+        {"t": tid, "d": json.dumps(pipeline_with_rules)},
+    )
+    cid = (await db_session.execute(
+        text("INSERT INTO customers (tenant_id, phone_e164) "
+             "VALUES (:t, '+5215555550037') RETURNING id"),
+        {"t": tid},
+    )).scalar()
+    conv_id = (await db_session.execute(
+        text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+             "VALUES (:t, :c, 'qualify') RETURNING id"),
+        {"t": tid, "c": cid},
+    )).scalar()
+    await db_session.execute(
+        text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
+        {"c": conv_id},
+    )
+    await db_session.commit()
+
+    runner = ConversationRunner(
+        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+    )
+    trace = await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "muchas gracias por la info"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert trace.flow_mode == "RETENTION"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
 async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypatch):
     """Vision endpoint 500s → ERROR_OCCURRED event, NLU result still drives turn."""
     import respx

@@ -181,7 +181,7 @@ class ConversationRunner:
                 )
             else:
                 # vision_result is consumed by mode-specific dispatch in T21.
-                (vision_result, _tokens_in, _tokens_out,  # noqa: RUF059
+                (vision_result, _tokens_in, _tokens_out,
                  vision_cost_usd, vision_latency_ms) = vision_outcome
         else:
             nlu, usage = await nlu_task
@@ -267,12 +267,44 @@ class ConversationRunner:
 
         # ===== Phase 3b: tone, tools, 24h check, Composer =====
 
-        # Load tone from tenant_branding.voice (defaults if missing).
-        voice_row = (await self._session.execute(
-            text("SELECT voice FROM tenant_branding WHERE tenant_id = :t"),
+        # Load tone + brand_facts from tenant_branding.
+        # voice -> Tone (Phase 3b). default_messages.brand_facts -> dict (Phase 3c.2,
+        # T23 will populate the slot; until then it's an empty dict and the composer
+        # pre-pass leaves brand_facts placeholders literal).
+        branding_row = (await self._session.execute(
+            text("SELECT voice, default_messages FROM tenant_branding WHERE tenant_id = :t"),
             {"t": tenant_id},
         )).fetchone()
-        tone = Tone.model_validate(voice_row[0] if voice_row else {})
+        tone = Tone.model_validate(branding_row[0] if branding_row else {})
+        brand_facts: dict = {}
+        if branding_row and branding_row[1]:
+            brand_facts = (branding_row[1] or {}).get("brand_facts", {}) or {}
+
+        # Phase 3c.2 — deterministic flow_mode for this turn.
+        # We feed pick_flow_mode an ExtractedFields built from the canonical
+        # subset of merged_extracted (Pydantic ignores anything outside the
+        # known field list). Tenants without rules in pipeline.flow_mode_rules
+        # get the default `always -> SUPPORT` fallback so this never raises.
+        from atendia.contracts.extracted_fields import ExtractedFields
+        from atendia.runner.flow_router import pick_flow_mode
+        ext_fields_data = {
+            k: v["value"] for k, v in merged_extracted.items()
+            if k in ExtractedFields.model_fields and v.get("value") is not None
+        }
+        try:
+            ext_fields = ExtractedFields.model_validate(ext_fields_data)
+        except Exception:
+            # Mismatched legacy data shouldn't crash the runner — fall back to
+            # defaults; SUPPORT mode handles unknown contexts gracefully.
+            ext_fields = ExtractedFields()
+        flow_mode = pick_flow_mode(
+            rules=pipeline.flow_mode_rules,
+            extracted=ext_fields,
+            nlu=nlu,
+            vision=vision_result,
+            inbound_text=inbound.text,
+            pending_confirmation=pending_confirmation,
+        )
 
         # ===== Phase 3c.1: real-data tool dispatch =====
         # quote / lookup_faq / search_catalog now hit the real catalog/FAQ
@@ -429,6 +461,11 @@ class ConversationRunner:
                 history=history_for_composer,
                 tone=tone,
                 max_messages=2,
+                # Phase 3c.2 wiring:
+                flow_mode=flow_mode,
+                brand_facts=brand_facts,
+                vision_result=vision_result,
+                turn_number=turn_number,
             )
             composer_output, composer_usage = await self._composer.compose(
                 input=composer_input,
@@ -525,6 +562,7 @@ class ConversationRunner:
             tool_cost_usd=tool_cost_usd if tool_cost_usd > 0 else None,
             vision_cost_usd=vision_cost_usd if vision_cost_usd > 0 else None,
             vision_latency_ms=vision_latency_ms,
+            flow_mode=flow_mode.value,
             outbound_messages=(
                 composer_output.messages if composer_output is not None else None
             ),

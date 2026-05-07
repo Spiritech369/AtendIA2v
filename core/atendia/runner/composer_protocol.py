@@ -30,7 +30,9 @@ class ComposerInput(BaseModel):
     flow_mode: FlowMode = FlowMode.SUPPORT
     brand_facts: dict = Field(default_factory=dict)
     vision_result: VisionResult | None = None
-    turn_number: int = Field(default=1, ge=1)
+    # turn_number: 1-indexed in production callers, but the legacy E2E
+    # fixture runner passes 0-indexed enumerate() values; allow either.
+    turn_number: int = Field(default=1, ge=0)
 
 
 class ComposerOutput(BaseModel):
