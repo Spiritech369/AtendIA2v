@@ -7,6 +7,21 @@ class MetaText(BaseModel):
     body: str
 
 
+class MetaMediaNode(BaseModel):
+    """Image / document / audio / video payload from Meta webhook.
+
+    Phase 3c.2 — Meta sends only metadata (id + mime_type + sha256). The
+    actual download URL is fetched separately via the Graph API media endpoint.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str  # media_id used for the Graph API URL fetch
+    mime_type: str
+    sha256: str | None = None
+    caption: str | None = None  # only on image/video/document nodes
+
+
 class MetaInboundMessage(BaseModel):
     """A single inbound message from Meta. Note: Meta sends the field as `from`,
     which is a Python reserved word — we accept it via alias and expose as `from_`.
@@ -19,6 +34,10 @@ class MetaInboundMessage(BaseModel):
     timestamp: str
     type: str
     text: MetaText | None = None
+    image: MetaMediaNode | None = None
+    document: MetaMediaNode | None = None
+    audio: MetaMediaNode | None = None
+    video: MetaMediaNode | None = None
 
 
 class MetaStatusCallback(BaseModel):
