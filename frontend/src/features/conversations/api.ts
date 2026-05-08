@@ -27,11 +27,21 @@ export interface ConversationDetail extends ConversationListItem {
   last_intent: string | null;
 }
 
+export interface MessageMedia {
+  type: "image" | "audio" | "document" | "video";
+  url: string;
+  original_filename?: string;
+  file_size?: number;
+  mime_type?: string;
+  caption?: string;
+}
+
 export interface MessageItem {
   id: string;
   conversation_id: string;
   direction: "inbound" | "outbound" | "system";
   text: string;
+  metadata: Record<string, unknown>;
   created_at: string;
   sent_at: string | null;
 }

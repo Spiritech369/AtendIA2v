@@ -78,6 +78,7 @@ class MessageItem(BaseModel):
     conversation_id: UUID
     direction: str
     text: str
+    metadata: dict
     created_at: datetime
     sent_at: datetime | None
 
@@ -321,6 +322,7 @@ async def list_messages(
             MessageRow.conversation_id,
             MessageRow.direction,
             MessageRow.text,
+            MessageRow.metadata_json,
             MessageRow.created_at,
             MessageRow.sent_at,
         )
@@ -348,6 +350,7 @@ async def list_messages(
             conversation_id=r.conversation_id,
             direction=r.direction,
             text=r.text,
+            metadata=r.metadata_json or {},
             created_at=r.created_at,
             sent_at=r.sent_at,
         )
