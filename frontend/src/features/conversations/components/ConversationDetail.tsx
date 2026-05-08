@@ -1,12 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { conversationsApi } from "@/features/conversations/api";
 import { useConversation } from "@/features/conversations/hooks/useConversations";
 import { turnTracesApi } from "@/features/turn-traces/api";
 import { ChatWindow } from "./ChatWindow";
@@ -15,8 +16,17 @@ import { DebugPanel } from "./DebugPanel";
 
 export function ConversationDetail({ conversationId }: { conversationId: string }) {
   const conv = useConversation(conversationId);
+  const queryClient = useQueryClient();
   const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
   const [debugMessageId, setDebugMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (conversationId) {
+      conversationsApi.markRead(conversationId).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      });
+    }
+  }, [conversationId, queryClient]);
 
   const traces = useQuery({
     queryKey: ["turn-traces", conversationId],
