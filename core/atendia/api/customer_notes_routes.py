@@ -17,6 +17,7 @@ from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
 from atendia.db.models.customer import Customer
 from atendia.db.models.customer_note import CustomerNote
+from atendia.db.models.tenant import TenantUser
 from atendia.db.session import get_db_session
 
 router = APIRouter()
@@ -27,6 +28,7 @@ class NoteOut(BaseModel):
     customer_id: UUID
     tenant_id: UUID
     author_user_id: UUID | None
+    author_email: str | None
     content: str
     pinned: bool
     created_at: datetime
@@ -68,26 +70,28 @@ async def list_notes(
     await _verify_customer_access(customer_id, tenant_id, session)
     rows = (
         await session.execute(
-            select(CustomerNote)
+            select(CustomerNote, TenantUser.email)
+            .outerjoin(TenantUser, TenantUser.id == CustomerNote.author_user_id)
             .where(
                 CustomerNote.customer_id == customer_id,
                 CustomerNote.tenant_id == tenant_id,
             )
             .order_by(CustomerNote.pinned.desc(), CustomerNote.created_at.desc())
         )
-    ).scalars().all()
+    ).all()
     return [
         NoteOut(
             id=n.id,
             customer_id=n.customer_id,
             tenant_id=n.tenant_id,
             author_user_id=n.author_user_id,
+            author_email=email,
             content=n.content,
             pinned=n.pinned,
             created_at=n.created_at,
             updated_at=n.updated_at,
         )
-        for n in rows
+        for n, email in rows
     ]
 
 
@@ -115,6 +119,7 @@ async def create_note(
         customer_id=note.customer_id,
         tenant_id=note.tenant_id,
         author_user_id=note.author_user_id,
+        author_email=user.email,
         content=note.content,
         pinned=note.pinned,
         created_at=note.created_at,
@@ -151,11 +156,19 @@ async def update_note(
         setattr(note, k, v)
     await session.commit()
     await session.refresh(note)
+    author_email = None
+    if note.author_user_id:
+        author_email = (
+            await session.execute(
+                select(TenantUser.email).where(TenantUser.id == note.author_user_id)
+            )
+        ).scalar_one_or_none()
     return NoteOut(
         id=note.id,
         customer_id=note.customer_id,
         tenant_id=note.tenant_id,
         author_user_id=note.author_user_id,
+        author_email=author_email,
         content=note.content,
         pinned=note.pinned,
         created_at=note.created_at,

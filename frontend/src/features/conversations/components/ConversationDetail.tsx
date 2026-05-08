@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
 import { useConversation, useMessages } from "@/features/conversations/hooks/useConversations";
+import { ContactPanel } from "./ContactPanel";
 import { InterventionComposer } from "./InterventionComposer";
 import { MessageBubble } from "./MessageBubble";
 
@@ -54,8 +55,8 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
   const messages = msgs.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-      <Card className="flex flex-col overflow-hidden">
+    <div className="flex h-full gap-4">
+      <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
@@ -105,36 +106,7 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
         <InterventionComposer conversationId={conversationId} botPaused={c.bot_paused} />
       </Card>
 
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Estado extraído</CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="space-y-3 py-4 text-sm">
-          {c.last_intent && (
-            <div>
-              <div className="text-xs text-muted-foreground">Última intención</div>
-              <div>{c.last_intent}</div>
-            </div>
-          )}
-          {c.pending_confirmation && (
-            <div>
-              <div className="text-xs text-muted-foreground">Esperando confirmación</div>
-              <div className="text-amber-600">{c.pending_confirmation}</div>
-            </div>
-          )}
-          <div>
-            <div className="mb-1 text-xs text-muted-foreground">Datos capturados</div>
-            {Object.keys(c.extracted_data).length === 0 ? (
-              <div className="text-xs text-muted-foreground">Sin datos.</div>
-            ) : (
-              <pre className="overflow-auto rounded bg-muted p-2 text-xs">
-                {JSON.stringify(c.extracted_data, null, 2)}
-              </pre>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ContactPanel customerId={c.customer_id} />
     </div>
   );
 }
