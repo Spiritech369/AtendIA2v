@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
 from atendia.api.analytics_routes import router as analytics_router
+from atendia.api.audit_log_routes import router as audit_log_router
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customers_routes import router as customers_router
@@ -12,6 +13,7 @@ from atendia.api.handoffs_routes import router as handoffs_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
 from atendia.api.turn_traces_routes import router as turn_traces_router
+from atendia.api.users_routes import router as users_router
 from atendia.realtime.ws_routes import router as ws_router
 from atendia.tools import register_all_tools
 from atendia.webhooks.meta_routes import router as meta_webhook_router
@@ -37,6 +39,8 @@ app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
 app.include_router(
     turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"]
 )
+app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(audit_log_router, prefix="/api/v1/audit-log", tags=["audit-log"])
 app.include_router(runner_router, prefix="/api/v1")
 app.include_router(meta_webhook_router)
 app.include_router(ws_router)

@@ -12,10 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as authIndexRouteImport } from './routes/(auth)/index'
+import { Route as authUsersRouteImport } from './routes/(auth)/users'
 import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
 import { Route as authCustomersRouteImport } from './routes/(auth)/customers'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
+import { Route as authAuditLogRouteImport } from './routes/(auth)/audit-log'
 import { Route as authAnalyticsRouteImport } from './routes/(auth)/analytics'
 import { Route as authCustomersCustomerIdRouteImport } from './routes/(auth)/customers.$customerId'
 import { Route as authConversationsConversationIdRouteImport } from './routes/(auth)/conversations.$conversationId'
@@ -32,6 +34,11 @@ const authRouteRoute = authRouteRouteImport.update({
 const authIndexRoute = authIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authUsersRoute = authUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authTurnTracesRoute = authTurnTracesRouteImport.update({
@@ -54,6 +61,11 @@ const authConfigRoute = authConfigRouteImport.update({
   path: '/config',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authAuditLogRoute = authAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authAnalyticsRoute = authAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -74,10 +86,12 @@ const authConversationsConversationIdRoute =
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/analytics': typeof authAnalyticsRoute
+  '/audit-log': typeof authAuditLogRoute
   '/config': typeof authConfigRoute
   '/customers': typeof authCustomersRouteWithChildren
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
+  '/users': typeof authUsersRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/customers/$customerId': typeof authCustomersCustomerIdRoute
@@ -85,10 +99,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/analytics': typeof authAnalyticsRoute
+  '/audit-log': typeof authAuditLogRoute
   '/config': typeof authConfigRoute
   '/customers': typeof authCustomersRouteWithChildren
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
+  '/users': typeof authUsersRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/customers/$customerId': typeof authCustomersCustomerIdRoute
@@ -98,10 +114,12 @@ export interface FileRoutesById {
   '/(auth)': typeof authRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/(auth)/analytics': typeof authAnalyticsRoute
+  '/(auth)/audit-log': typeof authAuditLogRoute
   '/(auth)/config': typeof authConfigRoute
   '/(auth)/customers': typeof authCustomersRouteWithChildren
   '/(auth)/handoffs': typeof authHandoffsRoute
   '/(auth)/turn-traces': typeof authTurnTracesRoute
+  '/(auth)/users': typeof authUsersRoute
   '/(auth)/': typeof authIndexRoute
   '/(auth)/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/(auth)/customers/$customerId': typeof authCustomersCustomerIdRoute
@@ -111,10 +129,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/login'
     | '/analytics'
+    | '/audit-log'
     | '/config'
     | '/customers'
     | '/handoffs'
     | '/turn-traces'
+    | '/users'
     | '/'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
@@ -122,10 +142,12 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/analytics'
+    | '/audit-log'
     | '/config'
     | '/customers'
     | '/handoffs'
     | '/turn-traces'
+    | '/users'
     | '/'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
@@ -134,10 +156,12 @@ export interface FileRouteTypes {
     | '/(auth)'
     | '/login'
     | '/(auth)/analytics'
+    | '/(auth)/audit-log'
     | '/(auth)/config'
     | '/(auth)/customers'
     | '/(auth)/handoffs'
     | '/(auth)/turn-traces'
+    | '/(auth)/users'
     | '/(auth)/'
     | '/(auth)/conversations/$conversationId'
     | '/(auth)/customers/$customerId'
@@ -171,6 +195,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authIndexRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/users': {
+      id: '/(auth)/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof authUsersRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/turn-traces': {
       id: '/(auth)/turn-traces'
       path: '/turn-traces'
@@ -197,6 +228,13 @@ declare module '@tanstack/react-router' {
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof authConfigRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/audit-log': {
+      id: '/(auth)/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof authAuditLogRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/analytics': {
@@ -237,20 +275,24 @@ const authCustomersRouteWithChildren = authCustomersRoute._addFileChildren(
 
 interface authRouteRouteChildren {
   authAnalyticsRoute: typeof authAnalyticsRoute
+  authAuditLogRoute: typeof authAuditLogRoute
   authConfigRoute: typeof authConfigRoute
   authCustomersRoute: typeof authCustomersRouteWithChildren
   authHandoffsRoute: typeof authHandoffsRoute
   authTurnTracesRoute: typeof authTurnTracesRoute
+  authUsersRoute: typeof authUsersRoute
   authIndexRoute: typeof authIndexRoute
   authConversationsConversationIdRoute: typeof authConversationsConversationIdRoute
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
   authAnalyticsRoute: authAnalyticsRoute,
+  authAuditLogRoute: authAuditLogRoute,
   authConfigRoute: authConfigRoute,
   authCustomersRoute: authCustomersRouteWithChildren,
   authHandoffsRoute: authHandoffsRoute,
   authTurnTracesRoute: authTurnTracesRoute,
+  authUsersRoute: authUsersRoute,
   authIndexRoute: authIndexRoute,
   authConversationsConversationIdRoute: authConversationsConversationIdRoute,
 }
