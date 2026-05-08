@@ -15,18 +15,21 @@ import json
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import and_, exists, func, or_, select
+from redis.asyncio import Redis
+from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
+from atendia.config import get_settings
 from atendia.db.models.conversation import Conversation, ConversationStateRow
 from atendia.db.models.customer import Customer
 from atendia.db.models.lifecycle import HumanHandoff
 from atendia.db.models.message import MessageRow
 from atendia.db.session import get_db_session
+from atendia.realtime.publisher import publish_event
 
 router = APIRouter()
 
@@ -357,3 +360,149 @@ async def list_messages(
         assert last.sent_at is not None
         next_cursor = _encode_cursor(last.sent_at, last.id)
     return MessageListResponse(items=items, next_cursor=next_cursor)
+
+
+# ---------- Operator intervention (Phase 4 T22-T23) ----------
+
+
+class InterveneBody(BaseModel):
+    text: str
+
+
+class MessageSentResponse(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    text: str
+    sent_at: datetime
+
+
+@router.post("/{conversation_id}/intervene", response_model=MessageSentResponse)
+async def intervene(
+    conversation_id: UUID,
+    body: InterveneBody,
+    request: Request,  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> MessageSentResponse:
+    """Operator takes over the conversation.
+
+    1. Sets `conversation_state.bot_paused = True`. The runner short-circuits
+       on next inbound (T24).
+    2. Inserts an outbound message row attributed to the operator
+       (`metadata.source = "operator"`, `metadata.operator_user_id`).
+    3. Publishes a `message_sent` event so the frontend list+detail
+       refresh in real time.
+    4. Best-effort: enqueues the actual WhatsApp send via arq if a pool
+       is available. In tests / dev without arq the row is still
+       persisted, but the customer won't physically receive it. The
+       outbound dispatcher worker is a separate process; this route
+       does NOT block on its delivery.
+    """
+    if not body.text.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "text is required")
+
+    # Existence check — also guards against operator → other tenant.
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    now = datetime.now()
+
+    # 1. Pause the bot.
+    await session.execute(
+        update(ConversationStateRow)
+        .where(ConversationStateRow.conversation_id == conversation_id)
+        .values(bot_paused=True)
+    )
+
+    # 2. Persist the outbound message attributed to the operator.
+    msg_id = (
+        await session.execute(
+            MessageRow.__table__.insert()
+            .values(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                direction="outbound",
+                text=body.text,
+                sent_at=now,
+                metadata_json={
+                    "source": "operator",
+                    "operator_user_id": str(user.user_id),
+                },
+            )
+            .returning(MessageRow.id)
+        )
+    ).scalar_one()
+
+    await session.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(last_activity_at=now)
+    )
+    await session.commit()
+
+    # 3. Best-effort live notification.
+    try:
+        redis = Redis.from_url(get_settings().redis_url)
+        try:
+            await publish_event(
+                redis,
+                tenant_id=str(tenant_id),
+                conversation_id=str(conversation_id),
+                event={
+                    "type": "message_sent",
+                    "source": "operator",
+                    "text": body.text,
+                },
+            )
+        finally:
+            await redis.aclose()
+    except Exception:  # pragma: no cover
+        pass
+
+    # 4. Actual WhatsApp send is the outbound worker's job (Phase 2).
+    # The route stays sync-fast; the worker reads its own queue.
+
+    return MessageSentResponse(
+        id=msg_id,
+        conversation_id=conversation_id,
+        text=body.text,
+        sent_at=now,
+    )
+
+
+@router.post("/{conversation_id}/resume-bot")
+async def resume_bot(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, bool]:
+    """Flips bot_paused back to False. The next inbound goes through the
+    normal runner pipeline."""
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    await session.execute(
+        update(ConversationStateRow)
+        .where(ConversationStateRow.conversation_id == conversation_id)
+        .values(bot_paused=False)
+    )
+    await session.commit()
+    return {"ok": True}

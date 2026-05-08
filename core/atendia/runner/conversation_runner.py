@@ -162,7 +162,8 @@ class ConversationRunner:
         # Load current state row
         row = (await self._session.execute(
             text("""SELECT current_stage, extracted_data, last_intent, stage_entered_at,
-                           followups_sent_count, total_cost_usd, pending_confirmation
+                           followups_sent_count, total_cost_usd, pending_confirmation,
+                           bot_paused
                     FROM conversation_state cs JOIN conversations c ON c.id = cs.conversation_id
                     WHERE cs.conversation_id = :cid"""),
             {"cid": conversation_id},
@@ -173,7 +174,27 @@ class ConversationRunner:
             )
         (current_stage, extracted_jsonb, last_intent,
          stage_entered_at, followups_sent_count,
-         total_cost_usd, pending_confirmation) = row
+         total_cost_usd, pending_confirmation, bot_paused) = row
+
+        # Phase 4 T24 — operator-driven conversation. Persist a minimal
+        # turn_trace so the audit log shows the inbound landed but the bot
+        # stayed silent, then return without invoking NLU/composer/tools.
+        # The operator decides when to flip bot_paused back via
+        # POST /api/v1/conversations/:cid/resume-bot.
+        if bot_paused:
+            paused_trace = TurnTrace(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                turn_number=turn_number,
+                inbound_text=inbound.text,
+                bot_paused=True,
+                state_before={"current_stage": current_stage},
+                state_after={"current_stage": current_stage},
+                total_latency_ms=int((time.perf_counter() - started) * 1000),
+            )
+            self._session.add(paused_trace)
+            await self._session.flush()
+            return paused_trace
 
         state_before = {
             "current_stage": current_stage,

@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,6 +57,9 @@ class TurnTrace(Base):
     total_latency_ms: Mapped[int | None] = mapped_column(Integer)
 
     errors: Mapped[list | None] = mapped_column(JSONB)
+    # Phase 4 T24 — true when the runner short-circuited because an
+    # operator was driving the conversation (conversation_state.bot_paused).
+    bot_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tool_calls: Mapped[list["ToolCallRow"]] = relationship(back_populates="turn_trace")
