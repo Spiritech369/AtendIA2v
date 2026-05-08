@@ -54,6 +54,36 @@ class ConversationListResponse(BaseModel):
     next_cursor: str | None
 
 
+class ConversationDetail(BaseModel):
+    id: UUID
+    tenant_id: UUID
+    customer_id: UUID
+    customer_phone: str
+    customer_name: str | None
+    status: str
+    current_stage: str
+    bot_paused: bool
+    last_activity_at: datetime
+    created_at: datetime
+    extracted_data: dict
+    pending_confirmation: str | None
+    last_intent: str | None
+
+
+class MessageItem(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    direction: str
+    text: str
+    created_at: datetime
+    sent_at: datetime | None
+
+
+class MessageListResponse(BaseModel):
+    items: list[MessageItem]
+    next_cursor: str | None
+
+
 # ---------- Cursor helpers ----------
 
 
@@ -196,3 +226,134 @@ async def list_conversations(
         next_cursor = _encode_cursor(last.last_activity_at, last.id)
 
     return ConversationListResponse(items=items, next_cursor=next_cursor)
+
+
+@router.get("/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ConversationDetail:
+    stmt = (
+        select(
+            Conversation.id,
+            Conversation.tenant_id,
+            Conversation.customer_id,
+            Conversation.status,
+            Conversation.current_stage,
+            Conversation.last_activity_at,
+            Conversation.created_at,
+            Customer.phone_e164.label("customer_phone"),
+            Customer.name.label("customer_name"),
+            ConversationStateRow.bot_paused,
+            ConversationStateRow.extracted_data,
+            ConversationStateRow.pending_confirmation,
+            ConversationStateRow.last_intent,
+        )
+        .select_from(Conversation)
+        .join(Customer, Customer.id == Conversation.customer_id)
+        .join(
+            ConversationStateRow,
+            ConversationStateRow.conversation_id == Conversation.id,
+        )
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.tenant_id == tenant_id,
+        )
+    )
+    row = (await session.execute(stmt)).first()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    return ConversationDetail(
+        id=row.id,
+        tenant_id=row.tenant_id,
+        customer_id=row.customer_id,
+        customer_phone=row.customer_phone,
+        customer_name=row.customer_name,
+        status=row.status,
+        current_stage=row.current_stage,
+        bot_paused=row.bot_paused,
+        last_activity_at=row.last_activity_at,
+        created_at=row.created_at,
+        extracted_data=row.extracted_data or {},
+        pending_confirmation=row.pending_confirmation,
+        last_intent=row.last_intent,
+    )
+
+
+@router.get("/{conversation_id}/messages", response_model=MessageListResponse)
+async def list_messages(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    limit: int = Query(50, ge=1, le=500),
+    cursor: str | None = Query(
+        None, description="Same cursor format as /conversations list"
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> MessageListResponse:
+    """Returns messages newest-first (operator scrolls UP into history,
+    same as WhatsApp). Tenant-scoped — 404 if the conversation isn't in
+    this tenant, NOT 403, to avoid leaking conversation existence."""
+    # Existence check first so we can 404 cleanly.
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    # Order by `sent_at` (conversational time), NOT `created_at` (DB insert
+    # time). For an operator scrolling history, "newest first" means
+    # most-recently-sent — backfilled or replayed messages should land in
+    # their conversational position, not at the top.
+    stmt = (
+        select(
+            MessageRow.id,
+            MessageRow.conversation_id,
+            MessageRow.direction,
+            MessageRow.text,
+            MessageRow.created_at,
+            MessageRow.sent_at,
+        )
+        .where(MessageRow.conversation_id == conversation_id)
+        .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
+        .limit(limit + 1)
+    )
+
+    if cursor is not None:
+        cur_ts, cur_id = _decode_cursor(cursor)
+        stmt = stmt.where(
+            or_(
+                MessageRow.sent_at < cur_ts,
+                and_(MessageRow.sent_at == cur_ts, MessageRow.id < cur_id),
+            )
+        )
+
+    rows = (await session.execute(stmt)).all()
+    has_more = len(rows) > limit
+    page = rows[:limit]
+
+    items = [
+        MessageItem(
+            id=r.id,
+            conversation_id=r.conversation_id,
+            direction=r.direction,
+            text=r.text,
+            created_at=r.created_at,
+            sent_at=r.sent_at,
+        )
+        for r in page
+    ]
+    next_cursor: str | None = None
+    if has_more and page:
+        last = page[-1]
+        # sent_at is NOT NULL for messages; reflected in the cursor too.
+        assert last.sent_at is not None
+        next_cursor = _encode_cursor(last.sent_at, last.id)
+    return MessageListResponse(items=items, next_cursor=next_cursor)

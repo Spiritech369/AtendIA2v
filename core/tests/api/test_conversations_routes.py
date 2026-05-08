@@ -235,6 +235,79 @@ def test_filter_by_status(operator_with_convs):
     assert len(active["items"]) == 4
 
 
+def test_get_conversation_detail_returns_state(operator_with_convs):
+    tid, _, email, plain, cids = operator_with_convs
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/conversations/{cids[0]}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["id"] == cids[0]
+    assert body["tenant_id"] == tid
+    assert body["customer_phone"]
+    assert "extracted_data" in body
+    assert body["bot_paused"] is False  # default
+    assert "current_stage" in body
+
+
+def test_get_conversation_404_for_other_tenant(two_tenants):
+    (tid_a, _, email_a, plain_a, _), (_, _, _, _, cids_b) = two_tenants
+    client = TestClient(app)
+    _login(client, email_a, plain_a)
+
+    resp = client.get(f"/api/v1/conversations/{cids_b[0]}")
+    # 404, not 403 — don't leak existence across tenant boundary.
+    assert resp.status_code == 404
+
+
+def test_list_messages_returns_newest_first(operator_with_convs):
+    tid, _, email, plain, cids = operator_with_convs
+
+    async def _add_messages() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            base = datetime(2026, 5, 2, 12, 0, 0, tzinfo=timezone.utc)
+            for i in range(3):
+                await conn.execute(
+                    text(
+                        "INSERT INTO messages (tenant_id, conversation_id, direction, text, sent_at, created_at) "
+                        "VALUES (:t, :c, :d, :m, :ts, :ts)"
+                    ),
+                    {
+                        "t": tid,
+                        "c": cids[0],
+                        "d": "inbound" if i % 2 == 0 else "outbound",
+                        "m": f"Msg #{i}",
+                        "ts": base + timedelta(minutes=i),
+                    },
+                )
+        await engine.dispose()
+
+    asyncio.run(_add_messages())
+
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/conversations/{cids[0]}/messages?limit=10")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # Newest first — Msg #2 at the top
+    assert body["items"][0]["text"] == "Msg #2"
+    # The fixture's "Hola 0" outbound from setup is also there
+    texts = [m["text"] for m in body["items"]]
+    assert "Hola 0" in texts
+
+
+def test_list_messages_404_for_other_tenant(two_tenants):
+    (_, _, email_a, plain_a, _), (_, _, _, _, cids_b) = two_tenants
+    client = TestClient(app)
+    _login(client, email_a, plain_a)
+
+    resp = client.get(f"/api/v1/conversations/{cids_b[0]}/messages")
+    assert resp.status_code == 404
+
+
 def test_filter_by_has_pending_handoff(operator_with_convs):
     tid, _, email, plain, cids = operator_with_convs
 
