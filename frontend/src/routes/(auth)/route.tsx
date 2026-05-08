@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
+import { AppShell } from "@/components/AppShell";
 import { useAuthStore } from "@/stores/auth";
 
 /**
@@ -19,5 +20,9 @@ export const Route = createFileRoute("/(auth)")({
     const user = state.user ?? (await state.fetchMe());
     if (!user) throw redirect({ to: "/login" });
   },
-  component: () => <Outlet />,
+  component: () => (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  ),
 });
