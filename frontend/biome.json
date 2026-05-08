@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/**", "tests/**", "*.ts", "*.tsx", "*.json", "!**/dist", "!**/node_modules"]
+    "includes": [
+      "src/**/*.{ts,tsx,json}",
+      "tests/**/*.{ts,tsx,json}",
+      "*.{ts,tsx,json}",
+      "!**/dist",
+      "!**/node_modules",
+      "!src/components/ui/**",
+      "!src/routeTree.gen.ts"
+    ]
   },
   "assist": {
     "enabled": true,
