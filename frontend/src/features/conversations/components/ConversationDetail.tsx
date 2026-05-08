@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
 import { useConversation, useMessages } from "@/features/conversations/hooks/useConversations";
+import { InterventionComposer } from "./InterventionComposer";
 import { MessageBubble } from "./MessageBubble";
 
 export function ConversationDetail({ conversationId }: { conversationId: string }) {
@@ -101,6 +102,7 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
             )}
           </div>
         </ScrollArea>
+        <InterventionComposer conversationId={conversationId} botPaused={c.bot_paused} />
       </Card>
 
       <Card>
