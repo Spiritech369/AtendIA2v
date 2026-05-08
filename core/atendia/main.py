@@ -12,6 +12,11 @@ from atendia.api.analytics_routes import router as analytics_router
 from atendia.api.audit_log_routes import router as audit_log_router
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.conversations_routes import router as conversations_router
+from atendia.api.customer_fields_routes import (
+    definitions_router as field_defs_router,
+    values_router as field_values_router,
+)
+from atendia.api.customer_notes_routes import router as customer_notes_router
 from atendia.api.customers_routes import router as customers_router
 from atendia.api.exports_routes import router as exports_router
 from atendia.api.handoffs_routes import router as handoffs_router
@@ -39,6 +44,21 @@ app.include_router(
 )
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
+app.include_router(
+    customer_notes_router,
+    prefix="/api/v1/customers/{customer_id}/notes",
+    tags=["customer-notes"],
+)
+app.include_router(
+    field_values_router,
+    prefix="/api/v1/customers/{customer_id}/field-values",
+    tags=["customer-fields"],
+)
+app.include_router(
+    field_defs_router,
+    prefix="/api/v1/customer-fields/definitions",
+    tags=["customer-fields"],
+)
 app.include_router(exports_router, prefix="/api/v1/exports", tags=["exports"])
 app.include_router(handoffs_router, prefix="/api/v1/handoffs", tags=["handoffs"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
