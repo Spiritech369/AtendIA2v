@@ -1,6 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   Bot,
+  ChevronRight,
   Circle,
   Copy,
   Hand,
@@ -9,6 +11,8 @@ import {
   ShieldAlert,
   Trash2,
   User,
+  UserMinus,
+  UserPlus,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -22,8 +26,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ConversationListItem } from "@/features/conversations/api";
+import { conversationsApi } from "@/features/conversations/api";
 import { useConversations } from "@/features/conversations/hooks/useConversations";
 import { useTenantStream } from "@/features/conversations/hooks/useTenantStream";
+import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -42,11 +48,11 @@ const STATUS_LABELS: Record<string, string> = {
   closed: "Cerrada",
 };
 
-type InboxTab = "all" | "handoffs" | "paused";
+type InboxTab = "all" | "mine" | "unassigned" | "handoffs" | "paused";
 
 function getStoredTab(): InboxTab {
   const stored = localStorage.getItem("conv_tab");
-  if (stored === "handoffs" || stored === "paused") return stored;
+  if (stored === "mine" || stored === "unassigned" || stored === "handoffs" || stored === "paused") return stored;
   return "all";
 }
 
@@ -89,10 +95,25 @@ interface ContextMenuState {
 function ConversationContextMenu({
   menu,
   onClose,
+  allStages,
+  currentUserId,
 }: {
   menu: ContextMenuState;
   onClose: () => void;
+  allStages: string[];
+  currentUserId: string | undefined;
 }) {
+  const queryClient = useQueryClient();
+  const patchMutation = useMutation({
+    mutationFn: (args: { id: string; body: Record<string, unknown> }) =>
+      conversationsApi.patchConversation(args.id, args.body),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["conversations"] }); onClose(); },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => conversationsApi.deleteConversation(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["conversations"] }); onClose(); },
+  });
+
   const handleCopyPhone = useCallback(() => {
     void navigator.clipboard.writeText(menu.conv.customer_phone).then(() => {
       toast.success("Teléfono copiado");
@@ -100,9 +121,11 @@ function ConversationContextMenu({
     onClose();
   }, [menu.conv.customer_phone, onClose]);
 
+  const isAssignedToMe = menu.conv.assigned_user_id === currentUserId;
+
   // Clamp position so menu doesn't overflow viewport
   const MENU_W = 220;
-  const MENU_H = 160;
+  const MENU_H = 420;
   const x = Math.min(menu.x, window.innerWidth - MENU_W - 8);
   const y = Math.min(menu.y, window.innerHeight - MENU_H - 8);
 
@@ -111,7 +134,7 @@ function ConversationContextMenu({
       {/* Backdrop */}
       <div className="fixed inset-0 z-50" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
       <div
-        className="fixed z-50 rounded-md border bg-popover p-1 shadow-md"
+        className="fixed z-50 max-h-[80vh] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
         style={{ left: x, top: y, width: MENU_W }}
       >
         <Link
@@ -131,13 +154,110 @@ function ConversationContextMenu({
         </button>
         <Separator className="my-1" />
         <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Etapa: {menu.conv.current_stage}
+          Mover a etapa
         </div>
-        <div className="px-2 py-1 text-[10px] text-muted-foreground">
-          {menu.conv.bot_paused ? "Bot pausado" : STATUS_LABELS[menu.conv.status] ?? menu.conv.status}
-        </div>
+        {allStages.map((stage) => (
+          <button
+            key={stage}
+            type="button"
+            className={cn(
+              "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+              menu.conv.current_stage === stage && "font-medium text-primary",
+            )}
+            onClick={() => patchMutation.mutate({ id: menu.conv.id, body: { current_stage: stage } })}
+          >
+            <ChevronRight className="h-3 w-3" /> {stage}
+          </button>
+        ))}
+        <Separator className="my-1" />
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+          onClick={() =>
+            patchMutation.mutate({
+              id: menu.conv.id,
+              body: { assigned_user_id: isAssignedToMe ? null : currentUserId },
+            })
+          }
+        >
+          {isAssignedToMe ? (
+            <><UserMinus className="h-4 w-4" /> Desasignar</>
+          ) : (
+            <><UserPlus className="h-4 w-4" /> Asignar a mí</>
+          )}
+        </button>
+        <Separator className="my-1" />
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent"
+          onClick={() => {
+            if (window.confirm("¿Eliminar esta conversación?")) {
+              deleteMutation.mutate(menu.conv.id);
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4" /> Eliminar
+        </button>
       </div>
     </>
+  );
+}
+
+// ── Sidebar: agent counts ───────────────────────────────────────────
+
+function AgentSidebar({
+  items,
+  activeAgent,
+  onSelect,
+}: {
+  items: ConversationListItem[];
+  activeAgent: string | null;
+  onSelect: (agent: string | null) => void;
+}) {
+  const agentCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of items) {
+      const key = c.assigned_user_email ?? "Bot";
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [items]);
+
+  if (agentCounts.length <= 1) return null;
+
+  return (
+    <div className="space-y-0.5">
+      <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        Agentes
+      </div>
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-center justify-between rounded-sm px-2 py-1 text-xs hover:bg-accent",
+          activeAgent === null && "bg-accent font-medium",
+        )}
+        onClick={() => onSelect(null)}
+      >
+        <span>Todos</span>
+        <span className="text-muted-foreground">{items.length}</span>
+      </button>
+      {agentCounts.map(([agent, count]) => (
+        <button
+          key={agent}
+          type="button"
+          className={cn(
+            "flex w-full items-center justify-between rounded-sm px-2 py-1 text-xs hover:bg-accent",
+            activeAgent === agent && "bg-accent font-medium",
+          )}
+          onClick={() => onSelect(activeAgent === agent ? null : agent)}
+        >
+          <span className="truncate">{agent}</span>
+          <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+            {count}
+          </Badge>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -227,12 +347,19 @@ function ConversationRow({
       {/* Main content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium">
+          <span className={cn("truncate text-sm", row.unread_count > 0 ? "font-bold" : "font-medium")}>
             {row.customer_name ?? row.customer_phone}
           </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {formatRelative(row.last_activity_at)}
-          </span>
+          <div className="flex shrink-0 items-center">
+            <span className="text-[10px] text-muted-foreground">
+              {formatRelative(row.last_activity_at)}
+            </span>
+            {row.unread_count > 0 && (
+              <Badge className="ml-1 h-4 min-w-4 justify-center rounded-full bg-blue-600 px-1 text-[10px] text-white">
+                {row.unread_count}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {row.customer_name && (
@@ -264,6 +391,16 @@ function ConversationRow({
               <Hand className="h-2.5 w-2.5" /> Pausado
             </Badge>
           )}
+          {row.tags?.slice(0, 2).map((tag) => (
+            <Badge key={tag} variant="outline" className="h-4 px-1 text-[10px] border-blue-300 text-blue-700">
+              {tag}
+            </Badge>
+          ))}
+          {(row.tags?.length ?? 0) > 2 && (
+            <Badge variant="outline" className="h-4 px-1 text-[10px]">
+              +{row.tags.length - 2}
+            </Badge>
+          )}
         </div>
       </div>
     </Link>
@@ -275,18 +412,22 @@ function ConversationRow({
 export function ConversationList() {
   useTenantStream();
 
+  const user = useAuthStore((s) => s.user);
   const [tab, setTab] = useState<InboxTab>(getStoredTab);
   const [search, setSearch] = useState(getStoredSearch);
   const [activeStage, setActiveStage] = useState<string | null>(null);
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // Map tab → API filter params
   const filters = useMemo(() => {
     const base = { limit: 100 };
+    if (tab === "mine") return { ...base, assigned_user_id: user?.id };
+    if (tab === "unassigned") return { ...base, unassigned: true };
     if (tab === "handoffs") return { ...base, has_pending_handoff: true as const };
     if (tab === "paused") return { ...base, bot_paused: true as const };
     return base;
-  }, [tab]);
+  }, [tab, user?.id]);
 
   const query = useConversations(filters);
 
@@ -308,7 +449,7 @@ export function ConversationList() {
 
   const allItems = query.data?.pages.flatMap((p) => p.items) ?? [];
 
-  // Client-side filtering: search + stage
+  // Client-side filtering: search + stage + agent
   const visibleItems = useMemo(() => {
     let items = allItems;
     if (search.trim()) {
@@ -317,18 +458,28 @@ export function ConversationList() {
     if (activeStage) {
       items = items.filter((c) => c.current_stage === activeStage);
     }
+    if (activeAgent) {
+      items = items.filter((c) => (c.assigned_user_email ?? "Bot") === activeAgent);
+    }
     return items;
-  }, [allItems, search, activeStage]);
+  }, [allItems, search, activeStage, activeAgent]);
 
   // Counts for tab badges
   const counts = useMemo(() => {
     const all = allItems;
     return {
       all: all.length,
+      mine: tab === "mine" ? all.length : all.filter((c) => c.assigned_user_id === user?.id).length,
+      unassigned: tab === "unassigned" ? all.length : all.filter((c) => c.assigned_user_id === null).length,
       handoffs: tab === "handoffs" ? all.length : all.filter((c) => c.has_pending_handoff).length,
       paused: tab === "paused" ? all.length : all.filter((c) => c.bot_paused).length,
     };
-  }, [allItems, tab]);
+  }, [allItems, tab, user?.id]);
+
+  const allStages = useMemo(() => {
+    const set = new Set(allItems.map((c) => c.current_stage));
+    return Array.from(set).sort();
+  }, [allItems]);
 
   if (query.isLoading) {
     return (
@@ -360,6 +511,8 @@ export function ConversationList() {
       <Card className="hidden w-48 shrink-0 lg:flex lg:flex-col">
         <div className="p-3">
           <div className="mb-2 text-sm font-semibold">Buzón</div>
+          <AgentSidebar items={allItems} activeAgent={activeAgent} onSelect={setActiveAgent} />
+          <Separator className="my-2" />
           <StageSidebar items={allItems} activeStage={activeStage} onSelect={setActiveStage} />
         </div>
       </Card>
@@ -380,25 +533,27 @@ export function ConversationList() {
           <Tabs value={tab} onValueChange={handleTabChange}>
             <TabsList className="w-full">
               <TabsTrigger value="all" className="flex-1 gap-1">
-                Todos
-                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                  {counts.all}
-                </Badge>
+                Todos <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{counts.all}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="mine" className="flex-1 gap-1">
+                Míos <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{counts.mine}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="unassigned" className="flex-1 gap-1">
+                Sin asignar
+                {counts.unassigned > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{counts.unassigned}</Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="handoffs" className="flex-1 gap-1">
                 Handoffs
                 {counts.handoffs > 0 && (
-                  <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
-                    {counts.handoffs}
-                  </Badge>
+                  <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">{counts.handoffs}</Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="paused" className="flex-1 gap-1">
                 Pausados
                 {counts.paused > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                    {counts.paused}
-                  </Badge>
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{counts.paused}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>
@@ -441,7 +596,12 @@ export function ConversationList() {
 
       {/* Context menu */}
       {contextMenu && (
-        <ConversationContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
+        <ConversationContextMenu
+          menu={contextMenu}
+          onClose={() => setContextMenu(null)}
+          allStages={allStages}
+          currentUserId={user?.id}
+        />
       )}
     </div>
   );
