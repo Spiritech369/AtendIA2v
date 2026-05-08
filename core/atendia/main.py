@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
@@ -9,6 +11,7 @@ from atendia.api.audit_log_routes import router as audit_log_router
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customers_routes import router as customers_router
+from atendia.api.exports_routes import router as exports_router
 from atendia.api.handoffs_routes import router as handoffs_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
@@ -34,6 +37,7 @@ app.include_router(
 )
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
+app.include_router(exports_router, prefix="/api/v1/exports", tags=["exports"])
 app.include_router(handoffs_router, prefix="/api/v1/handoffs", tags=["handoffs"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
 app.include_router(
@@ -49,3 +53,24 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+# Phase 4 T59 — serve the built React SPA from FastAPI in production.
+#
+# Path resolves to `<repo>/frontend/dist/` from the package layout
+# `<repo>/core/atendia/main.py`. We mount this LAST so /api, /ws, and
+# /health win their routing match first. `html=True` makes StaticFiles
+# fall back to index.html on any unknown path — that's what TanStack
+# Router needs for client-side deep links.
+#
+# Skipped silently when dist/ doesn't exist so dev runs (no `pnpm build`)
+# don't crash on startup.
+_FRONTEND_DIST = (
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+)
+if _FRONTEND_DIST.is_dir():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        name="frontend",
+    )

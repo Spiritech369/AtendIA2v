@@ -15,6 +15,7 @@ import { Route as authIndexRouteImport } from './routes/(auth)/index'
 import { Route as authUsersRouteImport } from './routes/(auth)/users'
 import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
+import { Route as authExportsRouteImport } from './routes/(auth)/exports'
 import { Route as authCustomersRouteImport } from './routes/(auth)/customers'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
 import { Route as authAuditLogRouteImport } from './routes/(auth)/audit-log'
@@ -49,6 +50,11 @@ const authTurnTracesRoute = authTurnTracesRouteImport.update({
 const authHandoffsRoute = authHandoffsRouteImport.update({
   id: '/handoffs',
   path: '/handoffs',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authExportsRoute = authExportsRouteImport.update({
+  id: '/exports',
+  path: '/exports',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authCustomersRoute = authCustomersRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/audit-log': typeof authAuditLogRoute
   '/config': typeof authConfigRoute
   '/customers': typeof authCustomersRouteWithChildren
+  '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/users': typeof authUsersRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/audit-log': typeof authAuditLogRoute
   '/config': typeof authConfigRoute
   '/customers': typeof authCustomersRouteWithChildren
+  '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/users': typeof authUsersRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/(auth)/audit-log': typeof authAuditLogRoute
   '/(auth)/config': typeof authConfigRoute
   '/(auth)/customers': typeof authCustomersRouteWithChildren
+  '/(auth)/exports': typeof authExportsRoute
   '/(auth)/handoffs': typeof authHandoffsRoute
   '/(auth)/turn-traces': typeof authTurnTracesRoute
   '/(auth)/users': typeof authUsersRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/audit-log'
     | '/config'
     | '/customers'
+    | '/exports'
     | '/handoffs'
     | '/turn-traces'
     | '/users'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/audit-log'
     | '/config'
     | '/customers'
+    | '/exports'
     | '/handoffs'
     | '/turn-traces'
     | '/users'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '/(auth)/audit-log'
     | '/(auth)/config'
     | '/(auth)/customers'
+    | '/(auth)/exports'
     | '/(auth)/handoffs'
     | '/(auth)/turn-traces'
     | '/(auth)/users'
@@ -214,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/handoffs'
       fullPath: '/handoffs'
       preLoaderRoute: typeof authHandoffsRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/exports': {
+      id: '/(auth)/exports'
+      path: '/exports'
+      fullPath: '/exports'
+      preLoaderRoute: typeof authExportsRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/customers': {
@@ -278,6 +297,7 @@ interface authRouteRouteChildren {
   authAuditLogRoute: typeof authAuditLogRoute
   authConfigRoute: typeof authConfigRoute
   authCustomersRoute: typeof authCustomersRouteWithChildren
+  authExportsRoute: typeof authExportsRoute
   authHandoffsRoute: typeof authHandoffsRoute
   authTurnTracesRoute: typeof authTurnTracesRoute
   authUsersRoute: typeof authUsersRoute
@@ -290,6 +310,7 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authAuditLogRoute: authAuditLogRoute,
   authConfigRoute: authConfigRoute,
   authCustomersRoute: authCustomersRouteWithChildren,
+  authExportsRoute: authExportsRoute,
   authHandoffsRoute: authHandoffsRoute,
   authTurnTracesRoute: authTurnTracesRoute,
   authUsersRoute: authUsersRoute,
