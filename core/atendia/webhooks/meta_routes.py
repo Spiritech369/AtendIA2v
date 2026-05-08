@@ -226,6 +226,12 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
         },
     )
 
+    # Bump unread count for the badge (scope gap: unread tracking)
+    await session.execute(
+        text("UPDATE conversations SET unread_count = unread_count + 1 WHERE id = :c"),
+        {"c": conv_id},
+    )
+
     # Emit event (T15)
     from atendia.contracts.event import EventType
     from atendia.state_machine.event_emitter import EventEmitter
