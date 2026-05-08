@@ -14,7 +14,9 @@ import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as authIndexRouteImport } from './routes/(auth)/index'
 import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
+import { Route as authCustomersRouteImport } from './routes/(auth)/customers'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
+import { Route as authCustomersCustomerIdRouteImport } from './routes/(auth)/customers.$customerId'
 import { Route as authConversationsConversationIdRouteImport } from './routes/(auth)/conversations.$conversationId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -41,10 +43,20 @@ const authHandoffsRoute = authHandoffsRouteImport.update({
   path: '/handoffs',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authCustomersRoute = authCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authConfigRoute = authConfigRouteImport.update({
   id: '/config',
   path: '/config',
   getParentRoute: () => authRouteRoute,
+} as any)
+const authCustomersCustomerIdRoute = authCustomersCustomerIdRouteImport.update({
+  id: '/$customerId',
+  path: '/$customerId',
+  getParentRoute: () => authCustomersRoute,
 } as any)
 const authConversationsConversationIdRoute =
   authConversationsConversationIdRouteImport.update({
@@ -56,55 +68,67 @@ const authConversationsConversationIdRoute =
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/config': typeof authConfigRoute
+  '/customers': typeof authCustomersRouteWithChildren
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
+  '/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/config': typeof authConfigRoute
+  '/customers': typeof authCustomersRouteWithChildren
   '/handoffs': typeof authHandoffsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
+  '/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)': typeof authRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/(auth)/config': typeof authConfigRoute
+  '/(auth)/customers': typeof authCustomersRouteWithChildren
   '/(auth)/handoffs': typeof authHandoffsRoute
   '/(auth)/turn-traces': typeof authTurnTracesRoute
   '/(auth)/': typeof authIndexRoute
   '/(auth)/conversations/$conversationId': typeof authConversationsConversationIdRoute
+  '/(auth)/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/login'
     | '/config'
+    | '/customers'
     | '/handoffs'
     | '/turn-traces'
     | '/'
     | '/conversations/$conversationId'
+    | '/customers/$customerId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/config'
+    | '/customers'
     | '/handoffs'
     | '/turn-traces'
     | '/'
     | '/conversations/$conversationId'
+    | '/customers/$customerId'
   id:
     | '__root__'
     | '/(auth)'
     | '/login'
     | '/(auth)/config'
+    | '/(auth)/customers'
     | '/(auth)/handoffs'
     | '/(auth)/turn-traces'
     | '/(auth)/'
     | '/(auth)/conversations/$conversationId'
+    | '/(auth)/customers/$customerId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -149,12 +173,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authHandoffsRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/customers': {
+      id: '/(auth)/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof authCustomersRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/config': {
       id: '/(auth)/config'
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof authConfigRouteImport
       parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/customers/$customerId': {
+      id: '/(auth)/customers/$customerId'
+      path: '/$customerId'
+      fullPath: '/customers/$customerId'
+      preLoaderRoute: typeof authCustomersCustomerIdRouteImport
+      parentRoute: typeof authCustomersRoute
     }
     '/(auth)/conversations/$conversationId': {
       id: '/(auth)/conversations/$conversationId'
@@ -166,8 +204,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface authCustomersRouteChildren {
+  authCustomersCustomerIdRoute: typeof authCustomersCustomerIdRoute
+}
+
+const authCustomersRouteChildren: authCustomersRouteChildren = {
+  authCustomersCustomerIdRoute: authCustomersCustomerIdRoute,
+}
+
+const authCustomersRouteWithChildren = authCustomersRoute._addFileChildren(
+  authCustomersRouteChildren,
+)
+
 interface authRouteRouteChildren {
   authConfigRoute: typeof authConfigRoute
+  authCustomersRoute: typeof authCustomersRouteWithChildren
   authHandoffsRoute: typeof authHandoffsRoute
   authTurnTracesRoute: typeof authTurnTracesRoute
   authIndexRoute: typeof authIndexRoute
@@ -176,6 +227,7 @@ interface authRouteRouteChildren {
 
 const authRouteRouteChildren: authRouteRouteChildren = {
   authConfigRoute: authConfigRoute,
+  authCustomersRoute: authCustomersRouteWithChildren,
   authHandoffsRoute: authHandoffsRoute,
   authTurnTracesRoute: authTurnTracesRoute,
   authIndexRoute: authIndexRoute,
