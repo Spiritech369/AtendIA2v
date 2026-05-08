@@ -50,6 +50,10 @@ class ConversationListItem(BaseModel):
     last_message_text: str | None
     last_message_direction: str | None
     has_pending_handoff: bool
+    assigned_user_id: UUID | None = None
+    assigned_user_email: str | None = None
+    unread_count: int = 0
+    tags: list[str] = []
 
 
 class ConversationListResponse(BaseModel):
@@ -121,6 +125,9 @@ async def list_conversations(
     conv_status: str | None = Query(None, alias="status"),
     has_pending_handoff: bool = Query(False),
     bot_paused: bool | None = Query(None),
+    assigned_user_id: UUID | None = Query(None, alias="assigned_user_id"),
+    unassigned: bool = Query(False),
+    tag: str | None = Query(None),
     session: AsyncSession = Depends(get_db_session),
 ) -> ConversationListResponse:
     # Subquery: last message per conversation (text + direction). Window
@@ -155,6 +162,7 @@ async def list_conversations(
         )
     )
 
+    from atendia.db.models.tenant import TenantUser as _TUList
     stmt = (
         select(
             Conversation.id,
@@ -163,12 +171,16 @@ async def list_conversations(
             Conversation.status,
             Conversation.current_stage,
             Conversation.last_activity_at,
+            Conversation.assigned_user_id,
+            Conversation.unread_count,
+            Conversation.tags,
             Customer.phone_e164.label("customer_phone"),
             Customer.name.label("customer_name"),
             ConversationStateRow.bot_paused,
             last_msg.c.text.label("last_message_text"),
             last_msg.c.direction.label("last_message_direction"),
             pending_handoff_exists.label("has_pending_handoff"),
+            _TUList.email.label("assigned_user_email"),
         )
         .select_from(Conversation)
         .join(Customer, Customer.id == Conversation.customer_id)
@@ -177,6 +189,7 @@ async def list_conversations(
             ConversationStateRow.conversation_id == Conversation.id,
         )
         .outerjoin(last_msg, last_msg.c.cid == Conversation.id)
+        .outerjoin(_TUList, _TUList.id == Conversation.assigned_user_id)
         .where(Conversation.tenant_id == tenant_id)
         .where(Conversation.deleted_at.is_(None))
         .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
@@ -191,6 +204,15 @@ async def list_conversations(
 
     if has_pending_handoff:
         stmt = stmt.where(pending_handoff_exists)
+
+    if assigned_user_id is not None:
+        stmt = stmt.where(Conversation.assigned_user_id == assigned_user_id)
+
+    if unassigned:
+        stmt = stmt.where(Conversation.assigned_user_id.is_(None))
+
+    if tag is not None:
+        stmt = stmt.where(Conversation.tags.contains([tag]))
 
     if cursor is not None:
         cur_ts, cur_id = _decode_cursor(cursor)
@@ -225,6 +247,10 @@ async def list_conversations(
             last_message_text=r.last_message_text,
             last_message_direction=r.last_message_direction,
             has_pending_handoff=r.has_pending_handoff,
+            assigned_user_id=r.assigned_user_id,
+            assigned_user_email=r.assigned_user_email,
+            unread_count=r.unread_count,
+            tags=r.tags or [],
         )
         for r in page
     ]
