@@ -84,11 +84,12 @@ def superadmin_seed() -> Iterator[tuple[str, str, str, str]]:
 
 @pytest.fixture
 def client_operator(operator_seed) -> Iterator[TestClient]:
-    """TestClient with operator session cookie already set."""
+    """TestClient with operator session cookie + CSRF header already set."""
     tid, uid, email, plain = operator_seed
     c = TestClient(app)
     resp = c.post("/api/v1/auth/login", json={"email": email, "password": plain})
     assert resp.status_code == 200, resp.text
+    c.headers["X-CSRF-Token"] = resp.json()["csrf_token"]
     c.tenant_id = tid  # type: ignore[attr-defined]  # convenience for assertions
     c.user_id = uid  # type: ignore[attr-defined]
     yield c
@@ -96,11 +97,12 @@ def client_operator(operator_seed) -> Iterator[TestClient]:
 
 @pytest.fixture
 def client_superadmin(superadmin_seed) -> Iterator[TestClient]:
-    """TestClient with superadmin session cookie already set."""
+    """TestClient with superadmin session cookie + CSRF header already set."""
     tid, uid, email, plain = superadmin_seed
     c = TestClient(app)
     resp = c.post("/api/v1/auth/login", json={"email": email, "password": plain})
     assert resp.status_code == 200, resp.text
+    c.headers["X-CSRF-Token"] = resp.json()["csrf_token"]
     c.home_tenant_id = tid  # type: ignore[attr-defined]
     c.user_id = uid  # type: ignore[attr-defined]
     yield c

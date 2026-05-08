@@ -100,8 +100,9 @@ def test_logout_clears_cookie(client, operator_user):
     _, _, email, plain = operator_user
     login = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
     assert login.status_code == 200
+    csrf = login.json()["csrf_token"]
 
-    logout = client.post("/api/v1/auth/logout")
+    logout = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})
     assert logout.status_code == 200
     # Set-Cookie header should expire the session cookie. TestClient surfaces
     # cookies with empty values when deleted via response.delete_cookie.
