@@ -144,22 +144,16 @@ class ConversationRunner:
     ) -> TurnTrace:
         started = time.perf_counter()
 
-        # Phase 3d — inbound arriving cancels any pending follow-ups for
-        # this conversation. Done first so even if the rest of the turn
-        # crashes, the cron worker won't fire a stale 'sigues en pie?'
-        # at a customer who just engaged. Lives in the same transaction as
-        # everything else: caller's commit covers it.
         from atendia.runner.followup_scheduler import (
             cancel_pending_followups,
             schedule_followups_after_outbound,
         )
-        await cancel_pending_followups(
-            session=self._session, conversation_id=conversation_id,
-        )
 
-        pipeline = await load_active_pipeline(self._session, tenant_id)
-
-        # Load current state row
+        # Load current state row FIRST so we can short-circuit on bot_paused
+        # without invoking the cancel-followups side-effect (Block D code
+        # review H1 — cancel before short-circuit was wiping the silence
+        # clock for paused conversations even though the runner wasn't
+        # producing a replacement schedule).
         row = (await self._session.execute(
             text("""SELECT current_stage, extracted_data, last_intent, stage_entered_at,
                            followups_sent_count, total_cost_usd, pending_confirmation,
@@ -181,6 +175,10 @@ class ConversationRunner:
         # stayed silent, then return without invoking NLU/composer/tools.
         # The operator decides when to flip bot_paused back via
         # POST /api/v1/conversations/:cid/resume-bot.
+        #
+        # Note we DON'T cancel pending follow-ups in this branch — the
+        # operator owns re-engagement while paused. When the bot resumes,
+        # the next inbound runs the full pipeline (cancel + schedule).
         if bot_paused:
             paused_trace = TurnTrace(
                 conversation_id=conversation_id,
@@ -195,6 +193,16 @@ class ConversationRunner:
             self._session.add(paused_trace)
             await self._session.flush()
             return paused_trace
+
+        # Bot is driving — restore the Phase 3d invariant: cancel any
+        # pending follow-ups for this conversation now that the customer
+        # has engaged. Lives in the caller's transaction so a crash
+        # mid-turn does NOT leave a stale silence reminder primed.
+        await cancel_pending_followups(
+            session=self._session, conversation_id=conversation_id,
+        )
+
+        pipeline = await load_active_pipeline(self._session, tenant_id)
 
         state_before = {
             "current_stage": current_stage,

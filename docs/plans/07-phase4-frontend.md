@@ -895,6 +895,32 @@ When implementing Block A, the following swaps were necessary or strongly prefer
   modern standard.
 - **`pydantic[email]`** added to deps so `EmailStr` works in the login body.
 
+## Block D — deferred work (from `phase-4a-foundation` review)
+
+These came out of the Block C+D code review and are NOT blockers for the
+`phase-4a-foundation` tag — they're queued for the T56 polish window
+or earlier blocks where they fit naturally:
+
+- **MEDIUM (T56)** — `useTenantStream` invalidates 4 query keys on every
+  WS event. Under burst (operator typing 5+ messages in 10s, each emitting
+  `message_sent`) this causes 20+ refetches in seconds. Debounce per-key
+  or filter by event type before invalidating. `staleTime: 30s` does NOT
+  suppress invalidate-driven refetches.
+- **MEDIUM (Block I)** — `assign_handoff` and `resolve_handoff` accept
+  status transitions in any direction (e.g. resolved → assigned). Reject
+  if `h.status == "resolved"`, or make resolve idempotent without
+  rewriting `resolved_at`. Audit-trail correctness, not security.
+- **MEDIUM (Block D follow-up)** — `intervene` doesn't actually deliver
+  to WhatsApp. Only DB row + redis fan-out happens; no
+  `arq_pool.enqueue_job(send_outbound, ...)`. Operator UI shows "sent"
+  but customer never receives it. Tracked here for visibility, NOT in
+  a docstring alone.
+- **MEDIUM (Block E)** — Cursor query parameter has no length cap. Add
+  `max_length=512` on the `cursor: str` Query for explicitness; current
+  Starlette default URL caps mitigate the practical risk.
+- **LOW** — `_publish_handoff_event` and `intervene` create+close a
+  Redis client per call. Pool would be cleaner. Not on the hot path.
+
 ## Block A — deferred work
 
 These came out of the Block A code review and are NOT blockers for `4a-block-a-done`:

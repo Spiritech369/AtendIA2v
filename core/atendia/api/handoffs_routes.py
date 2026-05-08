@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -227,7 +227,7 @@ async def resolve_handoff(
         .where(HumanHandoff.id == handoff_id)
         .values(
             status="resolved",
-            resolved_at=datetime.now(),
+            resolved_at=datetime.now(UTC),
             payload=new_payload or None,
         )
     )

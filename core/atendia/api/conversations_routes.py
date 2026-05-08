@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -414,7 +414,7 @@ async def intervene(
     if own is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
 
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     # 1. Pause the bot.
     await session.execute(
