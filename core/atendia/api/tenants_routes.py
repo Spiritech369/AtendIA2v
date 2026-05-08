@@ -1,0 +1,210 @@
+"""Operator dashboard — tenant configuration (Phase 4 Block E, T28-T30).
+
+Three pairs of endpoints, all tenant-scoped via `current_tenant_id`:
+
+* `GET /api/v1/tenants/:tid/pipeline` → active pipeline definition.
+* `PUT /api/v1/tenants/:tid/pipeline` → creates a NEW version row
+  (don't UPDATE — preserve history), marks it active, deactivates
+  prior versions.
+* `GET/PUT /api/v1/tenants/:tid/brand-facts` → JSONB sub-key
+  `default_messages.brand_facts` on tenant_branding.
+* `GET/PUT /api/v1/tenants/:tid/tone` → tenant_branding.voice.
+"""
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from atendia.api._auth_helpers import AuthUser
+from atendia.api._deps import current_tenant_id, current_user
+from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
+from atendia.db.session import get_db_session
+
+router = APIRouter()
+
+
+# ---------- Pipeline ----------
+
+
+class PipelineResponse(BaseModel):
+    version: int
+    definition: dict
+    active: bool
+    created_at: datetime
+
+
+class PipelinePutBody(BaseModel):
+    definition: dict = Field(..., description="The full pipeline JSONB.")
+
+
+@router.get("/pipeline", response_model=PipelineResponse)
+async def get_pipeline(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> PipelineResponse:
+    row = (
+        await session.execute(
+            select(TenantPipeline)
+            .where(
+                TenantPipeline.tenant_id == tenant_id,
+                TenantPipeline.active.is_(True),
+            )
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no active pipeline")
+    return PipelineResponse(
+        version=row.version,
+        definition=row.definition,
+        active=row.active,
+        created_at=row.created_at,
+    )
+
+
+@router.put("/pipeline", response_model=PipelineResponse)
+async def put_pipeline(
+    body: PipelinePutBody,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> PipelineResponse:
+    # Find the current max version (there might be 0 rows on first save).
+    max_version = (
+        await session.execute(
+            select(TenantPipeline.version)
+            .where(TenantPipeline.tenant_id == tenant_id)
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    new_version = (max_version or 0) + 1
+
+    # Deactivate all prior versions, then insert + activate the new one.
+    await session.execute(
+        update(TenantPipeline)
+        .where(TenantPipeline.tenant_id == tenant_id)
+        .values(active=False)
+    )
+    new_row = TenantPipeline(
+        tenant_id=tenant_id,
+        version=new_version,
+        definition=body.definition,
+        active=True,
+    )
+    session.add(new_row)
+    await session.commit()
+    await session.refresh(new_row)
+    return PipelineResponse(
+        version=new_row.version,
+        definition=new_row.definition,
+        active=new_row.active,
+        created_at=new_row.created_at,
+    )
+
+
+# ---------- Branding (brand_facts + tone) ----------
+
+
+class BrandFactsResponse(BaseModel):
+    brand_facts: dict
+
+
+class BrandFactsPutBody(BaseModel):
+    brand_facts: dict
+
+
+class ToneResponse(BaseModel):
+    voice: dict
+
+
+class TonePutBody(BaseModel):
+    voice: dict
+
+
+async def _ensure_branding(
+    session: AsyncSession, tenant_id: UUID
+) -> TenantBranding:
+    """Fetch the branding row, creating an empty one if missing.
+    Idempotent — safe to call from both GET and PUT."""
+    row = (
+        await session.execute(
+            select(TenantBranding).where(TenantBranding.tenant_id == tenant_id)
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        return row
+    row = TenantBranding(tenant_id=tenant_id)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.get("/brand-facts", response_model=BrandFactsResponse)
+async def get_brand_facts(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> BrandFactsResponse:
+    row = await _ensure_branding(session, tenant_id)
+    facts = (row.default_messages or {}).get("brand_facts", {})
+    return BrandFactsResponse(brand_facts=facts)
+
+
+@router.put("/brand-facts", response_model=BrandFactsResponse)
+async def put_brand_facts(
+    body: BrandFactsPutBody,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> BrandFactsResponse:
+    row = await _ensure_branding(session, tenant_id)
+    new_messages = dict(row.default_messages or {})
+    new_messages["brand_facts"] = body.brand_facts
+    await session.execute(
+        update(TenantBranding)
+        .where(TenantBranding.tenant_id == tenant_id)
+        .values(default_messages=new_messages)
+    )
+    await session.commit()
+    return BrandFactsResponse(brand_facts=body.brand_facts)
+
+
+@router.get("/tone", response_model=ToneResponse)
+async def get_tone(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ToneResponse:
+    row = await _ensure_branding(session, tenant_id)
+    return ToneResponse(voice=row.voice or {})
+
+
+@router.put("/tone", response_model=ToneResponse)
+async def put_tone(
+    body: TonePutBody,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ToneResponse:
+    await _ensure_branding(session, tenant_id)
+    await session.execute(
+        update(TenantBranding)
+        .where(TenantBranding.tenant_id == tenant_id)
+        .values(voice=body.voice)
+    )
+    await session.commit()
+    return ToneResponse(voice=body.voice)
+
+
+# Suppress unused-import warning when we don't actually use UTC anywhere
+# above (we kept the import for future timestamp work).
+_ = UTC
