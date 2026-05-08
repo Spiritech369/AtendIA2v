@@ -28,6 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { WhatsAppStatusBadge } from "./WhatsAppStatusBadge";
 
 interface NavItem {
   to: string;
@@ -94,8 +95,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between border-b px-6">
-          <div className="text-sm text-muted-foreground">
-            {user?.role === "superadmin" ? "Superadmin" : `Tenant: ${user?.tenant_id ?? "—"}`}
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              {user?.role === "superadmin" ? "Superadmin" : `Tenant: ${user?.tenant_id ?? "—"}`}
+            </span>
+            <WhatsAppStatusBadge />
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" aria-label="Notificaciones">

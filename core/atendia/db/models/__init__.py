@@ -1,5 +1,7 @@
 from atendia.db.models.conversation import Conversation, ConversationStateRow
 from atendia.db.models.customer import Customer
+from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
+from atendia.db.models.customer_note import CustomerNote
 from atendia.db.models.event import EventRow
 from atendia.db.models.lifecycle import FollowupScheduled, HumanHandoff
 from atendia.db.models.message import MessageRow
@@ -18,6 +20,9 @@ __all__ = [
     "Conversation",
     "ConversationStateRow",
     "Customer",
+    "CustomerFieldDefinition",
+    "CustomerFieldValue",
+    "CustomerNote",
     "EventRow",
     "FollowupScheduled",
     "HumanHandoff",

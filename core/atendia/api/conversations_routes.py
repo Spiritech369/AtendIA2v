@@ -50,6 +50,10 @@ class ConversationListItem(BaseModel):
     last_message_text: str | None
     last_message_direction: str | None
     has_pending_handoff: bool
+    assigned_user_id: UUID | None = None
+    assigned_user_email: str | None = None
+    unread_count: int = 0
+    tags: list[str] = []
 
 
 class ConversationListResponse(BaseModel):
@@ -71,6 +75,10 @@ class ConversationDetail(BaseModel):
     extracted_data: dict
     pending_confirmation: str | None
     last_intent: str | None
+    assigned_user_id: UUID | None = None
+    assigned_user_email: str | None = None
+    unread_count: int = 0
+    tags: list[str] = []
 
 
 class MessageItem(BaseModel):
@@ -78,6 +86,7 @@ class MessageItem(BaseModel):
     conversation_id: UUID
     direction: str
     text: str
+    metadata: dict
     created_at: datetime
     sent_at: datetime | None
 
@@ -116,6 +125,9 @@ async def list_conversations(
     conv_status: str | None = Query(None, alias="status"),
     has_pending_handoff: bool = Query(False),
     bot_paused: bool | None = Query(None),
+    assigned_user_id: UUID | None = Query(None, alias="assigned_user_id"),
+    unassigned: bool = Query(False),
+    tag: str | None = Query(None),
     session: AsyncSession = Depends(get_db_session),
 ) -> ConversationListResponse:
     # Subquery: last message per conversation (text + direction). Window
@@ -150,6 +162,7 @@ async def list_conversations(
         )
     )
 
+    from atendia.db.models.tenant import TenantUser as _TUList
     stmt = (
         select(
             Conversation.id,
@@ -158,12 +171,16 @@ async def list_conversations(
             Conversation.status,
             Conversation.current_stage,
             Conversation.last_activity_at,
+            Conversation.assigned_user_id,
+            Conversation.unread_count,
+            Conversation.tags,
             Customer.phone_e164.label("customer_phone"),
             Customer.name.label("customer_name"),
             ConversationStateRow.bot_paused,
             last_msg.c.text.label("last_message_text"),
             last_msg.c.direction.label("last_message_direction"),
             pending_handoff_exists.label("has_pending_handoff"),
+            _TUList.email.label("assigned_user_email"),
         )
         .select_from(Conversation)
         .join(Customer, Customer.id == Conversation.customer_id)
@@ -172,7 +189,9 @@ async def list_conversations(
             ConversationStateRow.conversation_id == Conversation.id,
         )
         .outerjoin(last_msg, last_msg.c.cid == Conversation.id)
+        .outerjoin(_TUList, _TUList.id == Conversation.assigned_user_id)
         .where(Conversation.tenant_id == tenant_id)
+        .where(Conversation.deleted_at.is_(None))
         .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
         .limit(limit + 1)  # fetch one extra to know if there's more
     )
@@ -185,6 +204,15 @@ async def list_conversations(
 
     if has_pending_handoff:
         stmt = stmt.where(pending_handoff_exists)
+
+    if assigned_user_id is not None:
+        stmt = stmt.where(Conversation.assigned_user_id == assigned_user_id)
+
+    if unassigned:
+        stmt = stmt.where(Conversation.assigned_user_id.is_(None))
+
+    if tag is not None:
+        stmt = stmt.where(Conversation.tags.contains([tag]))
 
     if cursor is not None:
         cur_ts, cur_id = _decode_cursor(cursor)
@@ -219,6 +247,10 @@ async def list_conversations(
             last_message_text=r.last_message_text,
             last_message_direction=r.last_message_direction,
             has_pending_handoff=r.has_pending_handoff,
+            assigned_user_id=r.assigned_user_id,
+            assigned_user_email=r.assigned_user_email,
+            unread_count=r.unread_count,
+            tags=r.tags or [],
         )
         for r in page
     ]
@@ -238,6 +270,7 @@ async def get_conversation(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ConversationDetail:
+    from atendia.db.models.tenant import TenantUser as _TU
     stmt = (
         select(
             Conversation.id,
@@ -247,12 +280,16 @@ async def get_conversation(
             Conversation.current_stage,
             Conversation.last_activity_at,
             Conversation.created_at,
+            Conversation.assigned_user_id,
+            Conversation.unread_count,
+            Conversation.tags,
             Customer.phone_e164.label("customer_phone"),
             Customer.name.label("customer_name"),
             ConversationStateRow.bot_paused,
             ConversationStateRow.extracted_data,
             ConversationStateRow.pending_confirmation,
             ConversationStateRow.last_intent,
+            _TU.email.label("assigned_user_email"),
         )
         .select_from(Conversation)
         .join(Customer, Customer.id == Conversation.customer_id)
@@ -260,9 +297,11 @@ async def get_conversation(
             ConversationStateRow,
             ConversationStateRow.conversation_id == Conversation.id,
         )
+        .outerjoin(_TU, _TU.id == Conversation.assigned_user_id)
         .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant_id,
+            Conversation.deleted_at.is_(None),
         )
     )
     row = (await session.execute(stmt)).first()
@@ -282,6 +321,10 @@ async def get_conversation(
         extracted_data=row.extracted_data or {},
         pending_confirmation=row.pending_confirmation,
         last_intent=row.last_intent,
+        assigned_user_id=row.assigned_user_id,
+        assigned_user_email=row.assigned_user_email,
+        unread_count=row.unread_count,
+        tags=row.tags or [],
     )
 
 
@@ -321,6 +364,7 @@ async def list_messages(
             MessageRow.conversation_id,
             MessageRow.direction,
             MessageRow.text,
+            MessageRow.metadata_json,
             MessageRow.created_at,
             MessageRow.sent_at,
         )
@@ -348,6 +392,7 @@ async def list_messages(
             conversation_id=r.conversation_id,
             direction=r.direction,
             text=r.text,
+            metadata=r.metadata_json or {},
             created_at=r.created_at,
             sent_at=r.sent_at,
         )
@@ -506,3 +551,167 @@ async def resume_bot(
     )
     await session.commit()
     return {"ok": True}
+
+
+# ---------- Partial update (scope gaps) ----------
+
+
+class ConversationPatchResponse(BaseModel):
+    id: UUID
+    current_stage: str
+    assigned_user_id: UUID | None
+    assigned_user_email: str | None
+    tags: list[str]
+    unread_count: int
+    status: str
+
+
+@router.patch("/{conversation_id}", response_model=ConversationPatchResponse)
+async def patch_conversation(
+    conversation_id: UUID,
+    body: Request,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ConversationPatchResponse:
+    """Partial update: change stage, assign/unassign user, set tags."""
+    raw = await body.json()
+
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    values: dict = {}
+    if "current_stage" in raw and raw["current_stage"] is not None:
+        values["current_stage"] = raw["current_stage"]
+    if "assigned_user_id" in raw:
+        values["assigned_user_id"] = raw["assigned_user_id"]  # None = unassign
+    if "tags" in raw and raw["tags"] is not None:
+        values["tags"] = raw["tags"]
+
+    if values:
+        await session.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(**values)
+        )
+
+    # Audit event
+    from atendia.contracts.event import EventType
+    from atendia.state_machine.event_emitter import EventEmitter
+    emitter = EventEmitter(session)
+    await emitter.emit(
+        conversation_id=conversation_id,
+        tenant_id=tenant_id,
+        event_type=EventType.CONVERSATION_UPDATED,
+        payload={"fields": list(values.keys()), "by": str(user.user_id)},
+    )
+
+    await session.commit()
+
+    # Re-fetch with joined user email
+    from atendia.db.models.tenant import TenantUser
+    row = (await session.execute(
+        select(
+            Conversation.id,
+            Conversation.current_stage,
+            Conversation.assigned_user_id,
+            Conversation.tags,
+            Conversation.unread_count,
+            Conversation.status,
+            TenantUser.email.label("assigned_user_email"),
+        )
+        .select_from(Conversation)
+        .outerjoin(TenantUser, TenantUser.id == Conversation.assigned_user_id)
+        .where(Conversation.id == conversation_id)
+    )).first()
+
+    return ConversationPatchResponse(
+        id=row.id,
+        current_stage=row.current_stage,
+        assigned_user_id=row.assigned_user_id,
+        assigned_user_email=row.assigned_user_email,
+        tags=row.tags or [],
+        unread_count=row.unread_count,
+        status=row.status,
+    )
+
+
+# ---------- Soft delete ----------
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Soft-delete: sets deleted_at, excluded from list/detail."""
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    await session.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(deleted_at=datetime.now(UTC))
+    )
+
+    from atendia.contracts.event import EventType
+    from atendia.state_machine.event_emitter import EventEmitter
+    emitter = EventEmitter(session)
+    await emitter.emit(
+        conversation_id=conversation_id,
+        tenant_id=tenant_id,
+        event_type=EventType.CONVERSATION_DELETED,
+        payload={"by": str(user.user_id)},
+    )
+    await session.commit()
+
+
+# ---------- Mark read ----------
+
+
+@router.post("/{conversation_id}/mark-read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_read(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Reset unread_count to 0 — called when operator opens a conversation."""
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    await session.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(unread_count=0)
+    )
+    await session.commit()

@@ -20,6 +20,12 @@ class Conversation(Base):
     current_stage: Mapped[str] = mapped_column(String(60), default="greeting")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    assigned_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    unread_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    tags: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     state: Mapped["ConversationStateRow"] = relationship(back_populates="conversation", uselist=False)
 

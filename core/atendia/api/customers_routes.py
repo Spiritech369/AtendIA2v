@@ -57,6 +57,11 @@ class CustomerDetail(BaseModel):
     total_cost_usd: Decimal
 
 
+class CustomerPatch(BaseModel):
+    name: str | None = None
+    attrs: dict | None = None
+
+
 @router.get("", response_model=CustomerListResponse)
 async def list_customers(
     user: AuthUser = Depends(current_user),  # noqa: ARG001
@@ -178,3 +183,34 @@ async def get_customer(
         last_extracted_data=last_extracted,
         total_cost_usd=total_cost,
     )
+
+
+@router.patch("/{customer_id}", response_model=CustomerDetail)
+async def patch_customer(
+    customer_id: UUID,
+    body: CustomerPatch,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> CustomerDetail:
+    cust = (
+        await session.execute(
+            select(Customer).where(
+                Customer.id == customer_id,
+                Customer.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if cust is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
+
+    changes = body.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no fields to update")
+
+    for k, v in changes.items():
+        setattr(cust, k, v)
+    await session.commit()
+    await session.refresh(cust)
+
+    return await get_customer(customer_id, user, tenant_id, session)

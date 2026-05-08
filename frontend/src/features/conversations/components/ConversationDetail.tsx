@@ -1,35 +1,60 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
-import { useConversation, useMessages } from "@/features/conversations/hooks/useConversations";
-import { InterventionComposer } from "./InterventionComposer";
-import { MessageBubble } from "./MessageBubble";
+import { conversationsApi } from "@/features/conversations/api";
+import { useConversation } from "@/features/conversations/hooks/useConversations";
+import { turnTracesApi } from "@/features/turn-traces/api";
+import { ChatWindow } from "./ChatWindow";
+import { ContactPanel } from "./ContactPanel";
+import { DebugPanel } from "./DebugPanel";
 
 export function ConversationDetail({ conversationId }: { conversationId: string }) {
   const conv = useConversation(conversationId);
-  const msgs = useMessages(conversationId);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
+  const [debugTraceId, setDebugTraceId] = useState<string | null>(null);
+  const [debugMessageId, setDebugMessageId] = useState<string | null>(null);
 
-  useConversationStream(conversationId, () => {
-    // Live-scroll to bottom on inbound. Defer one tick so the new
-    // message lands in the DOM first.
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }, 50);
+  useEffect(() => {
+    if (conversationId) {
+      conversationsApi.markRead(conversationId).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      });
+    }
+  }, [conversationId, queryClient]);
+
+  const traces = useQuery({
+    queryKey: ["turn-traces", conversationId],
+    queryFn: () => turnTracesApi.list(conversationId),
+    enabled: !!conversationId,
   });
 
-  // Initial scroll-to-bottom (top of the reverse-ordered list).
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, []);
+  const messageToTrace = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!traces.data?.items) return map;
+    for (const t of traces.data.items) {
+      if (t.inbound_message_id) {
+        map.set(t.inbound_message_id, t.id);
+      }
+    }
+    return map;
+  }, [traces.data]);
+
+  const handleDebug = useCallback(
+    (messageId: string) => {
+      const traceId = messageToTrace.get(messageId);
+      if (traceId) {
+        setDebugTraceId((prev) => (prev === traceId ? null : traceId));
+        setDebugMessageId((prev) => (prev === messageId ? null : messageId));
+      }
+    },
+    [messageToTrace],
+  );
 
   if (conv.isLoading) {
     return (
@@ -51,11 +76,10 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
   }
 
   const c = conv.data;
-  const messages = msgs.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-      <Card className="flex flex-col overflow-hidden">
+    <div className="flex h-full gap-4">
+      <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
@@ -78,63 +102,27 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
             <Badge variant="outline">{c.current_stage}</Badge>
           </div>
         </CardHeader>
-        <Separator />
-        <ScrollArea className="flex-1" ref={scrollRef}>
-          <div className="flex flex-col-reverse gap-2 p-4">
-            {messages.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                Sin mensajes en esta conversación.
-              </div>
-            ) : (
-              messages.map((m) => <MessageBubble key={m.id} message={m} />)
-            )}
-            {msgs.hasNextPage && (
-              <div className="flex justify-center pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => msgs.fetchNextPage()}
-                  disabled={msgs.isFetchingNextPage}
-                >
-                  {msgs.isFetchingNextPage ? "Cargando…" : "Más mensajes"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-        <InterventionComposer conversationId={conversationId} botPaused={c.bot_paused} />
+
+        <ChatWindow
+          conversationId={conversationId}
+          botPaused={c.bot_paused}
+          messageToTrace={messageToTrace}
+          debugMessageId={debugMessageId}
+          onDebug={handleDebug}
+        />
       </Card>
 
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Estado extraído</CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="space-y-3 py-4 text-sm">
-          {c.last_intent && (
-            <div>
-              <div className="text-xs text-muted-foreground">Última intención</div>
-              <div>{c.last_intent}</div>
-            </div>
-          )}
-          {c.pending_confirmation && (
-            <div>
-              <div className="text-xs text-muted-foreground">Esperando confirmación</div>
-              <div className="text-amber-600">{c.pending_confirmation}</div>
-            </div>
-          )}
-          <div>
-            <div className="mb-1 text-xs text-muted-foreground">Datos capturados</div>
-            {Object.keys(c.extracted_data).length === 0 ? (
-              <div className="text-xs text-muted-foreground">Sin datos.</div>
-            ) : (
-              <pre className="overflow-auto rounded bg-muted p-2 text-xs">
-                {JSON.stringify(c.extracted_data, null, 2)}
-              </pre>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {debugTraceId ? (
+        <DebugPanel
+          traceId={debugTraceId}
+          onClose={() => {
+            setDebugTraceId(null);
+            setDebugMessageId(null);
+          }}
+        />
+      ) : (
+        <ContactPanel customerId={c.customer_id} />
+      )}
     </div>
   );
 }

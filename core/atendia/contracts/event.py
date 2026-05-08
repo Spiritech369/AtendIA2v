@@ -14,6 +14,8 @@ class EventType(str, Enum):
     HUMAN_HANDOFF_REQUESTED = "human_handoff_requested"
     FOLLOWUP_SCHEDULED = "followup_scheduled"
     ERROR_OCCURRED = "error_occurred"
+    CONVERSATION_UPDATED = "conversation_updated"
+    CONVERSATION_DELETED = "conversation_deleted"
 
 
 class Event(BaseModel):
