@@ -509,3 +509,95 @@ async def resume_bot(
     )
     await session.commit()
     return {"ok": True}
+
+
+# ---------- Partial update (scope gaps) ----------
+
+
+class ConversationPatchResponse(BaseModel):
+    id: UUID
+    current_stage: str
+    assigned_user_id: UUID | None
+    assigned_user_email: str | None
+    tags: list[str]
+    unread_count: int
+    status: str
+
+
+@router.patch("/{conversation_id}", response_model=ConversationPatchResponse)
+async def patch_conversation(
+    conversation_id: UUID,
+    body: Request,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ConversationPatchResponse:
+    """Partial update: change stage, assign/unassign user, set tags."""
+    raw = await body.json()
+
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    values: dict = {}
+    if "current_stage" in raw and raw["current_stage"] is not None:
+        values["current_stage"] = raw["current_stage"]
+    if "assigned_user_id" in raw:
+        values["assigned_user_id"] = raw["assigned_user_id"]  # None = unassign
+    if "tags" in raw and raw["tags"] is not None:
+        values["tags"] = raw["tags"]
+
+    if values:
+        await session.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(**values)
+        )
+
+    # Audit event
+    from atendia.contracts.event import EventType
+    from atendia.state_machine.event_emitter import EventEmitter
+    emitter = EventEmitter(session)
+    await emitter.emit(
+        conversation_id=conversation_id,
+        tenant_id=tenant_id,
+        event_type=EventType.CONVERSATION_UPDATED,
+        payload={"fields": list(values.keys()), "by": str(user.user_id)},
+    )
+
+    await session.commit()
+
+    # Re-fetch with joined user email
+    from atendia.db.models.tenant import TenantUser
+    row = (await session.execute(
+        select(
+            Conversation.id,
+            Conversation.current_stage,
+            Conversation.assigned_user_id,
+            Conversation.tags,
+            Conversation.unread_count,
+            Conversation.status,
+            TenantUser.email.label("assigned_user_email"),
+        )
+        .select_from(Conversation)
+        .outerjoin(TenantUser, TenantUser.id == Conversation.assigned_user_id)
+        .where(Conversation.id == conversation_id)
+    )).first()
+
+    return ConversationPatchResponse(
+        id=row.id,
+        current_stage=row.current_stage,
+        assigned_user_id=row.assigned_user_id,
+        assigned_user_email=row.assigned_user_email,
+        tags=row.tags or [],
+        unread_count=row.unread_count,
+        status=row.status,
+    )
