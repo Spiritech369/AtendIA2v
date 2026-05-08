@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
+from atendia.api.analytics_routes import router as analytics_router
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customers_routes import router as customers_router
@@ -29,6 +30,7 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(
     conversations_router, prefix="/api/v1/conversations", tags=["conversations"]
 )
+app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
 app.include_router(handoffs_router, prefix="/api/v1/handoffs", tags=["handoffs"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
