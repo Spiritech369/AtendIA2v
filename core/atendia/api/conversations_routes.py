@@ -174,6 +174,7 @@ async def list_conversations(
         )
         .outerjoin(last_msg, last_msg.c.cid == Conversation.id)
         .where(Conversation.tenant_id == tenant_id)
+        .where(Conversation.deleted_at.is_(None))
         .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
         .limit(limit + 1)  # fetch one extra to know if there's more
     )
@@ -264,6 +265,7 @@ async def get_conversation(
         .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant_id,
+            Conversation.deleted_at.is_(None),
         )
     )
     row = (await session.execute(stmt)).first()
@@ -601,3 +603,44 @@ async def patch_conversation(
         unread_count=row.unread_count,
         status=row.status,
     )
+
+
+# ---------- Soft delete ----------
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Soft-delete: sets deleted_at, excluded from list/detail."""
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    await session.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(deleted_at=datetime.now(UTC))
+    )
+
+    from atendia.contracts.event import EventType
+    from atendia.state_machine.event_emitter import EventEmitter
+    emitter = EventEmitter(session)
+    await emitter.emit(
+        conversation_id=conversation_id,
+        tenant_id=tenant_id,
+        event_type=EventType.CONVERSATION_DELETED,
+        payload={"by": str(user.user_id)},
+    )
+    await session.commit()
