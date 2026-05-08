@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     composer_timeout_s: float = Field(default=8.0)
     composer_retry_delays_ms: list[int] = Field(default_factory=lambda: [500, 2000])
     composer_max_messages: int = Field(default=2, ge=1, le=3)
+    # Phase 4 — operator session auth (separate from Meta webhook secret).
+    # Override via ATENDIA_V2_AUTH_SESSION_SECRET in production.
+    auth_session_secret: str = Field(
+        default="dev-only-fallback-auth-secret-DO-NOT-USE-IN-PROD"
+    )
+    auth_session_ttl_s: int = Field(default=28800)  # 8h operator workday
+    auth_cookie_secure: bool = Field(default=False)  # True in production behind TLS
 
 
 @lru_cache
