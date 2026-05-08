@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.runner_routes import router as runner_router
@@ -12,6 +13,7 @@ from atendia.webhooks.meta_routes import router as meta_webhook_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    assert_prod_secret_safety()
     register_all_tools()
     yield
 

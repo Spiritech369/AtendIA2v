@@ -19,7 +19,9 @@ from atendia.api._auth_helpers import (
     CSRF_COOKIE,
     SESSION_COOKIE,
     AuthUser,
+    Role,
     decode_jwt,
+    dummy_password_check,
     get_current_user,
     issue_jwt,
     new_csrf_token,
@@ -40,7 +42,7 @@ class LoginRequest(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     tenant_id: UUID | None
-    role: str
+    role: Role
     email: str
 
 
@@ -51,6 +53,10 @@ class LoginResponse(BaseModel):
 
 def _set_session_cookies(response: Response, *, jwt_token: str, csrf: str) -> None:
     settings = get_settings()
+    # SameSite=Lax (not Strict) so the operator can follow a deep link from
+    # email (e.g., "review handoff X") and arrive logged in. CSRF risk is
+    # closed by the double-submit middleware (_csrf.py), not by SameSite.
+    # Do NOT tighten to Strict without first updating the email-link flow.
     response.set_cookie(
         SESSION_COOKIE,
         jwt_token,
@@ -87,6 +93,10 @@ async def login(
     )
     user = result.scalar_one_or_none()
     if user is None or user.password_hash is None:
+        # Run bcrypt against a dummy hash so the 401 returns at roughly the
+        # same wall-clock time as a real-user 401 (HIGH-2 in the Block A
+        # review — prevents email enumeration via response timing).
+        dummy_password_check()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")

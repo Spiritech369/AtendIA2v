@@ -881,6 +881,34 @@ git tag -a phase-4-frontend -m "Phase 4 — Operator Frontend (11 pillars + bulk
 
 ---
 
+## Block A — deviations from plan (locked in 2026-05-07)
+
+When implementing Block A, the following swaps were necessary or strongly preferable:
+
+- **`bcrypt` direct, NOT `passlib[bcrypt]`** — passlib is unmaintained and
+  raises `AttributeError: module 'bcrypt' has no attribute '__about__'`
+  against bcrypt 5.x (the current major). The direct `bcrypt` API is what
+  the bcrypt maintainers themselves recommend.
+- **`pyjwt`, NOT `python-jose`** — the plan said "jose (already in deps via
+  realtime auth)". This was inaccurate: `realtime/auth.py` uses pyjwt. Jose
+  has had multiple unpatched CVEs and is effectively abandoned. Pyjwt is the
+  modern standard.
+- **`pydantic[email]`** added to deps so `EmailStr` works in the login body.
+
+## Block A — deferred work
+
+These came out of the Block A code review and are NOT blockers for `4a-block-a-done`:
+
+- **MEDIUM (pre-existing)** — `/api/v1/runner/*` accepts arbitrary
+  `RunTurnRequest` POSTs with no auth. Currently CSRF-exempted to keep
+  internal tests working, but the exempt entry codifies a pre-Phase-4 gap.
+  Gate behind `enable_runner_routes: bool = False` and skip mounting in
+  prod. Track separately, NOT in Phase 4.
+- **MEDIUM (Block I)** — `/api/v1/auth/refresh` re-uses the same JWT
+  claims forever. No `iat`/`jti`, no rotation tracking, no revocation list.
+  If a session cookie leaks, an attacker can refresh until password change.
+  Add `jti` + a revocation table when the Users pillar lands in Block I.
+
 ## Notas finales
 
 **Tiempo estimado:** 6-10 días dev intensivo dedicado.

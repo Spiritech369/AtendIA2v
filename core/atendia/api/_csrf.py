@@ -24,10 +24,10 @@ from __future__ import annotations
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from atendia.api._auth_helpers import CSRF_COOKIE
+from atendia.api._auth_helpers import CSRF_COOKIE, constant_time_compare
 
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -50,7 +50,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         cookie = request.cookies.get(CSRF_COOKIE)
         header = request.headers.get(CSRF_HEADER)
-        if not cookie or not header or cookie != header:
+        if not cookie or not header or not constant_time_compare(cookie, header):
             return JSONResponse(
                 {"detail": "csrf token missing or invalid"}, status_code=403
             )
@@ -63,7 +63,3 @@ def install_csrf_middleware(app) -> None:
 
 
 __all__ = ["CSRFMiddleware", "install_csrf_middleware", "CSRF_HEADER"]
-
-
-# Re-export the response type so tests can `assert isinstance(...)` if they want.
-_ = Response  # silence unused import warning (kept for type hint convenience)

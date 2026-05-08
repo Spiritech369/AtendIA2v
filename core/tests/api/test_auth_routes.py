@@ -1,75 +1,22 @@
 """Phase 4 T2 — operator session auth route tests.
 
-Covers: login_ok, login_bad_pwd, logout_clears_cookie, me_returns_claims.
+Covers: login_ok, login_bad_pwd, logout_clears_cookie, me_returns_claims,
+me_without_cookie_401, login_unknown_email_constant_time.
+
+Uses the shared `client` and `operator_seed` fixtures from `conftest.py`.
 """
-import asyncio
-from uuid import uuid4
+from __future__ import annotations
 
-import pytest
+import time
+
 from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
 
-from atendia.api._auth_helpers import (
-    CSRF_COOKIE,
-    SESSION_COOKIE,
-    hash_password,
-)
-from atendia.config import get_settings
+from atendia.api._auth_helpers import CSRF_COOKIE, SESSION_COOKIE
 from atendia.main import app
 
 
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
-
-
-@pytest.fixture
-def operator_user():
-    """Seed a tenant + operator user with a known bcrypt password.
-
-    Yields (tenant_id, user_id, email, plain_password). Cleans up after.
-    """
-    email = f"phase4_t2_{uuid4().hex[:8]}@dinamo.com"
-    plain = "test-password-123"
-    hashed = hash_password(plain)
-
-    async def _setup() -> tuple[str, str]:
-        engine = create_async_engine(get_settings().database_url)
-        async with engine.begin() as conn:
-            tid = (
-                await conn.execute(
-                    text(
-                        "INSERT INTO tenants (name) VALUES (:n) RETURNING id"
-                    ),
-                    {"n": f"phase4_t2_tenant_{uuid4().hex[:8]}"},
-                )
-            ).scalar()
-            uid = (
-                await conn.execute(
-                    text(
-                        "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
-                        "VALUES (:t, :e, 'operator', :h) RETURNING id"
-                    ),
-                    {"t": tid, "e": email, "h": hashed},
-                )
-            ).scalar()
-        await engine.dispose()
-        return str(tid), str(uid)
-
-    async def _cleanup(tid: str) -> None:
-        engine = create_async_engine(get_settings().database_url)
-        async with engine.begin() as conn:
-            await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": tid})
-        await engine.dispose()
-
-    tid, uid = asyncio.run(_setup())
-    yield tid, uid, email, plain
-    asyncio.run(_cleanup(tid))
-
-
-def test_login_returns_jwt_cookie_and_csrf_token(client, operator_user):
-    tid, uid, email, plain = operator_user
+def test_login_returns_jwt_cookie_and_csrf_token(client, operator_seed):
+    tid, uid, email, plain = operator_seed
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
 
     assert resp.status_code == 200, resp.text
@@ -87,8 +34,8 @@ def test_login_returns_jwt_cookie_and_csrf_token(client, operator_user):
     assert resp.cookies[CSRF_COOKIE] == body["csrf_token"]
 
 
-def test_login_with_bad_password_returns_401(client, operator_user):
-    _, _, email, _ = operator_user
+def test_login_with_bad_password_returns_401(client, operator_seed):
+    _, _, email, _ = operator_seed
     resp = client.post(
         "/api/v1/auth/login", json={"email": email, "password": "wrong-password"}
     )
@@ -96,25 +43,23 @@ def test_login_with_bad_password_returns_401(client, operator_user):
     assert SESSION_COOKIE not in resp.cookies
 
 
-def test_logout_clears_cookie(client, operator_user):
-    _, _, email, plain = operator_user
+def test_logout_clears_cookie(client, operator_seed):
+    _, _, email, plain = operator_seed
     login = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
     assert login.status_code == 200
     csrf = login.json()["csrf_token"]
 
     logout = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})
     assert logout.status_code == 200
-    # Set-Cookie header should expire the session cookie. TestClient surfaces
-    # cookies with empty values when deleted via response.delete_cookie.
+    # Starlette emits Max-Age=0 on delete_cookie; assert that specifically.
     set_cookie_headers = logout.headers.get_list("set-cookie")
     assert any(
-        SESSION_COOKIE in h and ("Max-Age=0" in h or "expires=" in h.lower())
-        for h in set_cookie_headers
+        SESSION_COOKIE in h and "Max-Age=0" in h for h in set_cookie_headers
     ), set_cookie_headers
 
 
-def test_me_returns_claims(client, operator_user):
-    tid, uid, email, plain = operator_user
+def test_me_returns_claims(client, operator_seed):
+    tid, uid, email, plain = operator_seed
     login = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
     assert login.status_code == 200
 
@@ -127,7 +72,24 @@ def test_me_returns_claims(client, operator_user):
     assert body["email"] == email
 
 
-def test_me_without_cookie_returns_401(client):
+def test_me_without_cookie_returns_401():
     fresh = TestClient(app)
     resp = fresh.get("/api/v1/auth/me")
     assert resp.status_code == 401
+
+
+def test_login_unknown_email_runs_dummy_bcrypt(client):
+    """HIGH-2 from Block A review: missing-user 401 should not be detectably
+    faster than real-user 401. Sanity-bound by lower bound only — we can't
+    measure absolute equality, but a missing user without dummy_password_check
+    would return in <5ms; with the check it takes ~150ms+."""
+    t0 = time.perf_counter()
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody-here@dinamo.com", "password": "irrelevant"},
+    )
+    elapsed = time.perf_counter() - t0
+    assert resp.status_code == 401
+    # Should take meaningfully longer than a 5ms NotFound. Cost-12 bcrypt is
+    # >100ms on modern CPUs; allow generous lower bound for slow CI.
+    assert elapsed > 0.05, f"login looked too fast for missing user: {elapsed*1000:.1f}ms"
