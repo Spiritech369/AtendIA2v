@@ -3,6 +3,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Scope
 
 from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
@@ -59,18 +61,51 @@ async def health() -> dict:
 #
 # Path resolves to `<repo>/frontend/dist/` from the package layout
 # `<repo>/core/atendia/main.py`. We mount this LAST so /api, /ws, and
-# /health win their routing match first. `html=True` makes StaticFiles
-# fall back to index.html on any unknown path — that's what TanStack
-# Router needs for client-side deep links.
+# /health win their routing match first.
+#
+# `StaticFiles(html=True)` ALONE is NOT enough for SPA deep-linking:
+# it serves index.html only when a path resolves to a directory, NOT
+# as a fallback for unknown paths. So a page reload on `/login` would
+# 404 instead of letting TanStack Router take over.
+#
+# Subclass overrides `get_response` to fall back to `index.html` on any
+# 404 — the standard SPA pattern. API/WS routes resolve BEFORE this
+# mount so they keep their real 404s; only frontend-routed paths get
+# rewritten.
 #
 # Skipped silently when dist/ doesn't exist so dev runs (no `pnpm build`)
 # don't crash on startup.
+
+
+class _SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: Scope):
+        # Starlette RAISES HTTPException(404) instead of returning a
+        # Response — catch it and fall through to index.html so the
+        # client-side router resolves the path (`/login`,
+        # `/conversations/<uuid>`, etc).
+        #
+        # `path` is relative to the mount point (mount is at "/") and
+        # normalized through os.path — meaning on Windows it uses
+        # backslashes (`api\v1\nonexistent`), on Posix forward-slashes.
+        # Normalize before the prefix check so API/WS 404s stay 404
+        # cross-platform; only frontend-routed paths get rewritten.
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            normalized = path.replace("\\", "/")
+            if exc.status_code == 404 and not (
+                normalized.startswith("api/") or normalized.startswith("ws/")
+            ):
+                return await super().get_response("index.html", scope)
+            raise
+
+
 _FRONTEND_DIST = (
     Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 )
 if _FRONTEND_DIST.is_dir():
     app.mount(
         "/",
-        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        _SPAStaticFiles(directory=str(_FRONTEND_DIST), html=True),
         name="frontend",
     )

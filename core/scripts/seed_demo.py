@@ -10,12 +10,19 @@ the user row manually and re-seed.
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+# Ensure the project root (core/) is on sys.path so `import atendia` works
+# when this script is launched as `uv run python scripts/seed_demo.py`.
+# Python only auto-adds the script's directory; the package lives one up.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atendia.api._auth_helpers import hash_password
-from atendia.config import get_settings
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+
+from atendia.api._auth_helpers import hash_password  # noqa: E402
+from atendia.config import get_settings  # noqa: E402
 
 
 DEMO_TENANT_NAME = "demo"
@@ -40,9 +47,9 @@ async def main() -> None:
                         {"n": DEMO_TENANT_NAME},
                     )
                 ).scalar()
-                print(f"✓ Created tenant '{DEMO_TENANT_NAME}' (id={tid})")
+                print(f"[OK] Created tenant '{DEMO_TENANT_NAME}' (id={tid})")
             else:
-                print(f"· Tenant '{DEMO_TENANT_NAME}' already exists (id={tid})")
+                print(f"[--] Tenant '{DEMO_TENANT_NAME}' already exists (id={tid})")
 
             uid = (
                 await conn.execute(
@@ -64,11 +71,11 @@ async def main() -> None:
                     },
                 )
                 print(
-                    f"✓ Created operator {DEMO_EMAIL} (password '{DEMO_PASSWORD}')"
+                    f"[OK] Created operator {DEMO_EMAIL} (password '{DEMO_PASSWORD}')"
                 )
             else:
                 print(
-                    f"· User {DEMO_EMAIL} already exists "
+                    f"[--] User {DEMO_EMAIL} already exists "
                     f"(id={uid}; password unchanged)"
                 )
     finally:
