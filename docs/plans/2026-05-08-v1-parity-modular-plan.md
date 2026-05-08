@@ -73,12 +73,18 @@ frontend/src/routes/(auth)/{module}.tsx          # TanStack Router route
 | Google Sheets sync = OUT OF SCOPE | CSV import/export covers the need. Sheets = future integration. |
 | `origin` column on conversations = DROPPED | `conversation.channel` already covers this. No migration needed. |
 | Dashboard at `/dashboard`, conversations stays at `/` | No breaking URL changes. |
+| Clients page = TABLE only (no kanban) | Pipeline page IS the kanban. Avoids redundancy + expensive effective_stage grouping. |
+| Effective stage via lateral join | Single query, no N+1. `LEFT JOIN LATERAL (SELECT current_stage ... LIMIT 1)`. |
+| Agent `active_intents` uses exact NLU enum values | NLU enum: GREETING, ASK_INFO, ASK_PRICE, BUY, SCHEDULE, COMPLAIN, OFF_TOPIC, UNCLEAR. Frontend shows Spanish labels. |
+| Document checkboxes = static ExtractedFields booleans | Fields: docs_ine, docs_comprobante, docs_estados_de_cuenta, docs_nomina, etc. Looked up via `docs_per_plan[plan_credito]`. |
+| Workflow conditions use dot notation for field namespace | `conversation.current_stage`, `extracted.docs_ine`, `customer.score`. Default namespace = `extracted`. |
+| Workflow error handling = stop on first error | Execution fails, current_node_id saved, manual retry via API. No auto-retry. |
 
 ---
 
 ## Infrastructure Prerequisites
 
-Build these BEFORE any module. Both are small (1-2 days total).
+Build these BEFORE any module. All are small (2-3 days total).
 
 ### P1: File Storage Layer
 
@@ -140,6 +146,58 @@ cron_jobs = [
 ```
 
 **Each job function follows the same pattern** as `send_outbound`: create engine + session from ctx, do work, commit, handle errors.
+
+---
+
+### P3: Tenant Timezone
+
+**Why:** Dashboard "today" queries, Appointments date display, and Pipeline stale alerts all need tenant-local time. No timezone field exists on tenants.
+
+**Migration (part of 025 or standalone):**
+```sql
+ALTER TABLE tenants ADD COLUMN timezone VARCHAR(40) NOT NULL DEFAULT 'America/Mexico_City';
+```
+
+**Model change:** Add to `Tenant`:
+```python
+timezone: Mapped[str] = mapped_column(String(40), default="America/Mexico_City", server_default="'America/Mexico_City'")
+```
+
+**Usage:** All "today" queries use `AT TIME ZONE tenant.timezone`. Dashboard and Appointments endpoints convert datetimes to tenant-local for display.
+
+---
+
+### P4: Notifications (lightweight)
+
+**Why:** Workflow `notify_agent` action needs a delivery target. The Bell icon in AppShell is non-functional.
+
+**Migration (part of first module that needs it, or standalone):**
+```sql
+CREATE TABLE notifications (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+    title       VARCHAR(200) NOT NULL,
+    body        TEXT,
+    read        BOOLEAN NOT NULL DEFAULT false,
+    source_type VARCHAR(40),   -- 'workflow', 'system', 'handoff'
+    source_id   UUID,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_notifications_user_unread ON notifications (user_id) WHERE read = false;
+```
+
+**API:** `core/atendia/api/notifications_routes.py`
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/notifications` | GET | List notifications for current user. Query: `unread_only`. |
+| `/api/notifications/{id}/read` | PATCH | Mark as read. |
+| `/api/notifications/read-all` | POST | Mark all as read. |
+
+**Frontend:** Update Bell icon in `AppShell.tsx` → dropdown showing unread notifications with count badge. Small component, ~100 lines.
+
+**Model:** `core/atendia/db/models/notification.py`
 
 **Job files:**
 ```
@@ -225,7 +283,18 @@ frontend/src/features/appointments/components/CreateAppointmentDialog.tsx
 - Acciones: edit (opens dialog), complete, cancel, delete
 - CreateAppointmentDialog: customer search/select, datetime picker, service input, notes textarea
 
-#### 4.4 Tests
+#### 4.4 Runner Integration (optional subtask)
+
+The NLU already detects `SCHEDULE` intent and extracts `cita_dia` (ISO date string). To enable bot-created appointments:
+
+1. Add new action `"schedule_appointment"` to runner tool dispatch (`conversation_runner.py`)
+2. When triggered: check `cita_dia` in extracted_data. If missing, use `ask_field` to request it.
+3. If present: INSERT into appointments (created_by_type='bot', conversation_id=current), return confirmation in `action_payload`
+4. Composer generates confirmation message using action_payload
+
+This is additive — the CRUD page works independently. Bot integration can be deferred if needed.
+
+#### 4.5 Tests
 
 ```
 core/tests/api/test_appointments_crud.py     # 8-10 tests: create, list, filter by date, update status, delete
@@ -236,6 +305,8 @@ core/tests/api/test_appointments_crud.py     # 8-10 tests: create, list, filter 
 ### Module 5: Knowledge Base UI
 
 **Size:** L | **Type:** NEW frontend + backend enhancements | **Dependencies:** P1, P2
+
+**Python deps to install first:** `uv add pymupdf python-docx openpyxl` (PDF, Word, Excel parsing)
 
 #### 5.1 Database
 
@@ -425,7 +496,9 @@ core/tests/api/test_integrations_whatsapp.py  # 2-3 tests: status endpoint
 
 ### Module 1: Dashboard
 
-**Size:** M | **Type:** NEW page | **Dependencies:** Customers, Conversations, Appointments (Module 4)
+**Size:** M | **Type:** NEW page | **Dependencies:** Customers, Conversations, Appointments (Module 4), P3 (timezone)
+
+**Frontend dep to install first:** `npm install recharts` (lightweight chart library)
 
 #### 1.1 Backend
 
@@ -527,10 +600,26 @@ Score is manually-set (0-100). Auto-scoring is a future enhancement.
 New query params: `stage`, `assigned_user_id`, `sort_by` (name, last_activity, score), `sort_dir` (asc, desc).
 
 New response fields per customer:
-- `effective_stage`: derived from most recent active conversation's `current_stage`. SQL: `SELECT current_stage FROM conversations WHERE customer_id = :c AND deleted_at IS NULL ORDER BY last_activity_at DESC LIMIT 1`
-- `last_activity_at`: derived from most recent conversation's `last_activity_at`
-- `assigned_user_email`: from the most recent conversation's `assigned_user_id` join
+- `effective_stage`: from lateral join (see below)
+- `last_activity_at`: from lateral join
+- `assigned_user_email`: from lateral join → assigned_user_id → tenant_users
 - `score`: from customer record
+
+**Lateral join for effective_stage (critical — avoids N+1):**
+```sql
+SELECT c.*, latest.current_stage AS effective_stage,
+       latest.last_activity_at, latest.assigned_user_id
+FROM customers c
+LEFT JOIN LATERAL (
+    SELECT current_stage, last_activity_at, assigned_user_id
+    FROM conversations
+    WHERE customer_id = c.id AND deleted_at IS NULL
+    ORDER BY last_activity_at DESC
+    LIMIT 1
+) latest ON true
+WHERE c.tenant_id = :t
+```
+Single query, no N+1 subqueries.
 
 **New endpoints:**
 
@@ -548,16 +637,15 @@ New response fields per customer:
 ```
 frontend/src/features/customers/components/ClientsPage.tsx        # replaces CustomerSearch
 frontend/src/features/customers/components/ClientsTable.tsx       # enriched table
-frontend/src/features/customers/components/ClientsKanban.tsx      # kanban view
-frontend/src/features/customers/components/ViewToggle.tsx         # table/kanban switch
 frontend/src/features/customers/components/ImportExportBar.tsx    # import/export buttons
 frontend/src/features/customers/components/StageFilter.tsx        # stage dropdown filter
 ```
 
+**Note:** NO kanban view on Clients page. Pipeline page (Module 6) is the kanban.
+
 **ClientsPage:**
-- Header: "Clientes" + ViewToggle (table | kanban) + StageFilter + ImportExportBar
-- Table view: columns = Nombre, Teléfono, Etapa, Agente, Última actividad, Score
-- Kanban view: columns from pipeline stages, customer cards grouped by effective_stage
+- Header: "Clientes" + StageFilter + ImportExportBar
+- Table: columns = Nombre, Teléfono, Etapa, Agente, Última actividad, Score
 - Import: file input (CSV) → POST /api/customers/import → show results toast
 - Export: click → GET /api/customers/export → browser download
 
@@ -589,7 +677,7 @@ core/tests/api/test_customers_export.py      # CSV export content
 Add to response:
 - `customer_fields`: list of `{ key, label, field_type, value }` — joined from CustomerFieldDefinition + CustomerFieldValue
 - `customer_notes`: last 5 notes — from CustomerNote
-- `required_docs`: list of `{ name, present: bool }` — derived from pipeline's `docs_per_plan[current_plan]` cross-checked with `extracted_data` keys
+- `required_docs`: list of `{ field_name, label, present: bool }` — pipeline's `docs_per_plan[extracted_data.plan_credito]` gives field names (e.g. `docs_ine`, `docs_comprobante`); `present` = `extracted_data[field_name]` (static booleans from `ExtractedFields`)
 - `extracted_data`: the full `conversation_state.extracted_data` dict
 
 **`force_summary` arq job:**
@@ -665,7 +753,8 @@ core/tests/api/test_conversations_detail_enhanced.py  # customer_fields, notes, 
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/pipeline/board` | GET | Returns conversations grouped by stage. Each group: `{ stage_id, stage_label, count, timeout_hours, conversations: [...] }`. Conversations include: id, customer_name, customer_phone, last_message_text, last_activity_at, is_stale (bool). Limited to 50 per stage. |
+| `/api/pipeline/board` | GET | Returns conversations grouped by stage. Each group: `{ stage_id, stage_label, total_count, timeout_hours, conversations: [...first 50] }`. Conversations include: id, customer_name, customer_phone, last_message_text, last_activity_at, is_stale (bool). |
+| `/api/pipeline/board/{stage_id}` | GET | Paginated conversations for a single stage. Query: `cursor`, `limit` (default 50). For "Cargar más" in large stages. |
 | `/api/pipeline/alerts` | GET | Returns conversations past their stage's `timeout_hours`. |
 
 **`is_stale` logic:** `last_activity_at < now() - interval '{stage.timeout_hours} hours'`. Uses `StageDefinition.timeout_hours` from the active pipeline.
@@ -773,7 +862,7 @@ ALTER TABLE conversations ADD COLUMN assigned_agent_id UUID REFERENCES agents(id
 | return_to_flow | bool | When true, agent yields back to router after task |
 | is_default | bool | Partial unique index — only one default per tenant |
 | system_prompt | Text | Additional system prompt injected into composer |
-| active_intents | JSONB | `["GREETING", "PRICE_QUERY", ...]` — permission filter |
+| active_intents | JSONB | Exact NLU enum values: `["GREETING", "ASK_PRICE", "SCHEDULE", ...]`. Frontend maps to Spanish labels (ASK_PRICE → "Consulta precio"). Full list: GREETING, ASK_INFO, ASK_PRICE, BUY, SCHEDULE, COMPLAIN, OFF_TOPIC, UNCLEAR. |
 | extraction_config | JSONB | Which fields this agent is allowed to extract |
 | auto_actions | JSONB | Auto-actions config (stage transitions, field updates) |
 | knowledge_config | JSONB | KB access config (which categories, max results) |
@@ -790,6 +879,7 @@ ALTER TABLE conversations ADD COLUMN assigned_agent_id UUID REFERENCES agents(id
 | `/api/agents/{id}` | GET | Get agent with full config. |
 | `/api/agents/{id}` | PATCH | Update agent (partial). |
 | `/api/agents/{id}` | DELETE | Delete agent. Cannot delete default if it's the only one. |
+| `/api/agents/test` | POST | Test agent config without saving. Body: `{ "agent_config": {...}, "message": "hola" }`. Runs NLU + Composer in-memory with provided config. Returns: `{ response, flow_mode, intent }`. Used by "Probar ahora" tab. |
 
 ##### C1.3 Frontend
 
@@ -956,7 +1046,7 @@ CREATE UNIQUE INDEX idx_wf_exec_idempotent ON workflow_executions (workflow_id, 
 - `update_field` — update extracted_data field (config: field, value)
 - `pause_bot` — set bot_paused=true
 - `delay` — wait N seconds before next node (config: seconds)
-- `condition` — evaluate condition, route to true/false edge (config: field, operator, value)
+- `condition` — evaluate condition, route to true/false edge (config: field with dot notation, operator, value). Field namespace: `conversation.current_stage`, `extracted.docs_ine`, `customer.score`. Default namespace = `extracted`.
 
 ##### C1.2 Workflow Engine
 
@@ -980,7 +1070,7 @@ CREATE UNIQUE INDEX idx_wf_exec_idempotent ON workflow_executions (workflow_id, 
    - `delay` → save current_node_id, enqueue `execute_workflow_step` with _defer_by
    - `condition` → evaluate, follow true/false edge
 4. On completion: status=completed, finished_at=now()
-5. On error: status=failed, error=str(e)
+5. On error: **stop on first error**. status=failed, current_node_id=failed node, error=str(e). Manual retry via `POST /api/workflows/{id}/executions/{exec_id}/retry` resumes from failed node. No auto-retry.
 
 **Hook point:** After `ConversationRunner.run_turn()` completes, call `evaluate_triggers(event)` for the emitted events. This is the inline trigger path.
 
@@ -999,6 +1089,7 @@ CREATE UNIQUE INDEX idx_wf_exec_idempotent ON workflow_executions (workflow_id, 
 | `/api/workflows/{id}` | DELETE | Delete workflow + executions. |
 | `/api/workflows/{id}/toggle` | POST | Toggle active on/off. |
 | `/api/workflows/{id}/executions` | GET | List executions for workflow (audit log). |
+| `/api/workflows/{id}/executions/{exec_id}/retry` | POST | Retry failed execution from the failed node. |
 
 ##### C1.4 Tests
 
@@ -1033,6 +1124,8 @@ This is functional without the full visual editor.
 
 #### Sub-phase C3: Visual React Flow Editor
 
+**Frontend dep to install:** `npm install @xyflow/react` (React Flow v12)
+
 **Components:**
 ```
 frontend/src/features/workflows/components/WorkflowVisualEditor.tsx
@@ -1060,19 +1153,22 @@ frontend/src/features/workflows/components/NodeConfigPanel.tsx
 ```
 Prerequisites ──► P1 (File Storage) ──► Module 5 (KB)
               ──► P2 (arq expansion) ──► Module 5 (KB)
-                                     ──► Module 3 (Conv Enhanced)
-                                     ──► Module 9 (Workflows)
+              │                      ──► Module 3 (Conv Enhanced)
+              │                      ──► Module 9 (Workflows)
+              ──► P3 (Tenant timezone) ──► Module 1 (Dashboard)
+              │                        ──► Module 4 (Appointments)
+              ──► P4 (Notifications) ──► Module 9 (Workflows notify_agent action)
 
 Phase A:  Module 4 (Appointments) ──► Module 1 (Dashboard needs appointment data)
           Module 5 (KB) ───────────┘
           Module 10 (Integrations) ─┘
 
-Phase B:  Module 2 (Clients) ─── independent
-          Module 3 (Conv) ─────── needs P2
-          Module 6 (Pipeline) ── independent
+Phase B:  Module 2 (Clients, table only) ── independent
+          Module 3 (Conv Enhanced) ───────── needs P2
+          Module 6 (Pipeline Kanban) ─────── independent
 
 Phase C:  Module 7+8 C1 (Agent CRUD) ──► C2 (Runner integration)
-          Module 9 C1 (Engine) ──► C2 (Form editor) ──► C3 (Visual editor)
+          Module 9 C1 (Engine, needs P4) ──► C2 (Form editor) ──► C3 (Visual editor)
           Module 9 optionally uses Module 7 (assign_agent action)
 ```
 
@@ -1082,12 +1178,13 @@ Phase C:  Module 7+8 C1 (Agent CRUD) ──► C2 (Runner integration)
 
 | Number | Module | Description |
 |--------|--------|-------------|
-| 025 | Appointments | Create `appointments` table |
-| 026 | Knowledge Base | Create `knowledge_documents` + `knowledge_chunks` tables |
-| 027 | Knowledge Base | Add `tags`, `use_count` to `tenant_catalogs` |
-| 028 | Clients | Add `score` to `customers` |
-| 029 | Agents | Create `agents` table + add `assigned_agent_id` to conversations |
-| 030 | Workflows | Create `workflows` + `workflow_executions` tables |
+| 025 | Prerequisites | Add `timezone` to `tenants`, create `notifications` table |
+| 026 | Appointments | Create `appointments` table |
+| 027 | Knowledge Base | Create `knowledge_documents` + `knowledge_chunks` tables |
+| 028 | Knowledge Base | Add `tags`, `use_count` to `tenant_catalogs` |
+| 029 | Clients | Add `score` to `customers` |
+| 030 | Agents | Create `agents` table + add `assigned_agent_id` to conversations |
+| 031 | Workflows | Create `workflows` + `workflow_executions` tables |
 
 ---
 
