@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as authIndexRouteImport } from './routes/(auth)/index'
+import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
 import { Route as authConversationsConversationIdRouteImport } from './routes/(auth)/conversations.$conversationId'
@@ -28,6 +29,11 @@ const authRouteRoute = authRouteRouteImport.update({
 const authIndexRoute = authIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authTurnTracesRoute = authTurnTracesRouteImport.update({
+  id: '/turn-traces',
+  path: '/turn-traces',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authHandoffsRoute = authHandoffsRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/config': typeof authConfigRoute
   '/handoffs': typeof authHandoffsRoute
+  '/turn-traces': typeof authTurnTracesRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
 }
@@ -58,6 +65,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/config': typeof authConfigRoute
   '/handoffs': typeof authHandoffsRoute
+  '/turn-traces': typeof authTurnTracesRoute
   '/': typeof authIndexRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
 }
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/(auth)/config': typeof authConfigRoute
   '/(auth)/handoffs': typeof authHandoffsRoute
+  '/(auth)/turn-traces': typeof authTurnTracesRoute
   '/(auth)/': typeof authIndexRoute
   '/(auth)/conversations/$conversationId': typeof authConversationsConversationIdRoute
 }
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/config'
     | '/handoffs'
+    | '/turn-traces'
     | '/'
     | '/conversations/$conversationId'
   fileRoutesByTo: FileRoutesByTo
@@ -83,6 +93,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/config'
     | '/handoffs'
+    | '/turn-traces'
     | '/'
     | '/conversations/$conversationId'
   id:
@@ -91,6 +102,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/(auth)/config'
     | '/(auth)/handoffs'
+    | '/(auth)/turn-traces'
     | '/(auth)/'
     | '/(auth)/conversations/$conversationId'
   fileRoutesById: FileRoutesById
@@ -123,6 +135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authIndexRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/turn-traces': {
+      id: '/(auth)/turn-traces'
+      path: '/turn-traces'
+      fullPath: '/turn-traces'
+      preLoaderRoute: typeof authTurnTracesRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/handoffs': {
       id: '/(auth)/handoffs'
       path: '/handoffs'
@@ -150,6 +169,7 @@ declare module '@tanstack/react-router' {
 interface authRouteRouteChildren {
   authConfigRoute: typeof authConfigRoute
   authHandoffsRoute: typeof authHandoffsRoute
+  authTurnTracesRoute: typeof authTurnTracesRoute
   authIndexRoute: typeof authIndexRoute
   authConversationsConversationIdRoute: typeof authConversationsConversationIdRoute
 }
@@ -157,6 +177,7 @@ interface authRouteRouteChildren {
 const authRouteRouteChildren: authRouteRouteChildren = {
   authConfigRoute: authConfigRoute,
   authHandoffsRoute: authHandoffsRoute,
+  authTurnTracesRoute: authTurnTracesRoute,
   authIndexRoute: authIndexRoute,
   authConversationsConversationIdRoute: authConversationsConversationIdRoute,
 }
