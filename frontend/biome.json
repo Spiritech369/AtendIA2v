@@ -12,7 +12,7 @@
       "*.{ts,tsx,json}",
       "!**/dist",
       "!**/node_modules",
-      "!src/components/ui/**",
+      "!src/components/ui",
       "!src/routeTree.gen.ts"
     ]
   },
