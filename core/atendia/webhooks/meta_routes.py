@@ -153,6 +153,14 @@ async def receive_inbound(
     redis = await _get_redis()
     received_count = 0
     try:
+        # Record webhook arrival for channel status badge (Step 6).
+        from datetime import datetime, timezone
+
+        await redis.set(
+            f"webhook:last_at:{tenant_id}",
+            datetime.now(timezone.utc).isoformat(),
+            ex=86400,  # expire after 24h of inactivity
+        )
         for m in inbound_messages:
             if await is_duplicate(redis, m.channel_message_id):
                 continue

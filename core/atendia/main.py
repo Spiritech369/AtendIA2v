@@ -10,6 +10,7 @@ from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
 from atendia.api.analytics_routes import router as analytics_router
 from atendia.api.audit_log_routes import router as audit_log_router
+from atendia.api.channel_status_routes import router as channel_status_router
 from atendia.api.auth_routes import router as auth_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customer_fields_routes import (
@@ -67,6 +68,9 @@ app.include_router(
 )
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(audit_log_router, prefix="/api/v1/audit-log", tags=["audit-log"])
+app.include_router(
+    channel_status_router, prefix="/api/v1/channel/status", tags=["channel-status"]
+)
 app.include_router(runner_router, prefix="/api/v1")
 app.include_router(meta_webhook_router)
 app.include_router(ws_router)
