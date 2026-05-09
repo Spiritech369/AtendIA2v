@@ -7,10 +7,8 @@ Routes:
 * `PATCH  /api/v1/users/:id` — update (email, role, password optional).
 * `DELETE /api/v1/users/:id` — soft via 204.
 
-Roles: `operator` | `tenant_admin` | `superadmin`. Backend doesn't yet
-treat `tenant_admin` differently from `operator` — the column is
-forward-contract for Block I sub-features. Plan said migration 021,
-but the `role` column already lived on `tenant_users` from Phase 1.
+Roles: `operator` | `tenant_admin` | `superadmin`. Tenant admins can manage
+users inside their tenant; superadmins can manage every tenant.
 """
 from __future__ import annotations
 
@@ -18,7 +16,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +26,8 @@ from atendia.db.models.tenant import TenantUser
 from atendia.db.session import get_db_session
 
 router = APIRouter()
+TENANT_ROLES = {"operator", "tenant_admin"}
+ALL_ROLES = TENANT_ROLES | {"superadmin"}
 
 
 class UserItem(BaseModel):
@@ -45,11 +45,25 @@ class UserCreate(BaseModel):
     password: str
     tenant_id: UUID | None = None  # superadmin can create users in any tenant
 
+    @field_validator("role")
+    @classmethod
+    def _valid_role(cls, value: str) -> str:
+        if value not in ALL_ROLES:
+            raise ValueError("invalid role")
+        return value
+
 
 class UserPatch(BaseModel):
     email: EmailStr | None = None
     role: str | None = None
     password: str | None = None
+
+    @field_validator("role")
+    @classmethod
+    def _valid_role(cls, value: str | None) -> str | None:
+        if value is not None and value not in ALL_ROLES:
+            raise ValueError("invalid role")
+        return value
 
 
 def _to_item(u: TenantUser) -> UserItem:
@@ -96,7 +110,7 @@ async def create_user(
                 status.HTTP_400_BAD_REQUEST,
                 "superadmin must specify tenant_id when creating a user",
             )
-    else:
+    elif user.role == "tenant_admin":
         if user.tenant_id is None:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "user has no tenant")
         target_tenant = user.tenant_id
@@ -106,6 +120,8 @@ async def create_user(
                 status.HTTP_403_FORBIDDEN,
                 "only superadmin can create superadmin users",
             )
+    else:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "tenant admin only")
 
     new_user = TenantUser(
         tenant_id=target_tenant,
@@ -141,6 +157,8 @@ async def patch_user(
     session: AsyncSession = Depends(get_db_session),
 ) -> UserItem:
     target = await _load_or_404(session, user_id, current=user)
+    if user.role == "operator":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "tenant admin only")
     values: dict = {}
     if body.email is not None:
         values["email"] = body.email
@@ -168,6 +186,8 @@ async def delete_user(
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
     target = await _load_or_404(session, user_id, current=user)
+    if user.role == "operator":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "tenant admin only")
     if target.id == user.user_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "cannot delete yourself")
     await session.execute(delete(TenantUser).where(TenantUser.id == user_id))

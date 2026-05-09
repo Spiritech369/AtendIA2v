@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -21,7 +22,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
-from atendia.api._deps import current_tenant_id, current_user
+from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
 from atendia.db.session import get_db_session
 
@@ -72,7 +74,7 @@ async def get_pipeline(
 @router.put("/pipeline", response_model=PipelineResponse)
 async def put_pipeline(
     body: PipelinePutBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PipelineResponse:
@@ -129,6 +131,14 @@ class TonePutBody(BaseModel):
     voice: dict
 
 
+class TimezoneResponse(BaseModel):
+    timezone: str
+
+
+class TimezonePutBody(BaseModel):
+    timezone: str = Field(min_length=1, max_length=40)
+
+
 async def _ensure_branding(
     session: AsyncSession, tenant_id: UUID
 ) -> TenantBranding:
@@ -162,7 +172,7 @@ async def get_brand_facts(
 @router.put("/brand-facts", response_model=BrandFactsResponse)
 async def put_brand_facts(
     body: BrandFactsPutBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BrandFactsResponse:
@@ -191,7 +201,7 @@ async def get_tone(
 @router.put("/tone", response_model=ToneResponse)
 async def put_tone(
     body: TonePutBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ToneResponse:
@@ -203,6 +213,36 @@ async def put_tone(
     )
     await session.commit()
     return ToneResponse(voice=body.voice)
+
+
+@router.get("/timezone", response_model=TimezoneResponse)
+async def get_timezone(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> TimezoneResponse:
+    timezone = (
+        await session.execute(select(Tenant.timezone).where(Tenant.id == tenant_id))
+    ).scalar_one()
+    return TimezoneResponse(timezone=timezone)
+
+
+@router.put("/timezone", response_model=TimezoneResponse)
+async def put_timezone(
+    body: TimezonePutBody,
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> TimezoneResponse:
+    try:
+        ZoneInfo(body.timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid timezone") from exc
+    await session.execute(
+        update(Tenant).where(Tenant.id == tenant_id).values(timezone=body.timezone)
+    )
+    await session.commit()
+    return TimezoneResponse(timezone=body.timezone)
 
 
 # Suppress unused-import warning when we don't actually use UTC anywhere

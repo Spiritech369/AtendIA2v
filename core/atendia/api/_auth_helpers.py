@@ -8,7 +8,7 @@ and lives in an httpOnly cookie.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -31,7 +31,7 @@ SESSION_COOKIE = "atendia_session"
 CSRF_COOKIE = "atendia_csrf"
 JWT_ALGORITHM = "HS256"
 
-Role = Literal["operator", "superadmin"]
+Role = Literal["operator", "tenant_admin", "superadmin"]
 
 
 class AuthUser(BaseModel):
@@ -61,7 +61,7 @@ def issue_jwt(*, user_id: UUID, tenant_id: UUID | None, role: Role, email: str) 
         "tid": str(tenant_id) if tenant_id else None,
         "role": role,
         "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(seconds=settings.auth_session_ttl_s),
+        "exp": datetime.now(UTC) + timedelta(seconds=settings.auth_session_ttl_s),
     }
     return jwt.encode(payload, settings.auth_session_secret, algorithm=JWT_ALGORITHM)
 

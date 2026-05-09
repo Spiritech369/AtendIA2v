@@ -5,8 +5,12 @@ export interface CustomerListItem {
   tenant_id: string;
   phone_e164: string;
   name: string | null;
+  score: number;
   created_at: string;
   conversation_count: number;
+  effective_stage: string | null;
+  last_activity_at: string | null;
+  assigned_user_email: string | null;
 }
 
 export interface ConversationSummary {
@@ -18,6 +22,7 @@ export interface ConversationSummary {
 }
 
 export interface CustomerDetail extends CustomerListItem {
+  email: string | null;
   attrs: Record<string, unknown>;
   conversations: ConversationSummary[];
   last_extracted_data: Record<string, unknown>;
@@ -26,6 +31,7 @@ export interface CustomerDetail extends CustomerListItem {
 
 export interface CustomerPatch {
   name?: string;
+  email?: string | null;
   attrs?: Record<string, unknown>;
 }
 
@@ -59,12 +65,57 @@ export interface FieldValue {
 }
 
 export const customersApi = {
-  list: async (params: { q?: string; limit?: number } = {}) =>
+  list: async (params: {
+    q?: string;
+    limit?: number;
+    stage?: string;
+    assigned_user_id?: string;
+    sort_by?: string;
+    sort_dir?: string;
+  } = {}) =>
     (await api.get<{ items: CustomerListItem[] }>("/customers", { params })).data,
   getOne: async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data,
   patch: async (id: string, body: CustomerPatch) =>
     (await api.patch<CustomerDetail>(`/customers/${id}`, body)).data,
+  patchScore: async (id: string, score: number) =>
+    (await api.patch<CustomerDetail>(`/customers/${id}/score`, { score })).data,
+  importCsv: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return (
+      await api.post<{ created: number; updated: number; errors: string[] }>(
+        "/customers/import",
+        form,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      )
+    ).data;
+  },
+  importPreview: async (file: File): Promise<CustomerImportPreview> => {
+    const form = new FormData();
+    form.append("file", file);
+    return (
+      await api.post<CustomerImportPreview>("/customers/import/preview", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+    ).data;
+  },
+  exportCsvUrl: () => "/api/v1/customers/export",
 };
+
+export interface CustomerImportPreviewRow {
+  row: number;
+  phone: string;
+  name: string | null;
+  email: string | null;
+  score: number | null;
+  will: "create" | "update";
+}
+
+export interface CustomerImportPreview {
+  valid_rows: CustomerImportPreviewRow[];
+  errors: string[];
+  total: number;
+}
 
 export const notesApi = {
   list: async (customerId: string) =>

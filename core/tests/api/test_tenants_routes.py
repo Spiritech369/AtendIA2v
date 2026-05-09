@@ -15,7 +15,7 @@ from atendia.config import get_settings
 from atendia.main import app
 
 
-def _seed(role: str = "operator") -> tuple[str, str, str, str]:
+def _seed(role: str = "tenant_admin") -> tuple[str, str, str, str]:
     email = f"phase4_t28_{role}_{uuid4().hex[:8]}@dinamo.com"
     plain = "test-password-123"
     hashed = hash_password(plain)
@@ -58,6 +58,13 @@ def _cleanup(tid: str) -> None:
 @pytest.fixture
 def operator_seed_local() -> Iterator[tuple[str, str, str, str]]:
     seed = _seed()
+    yield seed
+    _cleanup(seed[0])
+
+
+@pytest.fixture
+def plain_operator_seed_local() -> Iterator[tuple[str, str, str, str]]:
+    seed = _seed("operator")
     yield seed
     _cleanup(seed[0])
 
@@ -133,6 +140,19 @@ def test_put_pipeline_creates_v1_then_v2_keeps_history(operator_seed_local):
     assert active == 1  # only v2 is active
 
 
+def test_operator_cannot_put_pipeline(plain_operator_seed_local):
+    _, _, email, plain = plain_operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    resp = client.put(
+        "/api/v1/tenants/pipeline",
+        json={"definition": {"version": 1, "stages": [{"id": "qualify"}]}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 403
+
+
 def test_brand_facts_round_trip(operator_seed_local):
     _, _, email, plain = operator_seed_local
     client = TestClient(app)
@@ -172,6 +192,25 @@ def test_tone_round_trip(operator_seed_local):
 
     g = client.get("/api/v1/tenants/tone").json()
     assert g["voice"] == voice
+
+
+def test_operator_cannot_put_brand_facts_or_tone(plain_operator_seed_local):
+    _, _, email, plain = plain_operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    facts = client.put(
+        "/api/v1/tenants/brand-facts",
+        json={"brand_facts": {"address": "Nope"}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    tone = client.put(
+        "/api/v1/tenants/tone",
+        json={"voice": {"register": "formal"}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert facts.status_code == 403
+    assert tone.status_code == 403
 
 
 def test_brand_facts_tenant_scoped(operator_seed_local):

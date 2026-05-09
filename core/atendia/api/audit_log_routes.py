@@ -27,7 +27,10 @@ router = APIRouter()
 class AuditEvent(BaseModel):
     id: UUID
     tenant_id: UUID
-    conversation_id: UUID
+    # Nullable after migration 028: admin actions (workflow toggle, KB
+    # upload/delete, etc.) emit events that don't have a conversation context.
+    conversation_id: UUID | None
+    actor_user_id: UUID | None
     type: str
     payload: dict
     occurred_at: datetime
@@ -56,7 +59,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
 
 @router.get("", response_model=AuditListResponse)
 async def list_events(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     type_: str | None = Query(None, alias="type"),
     from_: datetime | None = Query(None, alias="from"),
@@ -98,6 +101,7 @@ async def list_events(
             id=e.id,
             tenant_id=e.tenant_id,
             conversation_id=e.conversation_id,
+            actor_user_id=e.actor_user_id,
             type=e.type,
             payload=e.payload,
             occurred_at=e.occurred_at,

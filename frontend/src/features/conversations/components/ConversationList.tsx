@@ -381,6 +381,11 @@ function ConversationRow({
           <Badge variant="outline" className="h-4 px-1 text-[10px]">
             {row.current_stage}
           </Badge>
+          {row.assigned_agent_name && (
+            <Badge variant="outline" className="h-4 gap-0.5 px-1 text-[10px] border-purple-300 text-purple-700">
+              <Bot className="h-2.5 w-2.5" /> {row.assigned_agent_name}
+            </Badge>
+          )}
           {row.has_pending_handoff && (
             <Badge variant="destructive" className="h-4 gap-0.5 px-1 text-[10px]">
               <ShieldAlert className="h-2.5 w-2.5" /> Handoff

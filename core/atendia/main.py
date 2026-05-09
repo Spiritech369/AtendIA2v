@@ -8,7 +8,9 @@ from starlette.types import Scope
 
 from atendia.api._auth_helpers import assert_prod_secret_safety
 from atendia.api._csrf import install_csrf_middleware
+from atendia.api.agents_routes import router as agents_router
 from atendia.api.analytics_routes import router as analytics_router
+from atendia.api.appointments_routes import router as appointments_router
 from atendia.api.audit_log_routes import router as audit_log_router
 from atendia.api.channel_status_routes import router as channel_status_router
 from atendia.api.auth_routes import router as auth_router
@@ -19,12 +21,18 @@ from atendia.api.customer_fields_routes import (
 )
 from atendia.api.customer_notes_routes import router as customer_notes_router
 from atendia.api.customers_routes import router as customers_router
+from atendia.api.dashboard_routes import router as dashboard_router
 from atendia.api.exports_routes import router as exports_router
 from atendia.api.handoffs_routes import router as handoffs_router
+from atendia.api.integrations_routes import router as integrations_router
+from atendia.api.knowledge_routes import router as knowledge_router
+from atendia.api.notifications_routes import router as notifications_router
+from atendia.api.pipeline_routes import router as pipeline_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
 from atendia.api.turn_traces_routes import router as turn_traces_router
 from atendia.api.users_routes import router as users_router
+from atendia.api.workflows_routes import router as workflows_router
 from atendia.realtime.ws_routes import router as ws_router
 from atendia.tools import register_all_tools
 from atendia.webhooks.meta_routes import router as meta_webhook_router
@@ -44,7 +52,9 @@ app.include_router(
     conversations_router, prefix="/api/v1/conversations", tags=["conversations"]
 )
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["appointments"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
+app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(
     customer_notes_router,
     prefix="/api/v1/customers/{customer_id}/notes",
@@ -62,11 +72,17 @@ app.include_router(
 )
 app.include_router(exports_router, prefix="/api/v1/exports", tags=["exports"])
 app.include_router(handoffs_router, prefix="/api/v1/handoffs", tags=["handoffs"])
+app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["integrations"])
+app.include_router(knowledge_router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(pipeline_router, prefix="/api/v1/pipeline", tags=["pipeline"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
 app.include_router(
     turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"]
 )
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflows"])
 app.include_router(audit_log_router, prefix="/api/v1/audit-log", tags=["audit-log"])
 app.include_router(
     channel_status_router, prefix="/api/v1/channel/status", tags=["channel-status"]

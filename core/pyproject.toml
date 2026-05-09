@@ -20,6 +20,11 @@ dependencies = [
     "bcrypt>=4.2.0",
     "openai>=1.50.0",
     "pgvector>=0.2.5",
+    "python-multipart>=0.0.27",
+    "pymupdf>=1.27.2.3",
+    "python-docx>=1.2.0",
+    "openpyxl>=3.1.5",
+    "tzdata>=2026.2",
 ]
 
 [dependency-groups]

@@ -9,10 +9,16 @@ import { routeTree } from "./routeTree.gen";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Operator dashboard: aggressive freshness so live conversations
-      // and handoffs feel up-to-date without forcing a manual reload.
-      staleTime: 30_000,
-      refetchOnWindowFocus: true,
+      // Default to "cache for 5 min, don't refetch when the tab regains
+      // focus." Conversation/handoff freshness is driven by the WebSocket
+      // (``useTenantStream``) which invalidates the relevant query keys
+      // on every server event — refetchOnWindowFocus on top of that just
+      // adds spinners and DB load every time the operator switches tabs.
+      // Pages that DO need live polling (``WhatsAppStatusBadge``,
+      // notifications, document indexing) opt in via ``refetchInterval``.
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
     },
   },
 });

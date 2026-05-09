@@ -23,6 +23,9 @@ class Conversation(Base):
     assigned_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    assigned_agent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     unread_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     tags: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -48,3 +51,24 @@ class ConversationStateRow(Base):
     )
 
     conversation: Mapped[Conversation] = relationship(back_populates="state")
+
+
+class ConversationRead(Base):
+    __tablename__ = "conversation_reads"
+
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenant_users.id", ondelete="CASCADE"), primary_key=True
+    )
+    last_read_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_read_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

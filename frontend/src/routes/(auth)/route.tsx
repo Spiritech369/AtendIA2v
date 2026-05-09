@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/AppShell";
+import { RouteErrorFallback } from "@/components/RouteErrorFallback";
 import { useAuthStore } from "@/stores/auth";
 
 /**
@@ -23,6 +24,13 @@ export const Route = createFileRoute("/(auth)")({
   component: () => (
     <AppShell>
       <Outlet />
+    </AppShell>
+  ),
+  // A crash inside a child route renders the fallback INSIDE the AppShell —
+  // sidebar + header stay usable so the operator can navigate away.
+  errorComponent: ({ error, reset }) => (
+    <AppShell>
+      <RouteErrorFallback error={error} reset={reset} />
     </AppShell>
   ),
 });

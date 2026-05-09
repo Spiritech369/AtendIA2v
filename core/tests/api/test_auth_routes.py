@@ -34,6 +34,17 @@ def test_login_returns_jwt_cookie_and_csrf_token(client, operator_seed):
     assert resp.cookies[CSRF_COOKIE] == body["csrf_token"]
 
 
+def test_login_preserves_tenant_admin_role(client, tenant_admin_seed):
+    tid, uid, email, plain = tenant_admin_seed
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()["user"]
+    assert body["id"] == uid
+    assert body["tenant_id"] == tid
+    assert body["role"] == "tenant_admin"
+
+
 def test_login_with_bad_password_returns_401(client, operator_seed):
     _, _, email, _ = operator_seed
     resp = client.post(

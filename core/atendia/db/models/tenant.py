@@ -17,6 +17,9 @@ class Tenant(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")
     meta_business_id: Mapped[str | None] = mapped_column(String(80))
     config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    timezone: Mapped[str] = mapped_column(
+        String(40), default="America/Mexico_City", server_default="America/Mexico_City"
+    )
     # Phase 3d — kill-switch for the cron worker. Kept here (not in config
     # JSONB) so the cron query can join+filter cheaply without parsing JSON.
     followups_enabled: Mapped[bool] = mapped_column(

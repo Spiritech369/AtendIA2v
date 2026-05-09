@@ -1,20 +1,28 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   Bell,
+  BookOpen,
   Bug,
+  CalendarDays,
+  Columns3,
   Database,
   FileText,
+  LayoutDashboard,
   LogOut,
   MessageCircle,
+  Network,
   Settings,
   ShieldCheck,
+  Sparkles,
   UserRound,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { notificationsApi } from "@/features/notifications/api";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { WhatsAppStatusBadge } from "./WhatsAppStatusBadge";
@@ -34,17 +43,24 @@ interface NavItem {
   to: string;
   label: string;
   icon: typeof MessageCircle;
+  tenantAdminOnly?: boolean;
   superadminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/", label: "Conversaciones", icon: MessageCircle },
   { to: "/handoffs", label: "Handoffs", icon: ShieldCheck },
   { to: "/customers", label: "Clientes", icon: Users },
+  { to: "/pipeline", label: "Pipeline", icon: Columns3 },
+  { to: "/appointments", label: "Citas", icon: CalendarDays },
+  { to: "/knowledge", label: "Conocimiento", icon: BookOpen },
   { to: "/analytics", label: "Analítica", icon: BarChart3 },
   { to: "/turn-traces", label: "Debug de turnos", icon: Bug },
   { to: "/config", label: "Configuración", icon: Settings },
-  { to: "/users", label: "Usuarios", icon: UserRound, superadminOnly: true },
+  { to: "/agents", label: "Agentes IA", icon: Sparkles, tenantAdminOnly: true },
+  { to: "/workflows", label: "Workflows", icon: Network, tenantAdminOnly: true },
+  { to: "/users", label: "Usuarios", icon: UserRound, tenantAdminOnly: true },
   { to: "/audit-log", label: "Auditoría", icon: FileText, superadminOnly: true },
   { to: "/exports", label: "Exportar", icon: Database },
 ];
@@ -54,7 +70,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const logout = useAuthStore((s) => s.logout);
   const path = useRouterState({ select: (s) => s.location.pathname });
 
-  const visible = NAV_ITEMS.filter((item) => !item.superadminOnly || user?.role === "superadmin");
+  const visible = NAV_ITEMS.filter((item) => {
+    if (item.superadminOnly) return user?.role === "superadmin";
+    if (item.tenantAdminOnly) return user?.role === "tenant_admin" || user?.role === "superadmin";
+    return true;
+  });
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? "??";
 
@@ -102,9 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <WhatsAppStatusBadge />
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" aria-label="Notificaciones">
-              <Bell className="h-4 w-4" />
-            </Button>
+            <NotificationsDropdown />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 px-2">
@@ -134,5 +152,79 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
+  );
+}
+
+function NotificationsDropdown() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["notifications"],
+    queryFn: notificationsApi.list,
+    refetchInterval: 30_000,
+  });
+  const markRead = useMutation({
+    mutationFn: notificationsApi.markRead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const markAll = useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+  const unread = query.data?.unread_count ?? 0;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Notificaciones" className="relative">
+          <Bell className="h-4 w-4" />
+          {unread > 0 && (
+            <Badge className="absolute -right-1 -top-1 h-5 min-w-5 px-1 text-[10px]">
+              {unread}
+            </Badge>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel className="flex items-center justify-between">
+          Notificaciones
+          {unread > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => markAll.mutate()}
+            >
+              Leer todas
+            </Button>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <ScrollArea className="max-h-80">
+          {(query.data?.items ?? []).length === 0 ? (
+            <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+              Sin notificaciones.
+            </div>
+          ) : (
+            query.data?.items.map((item) => (
+              <DropdownMenuItem
+                key={item.id}
+                className="flex cursor-pointer flex-col items-start gap-1 py-2"
+                onClick={() => {
+                  if (!item.read) markRead.mutate(item.id);
+                }}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className={cn("text-sm", !item.read && "font-semibold")}>{item.title}</span>
+                  {!item.read && <span className="h-2 w-2 rounded-full bg-primary" />}
+                </div>
+                {item.body && (
+                  <span className="line-clamp-2 text-xs text-muted-foreground">{item.body}</span>
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </ScrollArea>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

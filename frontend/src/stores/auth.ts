@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { api } from "@/lib/api-client";
 
-export type Role = "operator" | "superadmin";
+export type Role = "operator" | "tenant_admin" | "superadmin";
 
 export interface AuthUser {
   id: string;

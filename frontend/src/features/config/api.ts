@@ -15,6 +15,29 @@ export interface ToneResponse {
   voice: Record<string, unknown>;
 }
 
+export interface TimezoneResponse {
+  timezone: string;
+}
+
+export interface WhatsAppDetails {
+  phone_number: string | null;
+  business_name: string | null;
+  phone_number_id: string | null;
+  business_id: string | null;
+  verify_token: string | null;
+  webhook_path: string;
+  last_webhook_at: string | null;
+  circuit_breaker_open: boolean;
+}
+
+export interface AIProviderInfo {
+  nlu_provider: string;
+  nlu_model: string;
+  composer_provider: string;
+  composer_model: string;
+  has_openai_key: boolean;
+}
+
 export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
   putPipeline: async (definition: Record<string, unknown>) =>
@@ -25,4 +48,14 @@ export const tenantsApi = {
   getTone: async () => (await api.get<ToneResponse>("/tenants/tone")).data,
   putTone: async (voice: Record<string, unknown>) =>
     (await api.put<ToneResponse>("/tenants/tone", { voice })).data,
+  getTimezone: async () => (await api.get<TimezoneResponse>("/tenants/timezone")).data,
+  putTimezone: async (timezone: string) =>
+    (await api.put<TimezoneResponse>("/tenants/timezone", { timezone })).data,
+};
+
+export const integrationsApi = {
+  getWhatsAppDetails: async () =>
+    (await api.get<WhatsAppDetails>("/integrations/whatsapp/details")).data,
+  getAIProvider: async () =>
+    (await api.get<AIProviderInfo>("/integrations/ai-provider")).data,
 };

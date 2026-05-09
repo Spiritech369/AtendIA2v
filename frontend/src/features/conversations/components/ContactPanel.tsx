@@ -1,3 +1,4 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -30,6 +31,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { tenantsApi } from "@/features/config/api";
+import { conversationsApi, type ConversationDetail } from "@/features/conversations/api";
 import type { CustomerNote, FieldDefinition } from "@/features/customers/api";
 import {
   useCreateNote,
@@ -45,9 +48,10 @@ import {
 
 interface Props {
   customerId: string | undefined;
+  conversation?: ConversationDetail;
 }
 
-export function ContactPanel({ customerId }: Props) {
+export function ContactPanel({ customerId, conversation }: Props) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (collapsed) {
@@ -76,10 +80,16 @@ export function ContactPanel({ customerId }: Props) {
           {customerId ? (
             <>
               <BasicInfoSection customerId={customerId} />
+              {conversation && (
+                <>
+                  <Separator />
+                  <ConversationSummarySection conversation={conversation} />
+                </>
+              )}
               <Separator />
               <CustomFieldsSection customerId={customerId} />
               <Separator />
-              <NotesSection customerId={customerId} />
+              <NotesSection customerId={customerId} conversationId={conversation?.id} />
             </>
           ) : (
             <div className="p-4 text-sm text-muted-foreground">
@@ -94,14 +104,71 @@ export function ContactPanel({ customerId }: Props) {
 
 // ── Basic Info ───────────────────────────────────────────────────────
 
+function ConversationSummarySection({ conversation }: { conversation: ConversationDetail }) {
+  const qc = useQueryClient();
+  const pipeline = useQuery({
+    queryKey: ["tenants", "pipeline"],
+    queryFn: tenantsApi.getPipeline,
+    retry: false,
+  });
+  const patch = useMutation({
+    mutationFn: (stage: string) => conversationsApi.patchConversation(conversation.id, { current_stage: stage }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["conversation", conversation.id] });
+      void qc.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+  const stages = (pipeline.data?.definition?.stages as Array<{ id: string; label?: string }> | undefined) ?? [];
+
+  return (
+    <div className="space-y-3 p-4">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        Conversacion
+      </div>
+      <div>
+        <Label className="text-xs">Etapa</Label>
+        <Select value={conversation.current_stage} onValueChange={(stage) => patch.mutate(stage)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((stage) => (
+              <SelectItem key={stage.id} value={stage.id}>
+                {stage.label ?? stage.id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <div className="text-xs font-medium text-muted-foreground">Documentos</div>
+        {conversation.required_docs.length === 0 ? (
+          <div className="text-xs text-muted-foreground">Sin checklist.</div>
+        ) : (
+          conversation.required_docs.map((doc) => (
+            <div key={doc.field_name} className="flex items-center justify-between rounded-md border px-2 py-1 text-xs">
+              <span>{doc.label}</span>
+              <Badge variant={doc.present ? "default" : "secondary"}>{doc.present ? "Listo" : "Pendiente"}</Badge>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BasicInfoSection({ customerId }: { customerId: string }) {
   const customer = useCustomerDetail(customerId);
   const patch = usePatchCustomer(customerId);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
-    if (customer.data) setName(customer.data.name ?? "");
+    if (customer.data) {
+      setName(customer.data.name ?? "");
+      setEmail(customer.data.email ?? "");
+    }
   }, [customer.data]);
 
   if (customer.isLoading) return <Skeleton className="m-4 h-20" />;
@@ -110,7 +177,15 @@ function BasicInfoSection({ customerId }: { customerId: string }) {
   const c = customer.data;
 
   const save = () => {
-    patch.mutate({ name: name.trim() || undefined }, { onSuccess: () => setEditing(false) });
+    const trimmedEmail = email.trim();
+    patch.mutate(
+      {
+        name: name.trim() || undefined,
+        // Empty string clears email (server treats blank as null).
+        email: trimmedEmail === "" ? null : trimmedEmail,
+      },
+      { onSuccess: () => setEditing(false) },
+    );
   };
 
   return (
@@ -132,6 +207,20 @@ function BasicInfoSection({ customerId }: { customerId: string }) {
               }}
             />
           </div>
+          <div>
+            <Label className="text-xs">Email</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-8 text-sm"
+              placeholder="cliente@ejemplo.com"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setEditing(false);
+              }}
+            />
+          </div>
           <div className="flex gap-1">
             <Button size="sm" className="h-7 text-xs" onClick={save} disabled={patch.isPending}>
               <Save className="mr-1 h-3 w-3" /> Guardar
@@ -142,6 +231,7 @@ function BasicInfoSection({ customerId }: { customerId: string }) {
               className="h-7 text-xs"
               onClick={() => {
                 setName(c.name ?? "");
+                setEmail(c.email ?? "");
                 setEditing(false);
               }}
             >
@@ -163,6 +253,11 @@ function BasicInfoSection({ customerId }: { customerId: string }) {
             </Button>
           </div>
           <div className="text-xs text-muted-foreground">{c.phone_e164}</div>
+          {c.email && (
+            <div className="text-xs text-muted-foreground truncate" title={c.email}>
+              {c.email}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -243,9 +338,9 @@ function FieldInput({
   onChange: (key: string, value: string | null) => void;
 }) {
   const { key, label, field_type, field_options } = definition;
+  const choices = (field_options as { choices?: string[] } | null)?.choices ?? [];
 
   if (field_type === "select") {
-    const choices = (field_options as { choices?: string[] } | null)?.choices ?? [];
     return (
       <div>
         <Label className="text-xs">{label}</Label>
@@ -261,6 +356,53 @@ function FieldInput({
             ))}
           </SelectContent>
         </Select>
+      </div>
+    );
+  }
+
+  if (field_type === "multiselect") {
+    // Backend stores as JSON-encoded string list (see customer_fields_routes
+    // canonicalisation). Decode defensively — old rows might be empty strings.
+    let selected: string[] = [];
+    if (value) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) selected = parsed.filter((v): v is string => typeof v === "string");
+      } catch {
+        selected = [];
+      }
+    }
+    const toggle = (choice: string) => {
+      const next = selected.includes(choice)
+        ? selected.filter((s) => s !== choice)
+        : [...selected, choice];
+      onChange(key, next.length > 0 ? JSON.stringify(next) : null);
+    };
+    return (
+      <div>
+        <Label className="text-xs">{label}</Label>
+        <div className="space-y-1">
+          {choices.length === 0 ? (
+            <div className="text-[10px] text-muted-foreground">(sin opciones definidas)</div>
+          ) : (
+            choices.map((c) => {
+              const checked = selected.includes(c);
+              return (
+                <div key={c} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggle(c)}
+                    aria-pressed={checked}
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-xs ${checked ? "border-primary bg-primary text-primary-foreground" : "border-input"}`}
+                  >
+                    {checked && <Check className="h-2.5 w-2.5" />}
+                  </button>
+                  <span className="text-xs">{c}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     );
   }
@@ -298,9 +440,18 @@ function FieldInput({
 
 // ── Notes ────────────────────────────────────────────────────────────
 
-function NotesSection({ customerId }: { customerId: string }) {
+function NotesSection({ customerId, conversationId }: { customerId: string; conversationId?: string }) {
   const notes = useCustomerNotes(customerId);
   const createNote = useCreateNote(customerId);
+  const qc = useQueryClient();
+  const forceSummary = useMutation({
+    mutationFn: () => conversationsApi.forceSummary(conversationId!),
+    onSuccess: () => {
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["customer-notes", customerId] });
+      }, 1200);
+    },
+  });
   const [composing, setComposing] = useState(false);
   const [newContent, setNewContent] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -329,16 +480,29 @@ function NotesSection({ customerId }: { customerId: string }) {
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Notas
         </div>
-        {!composing && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setComposing(true)}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
+        <div className="flex gap-1">
+          {conversationId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => forceSummary.mutate()}
+              disabled={forceSummary.isPending}
+            >
+              Resumen
+            </Button>
+          )}
+          {!composing && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setComposing(true)}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {composing && (

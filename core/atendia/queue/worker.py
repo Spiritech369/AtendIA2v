@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 from arq.connections import RedisSettings
@@ -17,6 +18,9 @@ from atendia.queue.circuit_breaker import (
     record_failure,
     record_success,
 )
+from atendia.queue.force_summary_job import force_summary
+from atendia.queue.index_document_job import index_document
+from atendia.queue.workflow_jobs import execute_workflow_step, poll_workflow_triggers
 
 
 def _is_transient(err: str | None) -> bool:
@@ -58,10 +62,10 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
         raise
 
     engine = ctx.get("engine") or create_async_engine(settings.database_url)
-    Session = async_sessionmaker(engine, expire_on_commit=False)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     try:
-        async with Session() as session:
+        async with session_factory() as session:
             cfg = await load_meta_config(session, UUID(msg.tenant_id))
             adapter = MetaCloudAPIAdapter(
                 access_token=settings.meta_access_token,
@@ -166,17 +170,49 @@ async def _persist_outbound(session, msg: OutboundMessage, message_id: str, rece
 
 
 class WorkerSettings:
-    """arq worker settings. Run: `uv run arq atendia.queue.worker.WorkerSettings`."""
+    """arq worker settings for the **default** queue (latency-critical work).
+
+    Run: ``uv run arq atendia.queue.worker.WorkerSettings``.
+
+    Workflow jobs live on a separate queue so a slow workflow can't starve
+    ``send_outbound``. See :class:`WorkflowWorkerSettings` below.
+    """
     from arq.cron import cron
 
     from atendia.queue.followup_worker import poll_followups
 
-    functions = [send_outbound]
-    cron_jobs = [
+    functions: ClassVar = [send_outbound, index_document, force_summary]
+    cron_jobs: ClassVar = [
         # Phase 3d — fires once a minute. unique=True prevents two ticks
         # from overlapping if a single poll takes >60s under load.
         cron(poll_followups, second={0}, unique=True, run_at_startup=False),
     ]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_jobs = 10
+    keep_result = 0
+
+
+class WorkflowWorkerSettings:
+    """arq worker settings for the **workflows** queue.
+
+    Run alongside the default worker:
+    ``uv run arq atendia.queue.worker.WorkflowWorkerSettings``.
+
+    The engine enqueues both fresh executions and delay-resumes here with
+    ``_queue_name=arq:queue:workflows``. Splitting queues keeps a noisy
+    workflow tenant from blocking outbound message delivery.
+    """
+    from arq.cron import cron
+
+    from atendia.workflows.engine import WORKFLOW_QUEUE_NAME
+
+    queue_name: ClassVar = WORKFLOW_QUEUE_NAME
+    functions: ClassVar = [execute_workflow_step]
+    cron_jobs: ClassVar = [
+        cron(poll_workflow_triggers, second={5, 15, 25, 35, 45, 55}, unique=True),
+    ]
+    redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
+    # Workflows are bursty and slow; cap concurrency lower than the default
+    # worker so a flood doesn't blow Redis connection limits.
+    max_jobs = 5
     keep_result = 0

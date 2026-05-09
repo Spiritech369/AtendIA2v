@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { extractErrorDetail } from "@/lib/error-detail";
 import { useAuthStore } from "@/stores/auth";
 
 const loginSchema = z.object({
@@ -46,9 +47,11 @@ function LoginPage() {
       toast.success("Sesión iniciada");
       await navigate({ to: "/" });
     } catch (e) {
-      const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      // ``detail`` may be a Pydantic 422 array — extractErrorDetail flattens
+      // both shapes to a string so the toast description never receives an
+      // object that React can't render.
       toast.error("Error al iniciar sesión", {
-        description: detail ?? "Credenciales inválidas",
+        description: extractErrorDetail(e, "Credenciales inválidas"),
       });
     }
   }

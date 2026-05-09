@@ -21,6 +21,7 @@ class CustomerNote(Base):
         ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String(40), default="manual", server_default="manual")
     pinned: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(),

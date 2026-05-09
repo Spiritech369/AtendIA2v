@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,14 @@ import { turnTracesApi } from "@/features/turn-traces/api";
 import { ChatWindow } from "./ChatWindow";
 import { ContactPanel } from "./ContactPanel";
 import { DebugPanel } from "./DebugPanel";
+
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+function isOutside24hWindow(lastInboundAt: string | null): boolean {
+  if (!lastInboundAt) return true;
+  const ms = Date.now() - new Date(lastInboundAt).getTime();
+  return ms > TWENTY_FOUR_HOURS_MS;
+}
 
 export function ConversationDetail({ conversationId }: { conversationId: string }) {
   const conv = useConversation(conversationId);
@@ -103,6 +111,23 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
           </div>
         </CardHeader>
 
+        {isOutside24hWindow(c.last_inbound_at) && (
+          <div
+            className="flex items-start gap-2 border-y border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+            role="status"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="space-y-0.5">
+              <div className="font-medium">Fuera de la ventana de 24h de WhatsApp.</div>
+              <div className="text-amber-800 dark:text-amber-300">
+                Mensajes en texto libre serán rechazados por Meta hasta que el cliente
+                vuelva a escribir. Para reactivar el contacto se requiere una plantilla
+                pre-aprobada (Phase 3d.2 — pendiente).
+              </div>
+            </div>
+          </div>
+        )}
+
         <ChatWindow
           conversationId={conversationId}
           botPaused={c.bot_paused}
@@ -121,7 +146,7 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
           }}
         />
       ) : (
-        <ContactPanel customerId={c.customer_id} />
+        <ContactPanel customerId={c.customer_id} conversation={c} />
       )}
     </div>
   );

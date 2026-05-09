@@ -15,6 +15,8 @@ export interface ConversationListItem {
   has_pending_handoff: boolean;
   assigned_user_id: string | null;
   assigned_user_email: string | null;
+  assigned_agent_id: string | null;
+  assigned_agent_name: string | null;
   unread_count: number;
   tags: string[];
 }
@@ -29,6 +31,18 @@ export interface ConversationDetail extends ConversationListItem {
   extracted_data: Record<string, unknown>;
   pending_confirmation: string | null;
   last_intent: string | null;
+  last_inbound_at: string | null;
+  customer_fields: Array<{ key: string; label: string; field_type: string; value: string | null }>;
+  customer_notes: Array<{
+    id: string;
+    author_email: string | null;
+    content: string;
+    source: string;
+    pinned: boolean;
+    created_at: string;
+    updated_at: string;
+  }>;
+  required_docs: Array<{ field_name: string; label: string; present: boolean }>;
 }
 
 export interface MessageMedia {
@@ -86,7 +100,7 @@ export const conversationsApi = {
   },
   patchConversation: async (
     id: string,
-    body: { current_stage?: string; assigned_user_id?: string | null; tags?: string[] },
+    body: { current_stage?: string; assigned_user_id?: string | null; assigned_agent_id?: string | null; tags?: string[] },
   ): Promise<unknown> => {
     const { data } = await api.patch(`/conversations/${id}`, body);
     return data;
@@ -97,4 +111,6 @@ export const conversationsApi = {
   markRead: async (id: string): Promise<void> => {
     await api.post(`/conversations/${id}/mark-read`);
   },
+  forceSummary: async (id: string): Promise<{ status: string }> =>
+    (await api.post<{ status: string }>(`/conversations/${id}/force-summary`)).data,
 };

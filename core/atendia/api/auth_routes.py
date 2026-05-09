@@ -101,8 +101,14 @@ async def login(
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
 
-    role = user.role if user.role in ("operator", "superadmin") else "operator"
-    tenant_id = None if role == "superadmin" else user.tenant_id
+    role = user.role if user.role in ("operator", "tenant_admin", "superadmin") else "operator"
+    # Always carry the user's home tenant_id in the JWT — including superadmin.
+    # Before sesión 6 superadmin tokens were minted with ``tenant_id=None`` and
+    # ``current_tenant_id`` required ``?tid=`` on every request, which the
+    # frontend doesn't pass — so list_conversations 400'd. Now the dep uses
+    # ``tid`` when explicitly passed (superadmin can still switch tenants),
+    # otherwise falls back to the home tenant from the JWT.
+    tenant_id = user.tenant_id
     token = issue_jwt(user_id=user.id, tenant_id=tenant_id, role=role, email=user.email)
     csrf = new_csrf_token()
     _set_session_cookies(response, jwt_token=token, csrf=csrf)

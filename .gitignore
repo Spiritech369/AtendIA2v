@@ -47,5 +47,11 @@ Thumbs.db
 # Worktrees / git internals
 .worktrees/
 
+# Claude Code local state (worktree pool, scheduled task locks, session memory)
+.claude/
+
+# Tenant-uploaded files (per-tenant binary blobs — must never be committed)
+core/uploads/
+
 # Logs
 *.log

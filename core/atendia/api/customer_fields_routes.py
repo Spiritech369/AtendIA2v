@@ -8,7 +8,9 @@ Values mounted at /api/v1/customers/{customer_id}/field-values
 """
 from __future__ import annotations
 
-from datetime import datetime
+import json
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +19,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
-from atendia.api._deps import current_tenant_id, current_user
+from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.db.models.customer import Customer
 from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 from atendia.db.session import get_db_session
@@ -91,7 +93,7 @@ async def list_definitions(
 )
 async def create_definition(
     body: FieldDefCreate,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> FieldDefOut:
@@ -122,7 +124,7 @@ async def create_definition(
 async def update_definition(
     def_id: UUID,
     body: FieldDefUpdate,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> FieldDefOut:
@@ -160,7 +162,7 @@ async def update_definition(
 @definitions_router.delete("/{def_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_definition(
     def_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
@@ -185,7 +187,7 @@ class FieldValueOut(BaseModel):
 
 
 class FieldValuePut(BaseModel):
-    values: dict[str, str | None]
+    values: dict[str, str | int | float | bool | list[str] | None]
 
 
 # ── Values endpoints ─────────────────────────────────────────────────
@@ -204,6 +206,101 @@ async def _verify_customer_access(
     ).scalar_one_or_none()
     if exists is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
+
+
+def _choices_for(defn: CustomerFieldDefinition) -> set[str] | None:
+    opts = defn.field_options or {}
+    raw = opts.get("choices") or opts.get("options")
+    if not isinstance(raw, list):
+        return None
+    return {str(v) for v in raw}
+
+
+def _canonicalize_field_value(
+    defn: CustomerFieldDefinition,
+    value: str | int | float | bool | list[str] | None,
+) -> str | None:
+    if value is None:
+        return None
+
+    field_type = defn.field_type
+    choices = _choices_for(defn)
+
+    if field_type in ("text", "select"):
+        if not isinstance(value, str):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be a string",
+            )
+        normalized = value.strip()
+        if field_type == "select" and choices is not None and normalized not in choices:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be one of: {', '.join(sorted(choices))}",
+            )
+        return normalized
+
+    if field_type == "number":
+        if isinstance(value, bool) or isinstance(value, list):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{defn.key} must be a number")
+        try:
+            number = Decimal(str(value).strip())
+        except (InvalidOperation, AttributeError):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{defn.key} must be a number") from None
+        return format(number.normalize(), "f")
+
+    if field_type == "date":
+        if not isinstance(value, str):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be an ISO date string",
+            )
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be an ISO date string",
+            ) from None
+        return parsed.isoformat()
+
+    if field_type == "checkbox":
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in ("true", "1", "yes", "si", "sí"):
+                return "true"
+            if lowered in ("false", "0", "no"):
+                return "false"
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{defn.key} must be boolean")
+
+    if field_type == "multiselect":
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be a list of strings",
+            )
+        normalized = []
+        seen = set()
+        for raw in value:
+            item = raw.strip()
+            if not item:
+                continue
+            if choices is not None and item not in choices:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"{defn.key} must contain only: {', '.join(sorted(choices))}",
+                )
+            if item not in seen:
+                seen.add(item)
+                normalized.append(item)
+        return json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        f"unsupported field type for {defn.key}: {field_type}",
+    )
 
 
 @values_router.get("", response_model=list[FieldValueOut])
@@ -270,6 +367,7 @@ async def put_field_values(
 
     for key, val in body.values.items():
         defn = key_to_def[key]
+        canonical = _canonicalize_field_value(defn, val)
         existing = (
             await session.execute(
                 select(CustomerFieldValue).where(
@@ -280,13 +378,13 @@ async def put_field_values(
         ).scalar_one_or_none()
 
         if existing is not None:
-            existing.value = val
+            existing.value = canonical
         else:
             session.add(
                 CustomerFieldValue(
                     customer_id=customer_id,
                     field_definition_id=defn.id,
-                    value=val,
+                    value=canonical,
                 )
             )
 

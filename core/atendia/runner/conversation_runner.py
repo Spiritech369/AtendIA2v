@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from arq.connections import ArqRedis
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.config import get_settings
@@ -203,6 +203,7 @@ class ConversationRunner:
         )
 
         pipeline = await load_active_pipeline(self._session, tenant_id)
+        agent_row = await self._load_agent(conversation_id=conversation_id, tenant_id=tenant_id)
 
         state_before = {
             "current_stage": current_stage,
@@ -339,6 +340,20 @@ class ConversationRunner:
                 payload={"where": "nlu", "ambiguities": nlu_errors},
             )
 
+        if agent_row is not None and agent_row.active_intents:
+            allowed = set(agent_row.active_intents or [])
+            if nlu.intent.value not in allowed:
+                await self._emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+                    payload={
+                        "reason": "agent_intent_not_allowed",
+                        "agent_id": str(agent_row.id),
+                        "intent": nlu.intent.value,
+                    },
+                )
+
         # Merge NLU entities into state_obj BEFORE process_turn so the transition
         # check (e.g. all_required_fields_present) sees fields just extracted.
         for k, field in nlu.entities.items():
@@ -422,6 +437,18 @@ class ConversationRunner:
         brand_facts: dict = {}
         if branding_row and branding_row[1]:
             brand_facts = (branding_row[1] or {}).get("brand_facts", {}) or {}
+        if agent_row is not None:
+            tone_data = tone.model_dump()
+            tone_data["bot_name"] = agent_row.name
+            tone_data["max_words_per_message"] = max(10, min(120, (agent_row.max_sentences or 5) * 20))
+            tone_data["use_emojis"] = "never" if agent_row.no_emoji else tone_data.get("use_emojis", "sparingly")
+            tone_data["register"] = _agent_tone_to_register(agent_row.tone)
+            tone = Tone.model_validate(tone_data)
+            brand_facts = dict(brand_facts)
+            if agent_row.goal:
+                brand_facts["agent_goal"] = agent_row.goal
+            if agent_row.system_prompt:
+                brand_facts["agent_system_prompt"] = agent_row.system_prompt
 
         # Phase 3c.2 — deterministic flow_mode for this turn.
         # We feed pick_flow_mode an ExtractedFields built from the canonical
@@ -778,3 +805,45 @@ class ConversationRunner:
             )
 
         return trace
+
+    async def _load_agent(self, *, conversation_id: UUID, tenant_id: UUID):
+        from atendia.db.models.agent import Agent
+
+        row = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT assigned_agent_id
+                    FROM conversations
+                    WHERE id = :cid AND tenant_id = :tenant_id
+                    """
+                ),
+                {"cid": conversation_id, "tenant_id": tenant_id},
+            )
+        ).fetchone()
+        assigned_agent_id = row.assigned_agent_id if row else None
+        if assigned_agent_id is not None:
+            agent = (
+                await self._session.execute(
+                    select(Agent).where(Agent.id == assigned_agent_id, Agent.tenant_id == tenant_id)
+                )
+            ).scalar_one_or_none()
+            if agent is not None:
+                return agent
+        return (
+            await self._session.execute(
+                select(Agent)
+                .where(Agent.tenant_id == tenant_id, Agent.is_default.is_(True))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+
+def _agent_tone_to_register(value: str | None) -> str:
+    mapping = {
+        "amigable": "informal_mexicano",
+        "informal": "informal_mexicano",
+        "formal": "formal_es",
+        "neutral": "neutral_es",
+    }
+    return mapping.get((value or "").lower(), "neutral_es")

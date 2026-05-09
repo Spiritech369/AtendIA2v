@@ -154,11 +154,11 @@ async def receive_inbound(
     received_count = 0
     try:
         # Record webhook arrival for channel status badge (Step 6).
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         await redis.set(
             f"webhook:last_at:{tenant_id}",
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
             ex=86400,  # expire after 24h of inactivity
         )
         for m in inbound_messages:
@@ -236,7 +236,7 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
     from atendia.contracts.event import EventType
     from atendia.state_machine.event_emitter import EventEmitter
     emitter = EventEmitter(session)
-    await emitter.emit(
+    event_row = await emitter.emit(
         conversation_id=conv_id,
         tenant_id=tenant_id,
         event_type=EventType.MESSAGE_RECEIVED,
@@ -245,6 +245,13 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             "text": m.text or "",
         },
     )
+
+    # Inline workflow trigger (closes the cron-only latency gap from session 1).
+    # ``evaluate_event`` flushes execution rows in the same transaction as the
+    # event itself; arq enqueues happen *after* the surrounding commit so the
+    # worker never sees an execution id that hasn't been persisted.
+    from atendia.workflows.engine import evaluate_event
+    started_executions = await evaluate_event(session, event_row.id)
 
     # Publish to Pub/Sub for realtime subscribers (T22)
     from atendia.realtime.publisher import publish_event
@@ -317,25 +324,46 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
     from arq.connections import RedisSettings, create_pool
     arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
-        trace = await runner.run_turn(
-            conversation_id=conv_id,
-            tenant_id=tenant_id,
-            inbound=inbound_canonical,
-            turn_number=next_turn,
-            arq_pool=arq_pool,
-            to_phone_e164=m.from_phone_e164,
-        )
-        _ = trace  # silence unused-trace lint
-    except Exception:
-        # Don't crash the webhook handler if the runner fails — just log via event.
-        # In production this would also bubble to monitoring.
-        from atendia.contracts.event import EventType
-        await emitter.emit(
-            conversation_id=conv_id,
-            tenant_id=tenant_id,
-            event_type=EventType.ERROR_OCCURRED,
-            payload={"where": "conversation_runner", "message": "run_turn failed"},
-        )
+        try:
+            trace = await runner.run_turn(
+                conversation_id=conv_id,
+                tenant_id=tenant_id,
+                inbound=inbound_canonical,
+                turn_number=next_turn,
+                arq_pool=arq_pool,
+                to_phone_e164=m.from_phone_e164,
+            )
+            _ = trace  # silence unused-trace lint
+        except Exception:
+            # Don't crash the webhook handler if the runner fails — just log via event.
+            # In production this would also bubble to monitoring.
+            from atendia.contracts.event import EventType
+            await emitter.emit(
+                conversation_id=conv_id,
+                tenant_id=tenant_id,
+                event_type=EventType.ERROR_OCCURRED,
+                payload={"where": "conversation_runner", "message": "run_turn failed"},
+            )
+        # Inline workflow trigger: hand off the execution ids that
+        # ``evaluate_event`` discovered earlier in this function to arq's
+        # ``workflows`` queue so ``WorkflowWorkerSettings`` picks them up.
+        # arq's ``_job_id`` dedupe plus the unique index on
+        # ``(workflow_id, trigger_event_id)`` keep this safe even if the
+        # surrounding commit later fails — the worker just no-ops.
+        if started_executions:
+            from atendia.workflows.engine import WORKFLOW_QUEUE_NAME
+            for execution_id in started_executions:
+                try:
+                    await arq_pool.enqueue_job(
+                        "execute_workflow_step",
+                        str(execution_id),
+                        None,
+                        _job_id=f"workflow:{execution_id}:start",
+                        _queue_name=WORKFLOW_QUEUE_NAME,
+                    )
+                except Exception:
+                    # Worker offline — the cron path picks it up next minute.
+                    continue
     finally:
         await arq_pool.aclose()
 
