@@ -794,3 +794,18 @@ async def reindex_documents(
             )
     await session.commit()
     return {"queued": queued, "failed": failed}
+
+
+# ---------------------------------------------------------------------------
+# KB module Phase B2 sub-routers (Tasks 16-29). Each new file under
+# ``atendia/api/_kb/`` exports its own ``router`` and gets included here so
+# the URL prefix stays /api/v1/knowledge/* with no path breakage.
+# Sub-routers ship incrementally — those not yet implemented will land in
+# follow-up sessions per the plan's gap list.
+from atendia.api._kb.collections import router as _kb_collections_router  # noqa: E402
+from atendia.api._kb.search import router as _kb_search_router  # noqa: E402
+from atendia.api._kb.test_query import router as _kb_test_query_router  # noqa: E402
+
+router.include_router(_kb_search_router)
+router.include_router(_kb_test_query_router)
+router.include_router(_kb_collections_router)
