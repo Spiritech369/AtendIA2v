@@ -29,7 +29,7 @@ export function CustomerSearch() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebounced(q, 250);
   const query = useQuery({
-    queryKey: ["customers", debouncedQ],
+    queryKey: ["customers", "search", debouncedQ],
     queryFn: () => customersApi.list({ q: debouncedQ || undefined, limit: 100 }),
   });
 

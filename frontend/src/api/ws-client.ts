@@ -23,15 +23,18 @@ export interface WSEvent<T = unknown> {
 export interface UseWebSocketOptions<E extends WSEvent = WSEvent> {
   path: string;
   onEvent: (e: E) => void;
+  onOpen?: () => void;
   enabled?: boolean;
   initialBackoffMs?: number;
   maxBackoffMs?: number;
 }
 
 export function useWebSocket<E extends WSEvent = WSEvent>(opts: UseWebSocketOptions<E>): void {
-  const { path, onEvent, enabled = true, initialBackoffMs = 1000, maxBackoffMs = 10_000 } = opts;
+  const { path, onEvent, onOpen, enabled = true, initialBackoffMs = 1000, maxBackoffMs = 10_000 } = opts;
   const onEventRef = useRef(onEvent);
+  const onOpenRef = useRef(onOpen);
   onEventRef.current = onEvent;
+  onOpenRef.current = onOpen;
 
   useEffect(() => {
     if (!enabled) return;
@@ -66,6 +69,7 @@ export function useWebSocket<E extends WSEvent = WSEvent>(opts: UseWebSocketOpti
 
       ws.onopen = () => {
         backoff = initialBackoffMs;
+        onOpenRef.current?.();
       };
 
       ws.onclose = () => {

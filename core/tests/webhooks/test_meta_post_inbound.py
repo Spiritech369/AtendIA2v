@@ -158,6 +158,24 @@ def test_meta_webhook_post_dedupes_duplicate_payload(setup_tenant):
     assert _count_messages(tid, "wamid.T13_DUP") == 1
 
 
+def test_meta_webhook_rejects_phone_number_from_other_tenant(setup_tenant):
+    tid = setup_tenant
+    payload = _inbound_payload(channel_msg_id="wamid.T13_WRONG_PHONE")
+    payload["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"] = "OTHER_PID"
+    body = json.dumps(payload).encode("utf-8")
+    sig = _sign(body)
+
+    with TestClient(app) as client:
+        r = client.post(
+            f"/webhooks/meta/{tid}",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
+        )
+        assert r.status_code == 403
+
+    assert _count_messages(tid, "wamid.T13_WRONG_PHONE") == 0
+
+
 def test_meta_webhook_post_403_when_signature_invalid(setup_tenant):
     tid = setup_tenant
     payload = _inbound_payload()

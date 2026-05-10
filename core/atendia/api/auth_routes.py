@@ -25,6 +25,7 @@ from atendia.api._auth_helpers import (
     get_current_user,
     issue_jwt,
     new_csrf_token,
+    revoke_jwt,
     verify_password,
 )
 from atendia.config import get_settings
@@ -120,7 +121,10 @@ async def login(
 
 
 @router.post("/logout")
-async def logout(response: Response) -> dict[str, bool]:
+async def logout(request: Request, response: Response) -> dict[str, bool]:
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        revoke_jwt(token)
     _clear_session_cookies(response)
     return {"ok": True}
 
@@ -136,6 +140,7 @@ async def refresh(request: Request, response: Response) -> LoginResponse:
     )
     csrf = new_csrf_token()
     _set_session_cookies(response, jwt_token=new_token, csrf=csrf)
+    revoke_jwt(token)
     return LoginResponse(
         csrf_token=csrf,
         user=UserResponse(

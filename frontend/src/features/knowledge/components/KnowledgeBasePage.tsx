@@ -95,7 +95,7 @@ function FAQsTab() {
                 <div className="font-medium">{faq.question}</div>
                 <p className="mt-1 text-sm text-muted-foreground">{faq.answer}</p>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => remove.mutate(faq.id)}>
+              <Button size="icon" variant="ghost" onClick={() => remove.mutate(faq.id)} aria-label="Eliminar FAQ">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </CardContent>
@@ -150,7 +150,7 @@ function CatalogTab() {
               </div>
               <div className="flex items-center gap-2">
                 {item.category && <Badge variant="outline">{item.category}</Badge>}
-                <Button size="icon" variant="ghost" onClick={() => remove.mutate(item.id)}>
+                <Button size="icon" variant="ghost" onClick={() => remove.mutate(item.id)} aria-label="Eliminar item de catálogo">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -290,6 +290,7 @@ function DocumentsTab() {
                     size="icon"
                     variant="ghost"
                     title="Reintentar indexado"
+                    aria-label="Reintentar indexado"
                     onClick={() => retry.mutate(doc.id)}
                     disabled={retry.isPending}
                   >
@@ -300,6 +301,7 @@ function DocumentsTab() {
                   size="icon"
                   variant="ghost"
                   onClick={() => remove.mutate(doc.id)}
+                  aria-label="Eliminar documento"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

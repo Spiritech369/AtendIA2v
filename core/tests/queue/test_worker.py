@@ -99,6 +99,35 @@ async def test_send_outbound_persists_outbound_row_on_success(setup_tenant):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_send_outbound_idempotency_key_does_not_resend(setup_tenant):
+    tid = setup_tenant
+    route = respx.post(
+        "https://graph.facebook.com/v21.0/PID_T17/messages"
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OUT_T17_IDEM"}]},
+        )
+    )
+    msg = {
+        "tenant_id": str(tid),
+        "to_phone_e164": "+5215555550171",
+        "text": "solo una vez",
+        "idempotency_key": "test_t17_idem_once",
+        "metadata": {},
+    }
+
+    first = await send_outbound({}, msg)
+    second = await send_outbound({}, msg)
+
+    assert first["status"] == "sent"
+    assert second["status"] == "sent"
+    assert route.call_count == 1
+    assert len(await _read_messages(tid)) == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_send_outbound_persists_failed_row_when_meta_returns_error(setup_tenant):
     tid = setup_tenant
     respx.post(

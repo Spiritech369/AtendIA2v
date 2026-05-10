@@ -81,6 +81,19 @@ def test_create_response_shape_and_no_conflicts(client_tenant_admin):
     assert body["appointment"]["customer_phone"].startswith("+521")
 
 
+def test_duplicate_create_returns_existing_appointment(client_tenant_admin):
+    customer_id = _seed_customers(client_tenant_admin.tenant_id, 1)[0]
+    when = (datetime.now(UTC) + timedelta(hours=5)).replace(microsecond=0).isoformat()
+    payload = {"customer_id": customer_id, "scheduled_at": when, "service": "Idempotente"}
+
+    first = client_tenant_admin.post("/api/v1/appointments", json=payload)
+    second = client_tenant_admin.post("/api/v1/appointments", json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["appointment"]["id"] == first.json()["appointment"]["id"]
+
+
 def test_conflict_detection_within_window(client_tenant_admin):
     customer_id = _seed_customers(client_tenant_admin.tenant_id, 1)[0]
     base = datetime.now(UTC) + timedelta(days=1)

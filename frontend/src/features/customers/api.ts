@@ -86,7 +86,6 @@ export const customersApi = {
       await api.post<{ created: number; updated: number; errors: string[] }>(
         "/customers/import",
         form,
-        { headers: { "Content-Type": "multipart/form-data" } },
       )
     ).data;
   },
@@ -94,9 +93,7 @@ export const customersApi = {
     const form = new FormData();
     form.append("file", file);
     return (
-      await api.post<CustomerImportPreview>("/customers/import/preview", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      await api.post<CustomerImportPreview>("/customers/import/preview", form)
     ).data;
   },
   exportCsvUrl: () => "/api/v1/customers/export",

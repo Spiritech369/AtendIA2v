@@ -41,6 +41,7 @@ class AuthUser(BaseModel):
     tenant_id: UUID | None
     role: Role
     email: str
+    jti: str | None = None
 
 
 def hash_password(plain: str) -> str:
@@ -61,22 +62,74 @@ def issue_jwt(*, user_id: UUID, tenant_id: UUID | None, role: Role, email: str) 
         "tid": str(tenant_id) if tenant_id else None,
         "role": role,
         "email": email,
+        "jti": secrets.token_urlsafe(24),
         "exp": datetime.now(UTC) + timedelta(seconds=settings.auth_session_ttl_s),
     }
     return jwt.encode(payload, settings.auth_session_secret, algorithm=JWT_ALGORITHM)
 
 
-def decode_jwt(token: str) -> AuthUser:
+def _revocation_key(jti: str) -> str:
+    return f"auth:revoked:{jti}"
+
+
+def _is_revoked(jti: str | None) -> bool:
+    if not jti:
+        return False
+    try:
+        from redis import Redis
+
+        client = Redis.from_url(get_settings().redis_url, socket_timeout=0.2)
+        try:
+            return bool(client.exists(_revocation_key(jti)))
+        finally:
+            client.close()
+    except Exception:
+        return False
+
+
+def revoke_jwt(token: str) -> bool:
+    settings = get_settings()
+    try:
+        claims = jwt.decode(
+            token,
+            settings.auth_session_secret,
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_exp": False},
+        )
+    except jwt.PyJWTError:
+        return False
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    if not jti or not exp:
+        return False
+    ttl = max(1, int(exp) - int(datetime.now(UTC).timestamp()))
+    try:
+        from redis import Redis
+
+        client = Redis.from_url(settings.redis_url, socket_timeout=0.2)
+        try:
+            client.set(_revocation_key(str(jti)), "1", ex=ttl)
+            return True
+        finally:
+            client.close()
+    except Exception:
+        return False
+
+
+def decode_jwt(token: str, *, check_revocation: bool = True) -> AuthUser:
     settings = get_settings()
     try:
         claims = jwt.decode(token, settings.auth_session_secret, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid session") from e
+    if check_revocation and _is_revoked(claims.get("jti")):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "session revoked")
     return AuthUser(
         user_id=UUID(claims["sub"]),
         tenant_id=UUID(claims["tid"]) if claims.get("tid") else None,
         role=claims["role"],
         email=claims["email"],
+        jti=claims.get("jti"),
     )
 
 

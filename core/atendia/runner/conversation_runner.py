@@ -785,6 +785,7 @@ class ConversationRunner:
         ):
             await enqueue_messages(
                 arq_pool,
+                session=self._session,
                 messages=composer_output.messages,
                 tenant_id=tenant_id,
                 to_phone_e164=to_phone_e164,

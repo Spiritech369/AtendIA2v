@@ -13,6 +13,8 @@ from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocume
 from atendia.storage import get_storage_backend
 from atendia.tools.embeddings import generate_embeddings_batch
 
+MAX_PDF_PAGES = 100
+
 
 async def index_document(ctx: dict, document_id: str) -> dict:
     settings = get_settings()
@@ -69,7 +71,9 @@ def _parse_document(filename: str, data: bytes) -> str:
         import fitz  # type: ignore[import-not-found]
 
         with fitz.open(stream=data, filetype="pdf") as pdf:
-            texts = [page.get_text("text") for page in pdf[:100]]
+            if pdf.page_count > MAX_PDF_PAGES:
+                raise ValueError(f"PDF has {pdf.page_count} pages; max supported is {MAX_PDF_PAGES}")
+            texts = [page.get_text("text") for page in pdf]
         return "\n".join(texts)
     if suffix == "docx":
         from docx import Document  # type: ignore[import-not-found]

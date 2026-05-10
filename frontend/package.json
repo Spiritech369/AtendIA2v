@@ -38,6 +38,14 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "esbuild",
+      "msw",
+      "@playwright/test"
+    ]
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
     "@playwright/test": "^1.59.1",

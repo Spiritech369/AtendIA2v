@@ -156,18 +156,18 @@ frontend/src/features/knowledge/
 
 ## 4. Database schema
 
-**6 Alembic migrations from the next available head (021+):**
+**6 Alembic migrations starting at file prefix 031 (030 already exists). Project uses hex-hash revision IDs internally (e.g. `a7b8c9d0e1f2`); numeric file prefix is purely for human ordering.**
 
 | # | Theme | Rollback impact |
 |---|---|---|
-| 021 | `kb_collections` | Drops table; FAQs/Catalog/Documents lose `collection_id` (set NULL) |
-| 022 | Extend FAQs/Catalog/Documents/Chunks with new columns | Strips status/visibility/expires_at/priority/owner/agent_permissions/collection_id/language. Text columns preserved. |
-| 023 | `kb_versions` | Loses version history |
-| 024 | `kb_conflicts` + `kb_unanswered_questions` | Loses conflict/unanswered queues |
-| 025 | `kb_test_cases` + `kb_test_runs` | Loses regression suite |
-| 026 | `kb_health_snapshots` + `kb_agent_permissions` + `kb_source_priority_rules` + `kb_safe_answer_settings` | Loses settings; runtime falls back to hardcoded defaults |
+| 031 | `kb_collections` | Drops table; FAQs/Catalog/Documents lose `collection_id` (set NULL) |
+| 032 | Extend FAQs/Catalog/Documents/Chunks with new columns | Strips status/visibility/expires_at/priority/owner/agent_permissions/collection_id/language. Text columns preserved. |
+| 033 | `kb_versions` | Loses version history |
+| 034 | `kb_conflicts` + `kb_unanswered_questions` | Loses conflict/unanswered queues |
+| 035 | `kb_test_cases` + `kb_test_runs` | Loses regression suite |
+| 036 | `kb_health_snapshots` + `kb_agent_permissions` + `kb_source_priority_rules` + `kb_safe_answer_settings` | Loses settings; runtime falls back to hardcoded defaults |
 
-### Shared metadata block (added to `tenant_faqs`, `tenant_catalogs`, `knowledge_documents` in 022)
+### Shared metadata block (added to `tenant_faqs`, `tenant_catalogs`, `knowledge_documents` in 032)
 
 ```
 status              VARCHAR(20)   NOT NULL DEFAULT 'published'  -- draft|review|published|archived
@@ -232,7 +232,7 @@ average_score        DOUBLE PRECISION
 
 ### Backward compatibility
 
-- Existing `KnowledgeDocument.status='indexed'` → `'ready'` via in-place UPDATE in 022.
+- Existing `KnowledgeDocument.status='indexed'` → `'ready'` via in-place UPDATE in 032.
 - Existing FAQs / Catalog / Documents get `status='published'`. Bot retrieval keeps working.
 - Existing chunks get `chunk_status='embedded'`.
 - `fragment_count` keeps existing semantics; `embedded_chunk_count` starts equal to it for migrated rows.
@@ -381,7 +381,7 @@ elif top_score >= 0.70 and risks:                      medium, clarify
 else:                                                  low, escalate
 ```
 
-### Default agent permissions (seeded by 026)
+### Default agent permissions (seeded by 036)
 
 | Agent | Allowed sources | Allowed collections | Quote prices | Quote stock | Required fields |
 |---|---|---|---|---|---|
@@ -512,7 +512,7 @@ In `core/atendia/queue/worker.py::WorkerSettings.cron_jobs`:
 
 ### Deploy order
 
-1. `alembic upgrade head` (021 → 026)
+1. `alembic upgrade head` (applies 031 → 036, run from `core/`)
 2. Restart API
 3. Restart arq worker
 4. Run `python -m atendia.scripts.seed_knowledge_defaults <tenant_id>` (idempotent)
@@ -521,7 +521,7 @@ In `core/atendia/queue/worker.py::WorkerSettings.cron_jobs`:
 
 ### Rollback
 
-`alembic downgrade <previous-head>` reverses 026 → 021. Data loss caveats per §4. Forward-only after 24h on prod.
+`alembic downgrade <previous-head>` reverses 036 → 031. Data loss caveats per §4. Forward-only after 24h on prod.
 
 ### Manual smoke checklist
 
@@ -543,8 +543,8 @@ In `core/atendia/queue/worker.py::WorkerSettings.cron_jobs`:
 
 ## 10. Acceptance criteria
 
-1. Migrations 021–026 apply cleanly on fresh DB.
-2. Existing 535 backend tests still green.
+1. Migrations 031–036 apply cleanly on fresh DB.
+2. Existing backend test baseline still green (count whatever current `uv run pytest -q` reports — memory's 535 is stale).
 3. ≥40 new backend tests, ≥60% coverage on new code.
 4. `/api/v1/knowledge/test-query` returns full structured response for 4 default agents.
 5. `/knowledge` page renders, no console errors, all 8 tabs present, dark mode works.
@@ -595,7 +595,7 @@ In `core/atendia/queue/worker.py::WorkerSettings.cron_jobs`:
 Realistic ~12h focused build. **If budget runs out, fallback cut order (last-cut-first):**
 
 1. **Cut first**: Métricas tab → Pruebas tab → Conflictos tab → Sin respuesta tab → Versions → Health.
-2. **Non-negotiable (must ship):** migrations 021-022 + provider abstraction + `/test-query` endpoint + prompt-preview drawer + 4 base tabs (FAQs, Catálogo, Artículos, Documentos) + agent permissions seed.
+2. **Non-negotiable (must ship):** migrations 031-032 + provider abstraction + `/test-query` endpoint + prompt-preview drawer + 4 base tabs (FAQs, Catálogo, Artículos, Documentos) + agent permissions seed.
 
 If operator wants a different fallback order, raise it in the writing-plans phase before implementation begins.
 

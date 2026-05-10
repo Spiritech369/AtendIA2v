@@ -15,13 +15,18 @@
 ## Pre-flight (run once before Task 1)
 
 ```powershell
-git status                           # confirm clean tree, branch=main
-cd core; uv run alembic current      # note current head — expected ~020
-cd core; uv run pytest -q            # baseline 535 tests green
-cd ..; cd frontend; pnpm test --run  # baseline FE tests green
+git status                                    # confirm clean tree, branch=feat/kb-module-b2 (or main)
+cd core; uv run alembic current               # note current head (hash like a7b8c9d0e1f2)
+cd core; uv run alembic heads                 # confirm single head
+cd core; uv run pytest -q                     # baseline NEW tests green (count whatever current is)
+cd ..\frontend; pnpm test --run               # baseline FE tests green
 ```
 
 If any of those fail, **stop**. Don't begin until baseline is green.
+
+**Migration convention reality check:** the project uses **hex-hash revision IDs internally** (e.g. `c5d72a801fb4`) but **numeric file prefixes** (e.g. `020_turn_traces_bot_paused.py`). The next file prefix is **031** (030 already exists as `030_launch_hardening.py`). Inside the file: `revision: str = "<new_hex_hash>"`, `down_revision: str = "<previous_hex_hash>"`. Read the prior migration to get the correct `down_revision`. Generate a new hex hash with `python -c "import secrets; print(secrets.token_hex(6))"`.
+
+**Migration path: `core/atendia/db/migrations/versions/` (not `core/atendia/db/migrations/versions/`).**
 
 Reference docs (read once before Task 1):
 - `docs/plans/2026-05-10-knowledge-base-module-design.md` — the contract
@@ -34,16 +39,16 @@ Reference docs (read once before Task 1):
 
 # Phase 1 — Foundation (migrations + models + provider)
 
-## Task 1: Migration 021 — `kb_collections` table
+## Task 1: Migration 031 — `kb_collections` table
 
 **Files:**
-- Create: `core/migrations/versions/021_kb_collections.py`
-- Test: `core/tests/db/test_migration_021.py`
+- Create: `core/atendia/db/migrations/versions/031_kb_collections.py`
+- Test: `core/tests/db/test_migration_031.py`
 
 **Step 1: Write the failing migration test**
 
 ```python
-# core/tests/db/test_migration_021.py
+# core/tests/db/test_migration_031.py
 import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,29 +78,34 @@ async def test_kb_collections_unique_slug_per_tenant(db_session: AsyncSession) -
 **Step 2: Run test, verify FAIL**
 
 ```powershell
-cd core; uv run pytest tests/db/test_migration_021.py -v
+cd core; uv run pytest tests/db/test_migration_031.py -v
 ```
 Expected: FAIL — table doesn't exist.
 
 **Step 3: Write the migration**
 
 ```python
-# core/migrations/versions/021_kb_collections.py
-"""kb_collections
+# core/atendia/db/migrations/versions/031_kb_collections.py
+"""031_kb_collections
 
-Revision ID: 021
-Revises: 020
+Revision ID: <NEW_HEX_HASH>      # generate via: python -c "import secrets; print(secrets.token_hex(6))"
+Revises: <PRIOR_HEAD_HEX_HASH>   # read from current head: cd core; uv run alembic heads
 Create Date: 2026-05-10
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from alembic import op
 
-revision = "021"
-down_revision = "020"
-branch_labels = None
-depends_on = None
+# Replace these placeholders with actual hex hashes.
+# Read the current head from the latest existing migration in core/atendia/db/migrations/versions/
+# (currently 030_launch_hardening.py with revision='a7b8c9d0e1f2').
+revision: str = "<NEW_HEX_HASH>"
+down_revision: str | Sequence[str] | None = "a7b8c9d0e1f2"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -127,29 +137,29 @@ def downgrade() -> None:
 
 ```powershell
 cd core; uv run alembic upgrade head
-cd core; uv run pytest tests/db/test_migration_021.py -v
+cd core; uv run pytest tests/db/test_migration_031.py -v
 ```
 Expected: 2 PASS.
 
 **Step 5: Commit**
 
 ```powershell
-git add core/migrations/versions/021_kb_collections.py core/tests/db/test_migration_021.py
-git commit -m "feat(kb): migration 021 — kb_collections table"
+git add core/atendia/db/migrations/versions/031_kb_collections.py core/tests/db/test_migration_031.py
+git commit -m "feat(kb): migration 031 — kb_collections table"
 ```
 
 ---
 
-## Task 2: Migration 022 — extend FAQs/Catalog/Documents/Chunks
+## Task 2: Migration 032 — extend FAQs/Catalog/Documents/Chunks
 
 **Files:**
-- Create: `core/migrations/versions/022_kb_extend_existing.py`
-- Test: `core/tests/db/test_migration_022.py`
+- Create: `core/atendia/db/migrations/versions/032_kb_extend_existing.py`
+- Test: `core/tests/db/test_migration_032.py`
 
 **Step 1: Write the failing test (multi-table column assertions)**
 
 ```python
-# core/tests/db/test_migration_022.py
+# core/tests/db/test_migration_032.py
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -207,28 +217,30 @@ async def test_chunk_columns(db_session: AsyncSession) -> None:
 **Step 2: Run test, verify FAIL**
 
 ```powershell
-cd core; uv run pytest tests/db/test_migration_022.py -v
+cd core; uv run pytest tests/db/test_migration_032.py -v
 ```
 
 **Step 3: Write the migration**
 
 ```python
-# core/migrations/versions/022_kb_extend_existing.py
-"""extend tenant_faqs/catalogs/documents/chunks for KB
+# core/atendia/db/migrations/versions/032_kb_extend_existing.py
+"""032_extend_existing — extend tenant_faqs/catalogs/documents/chunks for KB
 
-Revision ID: 022
-Revises: 021
+Revision ID: <NEW_HEX_HASH>
+Revises: <hash from migration 031>
 Create Date: 2026-05-10
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from alembic import op
 
-revision = "022"
-down_revision = "021"
-branch_labels = None
-depends_on = None
+revision: str = "<NEW_HEX_HASH>"
+down_revision: str | Sequence[str] | None = "<HEX_HASH_FROM_031>"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def _add_shared_metadata(table: str) -> None:
@@ -304,23 +316,23 @@ def downgrade() -> None:
 
 ```powershell
 cd core; uv run alembic upgrade head
-cd core; uv run pytest tests/db/test_migration_022.py -v
+cd core; uv run pytest tests/db/test_migration_032.py -v
 ```
 
 **Step 5: Commit**
 
 ```powershell
-git add core/migrations/versions/022_kb_extend_existing.py core/tests/db/test_migration_022.py
-git commit -m "feat(kb): migration 022 — extend FAQs/Catalog/Documents/Chunks"
+git add core/atendia/db/migrations/versions/032_kb_extend_existing.py core/tests/db/test_migration_032.py
+git commit -m "feat(kb): migration 032 — extend FAQs/Catalog/Documents/Chunks"
 ```
 
 ---
 
-## Task 3: Migration 023 — `kb_versions` table
+## Task 3: Migration 033 — `kb_versions` table
 
 **Files:**
-- Create: `core/migrations/versions/023_kb_versions.py`
-- Test: `core/tests/db/test_migration_023.py`
+- Create: `core/atendia/db/migrations/versions/033_kb_versions.py`
+- Test: `core/tests/db/test_migration_033.py`
 
 **Pattern:** Same TDD shape as Task 1. Test asserts columns + index. DDL:
 
@@ -344,15 +356,15 @@ op.create_index(
 )
 ```
 
-**Commit:** `feat(kb): migration 023 — kb_versions`.
+**Commit:** `feat(kb): migration 033 — kb_versions`.
 
 ---
 
-## Task 4: Migration 024 — `kb_conflicts` + `kb_unanswered_questions`
+## Task 4: Migration 034 — `kb_conflicts` + `kb_unanswered_questions`
 
 **Files:**
-- Create: `core/migrations/versions/024_kb_conflicts_unanswered.py`
-- Test: `core/tests/db/test_migration_024.py`
+- Create: `core/atendia/db/migrations/versions/034_kb_conflicts_unanswered.py`
+- Test: `core/tests/db/test_migration_034.py`
 
 **DDL:**
 
@@ -404,11 +416,11 @@ op.create_table(
 op.create_index("ix_kb_unanswered_status", "kb_unanswered_questions", ["tenant_id", "status", sa.text("created_at DESC")])
 ```
 
-**Commit:** `feat(kb): migration 024 — conflicts + unanswered tables`.
+**Commit:** `feat(kb): migration 034 — conflicts + unanswered tables`.
 
 ---
 
-## Task 5: Migration 025 — `kb_test_cases` + `kb_test_runs`
+## Task 5: Migration 035 — `kb_test_cases` + `kb_test_runs`
 
 **DDL:**
 
@@ -448,11 +460,11 @@ op.create_table(
 op.create_index("ix_kb_test_runs_run", "kb_test_runs", ["tenant_id", "run_id"])
 ```
 
-**Commit:** `feat(kb): migration 025 — test cases + test runs`.
+**Commit:** `feat(kb): migration 035 — test cases + test runs`.
 
 ---
 
-## Task 6: Migration 026 — health + agent perms + priority + safe answer
+## Task 6: Migration 036 — health + agent perms + priority + safe answer
 
 **DDL** (4 tables in one migration; downgrade order is reverse):
 
@@ -518,7 +530,7 @@ op.create_table(
 )
 ```
 
-**Commit:** `feat(kb): migration 026 — health/agent_perms/priority/safe_answer`.
+**Commit:** `feat(kb): migration 036 — health/agent_perms/priority/safe_answer`.
 
 ---
 
@@ -1811,7 +1823,7 @@ Final commit message format:
 feat(kb): Knowledge Base module (B2 scope, 2026-05-10)
 
 Shipped:
-✅ Migrations 021-026 (collections + extend FAQs/Catalog/Doc/Chunks + versions
+✅ Migrations 031-036 (collections + extend FAQs/Catalog/Doc/Chunks + versions
    + conflicts/unanswered + tests + health/perms/priority/safe-answer)
 ✅ RAG provider abstraction (OpenAI + Mock)
 ✅ Retriever + prompt builder + answer synthesizer + conflict detector
@@ -1871,7 +1883,7 @@ If we hit hour 10 and still have unfinished work, **last-cut-first**:
 7. ✂ Analytics (Task 28)
 
 **Non-negotiable (must ship even on tightest budget):**
-- Migrations 021-022
+- Migrations 031-032
 - Models (Task 7)
 - Provider abstraction (Tasks 8-9)
 - Retriever + prompt builder + synthesizer (Tasks 13-15)

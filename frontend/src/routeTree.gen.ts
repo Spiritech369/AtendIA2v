@@ -17,6 +17,7 @@ import { Route as authUsersRouteImport } from './routes/(auth)/users'
 import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
 import { Route as authPipelineRouteImport } from './routes/(auth)/pipeline'
 import { Route as authKnowledgeRouteImport } from './routes/(auth)/knowledge'
+import { Route as authInboxSettingsRouteImport } from './routes/(auth)/inbox-settings'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
 import { Route as authExportsRouteImport } from './routes/(auth)/exports'
 import { Route as authDashboardRouteImport } from './routes/(auth)/dashboard'
@@ -66,6 +67,11 @@ const authPipelineRoute = authPipelineRouteImport.update({
 const authKnowledgeRoute = authKnowledgeRouteImport.update({
   id: '/knowledge',
   path: '/knowledge',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authInboxSettingsRoute = authInboxSettingsRouteImport.update({
+  id: '/inbox-settings',
+  path: '/inbox-settings',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authHandoffsRoute = authHandoffsRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof authDashboardRoute
   '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
+  '/inbox-settings': typeof authInboxSettingsRoute
   '/knowledge': typeof authKnowledgeRoute
   '/pipeline': typeof authPipelineRoute
   '/turn-traces': typeof authTurnTracesRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof authDashboardRoute
   '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
+  '/inbox-settings': typeof authInboxSettingsRoute
   '/knowledge': typeof authKnowledgeRoute
   '/pipeline': typeof authPipelineRoute
   '/turn-traces': typeof authTurnTracesRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/(auth)/dashboard': typeof authDashboardRoute
   '/(auth)/exports': typeof authExportsRoute
   '/(auth)/handoffs': typeof authHandoffsRoute
+  '/(auth)/inbox-settings': typeof authInboxSettingsRoute
   '/(auth)/knowledge': typeof authKnowledgeRoute
   '/(auth)/pipeline': typeof authPipelineRoute
   '/(auth)/turn-traces': typeof authTurnTracesRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/exports'
     | '/handoffs'
+    | '/inbox-settings'
     | '/knowledge'
     | '/pipeline'
     | '/turn-traces'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/exports'
     | '/handoffs'
+    | '/inbox-settings'
     | '/knowledge'
     | '/pipeline'
     | '/turn-traces'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/(auth)/dashboard'
     | '/(auth)/exports'
     | '/(auth)/handoffs'
+    | '/(auth)/inbox-settings'
     | '/(auth)/knowledge'
     | '/(auth)/pipeline'
     | '/(auth)/turn-traces'
@@ -312,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/knowledge'
       fullPath: '/knowledge'
       preLoaderRoute: typeof authKnowledgeRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/inbox-settings': {
+      id: '/(auth)/inbox-settings'
+      path: '/inbox-settings'
+      fullPath: '/inbox-settings'
+      preLoaderRoute: typeof authInboxSettingsRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/handoffs': {
@@ -416,6 +435,7 @@ interface authRouteRouteChildren {
   authDashboardRoute: typeof authDashboardRoute
   authExportsRoute: typeof authExportsRoute
   authHandoffsRoute: typeof authHandoffsRoute
+  authInboxSettingsRoute: typeof authInboxSettingsRoute
   authKnowledgeRoute: typeof authKnowledgeRoute
   authPipelineRoute: typeof authPipelineRoute
   authTurnTracesRoute: typeof authTurnTracesRoute
@@ -435,6 +455,7 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authDashboardRoute: authDashboardRoute,
   authExportsRoute: authExportsRoute,
   authHandoffsRoute: authHandoffsRoute,
+  authInboxSettingsRoute: authInboxSettingsRoute,
   authKnowledgeRoute: authKnowledgeRoute,
   authPipelineRoute: authPipelineRoute,
   authTurnTracesRoute: authTurnTracesRoute,

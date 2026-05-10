@@ -9,6 +9,7 @@ from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocume
 from atendia.db.models.lifecycle import FollowupScheduled, HumanHandoff
 from atendia.db.models.message import MessageRow
 from atendia.db.models.notification import Notification
+from atendia.db.models.outbound_outbox import OutboundOutbox
 from atendia.db.models.tenant import Tenant, TenantUser
 from atendia.db.models.tenant_config import (
     TenantBranding,
@@ -43,6 +44,7 @@ __all__ = [
     "KnowledgeDocument",
     "MessageRow",
     "Notification",
+    "OutboundOutbox",
     "Tenant",
     "TenantBranding",
     "TenantCatalogItem",

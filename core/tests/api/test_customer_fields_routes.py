@@ -114,6 +114,19 @@ def test_create_definition(seed):
     assert body["ordering"] == 1
 
 
+def test_create_definition_rejects_unknown_field_type(seed):
+    _, _, _, email, plain = seed
+    c = TestClient(app)
+    csrf = _login(c, email, plain)
+    c.headers["X-CSRF-Token"] = csrf
+
+    resp = c.post(
+        "/api/v1/customer-fields/definitions",
+        json={"key": "bad_field", "label": "Bad", "field_type": "potato"},
+    )
+    assert resp.status_code == 422
+
+
 def test_list_definitions_ordered(seed):
     _, _, _, email, plain = seed
     c = TestClient(app)

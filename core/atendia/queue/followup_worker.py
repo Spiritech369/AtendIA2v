@@ -225,14 +225,12 @@ async def poll_followups(ctx: dict) -> dict:
                             body = render_followup_body(
                                 kind=f["kind"], extracted_data=extracted,
                             )
-                            from uuid import uuid4
-
                             from atendia.channels.base import OutboundMessage
                             outbound = OutboundMessage(
                                 tenant_id=str(f["tenant_id"]),
                                 to_phone_e164=phone,
                                 text=body,
-                                idempotency_key=f"followup-{f['id']}-{uuid4()}",
+                                idempotency_key=f"followup-{f['id']}",
                             )
                             await enqueue_outbound(arq_redis, outbound)
                             await _mark_sent(

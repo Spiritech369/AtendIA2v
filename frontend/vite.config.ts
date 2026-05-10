@@ -16,8 +16,16 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:8001",
-      "/ws": { target: "ws://localhost:8001", ws: true },
+      // En Docker → BACKEND_URL=http://backend:8001 (desde docker-compose)
+      // Local sin Docker → fallback a localhost:8001
+      "/api": process.env.BACKEND_URL ?? "http://localhost:8001",
+      "/ws": { target: process.env.BACKEND_WS_URL ?? "ws://localhost:8001", ws: true },
+    },
+    // Windows + Docker bind-mounts don't emit inotify events reliably.
+    // Polling ensures HMR works without manual container restarts.
+    watch: {
+      usePolling: true,
+      interval: 300,
     },
   },
 });

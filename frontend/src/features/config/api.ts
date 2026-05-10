@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import type { InboxConfig } from "@/features/inbox-settings/types";
 
 export interface PipelineResponse {
   version: number;
@@ -51,6 +52,17 @@ export const tenantsApi = {
   getTimezone: async () => (await api.get<TimezoneResponse>("/tenants/timezone")).data,
   putTimezone: async (timezone: string) =>
     (await api.put<TimezoneResponse>("/tenants/timezone", { timezone })).data,
+};
+
+export const inboxConfigApi = {
+  get: async (): Promise<InboxConfig> => {
+    const r = await api.get<{ inbox_config: InboxConfig }>("/tenants/inbox-config");
+    return r.data.inbox_config;
+  },
+  put: async (inbox_config: InboxConfig): Promise<InboxConfig> => {
+    const r = await api.put<{ inbox_config: InboxConfig }>("/tenants/inbox-config", { inbox_config });
+    return r.data.inbox_config;
+  },
 };
 
 export const integrationsApi = {

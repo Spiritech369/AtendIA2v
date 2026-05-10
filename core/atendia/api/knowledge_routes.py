@@ -39,7 +39,7 @@ router = APIRouter()
 REINDEX_COOLDOWN_SECONDS: int = 300  # at most one reindex per tenant every 5 min
 TEST_RATE_LIMIT_WINDOW_SECONDS: int = 60
 TEST_RATE_LIMIT_MAX_CALLS: int = 10
-INDEX_DOCUMENT_JOB_TIMEOUT_SECONDS: int = 90  # arq default is 300s; cap parsing here
+INDEX_DOCUMENT_JOB_TIMEOUT_SECONDS: int = 900
 
 
 class FAQItem(BaseModel):
@@ -508,13 +508,15 @@ async def upload_document(
     )
     await session.commit()
     await session.refresh(row)
-    await _enqueue_index_document(row.id)
+    if not await _enqueue_index_document(row.id):
+        row.status = "error"
+        row.error_message = "index worker unavailable"
+        await session.commit()
+        await session.refresh(row)
     return _doc_item(row)
 
 
-async def _enqueue_index_document(document_id: UUID) -> None:
-    """Best-effort enqueue. The worker may be offline in dev; the row stays
-    in ``processing`` and an operator can retry from the UI."""
+async def _enqueue_index_document(document_id: UUID) -> bool:
     try:
         pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
         try:
@@ -526,8 +528,9 @@ async def _enqueue_index_document(document_id: UUID) -> None:
             )
         finally:
             await pool.aclose()
+        return True
     except Exception:
-        return
+        return False
 
 
 @router.get("/documents/{document_id}", response_model=DocumentItem)
@@ -628,7 +631,11 @@ async def retry_document(
     )
     await session.commit()
     await session.refresh(row)
-    await _enqueue_index_document(row.id)
+    if not await _enqueue_index_document(row.id):
+        row.status = "error"
+        row.error_message = "index worker unavailable"
+        await session.commit()
+        await session.refresh(row)
     return _doc_item(row)
 
 
@@ -769,26 +776,21 @@ async def reindex_documents(
     queued = 0
     if not ids:
         return {"queued": 0}
-    pool = None
-    try:
-        pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
-        for doc_id in ids:
+    failed = 0
+    for doc_id in ids:
+        await session.execute(
+            update(KnowledgeDocument)
+            .where(KnowledgeDocument.id == doc_id)
+            .values(status="processing", error_message=None)
+        )
+        if await _enqueue_index_document(doc_id):
+            queued += 1
+        else:
+            failed += 1
             await session.execute(
                 update(KnowledgeDocument)
                 .where(KnowledgeDocument.id == doc_id)
-                .values(status="processing", error_message=None)
+                .values(status="error", error_message="index worker unavailable")
             )
-            await pool.enqueue_job(
-                "index_document",
-                str(doc_id),
-                _job_id=f"index_document:{doc_id}",
-                _job_timeout=INDEX_DOCUMENT_JOB_TIMEOUT_SECONDS,
-            )
-            queued += 1
-    except Exception:
-        queued = 0
-    finally:
-        if pool is not None:
-            await pool.aclose()
     await session.commit()
-    return {"queued": queued}
+    return {"queued": queued, "failed": failed}

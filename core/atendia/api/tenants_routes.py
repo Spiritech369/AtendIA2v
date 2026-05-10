@@ -245,6 +245,80 @@ async def put_timezone(
     return TimezoneResponse(timezone=body.timezone)
 
 
+# ---------- Inbox Config ----------
+
+DEFAULT_INBOX_CONFIG: dict = {
+    "layout": {
+        "three_pane": True,
+        "rail_width": "expanded",
+        "list_max_width": 360,
+        "composer_density": "comfortable",
+        "sticky_composer": True,
+    },
+    "filter_chips": [
+        {"id": "unread",            "label": "Sin leer",             "color": "#4f72f5", "query": "read_at IS NULL",                             "live_count": True,  "visible": True, "order": 0},
+        {"id": "mine",              "label": "Mías",                 "color": "#9b72f5", "query": "assigned_to = current_user",                  "live_count": True,  "visible": True, "order": 1},
+        {"id": "unassigned",        "label": "Sin asignar",          "color": "#f5a623", "query": "assigned_to IS NULL AND status != 'closed'",  "live_count": False, "visible": True, "order": 2},
+        {"id": "awaiting_customer", "label": "En espera de cliente", "color": "#4fa8f5", "query": "stage = 'waiting_customer'",                  "live_count": True,  "visible": True, "order": 3},
+        {"id": "stale",             "label": "Inactivas >24h",       "color": "#f25252", "query": "last_message_at < now() - interval '24h'",   "live_count": True,  "visible": True, "order": 4},
+    ],
+    "stage_rings": [
+        {"stage_id": "nuevo",      "emoji": "🆕", "color": "#6b7cf5", "sla_hours": 24},
+        {"stage_id": "en_curso",   "emoji": "🔄", "color": "#10c98f", "sla_hours": 4},
+        {"stage_id": "en_espera",  "emoji": "⏳", "color": "#f5a623", "sla_hours": 48},
+        {"stage_id": "cotizacion", "emoji": "💰", "color": "#9b72f5", "sla_hours": 12},
+        {"stage_id": "documentos", "emoji": "📄", "color": "#4fa8f5", "sla_hours": 24},
+        {"stage_id": "cierre",     "emoji": "🏁", "color": "#10c98f", "sla_hours": None},
+    ],
+    "handoff_rules": [
+        {"id": "ask_price", "intent": "ASK_PRICE",       "confidence": 82,  "action": "suggest_template",        "template": "precio_hr_v_2025",  "enabled": True,  "order": 0},
+        {"id": "docs_miss", "intent": "DOCS_MISSING",    "confidence": 75,  "action": "send_checklist",          "template": "docs_checklist_v2", "enabled": True,  "order": 1},
+        {"id": "human_req", "intent": "HUMAN_REQUESTED", "confidence": 90,  "action": "assign_to_free_operator", "template": "",                  "enabled": True,  "order": 2},
+        {"id": "stale_24h", "intent": "STALE_24H",       "confidence": 100, "action": "trigger_followup",        "template": "followup_24h",      "enabled": False, "order": 3},
+    ],
+}
+
+
+class InboxConfigBody(BaseModel):
+    inbox_config: dict = Field(..., description="Full inbox config object.")
+
+
+class InboxConfigResponse(BaseModel):
+    inbox_config: dict
+
+
+@router.get("/inbox-config", response_model=InboxConfigResponse)
+async def get_inbox_config(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> InboxConfigResponse:
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one()
+    cfg = (tenant.config or {}).get("inbox_config", DEFAULT_INBOX_CONFIG)
+    return InboxConfigResponse(inbox_config=cfg)
+
+
+@router.put("/inbox-config", response_model=InboxConfigResponse)
+async def put_inbox_config(
+    body: InboxConfigBody,
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> InboxConfigResponse:
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one()
+    new_config = dict(tenant.config or {})
+    new_config["inbox_config"] = body.inbox_config
+    await session.execute(
+        update(Tenant).where(Tenant.id == tenant_id).values(config=new_config)
+    )
+    await session.commit()
+    return InboxConfigResponse(inbox_config=body.inbox_config)
+
+
 # Suppress unused-import warning when we don't actually use UTC anywhere
 # above (we kept the import for future timestamp work).
 _ = UTC

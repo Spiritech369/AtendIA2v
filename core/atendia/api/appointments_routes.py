@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._audit import emit_admin_event
@@ -283,6 +284,29 @@ async def _find_conflicts(
     ]
 
 
+async def _find_exact_appointment_id(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    customer_id: UUID,
+    scheduled_at: datetime,
+    service: str,
+) -> UUID | None:
+    return (
+        await session.execute(
+            select(Appointment.id)
+            .where(
+                Appointment.tenant_id == tenant_id,
+                Appointment.customer_id == customer_id,
+                Appointment.scheduled_at == scheduled_at,
+                Appointment.service == service,
+                Appointment.deleted_at.is_(None),
+            )
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 @router.post("", response_model=AppointmentCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_appointment(
     body: AppointmentCreate,
@@ -298,24 +322,49 @@ async def create_appointment(
         customer_id=body.customer_id,
     )
     scheduled_utc = body.scheduled_at.astimezone(UTC)
+    service = body.service.strip()
     conflicts = await _find_conflicts(
         session,
         tenant_id=tenant_id,
         customer_id=body.customer_id,
         scheduled_at=scheduled_utc,
     )
+    existing_id = await _find_exact_appointment_id(
+        session,
+        tenant_id=tenant_id,
+        customer_id=body.customer_id,
+        scheduled_at=scheduled_utc,
+        service=service,
+    )
+    if existing_id is not None:
+        item = await _get_item(session, tenant_id=tenant_id, appointment_id=existing_id)
+        return AppointmentCreateResponse(appointment=item, conflicts=conflicts)
     appt = Appointment(
         tenant_id=tenant_id,
         customer_id=body.customer_id,
         conversation_id=body.conversation_id,
         scheduled_at=scheduled_utc,
-        service=body.service.strip(),
+        service=service,
         notes=body.notes,
         created_by_id=user.user_id,
         created_by_type="user",
     )
-    session.add(appt)
-    await session.flush()
+    try:
+        async with session.begin_nested():
+            session.add(appt)
+            await session.flush()
+    except IntegrityError:
+        existing_id = await _find_exact_appointment_id(
+            session,
+            tenant_id=tenant_id,
+            customer_id=body.customer_id,
+            scheduled_at=scheduled_utc,
+            service=service,
+        )
+        if existing_id is None:
+            raise
+        item = await _get_item(session, tenant_id=tenant_id, appointment_id=existing_id)
+        return AppointmentCreateResponse(appointment=item, conflicts=conflicts)
     await emit_admin_event(
         session,
         tenant_id=tenant_id,

@@ -12,3 +12,8 @@ async def is_duplicate(redis_client: Redis, message_id: str) -> bool:
     key = f"dedup:{message_id}"
     inserted = await redis_client.set(key, "1", ex=DEDUP_TTL_SECONDS, nx=True)
     return not inserted
+
+
+async def mark_processed(redis_client: Redis, tenant_id: str, message_id: str) -> None:
+    key = f"dedup:{tenant_id}:{message_id}"
+    await redis_client.set(key, "1", ex=DEDUP_TTL_SECONDS)

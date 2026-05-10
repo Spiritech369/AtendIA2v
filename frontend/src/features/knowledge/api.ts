@@ -63,9 +63,7 @@ export const knowledgeApi = {
     form.append("file", file);
     if (category) form.append("category", category);
     return (
-      await api.post<DocumentItem>("/knowledge/documents/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      await api.post<DocumentItem>("/knowledge/documents/upload", form)
     ).data;
   },
   deleteDocument: async (id: string) => api.delete(`/knowledge/documents/${id}`),

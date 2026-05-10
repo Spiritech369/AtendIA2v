@@ -69,6 +69,21 @@ def test_logout_clears_cookie(client, operator_seed):
     ), set_cookie_headers
 
 
+def test_logout_revokes_previous_jwt_server_side(client, operator_seed):
+    _, _, email, plain = operator_seed
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": plain})
+    assert login.status_code == 200
+    csrf = login.json()["csrf_token"]
+    old_cookie = login.cookies[SESSION_COOKIE]
+
+    logout = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})
+    assert logout.status_code == 200
+
+    replay = TestClient(app)
+    replay.cookies.set(SESSION_COOKIE, old_cookie)
+    assert replay.get("/api/v1/auth/me").status_code == 401
+
+
 def test_me_returns_claims(client, operator_seed):
     tid, uid, email, plain = operator_seed
     login = client.post("/api/v1/auth/login", json={"email": email, "password": plain})

@@ -1,7 +1,8 @@
 services:
+
+  # ── Infraestructura ────────────────────────────────────────────────────────
+
   postgres-v2:
-    # Pinned to a specific pgvector release to keep `<=>` cosine semantics
-    # deterministic across machines. Bumping requires re-running ingestion.
     image: pgvector/pgvector:0.8.2-pg15
     container_name: atendia_postgres_v2
     restart: unless-stopped
@@ -30,6 +31,51 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # ── Backend (FastAPI + uvicorn con hot-reload) ─────────────────────────────
+
+  backend:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: atendia_backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./core/.env        # tus API keys y settings quedan intactos
+    environment:
+      # Sobreescribir solo las URLs que cambian dentro de Docker
+      ATENDIA_V2_DATABASE_URL: postgresql+asyncpg://atendia:atendia@postgres-v2:5432/atendia_v2
+      ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
+    volumes:
+      - ./core:/app        # hot-reload: cambios en código se reflejan al instante
+      - /app/.venv         # el .venv del contenedor no es sobreescrito por el volumen
+    depends_on:
+      postgres-v2:
+        condition: service_healthy
+      redis-v2:
+        condition: service_healthy
+
+  # ── Frontend (Vite dev server con hot-reload) ──────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: atendia_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      # Le dice a Vite a qué contenedor proxear /api y /ws
+      BACKEND_URL: http://backend:8001
+      BACKEND_WS_URL: ws://backend:8001
+    volumes:
+      - ./frontend:/app          # hot-reload: cambios en src/ se reflejan en el browser
+      - /app/node_modules        # node_modules del contenedor, no del host
+    depends_on:
+      - backend
 
 volumes:
   atendia_v2_pg_data:

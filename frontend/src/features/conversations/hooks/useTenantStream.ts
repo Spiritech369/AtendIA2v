@@ -37,9 +37,16 @@ export function useTenantStream(): void {
     [queryClient],
   );
 
+  const onOpen = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    void queryClient.invalidateQueries({ queryKey: ["handoffs"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  }, [queryClient]);
+
   useWebSocket<ConversationEvent>({
     path: tenantId ? `/ws/tenants/${tenantId}` : "",
     onEvent,
+    onOpen,
     enabled: !!tenantId,
   });
 }

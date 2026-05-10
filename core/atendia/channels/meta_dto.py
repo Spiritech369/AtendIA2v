@@ -49,10 +49,18 @@ class MetaStatusCallback(BaseModel):
     recipient_id: str | None = None
 
 
+class MetaWebhookMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    display_phone_number: str | None = None
+    phone_number_id: str
+
+
 class MetaWebhookValue(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     messaging_product: str
+    metadata: MetaWebhookMetadata | None = None
     messages: list[MetaInboundMessage] | None = None
     statuses: list[MetaStatusCallback] | None = None
 

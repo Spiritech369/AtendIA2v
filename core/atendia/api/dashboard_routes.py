@@ -76,6 +76,9 @@ async def get_dashboard_summary(
 ) -> DashboardSummary:
     start_utc, end_utc, _timezone = await _tenant_day_bounds(session, tenant_id)
     seven_days = start_utc - timedelta(days=6)
+    zone = ZoneInfo(_timezone)
+    today_local = datetime.now(zone).date()
+    local_day = func.date_trunc("day", func.timezone(_timezone, MessageRow.sent_at))
 
     total_customers = (
         await session.execute(select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id))
@@ -159,7 +162,7 @@ async def get_dashboard_summary(
     activity_rows = (
         await session.execute(
             select(
-                func.date_trunc("day", MessageRow.sent_at).label("day"),
+                local_day.label("day"),
                 func.count().filter(MessageRow.direction == "inbound").label("inbound"),
                 func.count().filter(MessageRow.direction == "outbound").label("outbound"),
             )
@@ -178,7 +181,7 @@ async def get_dashboard_summary(
     }
     buckets: list[DayBucket] = []
     for i in range(7):
-        day = (start_utc + timedelta(days=i - 6)).date().isoformat()
+        day = (today_local + timedelta(days=i - 6)).isoformat()
         buckets.append(by_day.get(day, DayBucket(date=day, inbound=0, outbound=0)))
 
     return DashboardSummary(

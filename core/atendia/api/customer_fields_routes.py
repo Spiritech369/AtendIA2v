@@ -9,12 +9,13 @@ Values mounted at /api/v1/customers/{customer_id}/field-values
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,16 @@ from atendia.db.session import get_db_session
 
 definitions_router = APIRouter()
 values_router = APIRouter()
+
+FIELD_TYPES: frozenset[str] = frozenset({
+    "text",
+    "select",
+    "number",
+    "date",
+    "checkbox",
+    "multiselect",
+})
+_FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 
 
 # ── Definitions schemas ──────────────────────────────────────────────
@@ -43,18 +54,65 @@ class FieldDefOut(BaseModel):
 
 
 class FieldDefCreate(BaseModel):
-    key: str
-    label: str
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(min_length=2, max_length=64)
+    label: str = Field(min_length=1, max_length=120)
     field_type: str
     field_options: dict | None = None
     ordering: int = 0
 
+    @field_validator("key")
+    @classmethod
+    def _valid_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if not _FIELD_KEY_RE.fullmatch(normalized):
+            raise ValueError("key must be snake_case and start with a letter")
+        return normalized
+
+    @field_validator("field_type")
+    @classmethod
+    def _valid_field_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in FIELD_TYPES:
+            raise ValueError(f"field_type must be one of: {', '.join(sorted(FIELD_TYPES))}")
+        return normalized
+
+    @field_validator("field_options")
+    @classmethod
+    def _valid_options(cls, value: dict | None) -> dict | None:
+        if value is None:
+            return None
+        choices = value.get("choices") or value.get("options")
+        if choices is not None and (
+            not isinstance(choices, list) or not all(isinstance(v, str) and v.strip() for v in choices)
+        ):
+            raise ValueError("field_options choices/options must be a non-empty string list")
+        return value
+
 
 class FieldDefUpdate(BaseModel):
-    label: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(default=None, min_length=1, max_length=120)
     field_type: str | None = None
     field_options: dict | None = None
     ordering: int | None = None
+
+    @field_validator("field_type")
+    @classmethod
+    def _valid_field_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized not in FIELD_TYPES:
+            raise ValueError(f"field_type must be one of: {', '.join(sorted(FIELD_TYPES))}")
+        return normalized
+
+    @field_validator("field_options")
+    @classmethod
+    def _valid_options(cls, value: dict | None) -> dict | None:
+        return FieldDefCreate._valid_options(value)
 
 
 # ── Definitions endpoints ────────────────────────────────────────────

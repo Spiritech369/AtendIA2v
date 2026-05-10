@@ -13,6 +13,7 @@ from atendia.channels.tenant_config import (
     MetaTenantConfigNotFoundError,
     load_meta_config,
 )
+from atendia.channels.meta_dto import MetaInboundWebhook
 from atendia.config import get_settings
 from atendia.db.session import get_db_session
 from atendia.runner.composer_canned import CannedComposer
@@ -21,7 +22,7 @@ from atendia.runner.composer_protocol import ComposerProvider
 from atendia.runner.nlu_keywords import KeywordNLU
 from atendia.runner.nlu_openai import OpenAINLU
 from atendia.runner.nlu_protocol import NLUProvider
-from atendia.webhooks.deduplication import is_duplicate
+from atendia.webhooks.deduplication import mark_processed
 
 router = APIRouter()
 
@@ -98,7 +99,7 @@ async def _resolve_attachment_urls(
 
     Best-effort: errors leave the URL as the empty string the parser already
     set, and the runner downstream skips Vision when url is empty. We do
-    NOT raise — webhook contract is "always 200, retries are Meta's job".
+    NOT raise - webhook contract is "always 200, retries are Meta's job".
     """
     from atendia.channels.base import InboundMessageMetadata
     for m in inbound_messages:
@@ -112,6 +113,24 @@ async def _resolve_attachment_urls(
                 continue
             att.url = await adapter.fetch_media_url(att.media_id)
         m.metadata = meta.model_dump(mode="json")
+
+
+def _webhook_phone_number_ids(payload: dict) -> tuple[set[str], int]:
+    try:
+        webhook = MetaInboundWebhook.model_validate(payload)
+    except Exception:
+        return set(), 0
+    phone_ids: set[str] = set()
+    relevant_changes = 0
+    for entry in webhook.entry:
+        for change in entry.changes:
+            value = change.value
+            if not (value.messages or value.statuses):
+                continue
+            relevant_changes += 1
+            if value.metadata and value.metadata.phone_number_id:
+                phone_ids.add(value.metadata.phone_number_id)
+    return phone_ids, relevant_changes
 
 
 @router.post("/webhooks/meta/{tenant_id}")
@@ -142,16 +161,32 @@ async def receive_inbound(
             status_code=status.HTTP_400_BAD_REQUEST, detail="invalid json"
         )
 
+    try:
+        cfg = await load_meta_config(session, tenant_id)
+    except MetaTenantConfigNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="tenant has no Meta config",
+        )
+    phone_ids, relevant_changes = _webhook_phone_number_ids(payload)
+    if relevant_changes and (not phone_ids or phone_ids != {cfg.phone_number_id}):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="phone_number_id does not belong to tenant",
+        )
+
     inbound_messages = adapter.parse_webhook(payload, tenant_id=str(tenant_id))
     statuses = adapter.parse_status_callback(payload)
 
     # Resolve any attachment URLs via the Meta Graph API before we persist
     # them. fetch_media_url returns "" on failure so a transient Meta hiccup
-    # never 500s the webhook — the runner just skips Vision for that turn.
+    # never 500s the webhook - the runner just skips Vision for that turn.
     await _resolve_attachment_urls(adapter, inbound_messages)
 
     redis = await _get_redis()
     received_count = 0
+    processed_message_ids: list[str] = []
+    started_execution_ids = []
     try:
         # Record webhook arrival for channel status badge (Step 6).
         from datetime import datetime
@@ -162,15 +197,29 @@ async def receive_inbound(
             ex=86400,  # expire after 24h of inactivity
         )
         for m in inbound_messages:
-            if await is_duplicate(redis, m.channel_message_id):
+            started = await _persist_inbound(session, tenant_id, m)
+            if started is None:
                 continue
-            await _persist_inbound(session, tenant_id, m)
             received_count += 1
+            processed_message_ids.append(m.channel_message_id)
+            started_execution_ids.extend(started)
         for r in statuses:
-            await _update_status(session, r)
+            await _update_status(session, tenant_id, r)
         await session.commit()
+        for message_id in processed_message_ids:
+            await mark_processed(redis, str(tenant_id), message_id)
     finally:
         await redis.aclose()
+
+    if started_execution_ids:
+        from arq.connections import RedisSettings, create_pool
+        from atendia.workflows.engine import enqueue_executions_to_workflows_queue
+
+        arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        try:
+            await enqueue_executions_to_workflows_queue(arq_pool, started_execution_ids)
+        finally:
+            await arq_pool.aclose()
 
     return {
         "status": "ok",
@@ -179,7 +228,7 @@ async def receive_inbound(
     }
 
 
-async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
+async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UUID] | None:
     """Find or create customer + conversation, then insert inbound message."""
     cust_id = (await session.execute(
         text(
@@ -209,12 +258,15 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             {"c": conv_id},
         )
     metadata_json = _json.dumps(m.metadata or {})
-    await session.execute(
+    inserted_message_id = (await session.execute(
         text(
             "INSERT INTO messages "
             "(conversation_id, tenant_id, direction, text, channel_message_id, "
             "sent_at, metadata_json) "
-            "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, CAST(:meta AS JSONB))"
+            "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, CAST(:meta AS JSONB)) "
+            "ON CONFLICT (tenant_id, channel_message_id) "
+            "WHERE channel_message_id IS NOT NULL DO NOTHING "
+            "RETURNING id"
         ),
         {
             "c": conv_id,
@@ -224,7 +276,9 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             "ts": datetime.now(UTC),
             "meta": metadata_json,
         },
-    )
+    )).scalar_one_or_none()
+    if inserted_message_id is None:
+        return None
 
     # Bump unread count for the badge (scope gap: unread tracking)
     await session.execute(
@@ -335,7 +389,7 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
             )
             _ = trace  # silence unused-trace lint
         except Exception:
-            # Don't crash the webhook handler if the runner fails — just log via event.
+            # Don't crash the webhook handler if the runner fails - just log via event.
             # In production this would also bubble to monitoring.
             from atendia.contracts.event import EventType
             await emitter.emit(
@@ -344,33 +398,17 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> None:
                 event_type=EventType.ERROR_OCCURRED,
                 payload={"where": "conversation_runner", "message": "run_turn failed"},
             )
-        # Inline workflow trigger: hand off the execution ids that
-        # ``evaluate_event`` discovered earlier in this function to arq's
-        # ``workflows`` queue so ``WorkflowWorkerSettings`` picks them up.
-        # arq's ``_job_id`` dedupe plus the unique index on
-        # ``(workflow_id, trigger_event_id)`` keep this safe even if the
-        # surrounding commit later fails — the worker just no-ops.
-        if started_executions:
-            from atendia.workflows.engine import WORKFLOW_QUEUE_NAME
-            for execution_id in started_executions:
-                try:
-                    await arq_pool.enqueue_job(
-                        "execute_workflow_step",
-                        str(execution_id),
-                        None,
-                        _job_id=f"workflow:{execution_id}:start",
-                        _queue_name=WORKFLOW_QUEUE_NAME,
-                    )
-                except Exception:
-                    # Worker offline — the cron path picks it up next minute.
-                    continue
     finally:
         await arq_pool.aclose()
+    return started_executions
 
 
-async def _update_status(session: AsyncSession, r) -> None:
+async def _update_status(session: AsyncSession, tenant_id: UUID, r) -> None:
     """Update messages.delivery_status by channel_message_id (no-op if not found)."""
     await session.execute(
-        text("UPDATE messages SET delivery_status = :s WHERE channel_message_id = :cm"),
-        {"s": r.status, "cm": r.channel_message_id},
+        text(
+            "UPDATE messages SET delivery_status = :s "
+            "WHERE tenant_id = :t AND channel_message_id = :cm"
+        ),
+        {"s": r.status, "t": tenant_id, "cm": r.channel_message_id},
     )

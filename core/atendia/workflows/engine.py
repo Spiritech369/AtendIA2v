@@ -26,6 +26,7 @@ Design notes baked in here:
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -51,7 +52,7 @@ from atendia.db.models.workflow import (
     WorkflowActionRun,
     WorkflowExecution,
 )
-from atendia.queue.enqueue import enqueue_outbound
+from atendia.queue.outbox import stage_outbound
 
 # Trigger types match EventType.value (lowercase). Forward-contract triggers
 # (conversation_created, appointment_created, bot_paused) don't emit events
@@ -103,6 +104,10 @@ _CUSTOMER_FIELDS: frozenset[str] = frozenset({"score", "name", "phone_e164"})
 # Workflow jobs run on a dedicated arq queue so a burst of long-running
 # workflows can't starve send_outbound.
 WORKFLOW_QUEUE_NAME: str = "arq:queue:workflows"
+_OUTBOUND_SESSION: ContextVar[AsyncSession | None] = ContextVar(
+    "_OUTBOUND_SESSION",
+    default=None,
+)
 
 
 class WorkflowValidationError(ValueError):
@@ -386,17 +391,19 @@ async def evaluate_event(session: AsyncSession, event_id: UUID) -> list[UUID]:
         if not _trigger_matches(workflow.trigger_config or {}, event.payload or {}):
             continue
         # Idempotency on (workflow_id, trigger_event_id): unique index in 026.
+        # Use a savepoint so a duplicate retry does not roll back the caller's
+        # event/message transaction.
         try:
-            execution = WorkflowExecution(
-                workflow_id=workflow.id,
-                conversation_id=event.conversation_id,
-                trigger_event_id=event.id,
-                status="running",
-            )
-            session.add(execution)
-            await session.flush()
+            async with session.begin_nested():
+                execution = WorkflowExecution(
+                    workflow_id=workflow.id,
+                    conversation_id=event.conversation_id,
+                    trigger_event_id=event.id,
+                    status="running",
+                )
+                session.add(execution)
+                await session.flush()
         except IntegrityError:
-            await session.rollback()
             continue
         started.append(execution.id)
     return started
@@ -638,7 +645,11 @@ async def _node_message(
             "node_id": node["id"],
         },
     )
-    await _enqueue_outbound_for_workflow(msg)
+    token = _OUTBOUND_SESSION.set(session)
+    try:
+        await _enqueue_outbound_for_workflow(msg)
+    finally:
+        _OUTBOUND_SESSION.reset(token)
 
 
 async def _customer_phone_for_conversation(
@@ -957,11 +968,10 @@ async def _read_condition_value(
 
 async def _enqueue_outbound_for_workflow(msg: OutboundMessage) -> str:
     """Encapsulated for testability — monkeypatch in tests to record calls."""
-    redis = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
-    try:
-        return await enqueue_outbound(redis, msg)
-    finally:
-        await redis.aclose()
+    session = _OUTBOUND_SESSION.get()
+    if session is None:
+        raise RuntimeError("workflow outbound staging requires an active DB session")
+    return str(await stage_outbound(session, msg))
 
 
 async def _enqueue_workflow_step(

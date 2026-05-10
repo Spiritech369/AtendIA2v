@@ -39,9 +39,15 @@ export function useConversationStream(
     [conversationId, onMatch, queryClient],
   );
 
+  const onOpen = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
+    void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+  }, [conversationId, queryClient]);
+
   useWebSocket<ConversationEvent>({
     path: tenantId ? `/ws/tenants/${tenantId}` : "",
     onEvent,
+    onOpen,
     enabled: !!tenantId && !!conversationId,
   });
 }
