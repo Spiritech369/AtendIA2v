@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     )
     auth_session_ttl_s: int = Field(default=28800)  # 8h operator workday
     auth_cookie_secure: bool = Field(default=False)  # True in production behind TLS
+    # Phase B2 KB module — selects the LLM provider for retrieval/answer.
+    # ``mock`` is forced when ``openai_api_key`` is empty regardless of this
+    # value, so dev environments without keys still work.
+    kb_provider: Literal["openai", "mock"] = Field(default="openai")
 
 
 @lru_cache

@@ -153,33 +153,29 @@ def _read_event_types(tid):
 
 
 async def _drain_one_outbound_job(tid: str) -> dict | None:
-    """Pop one outbound job from arq's queue belonging to `tid` and return its msg_dict.
-    Returns None if no job is available within 2 seconds.
+    """Return the most recent outbound payload staged for ``tid``.
 
-    Note: scans all `arq:job:out:*` keys and filters by tenant_id, since prior tests
-    in the same suite may have left jobs in Redis for tenants that no longer exist.
+    Outbound messages are staged into ``outbound_outbox`` inside the same DB
+    transaction as the turn that produced them; an arq worker drains the
+    outbox onto the queue. Reading the staged payload here is equivalent to
+    the pre-outbox check that read the arq job key directly.
     """
-    from redis.asyncio import Redis
-    import arq.jobs
-    r = Redis.from_url(get_settings().redis_url)
+    engine = create_async_engine(get_settings().database_url)
     try:
-        # arq stores job data at key 'arq:job:<id>'. The queue is 'arq:queue'.
-        for _ in range(40):  # 2 seconds total
-            keys = await r.keys("arq:job:out:*")
-            for key in keys:
-                raw = await r.get(key)
-                if raw is None:
-                    continue
-                # arq encodes as msgpack; decoding requires arq internals.
-                job = arq.jobs.deserialize_job(raw, deserializer=None)
-                # job.args is a tuple — first arg is msg_dict
-                msg_dict = job.args[0]
-                if msg_dict.get("tenant_id") == tid:
-                    return msg_dict
-            await asyncio.sleep(0.05)
-        return None
+        async with engine.connect() as conn:
+            row = (await conn.execute(
+                text(
+                    "SELECT payload FROM outbound_outbox "
+                    "WHERE tenant_id = :t "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"t": tid},
+            )).first()
+            if row is None:
+                return None
+            return row[0]
     finally:
-        await r.aclose()
+        await engine.dispose()
 
 
 def test_e2e_echo_bot_flow(setup_tenant):

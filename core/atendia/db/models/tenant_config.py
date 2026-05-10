@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import HALFVEC  # type: ignore[import-untyped]
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -57,6 +58,24 @@ class TenantCatalogItem(Base):
     # Phase 3c.1
     category: Mapped[str | None] = mapped_column(String(60), nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(EMBEDDING_DIM), nullable=True)
+    # Phase B2 KB module — migration 032 (shared metadata + catalog-specific).
+    status: Mapped[str] = mapped_column(String(20), default="published", server_default="published")
+    visibility: Mapped[str] = mapped_column(String(20), default="agents", server_default="agents")
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID | None] = mapped_column()
+    updated_by: Mapped[UUID | None] = mapped_column()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    agent_permissions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    collection_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("kb_collections.id", ondelete="SET NULL")
+    )
+    language: Mapped[str] = mapped_column(String(8), default="es-MX", server_default="es-MX")
+    price_cents: Mapped[int | None] = mapped_column(BigInteger)
+    stock_status: Mapped[str] = mapped_column(String(20), default="unknown", server_default="unknown")
+    region: Mapped[str | None] = mapped_column(String(60))
+    branch: Mapped[str | None] = mapped_column(String(60))
+    payment_plans: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
 
 
 class TenantFAQ(Base):
@@ -73,6 +92,19 @@ class TenantFAQ(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Phase 3c.1
     embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(EMBEDDING_DIM), nullable=True)
+    # Phase B2 KB module — migration 032 (shared metadata).
+    status: Mapped[str] = mapped_column(String(20), default="published", server_default="published")
+    visibility: Mapped[str] = mapped_column(String(20), default="agents", server_default="agents")
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID | None] = mapped_column()
+    updated_by: Mapped[UUID | None] = mapped_column()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    agent_permissions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    collection_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("kb_collections.id", ondelete="SET NULL")
+    )
+    language: Mapped[str] = mapped_column(String(8), default="es-MX", server_default="es-MX")
 
 
 class TenantTemplateMeta(Base):
