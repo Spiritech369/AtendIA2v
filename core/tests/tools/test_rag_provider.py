@@ -1,6 +1,9 @@
 import pytest
 
+from atendia.config import get_settings
+from atendia.tools.rag import get_provider
 from atendia.tools.rag.mock_provider import MockProvider
+from atendia.tools.rag.openai_provider import OpenAIProvider
 from atendia.tools.rag.provider import PromptInput
 
 
@@ -35,6 +38,42 @@ async def test_mock_embedding_handles_whitespace_and_case_consistently():
     a = await p.create_embedding("  Hola Mundo  ")
     b = await p.create_embedding("hola mundo")
     assert a == b
+
+
+def test_get_provider_returns_mock_when_no_key(monkeypatch):
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "")
+    monkeypatch.setenv("ATENDIA_V2_KB_PROVIDER", "openai")
+    get_settings.cache_clear()
+    get_provider.cache_clear()
+    try:
+        assert isinstance(get_provider(), MockProvider)
+    finally:
+        get_settings.cache_clear()
+        get_provider.cache_clear()
+
+
+def test_get_provider_returns_mock_when_kb_provider_set_to_mock(monkeypatch):
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-fake-but-set")
+    monkeypatch.setenv("ATENDIA_V2_KB_PROVIDER", "mock")
+    get_settings.cache_clear()
+    get_provider.cache_clear()
+    try:
+        assert isinstance(get_provider(), MockProvider)
+    finally:
+        get_settings.cache_clear()
+        get_provider.cache_clear()
+
+
+def test_get_provider_returns_openai_when_key_present(monkeypatch):
+    monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-fake-but-set")
+    monkeypatch.setenv("ATENDIA_V2_KB_PROVIDER", "openai")
+    get_settings.cache_clear()
+    get_provider.cache_clear()
+    try:
+        assert isinstance(get_provider(), OpenAIProvider)
+    finally:
+        get_settings.cache_clear()
+        get_provider.cache_clear()
 
 
 @pytest.mark.asyncio
