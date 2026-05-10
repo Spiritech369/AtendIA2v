@@ -56,6 +56,11 @@ _RESPONSE_INSTRUCTIONS = (
     "Si la respuesta no está en las fuentes, escala al asesor."
 )
 
+# TODO(kb-followup-6): multi-language toggle. The `language` column ships
+# in migration 032 but is unused at synthesis time — every call assumes
+# es-MX. Plumb chunk.language through into the prompt so the system
+# instruction can switch register per language.
+
 _CHUNK_TEXT_MAX = 600
 
 
