@@ -1,426 +1,205 @@
 # atendia core
 
-The conversational core of AtendIA — Python package implementing the data-driven state machine, WhatsApp Cloud API transport, and realtime layer.
+The conversational core of AtendIA — Python package implementing the data-driven state machine, WhatsApp Cloud API transport, realtime layer, RAG pipeline, and operator REST API.
 
-## Overview
-
-`core/` is a self-contained Python package (`atendia`) that runs a conversation
-turn end-to-end **without an LLM**: a deterministic, data-driven state machine
-reads a JSONB pipeline definition per tenant, evaluates conditions against an
-NLU result, resolves the next action, executes any tools attached to that
-action, and persists a full `turn_traces` row plus structured `events`.
-
-Phase 1 delivers:
-
-- Tenant-configurable pipelines stored as JSONB in `tenant_pipelines`.
-- A `ConversationRunner` that drives one turn (NLU is canned in tests via YAML
-  fixtures; the real LLM-backed NLU lands in Phase 2).
-- 6 tool stubs registered behind a common `Tool` ABC.
-- Full observability: every turn writes a `turn_traces` record and emits
-  domain events into `events`.
-- A FastAPI surface (`POST /api/v1/runner/turn`, `GET /health`) and a smoke
-  script that exercises the full happy path against a real Postgres.
+> ⓘ Para un mapa de "qué hace cada módulo y dónde vive el código" mira [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md).
 
 ## Setup
 
 Prereqs: Docker + [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
-# 1. From the repo root, bring up Postgres + Redis.
+# 1. Desde el repo root, levanta Postgres + Redis.
 docker compose up -d
 
-# 2. From core/, install deps and run migrations.
+# 2. Desde core/, instala deps y aplica migraciones.
 cd core
 uv sync
 uv run alembic upgrade head
 
-# 3. Smoke test the full happy path against the live DB.
+# 3. Smoke test del full happy path contra la DB live.
 uv run python scripts/smoke_test_phase1.py
 
-# 4. (Optional) Run the API locally.
+# 4. (Opcional) Corre la API local.
 uv run uvicorn atendia.main:app --reload --port 8001
 ```
 
-Environment variables (loaded from `core/.env`):
+### Environment variables (loaded from `core/.env`)
 
-| Variable                          | Default                                                                  |
-|-----------------------------------|--------------------------------------------------------------------------|
-| `ATENDIA_V2_DATABASE_URL`         | `postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2`         |
-| `ATENDIA_V2_REDIS_URL`            | `redis://localhost:6380/0`                                               |
-| `ATENDIA_V2_LOG_LEVEL`            | `INFO`                                                                   |
-| `ATENDIA_V2_OPENAI_API_KEY`       | _(empty — set to enable real NLU/Composer)_                              |
-| `ATENDIA_V2_NLU_PROVIDER`         | `keyword` (set to `openai` to use `gpt-4o-mini`)                         |
-| `ATENDIA_V2_NLU_MODEL`            | `gpt-4o-mini`                                                            |
-| `ATENDIA_V2_NLU_TIMEOUT_S`        | `8.0`                                                                    |
-| `ATENDIA_V2_NLU_RETRY_DELAYS_MS`  | `[500, 2000]`                                                            |
-| `ATENDIA_V2_COMPOSER_PROVIDER`    | `canned` (set to `openai` to enable real Composer)                       |
-| `ATENDIA_V2_COMPOSER_MODEL`       | `gpt-4o`                                                                 |
-| `ATENDIA_V2_COMPOSER_TIMEOUT_S`   | `8.0`                                                                    |
-| `ATENDIA_V2_COMPOSER_RETRY_DELAYS_MS` | `[500, 2000]`                                                        |
-| `ATENDIA_V2_COMPOSER_MAX_MESSAGES`| `2`                                                                      |
+| Variable | Default |
+|---|---|
+| `ATENDIA_V2_DATABASE_URL` | `postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2` |
+| `ATENDIA_V2_REDIS_URL` | `redis://localhost:6380/0` |
+| `ATENDIA_V2_LOG_LEVEL` | `INFO` |
+| `ATENDIA_V2_OPENAI_API_KEY` | _(empty — set para activar real NLU/Composer/KB)_ |
+| `ATENDIA_V2_NLU_PROVIDER` | `keyword` (set `openai` para `gpt-4o-mini`) |
+| `ATENDIA_V2_NLU_MODEL` | `gpt-4o-mini` |
+| `ATENDIA_V2_NLU_TIMEOUT_S` | `8.0` |
+| `ATENDIA_V2_COMPOSER_PROVIDER` | `canned` (set `openai` para `gpt-4o`) |
+| `ATENDIA_V2_COMPOSER_MODEL` | `gpt-4o` |
+| `ATENDIA_V2_COMPOSER_MAX_MESSAGES` | `2` |
+| `ATENDIA_V2_KB_PROVIDER` | `openai` (auto-fallback a `mock` si no hay API key) |
+| `ATENDIA_V2_AUTH_SESSION_SECRET` | (override en prod) |
+| `ATENDIA_V2_AUTH_SESSION_TTL_S` | `28800` (8h) |
+| `ATENDIA_V2_AUTH_COOKIE_SECURE` | `false` (true detrás de TLS) |
 
-Postgres lives on port **5433**, Redis on **6380**. Both managed by `docker-compose.yml` at the repo root. (The non-default ports are a holdover from when v2 lived alongside v1; you can change them in `docker-compose.yml` and `core/.env` if you want.) The Postgres image is **`pgvector/pgvector:0.8.2-pg15`** — Phase 3c.1 added an `halfvec(3072)` column on `tenant_catalogs` and `tenant_faqs` for semantic search, and the `vector` extension comes pre-compiled in that image.
+Postgres en puerto **5433**, Redis en **6380**. Ambos manejados por `docker-compose.yml` en el repo root. La imagen Postgres es **`pgvector/pgvector:0.8.2-pg15`** — extensiones `vector` + `halfvec` precompiladas.
 
-### Ingesting Dinamo data (Phase 3c.1)
-
-Once the tenant + branding rows exist, populate the catalog + FAQs + plans
-from the canonical JSONs in `docs/`:
+### Seed scripts
 
 ```bash
+# Dinamo data + brand_facts (Phase 3c.1)
 cd core
 PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.ingest_dinamo_data \
     --tenant-id <UUID> --docs-dir ../docs [--dry-run]
-```
 
-`--dry-run` reports how many tokens + dollars an ingestion would cost
-without writing to the DB. A full Dinamo ingestion (34 catalog items + 26
-FAQs) costs roughly **$0.0004** at text-embedding-3-large pricing.
-Idempotent: re-runs UPDATE in place via ON CONFLICT.
-
-### Activating Phase 3c.2 — Router + flow modes
-
-The deterministic `flow_router` picks one of six conversational modes
-(PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT) per turn from a per-tenant
-rule list, then the composer renders the matching `MODE_PROMPTS` block.
-Three things must be configured before the router does anything useful:
-
-1. **`flow_mode_rules`** in `tenant_pipelines.definition` JSONB — list of
-   trigger/mode rules; if missing, defaults to `[always → SUPPORT]` (legacy
-   FAQ behavior preserved). The 8 trigger types are documented in
-   [`atendia/runner/flow_router.py`](atendia/runner/flow_router.py).
-
-2. **`docs_per_plan`** in the same JSONB — `tipo_credito` label → ordered
-   list of doc keys (`["ine", "comprobante", ...]`). Drives DOC mode's
-   `next_pending_doc()` logic and HandoffSummary's docs_recibidos split.
-
-3. **`brand_facts`** in `tenant_branding.default_messages` JSONB — the
-   composer pre-pass substitutes `{{brand_facts.X}}` references inside
-   MODE_PROMPTS with these values. Seed via:
-
-```bash
-cd core
 PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python -m atendia.scripts.seed_brand_facts \
     --tenant-name dinamomotos
+
+# KB module defaults (B2)
+uv run python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>
 ```
 
-The script UPSERTs into `tenant_branding` so a fresh tenant works too.
-Every escalation now writes a structured `HandoffSummary` to
-`human_handoffs.payload` (migration 016) so the operator dashboard
-renders context without parsing free-text reasons.
-
-Vision API runs in parallel with NLU when an inbound carries an image
-attachment; cost lands on `turn_traces.vision_cost_usd` (migration 015).
-Live tests for all six modes:
+## Tests
 
 ```bash
-cd core && RUN_LIVE_LLM_TESTS=1 uv run pytest \
-    tests/runner/test_phase3c2_live.py tests/tools/test_vision_live.py
+cd core
+
+# Suite completa (~800 tests).
+uv run pytest
+
+# Sólo el área que estás cambiando:
+uv run pytest tests/state_machine/
+uv run pytest tests/api/test_kb_test_query.py
+uv run pytest -k "happy_path"
+
+# Coverage (gate: ≥85%).
+uv run pytest --cov=atendia
+
+# Lint + type-check.
+uv run ruff check .
+uv run mypy atendia
 ```
 
-Total cost ~$0.035 USD per pass (defaults skipped in CI).
+Tests con DB (anything bajo `tests/db/`, `tests/runner/`, `tests/api/`, `tests/e2e/`) requieren Postgres + Redis corriendo y `alembic upgrade head` aplicado.
 
-### Activating Phase 3d.1 — In-window follow-ups
+Live OpenAI tests gated por `RUN_LIVE_LLM_TESTS=1` (default off).
 
-The runner schedules a two-tier silence ladder after every outbound:
-
-| Tier | Run-at | Body |
-|------|--------|------|
-| `3h_silence` | now + 3h | "En lugar de gastar en el camión, puedes invertirlo mejor en tu moto..." |
-| `12h_silence` | now + 12h | "¿sigues en pie con tu [modelo_moto]? Tu plan [plan_credito]% sigue activo..." |
-
-An inbound from the customer cancels every pending row for that
-conversation in a single SQL update — no race vs a cron tick that's
-mid-pick is possible because the worker re-checks `cancelled_at IS NULL`
-inside its `SELECT FOR UPDATE SKIP LOCKED` window.
-
-Run the cron worker (separate process from the outbound queue):
+## Workers
 
 ```bash
+# Outbound queue + cron jobs (followups, etc.).
 cd core
 uv run arq atendia.queue.worker.WorkerSettings
 ```
 
-The same `WorkerSettings` registers both `send_outbound` (queue) and
-`poll_followups` (cron, every minute). `poll_followups` is hardened:
-SKIP LOCKED, `enqueued_at` flag for crash-restart idempotency, `LIMIT 50`
-per tick to dodge Meta rate limits, quiet hours UTC 04-13 (≈ MX 22-07),
-and a `tenants.followups_enabled` kill-switch.
-
-**Out of scope for 3d.1, deferred to 3d.2:**
-  * `>24h` follow-ups via WhatsApp Templates (require Meta-approved
-    per-tenant templates; the OutboundMessage contract already supports
-    `type=template` so 3d.2 is mostly registry + parameter binding).
-  * Per-doc 2h/24h reminders for OBSTACLE-mode customers stuck on a
-    specific paper (compromiso INE / comprobante / etc.).
-  * Per-customer timezone (currently quiet hours are server-time UTC
-    tuned to Mexico).
-
-### NLU rollout sequence (Phase 3a)
-
-1. Deploy with `ATENDIA_V2_NLU_PROVIDER=keyword` (default). Behavior matches Phase 2.
-2. Provision the OpenAI key in env (`ATENDIA_V2_OPENAI_API_KEY=sk-...`).
-3. Flip `ATENDIA_V2_NLU_PROVIDER=openai` to enable the real classifier. The runner switches over without restart-only-code-changes.
-4. Watch `turn_traces.nlu_cost_usd` and `nlu_latency_ms` for cost/quality monitoring.
-
-## Running the outbound worker
-
-The webhook handler enqueues outbound messages on Redis. A separate `arq` worker process picks them up and calls Meta:
-
-```bash
-cd core
-uv run arq atendia.queue.worker.WorkerSettings
-```
-
-The worker reads `ATENDIA_V2_META_ACCESS_TOKEN` and `ATENDIA_V2_META_APP_SECRET` from env. Per-tenant `phone_number_id` lives in `tenants.config.meta.phone_number_id` (JSONB).
-
-In dev you can also drain the queue manually for one job and call `send_outbound` directly — see `tests/integration/test_e2e_echo_bot.py` for the pattern.
-
-## Connecting to WebSocket from a client
-
-The realtime endpoint is `/ws/conversations/{conversation_id}?token=<JWT>`. The JWT is issued by `atendia.realtime.auth.issue_token(tenant_id=..., ttl_seconds=...)` and signed with the Meta app secret (Phase 2 reuses it; Phase 3 will use a dedicated `WS_AUTH_SECRET`).
-
-JavaScript example (browser):
-
-```js
-const token = await fetch("/api/v1/auth/ws-token").then(r => r.text());  // your auth endpoint
-const ws = new WebSocket(`ws://localhost:8000/ws/conversations/${conversationId}?token=${token}`);
-ws.onmessage = (e) => {
-  const event = JSON.parse(e.data);
-  console.log(event.type, event.data);  // "message_received" / "message_sent"
-};
-```
-
-CLI testing with `wscat`:
-
-```bash
-TOKEN=$(uv run python -c "from atendia.realtime.auth import issue_token; print(issue_token(tenant_id='YOUR_TENANT_UUID', ttl_seconds=3600))")
-wscat -c "ws://localhost:8000/ws/conversations/YOUR_CONV_UUID?token=$TOKEN"
-```
+`WorkerSettings` registra `send_outbound` (queue), `index_document` (queue), `force_summary` (queue), `poll_followups` (cron cada minuto), `poll_workflow_triggers` (cron). El worker lee `ATENDIA_V2_META_ACCESS_TOKEN` y `ATENDIA_V2_META_APP_SECRET` del env. Per-tenant `phone_number_id` vive en `tenants.config.meta.phone_number_id` (JSONB).
 
 ## Smoke tests
-
-Two end-to-end smoke scripts you can run manually against your local DB + Redis:
 
 ```bash
 cd core
 # Phase 1: state machine sin LLM end-to-end
 PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python scripts/smoke_test_phase1.py
 
-# Phase 2: full transport chain (webhook → runner → queue → worker → mocked Meta)
+# Phase 2: full transport chain (webhook → runner → outbox → worker → mocked Meta)
 PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python scripts/smoke_test_phase2.py
 ```
 
-**Windows note:** `PYTHONIOENCODING=utf-8` avoids Unicode encoding errors when printing emoji / arrows. `PYTHONPATH=.` is needed because the package isn't installed (no build-system entry in `pyproject.toml`); pytest doesn't need it because pytest auto-adds the rootdir.
+**Windows:** `PYTHONIOENCODING=utf-8` evita errores de encoding al imprimir emoji / arrows. `PYTHONPATH=.` es necesario porque el package no está instalado.
 
-Both scripts print a turn-by-turn summary and exit `0` with `OK — phase N smoke test passed`.
-
-## Architecture
+## Architecture (resumen)
 
 ```
-core/
-  atendia/
-    api/              FastAPI router (POST /api/v1/runner/turn, GET /health)
-    config.py         pydantic-settings: ATENDIA_V2_* env vars
-    contracts/        Pydantic v2 contracts (Message, Event, NLUResult,
-                      ConversationState, PipelineDefinition)
-    db/
-      base.py         declarative Base
-      session.py      async SQLAlchemy engine + session factory
-      models/         ORM models (tenant, customer, conversation, message,
-                      event, turn_trace, lifecycle, tenant_config)
-      migrations/     Alembic (async). 9 revisions, 17 tables total.
-    runner/
-      conversation_runner.py  Orchestrates one turn end-to-end
-      nlu_canned.py           YAML-fixture-backed NLU for tests
-      nlu_keywords.py         Keyword-matching NLU (Phase 2 default)
-      nlu_openai.py           gpt-4o-mini structured-output NLU (Phase 3a)
-      nlu_prompts.py          System/user prompt builder for the LLM
-      nlu/pricing.py          Per-token cost computation
-    state_machine/
-      pipeline_loader.py  Loads + validates active tenant pipeline
-      conditions.py       Tiny DSL: intent, sentiment, confidence, in, AND/OR
-      ambiguity.py        Confidence threshold + explicit ambiguity guard
-      transitioner.py     Picks next stage from the pipeline
-      action_resolver.py  Maps intent -> first allowed action in the stage
-      event_emitter.py    Persists Event rows
-      orchestrator.py     Composes the above into one call
-    tools/
-      base.py             Tool ABC + ToolNotFoundError
-      registry.py         In-memory registry (name -> Tool)
-      runner.py           Executes a tool and persists a tool_calls row
-      __init__.py         register_all_tools()
-      search_catalog.py, quote.py, lookup_faq.py,
-      book_appointment.py, escalate.py, followup.py
-    main.py             FastAPI app entry point
-  scripts/
-    smoke_test_phase1.py  End-to-end smoke against the live v2 DB
-  tests/                  pytest-asyncio suite (139 tests in Phase 3a scope, 85.52% coverage)
-    fixtures/conversations/  5 YAML conversation scenarios
+core/atendia/
+  api/              FastAPI routes (per feature) + _kb/ subrouters
+  channels/         Meta Cloud API adapter + DTOs + HMAC
+  config.py         pydantic-settings (ATENDIA_V2_*)
+  contracts/        Pydantic v2 contracts (Message, Event, NLUResult, ...)
+  db/
+    base.py session.py
+    models/         ORM (28+ tablas)
+    migrations/     Alembic async, 36+ revisions
+  queue/            arq workers + outbox + circuit breaker
+  realtime/         Pub/Sub publisher + WebSocket + JWT
+  runner/           ConversationRunner + NLU adapters + Composer + flow_router
+  scripts/          ingest_dinamo_data, seed_brand_facts, seed_knowledge_defaults
+  state_machine/    Pipeline loader, conditions, orchestrator
+  storage/          Storage backend abstraction
+  tools/            7 tools + tools/rag/ (provider, retriever, prompt_builder,
+                    answer_synthesizer, conflict_detector, risky_phrase_detector)
+  webhooks/         POST /webhooks/meta/:tenant_id
+  main.py           FastAPI app
 ```
 
-The 17 tables, by migration:
+Per-feature breakdown completo: ver [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md).
 
-1. `tenants`, `tenant_users`
-2. `customers`
-3. `conversations`, `conversation_state`
-4. `messages`
-5. `events`
-6. `turn_traces`, `tool_calls`
-7. `tenant_catalogs`, `tenant_faqs`, `tenant_pipelines`
-8. `tenant_branding`, `tenant_templates_meta`, `tenant_tools_config`
-9. `followups_scheduled`, `human_handoffs`
+Stack: Python 3.12, `uv`, FastAPI, SQLAlchemy 2.0 async, asyncpg, Alembic, Pydantic v2, `arq`, Redis, Postgres + pgvector + halfvec(3072) HNSW, pytest-asyncio, ruff, mypy.
 
-Stack: Python 3.12, `uv`, FastAPI, SQLAlchemy 2.0 async, asyncpg, Alembic,
-Pydantic v2, pytest-asyncio, ruff, mypy.
+## How-to
 
-## How to run tests
+### Add a new tool
 
-```bash
-cd core
+1. Crear clase en `core/atendia/tools/<name>.py` que herede de `Tool` (`atendia/tools/base.py`). Definir `name: str` y `async def run(self, session: AsyncSession, **kwargs) -> dict`.
+2. Registrarlo en `core/atendia/tools/__init__.py` añadiéndolo a `register_all_tools()`.
+3. Test unitario en `core/tests/tools/`.
 
-# Full suite (196 tests).
-uv run pytest
+El runner (`atendia/tools/runner.py`) lo recoge automáticamente del registry y persiste un `tool_calls` row con `latency_ms`. Sin glue extra.
 
-# With coverage report. Hard floor is 85% (enforced via pyproject.toml).
-uv run pytest --cov=atendia
+### Add a new pipeline stage
 
-# A single module or test.
-uv run pytest tests/state_machine/test_orchestrator.py
-uv run pytest -k "happy_path"
-
-# Lint and type-check.
-uv run ruff check .
-uv run mypy atendia
-```
-
-DB-touching tests (anything under `tests/db/`, `tests/runner/`, `tests/api/`,
-`tests/e2e/`) require the v2 Postgres to be running and migrations applied.
-
-## How to add a new tool
-
-1. Create a class in `core/atendia/tools/<name>.py` that subclasses `Tool`
-   from `atendia/tools/base.py`. Set `name: str` and implement
-   `async def run(self, session: AsyncSession, **kwargs) -> dict`.
-2. Register it in `core/atendia/tools/__init__.py` by adding the class to the
-   list inside `register_all_tools()`.
-3. Add a unit test under `core/tests/tools/`.
-
-The runner (`atendia/tools/runner.py`) will pick it up via the registry,
-execute it, and persist a `tool_calls` row with `latency_ms` automatically.
-No glue code beyond steps 1 and 2.
-
-## How to add a new stage to a tenant pipeline
-
-A pipeline lives as a single JSONB blob in `tenant_pipelines.definition`,
-keyed by `tenant_id` + `version`, with `active = true` for the row in use.
-There is no schema migration involved.
-
-Minimal example: insert a 4-stage pipeline for a tenant.
+Un pipeline vive como un único JSONB blob en `tenant_pipelines.definition`, keyed por `(tenant_id, version)` con `active = true` para la fila en uso. **No hay migración involucrada.**
 
 ```sql
 INSERT INTO tenant_pipelines (tenant_id, version, definition, active) VALUES (
-  '<tenant-uuid>',
-  1,
+  '<tenant-uuid>', 1,
   '{
     "version": 1,
     "stages": [
-      {"id": "greeting",
-       "actions_allowed": ["greet", "ask_field"],
+      {"id": "greeting", "actions_allowed": ["greet", "ask_field"],
        "transitions": [{"to": "qualify", "when": "intent in [ask_info, ask_price]"}]},
-      {"id": "qualify",
-       "required_fields": ["interes_producto", "ciudad"],
+      {"id": "qualify", "required_fields": ["interes_producto", "ciudad"],
        "actions_allowed": ["ask_field", "lookup_faq", "ask_clarification"],
        "transitions": [{"to": "quote",
                         "when": "all_required_fields_present AND intent == ask_price"}]},
-      {"id": "quote",
-       "actions_allowed": ["quote", "ask_clarification"],
+      {"id": "quote", "actions_allowed": ["quote", "ask_clarification"],
        "transitions": [{"to": "close", "when": "intent == buy"}]},
       {"id": "close", "actions_allowed": ["close"], "transitions": []}
     ],
     "tone": {"register": "informal_mexicano"},
     "fallback": "escalate_to_human"
-  }'::jsonb,
-  true
+  }'::jsonb, true
 );
 ```
 
-The condition DSL supports `intent`, `sentiment`, `confidence`,
-`all_required_fields_present`, `in [...]`, `==`, and `AND` / `OR`. See
-`atendia/state_machine/conditions.py` for the full grammar and
-`atendia/contracts/pipeline_definition.py` for the structural validator that
-runs at load time.
+DSL completo: [`atendia/state_machine/conditions.py`](atendia/state_machine/conditions.py).
+Validador estructural: [`atendia/contracts/pipeline_definition.py`](atendia/contracts/pipeline_definition.py).
 
-## Phase 1 status
+### Connect to WebSocket from a client
 
-**Done:**
+Endpoint: `/ws/conversations/{conversation_id}?token=<JWT>`. JWT firmado por `atendia.realtime.auth.issue_token(...)`.
 
-- 9 Alembic migrations, 17 tables, async-first.
-- Pydantic contracts with json-schema consistency tests.
-- Pipeline loader + condition DSL + transitioner + action resolver +
-  ambiguity guard, all wired through an orchestrator.
-- 6 registered tools (`search_catalog`, `quote`, `lookup_faq`,
-  `book_appointment`, `escalate_to_human`, `schedule_followup`) — currently
-  stubs that return deterministic payloads and persist `tool_calls` rows.
-- `ConversationRunner` end-to-end with a canned-NLU adapter for fixtures.
-- FastAPI runner endpoint + healthcheck.
-- 5 conversation fixtures exercised by an e2e test runner.
-- Smoke test script against the live DB.
-- 196 tests passing (90 from Fase 1 + 106 from Fase 2), 95.32% aggregate coverage. Gate: ≥ 85%.
+```js
+const token = await fetch("/api/v1/auth/ws-token").then(r => r.text());
+const ws = new WebSocket(`ws://localhost:8000/ws/conversations/${conversationId}?token=${token}`);
+ws.onmessage = (e) => {
+  const event = JSON.parse(e.data);
+  console.log(event.type, event.data);
+};
+```
 
-**Deliberately NOT done in Phase 1:**
+CLI con `wscat`:
 
-- No real LLM. NLU is canned per fixture (`runner/nlu_canned.py`); the
-  Anthropic-backed NLU adapter lands in Phase 2.
-- No WhatsApp transport. The gateway and Meta adapter are still v1; v2
-  ingestion is Phase 3.
-- No outbound message composer. Tools return structured data; turning that
-  into a customer-facing reply is Phase 2.
-- Tool implementations are stubs. Real catalog search, real quote logic,
-  real FAQ retrieval and real calendar booking land alongside the LLM
-  composer.
+```bash
+TOKEN=$(uv run python -c "from atendia.realtime.auth import issue_token; print(issue_token(tenant_id='YOUR_TENANT_UUID', ttl_seconds=3600))")
+wscat -c "ws://localhost:8000/ws/conversations/YOUR_CONV_UUID?token=$TOKEN"
+```
 
-## Phase 2 status — WhatsApp Cloud API transport
+## Status (2026-05-10)
 
-Done:
-- Webhook GET (subscription challenge) verified per-tenant via `verify_token` in `tenants.config.meta`.
-- Webhook POST validates HMAC-SHA256, dedupes via Redis (24h TTL), persists inbound, emits `message_received` event, publishes to Pub/Sub, and runs `ConversationRunner` with keyword-based NLU.
-- Outbound queue (`arq`) with idempotency-by-key, exponential backoff retry on transient failures, and per-tenant circuit breaker (10 failures / 60s opens for 30s).
-- Worker (`atendia.queue.worker.send_outbound`) calls Meta Cloud API, persists outbound message, publishes `message_sent` event.
-- WebSocket endpoint `/ws/conversations/:conversation_id?token=<JWT>` forwards Pub/Sub events scoped to the JWT's tenant.
-- Outbound dispatcher maps orchestrator decisions to Phase 2 canned text per action (Phase 3 will replace this with the LLM Composer).
+Phases 1, 2, 3a, 3b, 3c.1, 3c.2, 3d.1 — ✅ shipped.
+Phase 3d.2 (WhatsApp Templates >24h) + 3d.3 (outbound multimedia) — ⏳ pendientes.
+Phase 4 / V1 parity sprint (frontend operator workspace) — ✅ scaffolded; per-module parity verification still pending.
+Knowledge Base module B2 — ⚠️ **partial** (backend Phase 1+2 + 3 endpoints + seed/runbook; frontend rebuild + ~44 endpoints + 5 workers diferidos). Ver [`../docs/runbooks/knowledge-base.md`](../docs/runbooks/knowledge-base.md).
 
-Not in Phase 2 (deliberate):
-- LLM-based NLU (`gpt-4o-mini`) — Phase 3.
-- LLM Composer (`gpt-4o`) — Phase 3.
-- Real Meta Business onboarding flow — Phase 5.
-- Encryption at rest for tenant credentials — Phase 6.
-
-## Next phases
-
-- Architecture doc: [`../docs/design/atendia-v2-architecture.md`](../docs/design/atendia-v2-architecture.md)
-- Phase 1 plan (state machine): [`../docs/plans/01-nucleo-conversacional.md`](../docs/plans/01-nucleo-conversacional.md)
-- Phase 2 plan (WhatsApp transport): [`../docs/plans/02-transporte-whatsapp.md`](../docs/plans/02-transporte-whatsapp.md)
-
-**Phase 3a (done)** — NLU real (`gpt-4o-mini`) with structured outputs, retry on transient
-errors, and per-turn cost/latency tracking persisted in `turn_traces`. Toggled by
-`ATENDIA_V2_NLU_PROVIDER` (`keyword` → `openai`). Live OpenAI smoke test gated by
-`RUN_LIVE_LLM_TESTS=1`.
-
-**Phase 3b (done)** — Composer real (`gpt-4o`) replaces the canned action-text dispatcher.
-Returns `list[str]` (1–3 messages) via OpenAI strict structured outputs, applies the per-tenant
-`Tone` from `tenant_branding.voice` (register, emojis, forbidden / signature phrases, max words),
-respects the 24h Meta session window (escalates to human handoff outside of it), and falls back
-to canned text on retry exhaustion. Toggled by `ATENDIA_V2_COMPOSER_PROVIDER` (`canned` → `openai`).
-Rollout: run `seed_dinamo_voice` + `alembic upgrade head` (drops legacy `pipeline.tone`) before
-flipping the flag. Live OpenAI smoke test (including a no-invent-price assertion) gated by
-`RUN_LIVE_LLM_TESTS=1`.
-
-**Phase 3c** — Migración de pipeline / catálogo / FAQs de Dinamo a DB con embeddings.
-
-The state machine, transport, queue, and realtime layer stay unchanged across 3a–3c — only
-the LLM-touched components swap in.
-
-**Phase 4** — frontend debug panel + tenant config UI consuming the realtime WebSocket.
-
-**Phase 5+** — onboarding flow, multi-channel adapters (Instagram DM, web), Google
-Calendar / Sheets integrations, A/B testing of prompts.
+Status detallado por módulo en [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md) y [`../docs/plans/2026-05-08-v1-parity-modular-plan.md`](../docs/plans/2026-05-08-v1-parity-modular-plan.md).
