@@ -104,19 +104,27 @@ async def _redis_clear(channel_id: str):
     from redis.asyncio import Redis
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_id}")
-    # Clear arq queue keys that might be left over
     await r.aclose()
 
 
-def _count_arq_jobs():
-    """Count jobs currently queued in arq's default queue."""
+def _count_outbox_jobs(tid):
+    """Count outbound_outbox rows for the tenant.
+
+    The runner stages outbound messages in the ``outbound_outbox`` table inside
+    the same DB transaction as the turn; a separate worker drains the outbox
+    onto the arq queue. The pre-outbox version of this test counted
+    ``arq:job:out:*`` keys directly — that's no longer where new outbound
+    messages land first.
+    """
     async def _do():
-        from redis.asyncio import Redis
-        r = Redis.from_url(get_settings().redis_url)
-        # arq uses 'arq:queue' for the queue and 'arq:job:<id>' per job
-        keys = await r.keys("arq:job:out:*")
-        await r.aclose()
-        return len(keys)
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.connect() as conn:
+            n = (await conn.execute(
+                text("SELECT COUNT(*) FROM outbound_outbox WHERE tenant_id = :t"),
+                {"t": tid},
+            )).scalar_one()
+        await engine.dispose()
+        return n
     return asyncio.run(_do())
 
 
@@ -127,7 +135,7 @@ def test_inbound_greeting_enqueues_outbound_greet_text(setup_tenant):
     body = json.dumps(_payload("wamid.T26_GREET", "hola buenos días")).encode()
     sig = _sign(body)
 
-    jobs_before = _count_arq_jobs()
+    jobs_before = _count_outbox_jobs(tid)
     with TestClient(app) as client:
         r = client.post(
             f"/webhooks/meta/{tid}",
@@ -136,7 +144,7 @@ def test_inbound_greeting_enqueues_outbound_greet_text(setup_tenant):
         )
         assert r.status_code == 200
 
-    jobs_after = _count_arq_jobs()
+    jobs_after = _count_outbox_jobs(tid)
     assert jobs_after == jobs_before + 1, (
-        f"expected exactly one new arq job after greeting; before={jobs_before}, after={jobs_after}"
+        f"expected exactly one new outbox row after greeting; before={jobs_before}, after={jobs_after}"
     )

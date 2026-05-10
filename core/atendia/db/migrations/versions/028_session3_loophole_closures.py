@@ -75,6 +75,12 @@ def downgrade() -> None:
     op.drop_constraint("fk_events_actor_user_id", "events", type_="foreignkey")
     op.drop_column("events", "actor_user_id")
 
+    # Admin/system events written under the new schema may have NULL
+    # conversation_id (workflow-level, KB-level, tenant-level). Reverting
+    # the column to NOT NULL must drop those rows first or the ALTER fails.
+    # This is destructive but matches the intent of the downgrade — go back
+    # to the pre-028 invariant where every event was conversation-scoped.
+    op.execute("DELETE FROM events WHERE conversation_id IS NULL")
     op.alter_column(
         "events",
         "conversation_id",

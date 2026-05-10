@@ -19,7 +19,9 @@
         "tool_called",
         "human_handoff_requested",
         "followup_scheduled",
-        "error_occurred"
+        "error_occurred",
+        "conversation_updated",
+        "conversation_deleted"
       ]
     },
     "payload": { "type": "object" },
