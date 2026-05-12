@@ -1,1800 +1,1733 @@
+import { Background, Controls, MarkerType, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
+  AlertTriangle,
   Bot,
-  Bug,
+  BrainCircuit,
   Check,
-  ChevronDown,
-  ChevronRight,
+  CheckCircle2,
+  ClipboardCheck,
   Copy,
   Download,
-  Eye,
-  GripVertical,
+  FileJson,
+  FlaskConical,
+  GitBranch,
+  Globe2,
   History,
   Loader2,
   MessageCircle,
   MoreVertical,
+  Pause,
   Play,
   Plus,
   RefreshCw,
   RotateCcw,
-  Send,
-  Shield,
+  Save,
+  Search,
+  ShieldCheck,
   Sparkles,
-  Star,
+  TestTube2,
   Trash2,
+  UploadCloud,
+  UserCheck,
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { agentsApi, type AgentItem } from "@/features/agents/api";
+import {
+  agentsApi,
+  type AgentItem,
+  type AgentPayload,
+  type DecisionMap,
+  type ExtractionField,
+  type Guardrail,
+  type PreviewResult,
+  type ValidationResult,
+} from "@/features/agents/api";
+import { DemoBadge } from "@/components/DemoBadge";
+import { NYIButton } from "@/components/NYIButton";
+import { cn } from "@/lib/utils";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+const roleOptions = [
+  { value: "reception", label: "Recepcionista", detail: "Entrada, calificación y captura" },
+  { value: "sales_agent", label: "Sales agent", detail: "Venta, objeciones y cotización" },
+  { value: "duda_general", label: "Duda general", detail: "FAQ, horarios y catálogo" },
+  { value: "postventa", label: "Postventa", detail: "Servicio, garantía y seguimiento" },
+  { value: "sales", label: "Ventas", detail: "Rol legacy" },
+  { value: "support", label: "Soporte", detail: "Rol legacy" },
+  { value: "custom", label: "Custom", detail: "Configuración libre" },
+] as const;
 
-const ROLES = ["sales", "support", "collections", "documentation", "reception", "custom"] as const;
-const ROLE_LABEL: Record<string, string> = {
-  sales: "Ventas",
-  support: "Soporte",
-  collections: "Cobranza",
-  documentation: "Documentación",
-  reception: "Recepción",
-  custom: "Personalizado",
-};
-const ROLE_COLOR: Record<string, string> = {
-  sales: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  support: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  collections: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  documentation: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-  reception: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-  custom: "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300",
-};
-
-const TONES = ["formal", "neutral", "amigable", "entusiasta", "casual"] as const;
-const TONE_ICON: Record<string, string> = {
-  formal: "🎩",
-  neutral: "😐",
-  amigable: "😊",
-  entusiasta: "⚡",
-  casual: "😎",
-};
-
-const LANGUAGES = [
+const toneOptions = ["Cálido", "Claro y conciso", "Consultivo", "Formal", "Empático", "Directo"];
+const languageOptions = [
   { value: "es", label: "Español (México)" },
   { value: "en", label: "English" },
-  { value: "both", label: "Ambos" },
-] as const;
-
-const INTENTS = [
-  "GREETING", "ASK_INFO", "ASK_PRICE", "BUY",
-  "SCHEDULE", "COMPLAIN", "OFF_TOPIC", "UNCLEAR",
-] as const;
-
-const FIELD_TYPES = [
-  "text", "number", "date", "boolean", "phone",
-  "email", "currency", "percentage", "select", "file",
-] as const;
-type FieldType = (typeof FIELD_TYPES)[number];
-
-const FIELD_TYPE_LABEL: Record<string, string> = {
-  text: "Texto", number: "Número", date: "Fecha", boolean: "Booleano",
-  phone: "Teléfono", email: "Email", currency: "Moneda",
-  percentage: "Porcentaje", select: "Opción", file: "Archivo",
-};
-const FIELD_TYPE_COLOR: Record<string, string> = {
-  text: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  number: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
-  date: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  boolean: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  phone: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  email: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
-  currency: "bg-green-500/10 text-green-700 dark:text-green-300",
-  percentage: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  select: "bg-pink-500/10 text-pink-700 dark:text-pink-300",
-  file: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-};
-
-const KEYWORD_SUGGESTIONS = [
-  "precio", "modelo", "cotización", "ubicación", "buró",
-  "documentos", "requisitos", "enganche", "pagos", "humano",
-  "garantía", "servicio", "taller", "crédito", "seguro",
+  { value: "both", label: "Bilingüe" },
+];
+const intentOptions = [
+  "GREETING",
+  "ASK_INFO",
+  "ASK_PRICE",
+  "BUY",
+  "SCHEDULE",
+  "COMPLAIN",
+  "OFF_TOPIC",
+  "UNCLEAR",
+  "CREDIT_APPLICATION",
+  "SERVICE_REQUEST",
+  "POSTSALE",
+  "HUMAN_REQUESTED",
 ];
 
-const HANDOFF_SUGGESTIONS = [
-  "quiero hablar con alguien", "necesito un asesor", "no funciona",
-  "es un fraude", "estoy enojado", "ya no me interesa",
-];
+const tabs = [
+  "Identidad",
+  "Guardrails",
+  "Extracción",
+  "Monitor",
+  "Knowledge",
+  "Decision Map",
+  "Pruebas",
+] as const;
 
-// ─── Data interfaces ───────────────────────────────────────────────────────────
+type AgentTab = (typeof tabs)[number];
+type ComparisonResult = Awaited<ReturnType<typeof agentsApi.compare>>;
+type ContextMenuTarget =
+  | { kind: "agent"; agentId: string }
+  | { kind: "guardrail"; itemId: string }
+  | { kind: "field"; itemId: string };
+type ContextMenuState = ContextMenuTarget & { x: number; y: number };
 
-interface ExtractionField {
-  key: string;
-  label: string;
-  type: FieldType;
-  description?: string;
-  required?: boolean;
+function roleLabel(role: string): string {
+  return roleOptions.find((item) => item.value === role)?.label ?? role;
 }
 
-interface AutoActions {
-  close_keywords: string[];
-  handoff_keywords: string[];
-  trigger_workflows: Record<string, string[]>;
+function roleDetail(role: string): string {
+  return roleOptions.find((item) => item.value === role)?.detail ?? "Perfil operativo";
 }
 
-interface KnowledgeConfig {
-  strict_ks: boolean;
-  structured_enabled: boolean;
-  semi_structured_enabled: boolean;
-  free_text_enabled: boolean;
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    draft: "Borrador",
+    validation: "Validación",
+    testing: "Pruebas",
+    production: "Producción",
+    paused: "Pausado",
+  };
+  return labels[status] ?? status;
 }
 
-interface MemoryRules {
-  enabled: boolean;
-  max_history_messages: number;
-  learn_from_customers: boolean;
-  learn_from_human_feedback: boolean;
+function modeLabel(mode: string): string {
+  const labels: Record<string, string> = {
+    normal: "Normal",
+    conservative: "Conservador",
+    strict: "Estricto",
+  };
+  return labels[mode] ?? mode;
 }
 
-function asExtractionFields(value: unknown): ExtractionField[] {
-  if (!value || typeof value !== "object") return [];
-  const fields = (value as Record<string, unknown>).fields;
-  if (!Array.isArray(fields)) return [];
-  return fields
-    .filter((f): f is Record<string, unknown> => typeof f === "object" && f !== null)
-    .map((f) => ({
-      key: String(f.key ?? ""),
-      label: String(f.label ?? f.key ?? ""),
-      type: (FIELD_TYPES as readonly string[]).includes(String(f.type))
-        ? (f.type as FieldType)
-        : "text",
-      description: typeof f.description === "string" ? f.description : "",
-      required: Boolean(f.required),
-    }));
+function pct(value: number | undefined): string {
+  return `${Math.round(value ?? 0)}%`;
 }
 
-function asAutoActions(value: unknown): AutoActions {
-  const v = (value as Record<string, unknown>) ?? {};
-  const close = Array.isArray(v.close_keywords) ? v.close_keywords.map(String) : [];
-  const handoff = Array.isArray(v.handoff_keywords) ? v.handoff_keywords.map(String) : [];
-  const triggers: Record<string, string[]> = {};
-  if (v.trigger_workflows && typeof v.trigger_workflows === "object") {
-    for (const [k, val] of Object.entries(v.trigger_workflows as Record<string, unknown>)) {
-      if (Array.isArray(val)) triggers[k] = val.map(String);
-    }
-  }
-  return { close_keywords: close, handoff_keywords: handoff, trigger_workflows: triggers };
+function scoreTone(score: number | undefined): string {
+  const value = score ?? 0;
+  if (value >= 88) return "text-emerald-300";
+  if (value >= 72) return "text-amber-300";
+  return "text-red-300";
 }
 
-function asKnowledgeConfig(value: unknown): KnowledgeConfig {
-  const v = (value as Record<string, unknown>) ?? {};
+function statusClass(status: string): string {
+  if (status === "production") return "border-emerald-400/30 bg-emerald-500/10 text-emerald-200";
+  if (status === "paused") return "border-amber-400/30 bg-amber-500/10 text-amber-200";
+  if (status === "testing") return "border-sky-400/30 bg-sky-500/10 text-sky-200";
+  return "border-white/10 bg-white/5 text-slate-200";
+}
+
+function severityClass(severity: string): string {
+  if (severity === "critical") return "border-red-400/40 bg-red-500/10 text-red-200";
+  if (severity === "high") return "border-orange-400/40 bg-orange-500/10 text-orange-200";
+  if (severity === "medium") return "border-amber-400/40 bg-amber-500/10 text-amber-200";
+  return "border-sky-400/40 bg-sky-500/10 text-sky-200";
+}
+
+function cloneAgent(agent: AgentItem): AgentItem {
+  return JSON.parse(JSON.stringify(agent)) as AgentItem;
+}
+
+function agentPatch(agent: AgentItem): Partial<AgentPayload> {
   return {
-    strict_ks: v.strict_ks !== false,
-    structured_enabled: v.structured_enabled !== false,
-    semi_structured_enabled: v.semi_structured_enabled !== false,
-    free_text_enabled: v.free_text_enabled !== false,
+    name: agent.name,
+    role: agent.role,
+    status: agent.status,
+    behavior_mode: agent.behavior_mode,
+    version: agent.version,
+    dealership_id: agent.dealership_id,
+    branch_id: agent.branch_id,
+    goal: agent.goal,
+    style: agent.style,
+    tone: agent.tone,
+    language: agent.language,
+    max_sentences: agent.max_sentences,
+    no_emoji: agent.no_emoji,
+    return_to_flow: agent.return_to_flow,
+    is_default: agent.is_default,
+    system_prompt: agent.system_prompt,
+    active_intents: agent.active_intents,
+    extraction_config: agent.extraction_config,
+    auto_actions: agent.auto_actions,
+    knowledge_config: agent.knowledge_config,
+    flow_mode_rules: agent.flow_mode_rules,
+    ops_config: agent.ops_config,
   };
 }
 
-function asMemoryRules(value: unknown): MemoryRules {
-  const v = (value as Record<string, unknown>) ?? {};
-  return {
-    enabled: v.enabled !== false,
-    max_history_messages: typeof v.max_history_messages === "number" ? v.max_history_messages : 20,
-    learn_from_customers: v.learn_from_customers !== false,
-    learn_from_human_feedback: v.learn_from_human_feedback !== false,
-  };
+function compactPatchKey(agent: AgentItem): string {
+  return JSON.stringify(agentPatch(agent));
 }
 
-// ─── Change tracking ───────────────────────────────────────────────────────────
-
-interface FieldChange { label: string; from: string; to: string }
-
-function computeChanges(orig: AgentItem, draft: AgentItem): FieldChange[] {
-  const changes: FieldChange[] = [];
-  const push = (label: string, from: unknown, to: unknown) => {
-    const a = String(from ?? "—"), b = String(to ?? "—");
-    if (a !== b) changes.push({ label, from: a, to: b });
-  };
-  push("Nombre", orig.name, draft.name);
-  push("Rol", ROLE_LABEL[orig.role] ?? orig.role, ROLE_LABEL[draft.role] ?? draft.role);
-  push("Tono", orig.tone, draft.tone);
-  push("Estilo", orig.style, draft.style);
-  push("Máx. oraciones", orig.max_sentences, draft.max_sentences);
-  push("Sin emojis", orig.no_emoji, draft.no_emoji);
-  push("Idioma", orig.language, draft.language);
-  if (JSON.stringify(orig.active_intents) !== JSON.stringify(draft.active_intents))
-    changes.push({ label: "Intenciones activas", from: `${orig.active_intents.length}`, to: `${draft.active_intents.length}` });
-  if (JSON.stringify(orig.extraction_config) !== JSON.stringify(draft.extraction_config))
-    changes.push({ label: "Campos de extracción", from: "modificados", to: "" });
-  if (JSON.stringify(orig.auto_actions) !== JSON.stringify(draft.auto_actions))
-    changes.push({ label: "Acciones automáticas", from: "modificadas", to: "" });
-  return changes;
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
-// ─── Preview message generator ─────────────────────────────────────────────────
-
-const PREVIEW_MSGS: Record<string, Record<string, string>> = {
-  reception: {
-    formal: "He revisado su solicitud detenidamente. Para continuar el proceso, le solicito proporcione su comprobante de domicilio y sus 2 últimos recibos de nómina.",
-    neutral: "Ya revisé tu solicitud. Para continuar necesito tu comprobante de domicilio y tus 2 últimos recibos de nómina.",
-    amigable: "Perfecto. Ya revisé tu solicitud. Para seguir, compárteme tu comprobante de domicilio y tus 2 últimos recibos de nómina.",
-    entusiasta: "¡Perfecto! Ya revisé tu solicitud y todo va muy bien. Para avanzar, compárteme tu comprobante de domicilio y tus 2 recibos de nómina más recientes.",
-    casual: "Oye perfecto. Vi tu solicitud. Mándame el comprobante de domicilio y tus 2 últimos recibos de nómina y ya.",
-  },
-  sales: {
-    formal: "Le informo que contamos con las unidades que se ajustan a sus requerimientos. ¿Le gustaría agendar una visita para conocerlas?",
-    neutral: "Tenemos varias opciones disponibles. ¿Te gustaría ver los modelos en tu rango de precio?",
-    amigable: "¡Qué buena elección! Tenemos justo lo que buscas. ¿Te cuento las opciones disponibles esta semana?",
-    entusiasta: "¡Excelente gusto! Esta unidad es de las más buscadas. ¡Tenemos stock y puedes llevártela hoy mismo! 🚗",
-    casual: "Mira, tienes suerte. Justo llegó un modelo que te va a gustar. ¿Le das un vistazo?",
-  },
-  support: {
-    formal: "Entiendo su situación. Procederé a revisar el historial de su unidad para ofrecerle la solución más adecuada.",
-    neutral: "Entiendo el problema. Voy a revisar tu historial y te digo qué opciones tienes.",
-    amigable: "Con gusto te ayudo. Déjame revisar el historial de tu unidad para ver qué podemos hacer.",
-    entusiasta: "¡Claro que sí! Con mucho gusto te ayudamos. Voy a revisar tu caso ahora mismo.",
-    casual: "No te preocupes. Le echo un ojo a tu expediente y te aviso qué se puede hacer.",
-  },
-};
-
-function previewMessage(draft: AgentItem): string {
-  const role = draft.role in PREVIEW_MSGS ? draft.role : "reception";
-  const tone = draft.tone ?? "amigable";
-  const roleMap = PREVIEW_MSGS[role] ?? PREVIEW_MSGS.reception!;
-  let text = roleMap?.[tone] ?? roleMap?.["amigable"] ?? "Perfecto. Ya revisé tu solicitud. Para seguir, compárteme los documentos necesarios.";
-  // Trim to max_sentences
-  const maxSents = draft.max_sentences ?? 3;
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  text = sentences.slice(0, maxSents).join(" ");
-  // Strip emoji if no_emoji
-  if (draft.no_emoji) text = text.replace(/\p{Emoji_Presentation}/gu, "").trim();
-  return text;
+function downloadJson(filename: string, value: unknown): void {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
-// ─── Toggle switch ─────────────────────────────────────────────────────────────
+function Panel({
+  title,
+  icon,
+  action,
+  children,
+  className,
+}: {
+  title: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("min-w-0 rounded-lg border border-white/10 bg-slate-950/70 shadow-sm shadow-black/20", className)}>
+      <div className="flex min-h-10 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+          {icon}
+          {title}
+        </div>
+        {action}
+      </div>
+      <div className="p-3">{children}</div>
+    </section>
+  );
+}
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function MetricTile({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail?: string; tone?: "good" | "warn" | "bad" | "neutral" }) {
+  const color = tone === "good" ? "text-emerald-300" : tone === "warn" ? "text-amber-300" : tone === "bad" ? "text-red-300" : "text-slate-100";
   return (
     <button
       type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${checked ? "bg-primary" : "bg-muted-foreground/30"}`}
+      onClick={() => toast.info(`${label}: ${value}`)}
+      className="min-w-0 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-sky-400/40 hover:bg-sky-500/10"
     >
-      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
+      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className={cn("mt-1 text-xl font-semibold leading-none", color)}>{value}</div>
+      {detail ? <div className="mt-1 truncate text-[10px] text-slate-500">{detail}</div> : null}
     </button>
   );
 }
 
-// ─── Chip Input ───────────────────────────────────────────────────────────────
-
-function ChipInput({
-  values,
+function Toggle({
+  checked,
   onChange,
-  placeholder,
-  suggestions,
 }: {
-  values: string[];
-  onChange: (values: string[]) => void;
-  placeholder?: string;
-  suggestions?: string[];
+  checked: boolean;
+  onChange: (value: boolean) => void;
 }) {
-  const [text, setText] = useState("");
-  const commit = () => {
-    const t = text.trim();
-    if (!t || values.includes(t)) { setText(""); return; }
-    onChange([...values, t]);
-    setText("");
-  };
   return (
-    <div className="mt-1 space-y-2">
-      <Input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit(); }
-          else if (e.key === "Backspace" && text === "" && values.length > 0) onChange(values.slice(0, -1));
-        }}
-        onBlur={commit}
-        placeholder={placeholder}
-        className="text-sm"
-      />
-      {values.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {values.map((v) => (
-            <span key={v} className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs text-primary">
-              {v}
-              <button type="button" onClick={() => onChange(values.filter((x) => x !== v))} aria-label={`Quitar ${v}`}>
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </span>
-          ))}
-        </div>
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative h-5 w-9 rounded-full border transition",
+        checked ? "border-sky-300/60 bg-sky-500" : "border-white/15 bg-slate-800",
       )}
-      {suggestions && (
-        <div className="flex flex-wrap gap-1">
-          {suggestions.filter((s) => !values.includes(s)).slice(0, 10).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onChange([...values, s])}
-              className="rounded-full border border-dashed px-2 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-            >
-              + {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    >
+      <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition", checked ? "left-4" : "left-0.5")} />
+    </button>
   );
 }
-
-// ─── Agent Card ────────────────────────────────────────────────────────────────
 
 function AgentCard({
   agent,
   selected,
   compareSelected,
   onSelect,
-  onShiftClick,
-  onStar,
-  onDuplicate,
-  onExport,
-  onDelete,
-  dragHandleProps,
+  onCompare,
+  onMenu,
 }: {
   agent: AgentItem;
   selected: boolean;
   compareSelected: boolean;
   onSelect: () => void;
-  onShiftClick: () => void;
-  onStar: () => void;
-  onDuplicate: () => void;
-  onExport: () => void;
-  onDelete: () => void;
-  dragHandleProps: {
-    draggable: boolean;
-    onDragStart: (e: React.DragEvent) => void;
-    onDragOver: (e: React.DragEvent) => void;
-    onDrop: (e: React.DragEvent) => void;
-  };
+  onCompare: () => void;
+  onMenu: (event: React.MouseEvent) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
-
-  const convCount = 0; // placeholder — no real metric on AgentItem
-  const accuracy = agent.active_intents.length > 0 ? Math.round(88 + (agent.id.charCodeAt(0) % 10)) : 0;
-
+  const riskTone = agent.metrics.risk_score >= 70 ? "text-red-300" : agent.metrics.risk_score >= 45 ? "text-amber-300" : "text-emerald-300";
   return (
-    <div
-      {...dragHandleProps}
-      onClick={(e) => {
-        if (e.shiftKey) onShiftClick();
-        else onSelect();
-      }}
-      className={`group relative flex cursor-pointer select-none items-start gap-2 rounded-lg border p-2.5 text-left text-sm transition-all ${
-        selected
-          ? "border-primary bg-primary/5"
-          : compareSelected
-          ? "border-amber-500/60 bg-amber-500/5"
-          : "border-border hover:border-muted-foreground/30 hover:bg-muted/30"
-      }`}
+    <button
+      type="button"
+      onClick={onSelect}
+      onContextMenu={onMenu}
+      className={cn(
+        "group w-full rounded-lg border p-3 text-left transition",
+        selected ? "border-sky-400/70 bg-sky-500/10" : "border-white/10 bg-white/[0.035] hover:border-sky-400/40 hover:bg-sky-500/5",
+        compareSelected && "ring-1 ring-amber-300/70",
+      )}
     >
-      {/* Drag handle */}
-      <div className="mt-0.5 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
-        <GripVertical className="h-3.5 w-3.5" />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-1">
-          <span className="truncate font-medium text-sm leading-tight">{agent.name}</span>
-          <button
-            type="button"
-            title={agent.is_default ? "Agente por defecto" : "Marcar como predeterminado"}
-            aria-label="Marcar como predeterminado"
-            onClick={(e) => { e.stopPropagation(); onStar(); }}
-            className={`shrink-0 transition-colors ${agent.is_default ? "text-amber-400" : "text-muted-foreground/30 hover:text-amber-300"}`}
-          >
-            <Star className={`h-3.5 w-3.5 ${agent.is_default ? "fill-amber-400" : ""}`} />
-          </button>
-        </div>
-
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ROLE_COLOR[agent.role] ?? ""}`}>
-            {ROLE_LABEL[agent.role] ?? agent.role}
-          </span>
-          <span className={`h-1.5 w-1.5 rounded-full ${agent.active_intents.length > 0 ? "bg-emerald-500" : "bg-zinc-400"}`} />
-          <span className="text-[10px] text-muted-foreground">
-            {agent.active_intents.length > 0 ? `${accuracy}% precisión` : "inactivo"}
-          </span>
-        </div>
-      </div>
-
-      {/* Context menu */}
-      <div className="relative shrink-0" ref={menuRef}>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
-          title="Más acciones"
-          aria-label="Más acciones"
-          className="grid h-6 w-6 place-items-center rounded text-muted-foreground/50 opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
-        >
-          <MoreVertical className="h-3.5 w-3.5" />
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-7 z-50 min-w-[140px] rounded-lg border bg-popover p-1 shadow-lg">
-            {[
-              { icon: Copy, label: "Duplicar", action: onDuplicate },
-              { icon: Download, label: "Exportar", action: onExport },
-              { icon: History, label: "Historial", action: () => toast.info("Historial próximamente") },
-              { icon: Trash2, label: "Eliminar", action: onDelete, danger: true },
-            ].map(({ icon: Icon, label, action, danger }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); action(); }}
-                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors ${danger ? "text-destructive hover:bg-destructive/10" : "hover:bg-muted"}`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={cn("h-2 w-2 rounded-full", agent.status === "production" ? "bg-emerald-400" : agent.status === "paused" ? "bg-amber-400" : "bg-sky-400")} />
+            <span className="truncate text-sm font-semibold text-slate-100">{agent.name}</span>
           </div>
-        )}
+          <div className="mt-1 text-[11px] text-slate-400">{roleLabel(agent.role)}</div>
+        </div>
+        <span className={cn("text-xl font-semibold leading-none", scoreTone(agent.health.score))}>{agent.health.score}</span>
       </div>
-    </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <div className="text-slate-500">Activas</div>
+          <div className="font-medium text-slate-200">{agent.metrics.active_conversations}</div>
+        </div>
+        <div>
+          <div className="text-slate-500">Precisión</div>
+          <div className="font-medium text-emerald-300">{pct(agent.metrics.response_accuracy)}</div>
+        </div>
+        <div>
+          <div className="text-slate-500">Riesgo</div>
+          <div className={cn("font-medium", riskTone)}>{agent.metrics.risk_score}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <Badge variant="outline" className={cn("h-5 border text-[10px]", statusClass(agent.status))}>
+          {statusLabel(agent.status)}
+        </Badge>
+        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <span
+            role="checkbox"
+            aria-checked={compareSelected}
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              onCompare();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onCompare();
+              }
+            }}
+            className={cn("grid h-6 w-6 place-items-center rounded border", compareSelected ? "border-amber-300 bg-amber-400/20 text-amber-100" : "border-white/10 text-slate-400")}
+            title="Comparar"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              onMenu(event);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onMenu(event as unknown as React.MouseEvent);
+              }
+            }}
+            className="grid h-6 w-6 place-items-center rounded border border-white/10 text-slate-400 hover:text-slate-100"
+            title="Más acciones"
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      </div>
+    </button>
   );
 }
 
-// ─── Save Button ───────────────────────────────────────────────────────────────
-
-function SaveButton({
-  changes,
-  isPending,
+function TopBar({
+  selected,
   dirty,
+  saving,
   onSave,
   onDiscard,
+  onCreate,
+  onValidate,
+  onPublish,
+  onRollback,
+  onOpenCommands,
 }: {
-  changes: FieldChange[];
-  isPending: boolean;
+  selected: AgentItem | null;
   dirty: boolean;
+  saving: boolean;
   onSave: () => void;
   onDiscard: () => void;
+  onCreate: () => void;
+  onValidate: () => void;
+  onPublish: () => void;
+  onRollback: () => void;
+  onOpenCommands: () => void;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
   return (
-    <div className="flex items-center gap-1.5">
-      {dirty && (
-        <button
-          type="button"
-          onClick={onDiscard}
-          title="Descartar cambios"
-          aria-label="Descartar cambios"
-          className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </button>
-      )}
-      <div
-        className="relative"
-        onMouseEnter={() => { if (dirty && changes.length > 0) setShowTooltip(true); }}
-        onMouseLeave={() => setShowTooltip(false)}
+    <header className="flex min-h-14 items-center gap-3 border-b border-white/10 bg-slate-950 px-4 text-slate-100">
+      <div className="flex min-w-56 items-center gap-2">
+        <Bot className="h-5 w-5 text-sky-300" />
+        <div>
+          <div className="text-sm font-semibold">Agents</div>
+          <div className="text-[11px] text-slate-500">Centro de comportamiento IA</div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => toast.info("Distribuidora del Norte seleccionada")}
+        className="hidden h-8 items-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 text-xs text-slate-300 transition hover:border-sky-400/40 md:flex"
       >
-        <Button
-          size="sm"
-          onClick={onSave}
-          disabled={isPending || !dirty}
-          className="gap-2"
-        >
-          {changes.length > 0 && dirty && (
-            <span className="grid h-4 w-4 place-items-center rounded-full bg-primary-foreground/20 text-[10px] font-bold">
-              {changes.length}
-            </span>
-          )}
-          {isPending ? "Guardando..." : dirty ? "Guardar cambios" : "Guardado"}
-        </Button>
-        {showTooltip && changes.length > 0 && (
-          <div className="absolute right-0 top-full z-50 mt-2 min-w-[220px] rounded-lg border bg-popover p-3 shadow-xl text-xs">
-            <div className="mb-2 font-medium text-muted-foreground uppercase tracking-wide text-[10px]">
-              Cambios pendientes
-            </div>
-            {changes.map((c, i) => (
-              <div key={i} className="flex items-start gap-2 py-0.5">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                <span>
-                  <span className="font-medium">{c.label}</span>
-                  {c.from && c.to ? (
-                    <span className="text-muted-foreground"> {c.from} → {c.to}</span>
-                  ) : (
-                    <span className="text-muted-foreground"> {c.from || c.to}</span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Live Preview ──────────────────────────────────────────────────────────────
-
-function LivePreview({ draft }: { draft: AgentItem }) {
-  const msg = previewMessage(draft);
-  const chips = [
-    `Tono: ${draft.tone ?? "amigable"}`,
-    `Estilo: ${draft.style ?? "Natural"}`,
-    `Máx. oraciones: ${draft.max_sentences ?? "—"}`,
-    draft.no_emoji ? "Sin emojis" : "Con emojis",
-  ];
-  const now = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
-
-  return (
-    <div className="flex w-72 shrink-0 flex-col border-l bg-card overflow-hidden">
-      <div className="flex items-center justify-between border-b px-3 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <MessageCircle className="h-4 w-4 text-primary" />
-          Vista previa de mensaje
-        </div>
-        <Badge variant="outline" className="text-[10px] px-1.5">
-          WhatsApp
+        <Globe2 className="h-3.5 w-3.5" />
+        Distribuidora del Norte
+      </button>
+      <button
+        type="button"
+        onClick={onOpenCommands}
+        className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 text-left text-xs text-slate-500 transition hover:border-sky-400/40"
+      >
+        <Search className="h-3.5 w-3.5" />
+        Ctrl/Cmd+K para buscar acción, agente o prueba
+      </button>
+      <Badge variant="outline" className="hidden h-7 border-emerald-400/30 bg-emerald-500/10 text-emerald-200 lg:flex">
+        En vivo
+      </Badge>
+      {selected ? (
+        <Badge variant="outline" className="hidden h-7 border-white/10 bg-white/[0.035] text-slate-200 md:flex">
+          Salud IA <span className={cn("ml-1 font-semibold", scoreTone(selected.health.score))}>{selected.health.score}/100</span>
         </Badge>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-        <p className="text-[11px] text-muted-foreground">
-          Así se vería la respuesta con la configuración actual.
-        </p>
-
-        {/* WhatsApp bubble */}
-        <div className="flex justify-end">
-          <div className="max-w-[85%] rounded-lg rounded-tr-sm bg-muted px-3 py-2 text-xs leading-relaxed text-foreground shadow-sm">
-            {msg}
-            <div className="mt-1.5 flex justify-end text-[10px] text-muted-foreground">
-              {now} <Check className="ml-1 h-3 w-3" />
-            </div>
-          </div>
-        </div>
-
-        {/* Config chips */}
-        <div className="flex flex-wrap gap-1.5">
-          {chips.map((c) => (
-            <span key={c} className="rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
-              {c}
-            </span>
-          ))}
-        </div>
-
-        <p className="text-[10px] text-muted-foreground">
-          ⓘ Los cambios en Identidad se reflejan aquí en tiempo real.
-        </p>
-      </div>
-    </div>
+      ) : null}
+      {dirty ? (
+        <Badge variant="outline" className="h-7 border-amber-400/30 bg-amber-500/10 text-amber-200">
+          Cambios sin guardar
+        </Badge>
+      ) : null}
+      <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onValidate} disabled={!selected}>
+        <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
+        Validar
+      </Button>
+      <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onRollback} disabled={!selected}>
+        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+        Revertir
+      </Button>
+      <Button size="sm" className="h-8 bg-sky-600 text-xs hover:bg-sky-500" onClick={onSave} disabled={!selected || !dirty || saving}>
+        {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+        Guardar
+      </Button>
+      <Button size="sm" className="h-8 bg-emerald-600 text-xs hover:bg-emerald-500" onClick={onPublish} disabled={!selected}>
+        <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
+        Publicar
+      </Button>
+      <Button size="sm" className="h-8 bg-blue-600 text-xs hover:bg-blue-500" onClick={onCreate}>
+        <Plus className="mr-1.5 h-3.5 w-3.5" />
+        Nuevo
+      </Button>
+      {dirty ? (
+        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={onDiscard} title="Descartar cambios">
+          <X className="h-4 w-4" />
+        </Button>
+      ) : null}
+    </header>
   );
 }
 
-// ─── Identity Tab ─────────────────────────────────────────────────────────────
-
-function IdentityTab({
+function IdentityPanel({
   draft,
-  update,
-  toggleIntent,
+  onChange,
 }: {
   draft: AgentItem;
-  update: <K extends keyof AgentItem>(key: K, value: AgentItem[K]) => void;
-  toggleIntent: (i: string) => void;
+  onChange: (patch: Partial<AgentItem>) => void;
 }) {
-  const [guardrailsOpen, setGuardrailsOpen] = useState(false);
+  const toggleIntent = (intent: string) => {
+    const next = draft.active_intents.includes(intent)
+      ? draft.active_intents.filter((item) => item !== intent)
+      : [...draft.active_intents, intent];
+    onChange({ active_intents: next });
+  };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-      {/* Left: identity fields */}
-      <div className="space-y-4">
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Identidad del agente
-          </h3>
-
-          <div>
-            <Label className="text-xs">Rol</Label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {ROLES.map((role) => (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => update("role", role)}
-                  className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
-                    draft.role === role
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  {ROLE_LABEL[role]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Tono</Label>
-              <Select value={draft.tone ?? "amigable"} onValueChange={(v) => update("tone", v)}>
-                <SelectTrigger className="mt-1 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TONES.map((t) => (
-                    <SelectItem key={t} value={t} className="text-xs">
-                      {TONE_ICON[t]} {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Idioma de respuesta</Label>
-              <Select value={draft.language ?? "es"} onValueChange={(v) => update("language", v)}>
-                <SelectTrigger className="mt-1 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map((l) => (
-                    <SelectItem key={l.value} value={l.value} className="text-xs">
-                      {l.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Estilo</Label>
-              <Input
-                value={draft.style ?? ""}
-                onChange={(e) => update("style", e.target.value || null)}
-                placeholder="claro y conciso"
-                className="mt-1 text-xs"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Máx. oraciones</Label>
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={draft.max_sentences ?? 3}
-                onChange={(e) => update("max_sentences", Number(e.target.value || 3))}
-                className="mt-1 text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-            <div>
-              <div className="text-xs font-medium">Sin emojis</div>
-              <div className="text-[11px] text-muted-foreground">Evitar el uso de emojis en respuestas</div>
-            </div>
-            <Toggle checked={draft.no_emoji} onChange={(v) => update("no_emoji", v)} />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-            <div>
-              <div className="text-xs font-medium">Agente por defecto</div>
-              <div className="text-[11px] text-muted-foreground">Usar para conversaciones sin agente asignado</div>
-            </div>
-            <Toggle checked={draft.is_default} onChange={(v) => update("is_default", v)} />
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Intenciones activas
-          </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {INTENTS.map((intent) => {
-              const active = draft.active_intents.includes(intent);
-              return (
-                <button
-                  key={intent}
-                  type="button"
-                  onClick={() => toggleIntent(intent)}
-                  className={`rounded-md border px-2 py-1 font-mono text-[10px] transition-colors ${
-                    active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-transparent bg-muted text-muted-foreground hover:bg-muted/70"
-                  }`}
-                >
-                  {intent}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Guardrails collapsible */}
-        <section className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setGuardrailsOpen((o) => !o)}
-            className="flex w-full items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+    <Panel title="Identidad del agente" icon={<Bot className="h-4 w-4 text-sky-300" />}>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Nombre</span>
+          <Input value={draft.name} onChange={(event) => onChange({ name: event.target.value })} className="h-8 border-white/10 bg-black/20 text-sm text-slate-100" />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Rol</span>
+          <select
+            value={draft.role}
+            onChange={(event) => onChange({ role: event.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-slate-950 px-2 text-sm text-slate-100"
           >
-            <Shield className="h-3.5 w-3.5" />
-            Guardrails
-            {guardrailsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {roleOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Tono</span>
+          <select
+            value={draft.tone ?? "Cálido"}
+            onChange={(event) => onChange({ tone: event.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-slate-950 px-2 text-sm text-slate-100"
+          >
+            {toneOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Estilo</span>
+          <Input value={draft.style ?? ""} onChange={(event) => onChange({ style: event.target.value })} className="h-8 border-white/10 bg-black/20 text-sm text-slate-100" />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Máx. oraciones</span>
+          <Input
+            type="number"
+            min={1}
+            max={5}
+            value={draft.max_sentences ?? 3}
+            onChange={(event) => onChange({ max_sentences: Number(event.target.value) })}
+            className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Idioma</span>
+          <select
+            value={draft.language ?? "es"}
+            onChange={(event) => onChange({ language: event.target.value })}
+            className="h-8 w-full rounded-md border border-white/10 bg-slate-950 px-2 text-sm text-slate-100"
+          >
+            {languageOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="mt-3 block space-y-1.5">
+        <span className="text-[11px] text-slate-400">Objetivo operativo</span>
+        <Textarea
+          value={draft.goal ?? ""}
+          onChange={(event) => onChange({ goal: event.target.value })}
+          className="min-h-16 border-white/10 bg-black/20 text-sm text-slate-100"
+        />
+      </label>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
+          <span className="text-xs text-slate-300">Evitar emojis</span>
+          <Toggle checked={draft.no_emoji} onChange={(value) => onChange({ no_emoji: value })} />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
+          <span className="text-xs text-slate-300">Regresar al flujo</span>
+          <Toggle checked={draft.return_to_flow} onChange={(value) => onChange({ return_to_flow: value })} />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
+          <span className="text-xs text-slate-300">Predeterminado</span>
+          <Toggle checked={draft.is_default} onChange={(value) => onChange({ is_default: value })} />
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {intentOptions.map((intent) => (
+          <button
+            key={intent}
+            type="button"
+            onClick={() => toggleIntent(intent)}
+            className={cn(
+              "rounded-md border px-2 py-1 text-[11px] transition",
+              draft.active_intents.includes(intent)
+                ? "border-sky-300/50 bg-sky-500/15 text-sky-100"
+                : "border-white/10 bg-white/[0.035] text-slate-400 hover:text-slate-100",
+            )}
+          >
+            {intent}
           </button>
-          {guardrailsOpen && (
-            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-              {[
-                "No compartir datos personales o financieros.",
-                "No prometer aprobaciones o montos.",
-                "Redirigir a un asesor humano si hay dudas.",
-                "No usar lenguaje ofensivo o discriminatorio.",
-              ].map((rule, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                  {rule}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        ))}
       </div>
-
-      {/* Right: system prompt + goal */}
-      <div className="space-y-4">
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Comportamiento IA
-          </h3>
-          <div>
-            <Label className="text-xs">Objetivo principal</Label>
-            <Input
-              value={draft.goal ?? ""}
-              onChange={(e) => update("goal", e.target.value || null)}
-              placeholder="Ej. convertir leads en ventas lo más rápido posible"
-              className="mt-1 text-xs"
-            />
-          </div>
-          <div>
-            <Label className="text-xs">System prompt</Label>
-            <Textarea
-              value={draft.system_prompt ?? ""}
-              onChange={(e) => update("system_prompt", e.target.value || null)}
-              rows={7}
-              placeholder="Eres un agente especialista en..."
-              className="mt-1 resize-none text-xs"
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-            <div>
-              <div className="text-xs font-medium">Volver al flujo</div>
-              <div className="text-[11px] text-muted-foreground">Reconducir al cliente al tema principal</div>
-            </div>
-            <Toggle checked={draft.return_to_flow} onChange={(v) => update("return_to_flow", v)} />
-          </div>
-        </section>
-      </div>
-    </div>
+    </Panel>
   );
 }
 
-// ─── Data Tab ─────────────────────────────────────────────────────────────────
+function WhatsAppPreview({
+  draft,
+  preview,
+  onRunPreview,
+  loading,
+}: {
+  draft: AgentItem;
+  preview: PreviewResult | null;
+  onRunPreview: () => void;
+  loading: boolean;
+}) {
+  const response = preview?.finalResponse ?? "Perfecto. Ya revisé tu solicitud. Para seguir, compárteme tu comprobante de domicilio y tus 2 últimos recibos de nómina.";
+  return (
+    <Panel
+      title="Vista previa en WhatsApp"
+      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
+      action={
+        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onRunPreview} disabled={loading}>
+          {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}
+          Probar
+        </Button>
+      }
+    >
+      <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-3">
+        <div className="max-w-[84%] rounded-lg rounded-tl-sm bg-emerald-700 px-3 py-2 text-sm leading-relaxed text-white shadow">
+          {response}
+          <span className="ml-2 text-[10px] text-emerald-100/70">11:42</span>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+          <div className="text-slate-500">Confianza</div>
+          <div className="mt-1 font-semibold text-emerald-300">{pct((preview?.confidence ?? 0.96) * 100)}</div>
+        </div>
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+          <div className="text-slate-500">Reglas activas</div>
+          <div className="mt-1 font-semibold text-slate-100">{draft.guardrails.filter((item) => item.active).length}</div>
+        </div>
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+          <div className="text-slate-500">Supervisor</div>
+          <div className="mt-1 font-semibold text-emerald-300">Aprobado</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {(preview?.retrievedFragments ?? [
+          { id: "credit", title: "Proceso crédito automático", score: 0.93 },
+          { id: "docs", title: "Comprobante de domicilio", score: 0.89 },
+          { id: "nomina", title: "Nómina reciente", score: 0.87 },
+        ]).map((fragment) => (
+          <Badge key={fragment.id} variant="outline" className="border-sky-300/20 bg-sky-500/10 text-[10px] text-sky-200">
+            {fragment.title}
+          </Badge>
+        ))}
+      </div>
+    </Panel>
+  );
+}
 
-interface ExamplePopover { fieldKey: string; message: string; extracted: string; confidence: number; valid: boolean }
+function GuardrailsPanel({
+  guardrails,
+  onAdd,
+  onTest,
+  onContext,
+}: {
+  guardrails: Guardrail[];
+  onAdd: () => void;
+  onTest: (guardrail: Guardrail) => void;
+  onContext: (event: React.MouseEvent, guardrail: Guardrail) => void;
+}) {
+  return (
+    <Panel
+      title="Guardrails"
+      icon={<ShieldCheck className="h-4 w-4 text-amber-300" />}
+      action={
+        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onAdd}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Regla
+        </Button>
+      }
+    >
+      <div className="grid gap-2 lg:grid-cols-3">
+        {guardrails.slice(0, 6).map((guardrail) => (
+          <div
+            key={guardrail.id}
+            onContextMenu={(event) => onContext(event, guardrail)}
+            className={cn("rounded-lg border p-3", severityClass(guardrail.severity))}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">{guardrail.name}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] text-slate-300">{guardrail.rule_text}</div>
+              </div>
+              <Toggle checked={guardrail.active} onChange={() => toast.info("Edita la regla desde el menú contextual")} />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-[11px]">
+              <span>{guardrail.violation_count} violaciones</span>
+              <Button size="sm" variant="outline" className="h-7 border-white/10 bg-black/20 text-[11px]" onClick={() => onTest(guardrail)}>
+                <TestTube2 className="mr-1 h-3 w-3" />
+                Probar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
 
-function DataTab({
+function ExtractionPanel({
   fields,
-  onChange,
+  onAdd,
+  onTest,
+  onContext,
 }: {
   fields: ExtractionField[];
-  onChange: (fields: ExtractionField[]) => void;
+  onAdd: () => void;
+  onTest: (field: ExtractionField) => void;
+  onContext: (event: React.MouseEvent, field: ExtractionField) => void;
 }) {
-  const [examplePopover, setExamplePopover] = useState<ExamplePopover | null>(null);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-
-  const update = (idx: number, patch: Partial<ExtractionField>) =>
-    onChange(fields.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
-
-  const remove = (idx: number) => onChange(fields.filter((_, i) => i !== idx));
-
-  const add = () =>
-    onChange([...fields, { key: `campo_${fields.length + 1}`, label: "Nuevo campo", type: "text", required: false }]);
-
-  const moveUp = (idx: number) => {
-    if (idx === 0) return;
-    const next = [...fields];
-    [next[idx - 1], next[idx]] = [next[idx]!, next[idx - 1]!];
-    onChange(next);
-  };
-
-  const EXAMPLES: Record<string, ExamplePopover> = {
-    date: { fieldKey: "date", message: "Nací el 15 de marzo de 1990.", extracted: "15/03/1990", confidence: 98, valid: true },
-    phone: { fieldKey: "phone", message: "Mi número es 55 1234 5678.", extracted: "+52 55 1234 5678", confidence: 97, valid: true },
-    currency: { fieldKey: "currency", message: "Busco algo de unos 350 mil pesos.", extracted: "$350,000 MXN", confidence: 94, valid: true },
-  };
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Campos que el agente extrae de la conversación y guarda en el perfil del cliente.
-        </p>
-        <Button variant="outline" size="sm" className="text-xs" onClick={add}>
-          <Plus className="mr-1.5 h-3 w-3" /> Agregar campo
+    <Panel
+      title="Extracción de campos"
+      icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}
+      action={
+        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onAdd}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Campo
         </Button>
-      </div>
-
-      {fields.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-12 text-center">
-          <Sparkles className="h-8 w-8 text-muted-foreground/30" />
-          <div className="text-sm font-medium">Sin campos de extracción</div>
-          <div className="text-xs text-muted-foreground">
-            Agrega campos para que el agente capture datos útiles de las conversaciones.
-          </div>
-          <Button size="sm" variant="outline" className="mt-2 text-xs" onClick={add}>
-            <Plus className="mr-1.5 h-3 w-3" /> Agregar campo
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {/* Header */}
-          <div className="grid grid-cols-[24px_1fr_1fr_100px_80px_auto] gap-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            <div />
-            <div>Campo</div>
-            <div>Descripción</div>
-            <div>Tipo</div>
-            <div>Req.</div>
-            <div>Acciones</div>
-          </div>
-          {fields.map((f, idx) => (
-            <div
-              key={idx}
-              draggable
-              onDragStart={() => setDragIdx(idx)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                if (dragIdx === null || dragIdx === idx) return;
-                const next = [...fields];
-                const [moved] = next.splice(dragIdx, 1);
-                next.splice(idx, 0, moved!);
-                onChange(next);
-                setDragIdx(null);
-              }}
-              className={`grid grid-cols-[24px_1fr_1fr_100px_80px_auto] items-center gap-2 rounded-lg border bg-card px-2 py-2 transition-colors ${dragIdx === idx ? "opacity-40" : ""}`}
-            >
-              <GripVertical className="h-3.5 w-3.5 cursor-grab text-muted-foreground/40" />
-              <Input
-                value={f.label}
-                onChange={(e) => update(idx, { label: e.target.value })}
-                className="h-7 text-xs"
-                placeholder="Etiqueta"
-              />
-              <Input
-                value={f.description ?? ""}
-                onChange={(e) => update(idx, { description: e.target.value })}
-                className="h-7 text-xs"
-                placeholder="Descripción para la IA"
-              />
-              <Select value={f.type} onValueChange={(v) => update(idx, { type: v as FieldType })}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FIELD_TYPES.map((t) => (
-                    <SelectItem key={t} value={t} className="text-xs">
-                      <span className={`mr-1.5 rounded px-1 py-0.5 text-[9px] ${FIELD_TYPE_COLOR[t] ?? ""}`}>
-                        {FIELD_TYPE_LABEL[t]}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex justify-center">
-                <Toggle checked={f.required ?? false} onChange={(v) => update(idx, { required: v })} />
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  title="Ver ejemplo"
-                  aria-label="Ver ejemplo de extracción"
-                  onClick={() => {
-                    const ex = EXAMPLES[f.type] ?? EXAMPLES.date!;
-                    setExamplePopover({ ...ex, fieldKey: f.key });
-                  }}
-                  className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  title="Duplicar"
-                  aria-label="Duplicar campo"
-                  onClick={() => onChange([...fields, { ...f, key: `${f.key}_copia` }])}
-                  className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  title="Eliminar"
-                  aria-label="Eliminar campo"
-                  onClick={() => remove(idx)}
-                  className="grid h-6 w-6 place-items-center rounded text-destructive/60 hover:bg-destructive/10 hover:text-destructive transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Example popover modal */}
-      {examplePopover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setExamplePopover(null)}>
-          <div className="w-80 rounded-xl border bg-card p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold">Ejemplo de extracción</div>
-              <button type="button" onClick={() => setExamplePopover(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-2.5 text-xs">
-              <div>
-                <div className="text-muted-foreground mb-1">Mensaje del cliente</div>
-                <div className="rounded-md border bg-muted/40 px-3 py-2 italic">{examplePopover.message}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Valor detectado</div>
-                <div className="font-mono font-medium">{examplePopover.extracted}</div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Confianza</div>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{ width: `${examplePopover.confidence}%` }}
-                    />
-                  </div>
-                  <span className="font-medium">{examplePopover.confidence}%</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-muted-foreground">Estado</div>
-                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${examplePopover.valid ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
-                  {examplePopover.valid ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                  {examplePopover.valid ? "Válido" : "Inválido"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Actions Tab ─────────────────────────────────────────────────────────────
-
-function TriggerWorkflowsEditor({
-  triggers,
-  onChange,
-}: {
-  triggers: Record<string, string[]>;
-  onChange: (next: Record<string, string[]>) => void;
-}) {
-  const [newKey, setNewKey] = useState("");
-
-  const add = () => {
-    const key = newKey.trim();
-    if (!key || key in triggers) { setNewKey(""); return; }
-    onChange({ ...triggers, [key]: [] });
-    setNewKey("");
-  };
-
-  return (
-    <div className="space-y-2">
-      {Object.entries(triggers).length === 0 ? (
-        <div className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
-          Sin triggers configurados.
-        </div>
-      ) : (
-        Object.entries(triggers).map(([key, values]) => (
-          <div key={key} className="rounded-lg border p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded bg-muted px-2 py-1 font-mono text-xs text-primary">{key}</code>
-              <button
-                type="button"
-                title="Eliminar trigger"
-                aria-label="Eliminar trigger"
-                onClick={() => { const n = { ...triggers }; delete n[key]; onChange(n); }}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <ChipInput
-              values={values}
-              onChange={(next) => onChange({ ...triggers, [key]: next })}
-              placeholder="Palabras clave que activan este workflow…"
-              suggestions={KEYWORD_SUGGESTIONS.filter((s) => !values.includes(s))}
-            />
-          </div>
-        ))
-      )}
-      <div className="flex gap-2">
-        <Input
-          value={newKey}
-          onChange={(e) => setNewKey(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder="!nombre_workflow"
-          className="font-mono text-xs"
-        />
-        <Button variant="outline" size="sm" onClick={add} className="text-xs shrink-0">
-          <Plus className="mr-1.5 h-3 w-3" /> Agregar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ActionsTab({
-  actions,
-  onChange,
-}: {
-  actions: AutoActions;
-  onChange: (next: Partial<AutoActions>) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <X className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Palabras que cierran la conversación</h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Cuando el cliente escribe alguna de estas frases, el agente cierra la conversación correctamente.
-        </p>
-        <ChipInput
-          values={actions.close_keywords}
-          onChange={(v) => onChange({ close_keywords: v })}
-          placeholder="ya no quiero, no gracias, más adelante…"
-          suggestions={["ya no quiero", "no gracias", "más adelante", "bye", "adios"]}
-        />
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-amber-500" />
-          <h3 className="text-sm font-semibold">Palabras que escalan a un humano</h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Detectadas estas frases, el agente transfiere la conversación a un operador.
-        </p>
-        <ChipInput
-          values={actions.handoff_keywords}
-          onChange={(v) => onChange({ handoff_keywords: v })}
-          placeholder="humano, asesor, persona…"
-          suggestions={HANDOFF_SUGGESTIONS}
-        />
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold">Triggers de workflow por palabra clave</h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Cuando el cliente menciona una frase específica, se ejecuta el workflow indicado.
-        </p>
-        <TriggerWorkflowsEditor
-          triggers={actions.trigger_workflows}
-          onChange={(trigger_workflows) => onChange({ trigger_workflows })}
-        />
-      </section>
-    </div>
-  );
-}
-
-// ─── Test Tab ─────────────────────────────────────────────────────────────────
-
-interface ChatMessage { role: "user" | "assistant"; content: string; meta?: Record<string, string> }
-
-function TestTab({ agent }: { agent: AgentItem }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([{
-    role: "assistant",
-    content: "Escribe una pregunta y probaré este agente con la configuración actual, sin afectar conversaciones reales.",
-  }]);
-  const [input, setInput] = useState("");
-  const [debugOpen, setDebugOpen] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  const test = useMutation({
-    mutationFn: (text: string) => agentsApi.test(agent as unknown as Record<string, unknown>, text),
-    onSuccess: (res, text) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: res.response,
-          meta: {
-            "Intención": res.intent,
-            "Modo": res.flow_mode,
-            "Tokens estimados": "~240",
-            "Latencia": "890ms",
-          },
-        },
-      ]);
-    },
-    onError: (e) => toast.error("Error en la prueba", { description: e.message }),
-  });
-
-  const send = () => {
-    const text = input.trim();
-    if (!text || test.isPending) return;
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    setInput("");
-    test.mutate(text);
-  };
-
-  const reset = () => setMessages([{
-    role: "assistant",
-    content: "Conversación reiniciada. Escribe un mensaje para probar el agente.",
-  }]);
-
-  return (
-    <div className="flex gap-3">
-      {/* Chat panel */}
-      <div className="flex flex-1 flex-col rounded-xl border overflow-hidden" style={{ height: 480 }}>
-        <div className="flex items-center justify-between border-b px-3 py-2 text-xs">
-          <span className="font-medium text-muted-foreground">Vista de chat</span>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              title="Activar modo debug"
-              aria-label="Modo debug"
-              onClick={() => setDebugOpen((o) => !o)}
-              className={`grid h-6 w-6 place-items-center rounded transition-colors ${debugOpen ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Bug className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Reiniciar conversación"
-              aria-label="Reiniciar conversación"
-              onClick={reset}
-              className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-muted transition-colors"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted text-foreground"
-              }`}>
-                {m.content}
-                {m.meta && debugOpen && (
-                  <div className="mt-2 border-t border-current/10 pt-2">
-                    {Object.entries(m.meta).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-4 text-[10px] opacity-70">
-                        <span>{k}</span><span className="font-mono">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {test.isPending && (
-            <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-xl rounded-tl-sm bg-muted px-3 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> pensando…
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 border-t p-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-            }}
-            placeholder="Escribe un mensaje de prueba…"
-            disabled={test.isPending}
-            className="text-sm"
-          />
-          <Button size="sm" onClick={send} disabled={test.isPending || !input.trim()}>
-            <Send className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Debug panel */}
-      {debugOpen && (
-        <div className="w-64 shrink-0 rounded-xl border overflow-hidden" style={{ height: 480 }}>
-          <div className="border-b px-3 py-2 text-xs font-medium flex items-center gap-1.5">
-            <Bug className="h-3.5 w-3.5 text-primary" /> Panel de debug
-          </div>
-          <div className="overflow-y-auto p-3 space-y-3" style={{ height: "calc(480px - 37px)" }}>
-            {[
-              { label: "Clasificación de intención", value: "ASK_PRICE" },
-              { label: "Palabras coincidentes", value: "precio, cotización" },
-              { label: "Campos extraídos", value: "modelo: Tiggo 5x" },
-              { label: "Fuentes de conocimiento", value: "catálogo_precios.pdf" },
-              { label: "Guardrails activados", value: "Ninguno" },
-              { label: "Acciones ejecutadas", value: "trigger_cotizacion" },
-              { label: "Tokens (estimado)", value: "~240 tokens" },
-              { label: "Costo estimado", value: "$0.0003 USD" },
-              { label: "Latencia", value: "890ms" },
-            ].map(({ label, value }) => (
-              <div key={label} className="space-y-0.5">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-                <div className="font-mono text-xs">{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Knowledge Tab ────────────────────────────────────────────────────────────
-
-function KnowledgeTab({
-  config,
-  onChange,
-}: {
-  config: KnowledgeConfig;
-  onChange: (next: Partial<KnowledgeConfig>) => void;
-}) {
-  const sources = [
-    { key: "strict_ks", label: "Modo estricto", desc: "Solo responde con información de las fuentes. Si no hay match, escala a humano.", value: config.strict_ks, icon: Shield },
-    { key: "structured_enabled", label: "Catálogo / fuentes estructuradas", desc: "Tablas de modelos, precios y especificaciones.", value: config.structured_enabled, icon: Zap },
-    { key: "semi_structured_enabled", label: "Artículos y FAQ", desc: "Documentación semi-estructurada del knowledge base.", value: config.semi_structured_enabled, icon: MessageCircle },
-    { key: "free_text_enabled", label: "Documentos libres (PDF, web)", desc: "Documentos indexados con embeddings.", value: config.free_text_enabled, icon: Download },
-  ] as const;
-
-  return (
-    <div className="space-y-2.5">
-      <p className="text-xs text-muted-foreground">
-        Controla qué fuentes de conocimiento puede consultar este agente.
-      </p>
-      {sources.map(({ key, label, desc, value, icon: Icon }) => (
-        <div key={key} className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
-          <div className="flex items-start gap-3">
-            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div>
-              <div className="text-sm font-medium">{label}</div>
-              <div className="text-xs text-muted-foreground">{desc}</div>
-            </div>
-          </div>
-          <Toggle checked={value} onChange={(v) => onChange({ [key]: v } as Partial<KnowledgeConfig>)} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Compare Panel ────────────────────────────────────────────────────────────
-
-function ComparePanel({
-  agents,
-  onClose,
-}: {
-  agents: [AgentItem, AgentItem];
-  onClose: () => void;
-}) {
-  const [showOnlyDiff, setShowOnlyDiff] = useState(false);
-
-  type AgentKey = keyof AgentItem;
-  const rows: { key: AgentKey; label: string; format?: (v: AgentItem[AgentKey]) => string }[] = [
-    { key: "name", label: "Nombre" },
-    { key: "role", label: "Rol", format: (v) => ROLE_LABEL[String(v)] ?? String(v) },
-    { key: "tone", label: "Tono" },
-    { key: "style", label: "Estilo", format: (v) => String(v ?? "—") },
-    { key: "max_sentences", label: "Máx. oraciones", format: (v) => String(v ?? "—") },
-    { key: "no_emoji", label: "Sin emojis", format: (v) => (v ? "Sí" : "No") },
-    { key: "language", label: "Idioma", format: (v) => LANGUAGES.find((l) => l.value === String(v))?.label ?? String(v ?? "—") },
-    { key: "return_to_flow", label: "Volver al flujo", format: (v) => (v ? "Sí" : "No") },
-    { key: "is_default", label: "Predeterminado", format: (v) => (v ? "Sí" : "No") },
-  ];
-
-  const getVal = (agent: AgentItem, key: AgentKey, format?: (v: AgentItem[AgentKey]) => string): string => {
-    const raw = agent[key];
-    return format ? format(raw) : String(raw ?? "—");
-  };
-
-  return (
-    <div className="shrink-0 border-t bg-card" style={{ maxHeight: 280 }}>
-      <div className="flex items-center justify-between border-b px-4 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          Comparar agentes
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            Modo comparación
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-            <Toggle checked={showOnlyDiff} onChange={setShowOnlyDiff} />
-            Ver solo diferencias
-          </label>
-          <Button size="sm" variant="ghost" className="text-xs" onClick={onClose}>
-            <X className="mr-1.5 h-3 w-3" /> Cerrar comparación
-          </Button>
-        </div>
-      </div>
-      <div className="overflow-auto" style={{ maxHeight: 220 }}>
+      }
+    >
+      <div className="overflow-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-card">
-            <tr className="border-b">
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground w-36">Campo</th>
-              <th className="px-4 py-2 text-left font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" /> {agents[0].name}
-                </div>
-              </th>
-              <th className="px-4 py-2 text-left font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-violet-500" /> {agents[1].name}
-                </div>
-              </th>
-              <th className="px-4 py-2 w-20" />
+          <thead>
+            <tr className="border-b border-white/10 text-left text-slate-500">
+              <th className="py-2 pr-3 font-medium">Campo</th>
+              <th className="py-2 pr-3 font-medium">Tipo</th>
+              <th className="py-2 pr-3 font-medium">Confianza</th>
+              <th className="py-2 pr-3 font-medium">Autoguardado</th>
+              <th className="py-2 pr-3 font-medium">Estado</th>
+              <th className="py-2 text-right font-medium">Acción</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ key, label, format }) => {
-              const av = getVal(agents[0], key, format);
-              const bv = getVal(agents[1], key, format);
-              const same = av === bv;
-              if (showOnlyDiff && same) return null;
-              return (
-                <tr key={key} className="border-t hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-1.5 text-muted-foreground">{label}</td>
-                  <td className={`px-4 py-1.5 font-medium ${same ? "" : "text-amber-500"}`}>{av}</td>
-                  <td className={`px-4 py-1.5 font-medium ${same ? "" : "text-amber-500"}`}>{bv}</td>
-                  <td className="px-4 py-1.5">
-                    {same ? (
-                      <span className="text-emerald-500">
-                        <Check className="h-3.5 w-3.5" />
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-medium text-amber-500">Dif.</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {fields.map((field) => (
+              <tr key={field.id} onContextMenu={(event) => onContext(event, field)} className="border-b border-white/5 text-slate-200">
+                <td className="py-2 pr-3">
+                  <div className="font-medium">{field.label}</div>
+                  <div className="text-[10px] text-slate-500">{field.field_key}</div>
+                </td>
+                <td className="py-2 pr-3 text-slate-400">{field.type}</td>
+                <td className="py-2 pr-3 text-emerald-300">{pct((field.confidence ?? field.confidence_threshold) * 100)}</td>
+                <td className="py-2 pr-3">{field.auto_save ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> : <span className="text-slate-500">Pendiente</span>}</td>
+                <td className="py-2 pr-3">
+                  <Badge variant="outline" className={cn("h-5 border text-[10px]", field.status === "pending" ? "border-amber-300/30 bg-amber-500/10 text-amber-200" : "border-emerald-300/30 bg-emerald-500/10 text-emerald-200")}>
+                    {field.status ?? "confirmed"}
+                  </Badge>
+                </td>
+                <td className="py-2 text-right">
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px] text-sky-200" onClick={() => onTest(field)}>
+                    Ver
+                  </Button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </Panel>
   );
 }
 
-// ─── Agent Editor ─────────────────────────────────────────────────────────────
+function MonitorPanel({ agent }: { agent: AgentItem }) {
+  const monitor = agent.live_monitor;
+  const risky = monitor.risky_leads.slice(0, 2);
+  return (
+    <Panel title="Monitor en vivo" icon={<Activity className="h-4 w-4 text-emerald-300" />}>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <MetricTile label="Conversaciones" value={String(monitor.conversations_active)} tone="neutral" />
+        <MetricTile label="Leads en riesgo" value={String(monitor.leads_at_risk)} tone={monitor.leads_at_risk > 6 ? "bad" : "warn"} />
+        <MetricTile label="Esperando humano" value={String(monitor.leads_waiting_human)} tone={monitor.leads_waiting_human > 4 ? "warn" : "good"} />
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        {risky.map((lead, index) => (
+          <div key={String(lead.id ?? index)} className="rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-red-100">{String(lead.name ?? "Lead en riesgo")}</span>
+              <Badge variant="outline" className="border-red-300/30 text-red-200">{String(lead.risk ?? "Alto")}</Badge>
+            </div>
+            <div className="mt-2 text-slate-300">{String(lead.reason ?? "Documento incompleto")}</div>
+            <div className="mt-3 flex gap-2">
+              <NYIButton label="Abrir" size="sm" />
+              <Button size="sm" variant="outline" className="h-7 border-white/10 bg-black/20 text-[11px]" onClick={() => toast.success("Asignado a humano")}>Asignar</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
 
-function AgentEditor({
+function SupervisorPanel({ agent }: { agent: AgentItem }) {
+  const supervisor = agent.supervisor;
+  return (
+    <Panel title="Supervisor IA" icon={<UserCheck className="h-4 w-4 text-emerald-300" />}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {[
+          ["Riesgo de alucinación", supervisor.hallucination_risk],
+          ["Guardrails", supervisor.guardrail_compliance],
+          ["Tono", supervisor.tone],
+          ["Handoff correcto", pct(supervisor.handoff_correctness)],
+          ["Extracción confiable", pct(supervisor.extraction_reliability)],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+            <span className="text-slate-400">{label}</span>
+            <span className="font-semibold text-emerald-300">{value}</span>
+          </div>
+        ))}
+      </div>
+      {supervisor.alert ? (
+        <div className="mt-3 rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5" />
+          {supervisor.alert}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+function KnowledgePanel({ agent }: { agent: AgentItem }) {
+  const coverage = agent.knowledge_coverage;
+  return (
+    <Panel title="Cobertura de conocimiento" icon={<BrainCircuit className="h-4 w-4 text-violet-300" />}>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <MetricTile label="Cobertura" value={pct(coverage.coverage)} tone={coverage.coverage >= 80 ? "good" : "warn"} />
+        <MetricTile label="FAQ conectadas" value={String(coverage.faq_answered)} tone="good" />
+        <MetricTile label="Sin respuesta" value={String(coverage.unanswered_queries)} tone={coverage.unanswered_queries > 10 ? "warn" : "good"} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {coverage.weak_topics.map((topic) => (
+          <Badge key={topic} variant="outline" className="border-red-300/20 bg-red-500/10 text-[10px] text-red-200">
+            {topic}
+          </Badge>
+        ))}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500" onClick={() => toast.success("FAQ preparada")}>Agregar FAQ</Button>
+        <NYIButton label="Subir documento" />
+        <NYIButton label="Ver fallidas" />
+      </div>
+    </Panel>
+  );
+}
+
+function toFlowNodes(map: DecisionMap): Node[] {
+  return map.nodes.map((rawNode, index) => {
+    const node = asRecord(rawNode);
+    const position = asRecord(node.position);
+    const id = String(node.id ?? `node_${index}`);
+    const enabled = node.enabled !== false;
+    return {
+      id,
+      position: {
+        x: Number(position.x ?? index * 150),
+        y: Number(position.y ?? 80),
+      },
+      data: { label: String(node.label ?? id) },
+      style: {
+        background: enabled ? "rgba(14, 165, 233, 0.16)" : "rgba(71, 85, 105, 0.35)",
+        border: enabled ? "1px solid rgba(125, 211, 252, 0.55)" : "1px solid rgba(148, 163, 184, 0.2)",
+        color: "#e2e8f0",
+        borderRadius: 8,
+        fontSize: 11,
+        minWidth: 130,
+      },
+    };
+  });
+}
+
+function toFlowEdges(map: DecisionMap): Edge[] {
+  return map.edges.map((rawEdge, index) => {
+    const edge = asRecord(rawEdge);
+    return {
+      id: String(edge.id ?? `edge_${index}`),
+      source: String(edge.source ?? ""),
+      target: String(edge.target ?? ""),
+      animated: true,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { stroke: "rgba(56, 189, 248, 0.65)" },
+    };
+  });
+}
+
+function DecisionMapPanel({
+  map,
+  onValidate,
+  onSave,
+}: {
+  map: DecisionMap;
+  onValidate: () => void;
+  onSave: () => void;
+}) {
+  const nodes = useMemo(() => toFlowNodes(map), [map]);
+  const edges = useMemo(() => toFlowEdges(map), [map]);
+  return (
+    <Panel
+      title="Decision Map"
+      icon={<GitBranch className="h-4 w-4 text-violet-300" />}
+      action={
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onValidate}>
+            Validar
+          </Button>
+          <Button size="sm" className="h-7 bg-sky-600 text-xs hover:bg-sky-500" onClick={onSave}>
+            Guardar
+          </Button>
+        </div>
+      }
+    >
+      <div className="h-72 overflow-hidden rounded-lg border border-white/10 bg-slate-950">
+        <ReactFlow nodes={nodes} edges={edges} fitView nodesDraggable={false} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+          <Background color="rgba(148, 163, 184, 0.16)" gap={18} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
+    </Panel>
+  );
+}
+
+function ScenarioPanel({
   agent,
-  onDelete,
-  showPreview,
+  onRun,
+  onStress,
 }: {
   agent: AgentItem;
-  onDelete: () => void;
-  showPreview: boolean;
+  onRun: (scenarioId: string) => void;
+  onStress: () => void;
 }) {
-  const qc = useQueryClient();
-  const [draft, setDraft] = useState<AgentItem>(agent);
-
-  useEffect(() => setDraft(agent), [agent]);
-
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(agent), [draft, agent]);
-  const changes = useMemo(() => computeChanges(agent, draft), [agent, draft]);
-
-  const save = useMutation({
-    mutationFn: () =>
-      agentsApi.patch(agent.id, {
-        name: draft.name, role: draft.role, goal: draft.goal, style: draft.style,
-        tone: draft.tone, language: draft.language, max_sentences: draft.max_sentences,
-        no_emoji: draft.no_emoji, return_to_flow: draft.return_to_flow,
-        is_default: draft.is_default, system_prompt: draft.system_prompt,
-        active_intents: draft.active_intents, extraction_config: draft.extraction_config,
-        auto_actions: draft.auto_actions, knowledge_config: draft.knowledge_config,
-        flow_mode_rules: draft.flow_mode_rules,
-      }),
-    onSuccess: () => {
-      toast.success("Agente guardado");
-      void qc.invalidateQueries({ queryKey: ["agents"] });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      void qc.invalidateQueries({ queryKey: ["conversations"] });
-      void qc.invalidateQueries({ queryKey: ["pipeline"] });
-    },
-    onError: (e) => toast.error("No se pudo guardar", { description: e.message }),
-  });
-
-  const update = <K extends keyof AgentItem>(key: K, value: AgentItem[K]) =>
-    setDraft((prev) => ({ ...prev, [key]: value }));
-
-  const toggleIntent = (intent: string) => {
-    const present = draft.active_intents.includes(intent);
-    update("active_intents", present
-      ? draft.active_intents.filter((i) => i !== intent)
-      : [...draft.active_intents, intent]);
-  };
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); if (dirty) save.mutate(); }
-      if (e.key === "Escape") setDraft(agent);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [dirty, agent]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const passed = agent.scenarios.filter((item) => item.status === "passed").length;
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Editor header */}
-      <div className="shrink-0 border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <input
-              value={draft.name}
-              onChange={(e) => update("name", e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-lg font-semibold outline-none focus:ring-0"
-              aria-label="Nombre del agente"
-            />
-            <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${ROLE_COLOR[draft.role] ?? ""}`}>
-              {ROLE_LABEL[draft.role] ?? draft.role}
-            </span>
-            {draft.is_default && (
-              <Badge variant="outline" className="text-[10px]">Predeterminado</Badge>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+    <Panel
+      title="Pruebas de escenarios"
+      icon={<FlaskConical className="h-4 w-4 text-emerald-300" />}
+      action={
+        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onStress}>
+          Ejecutar todas
+        </Button>
+      }
+    >
+      <div className="grid gap-3 lg:grid-cols-[1fr_170px]">
+        <div className="space-y-1.5">
+          {agent.scenarios.map((scenario) => (
             <button
+              key={scenario.id}
               type="button"
-              onClick={onDelete}
-              title="Eliminar agente"
-              aria-label="Eliminar agente"
-              className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
+              onClick={() => onRun(scenario.id)}
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs transition hover:border-sky-300/30"
             >
-              <Trash2 className="h-4 w-4" />
+              <span className="text-slate-200">{scenario.name}</span>
+              <Badge variant="outline" className={cn("h-5 text-[10px]", scenario.status === "failed" ? "border-red-300/30 text-red-200" : scenario.status === "warning" || scenario.status === "risky" ? "border-amber-300/30 text-amber-200" : "border-emerald-300/30 text-emerald-200")}>
+                {scenario.status}
+              </Badge>
             </button>
-            <SaveButton
-              changes={changes}
-              isPending={save.isPending}
-              dirty={dirty}
-              onSave={() => save.mutate()}
-              onDiscard={() => setDraft(agent)}
-            />
-          </div>
+          ))}
+        </div>
+        <div className="grid place-items-center rounded-lg border border-white/10 bg-white/[0.035] p-3 text-center">
+          <div className="grid h-24 w-24 place-items-center rounded-full border-8 border-emerald-400/70 text-2xl font-semibold text-slate-100">{agent.scenarios.length}</div>
+          <div className="mt-2 text-xs text-slate-400">Escenarios</div>
+          <div className="mt-1 text-[11px] text-emerald-300">{passed} aprobados</div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="identity" className="flex flex-1 flex-col overflow-hidden">
-        <TabsList className="shrink-0 rounded-none border-b bg-transparent px-4 h-auto pb-0 justify-start gap-1">
-          {[
-            { value: "identity", label: "Identidad" },
-            { value: "data", label: "Datos" },
-            { value: "actions", label: "Acciones" },
-            { value: "test", label: "Probar" },
-            { value: "knowledge", label: "Conocimiento" },
-          ].map(({ value, label }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="rounded-b-none rounded-t-md border-b-2 border-transparent px-3 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {/* Tab content panels */}
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <TabsContent value="identity" className="m-0 p-4">
-              <IdentityTab draft={draft} update={update} toggleIntent={toggleIntent} />
-            </TabsContent>
-            <TabsContent value="data" className="m-0 p-4">
-              <DataTab
-                fields={asExtractionFields(draft.extraction_config)}
-                onChange={(fields) => update("extraction_config", { ...(draft.extraction_config ?? {}), fields })}
-              />
-            </TabsContent>
-            <TabsContent value="actions" className="m-0 p-4">
-              <ActionsTab
-                actions={asAutoActions(draft.auto_actions)}
-                onChange={(next) => update("auto_actions", { ...(draft.auto_actions ?? {}), ...next })}
-              />
-            </TabsContent>
-            <TabsContent value="test" className="m-0 p-4">
-              <TestTab agent={draft} />
-            </TabsContent>
-            <TabsContent value="knowledge" className="m-0 p-4">
-              <KnowledgeTab
-                config={asKnowledgeConfig(draft.knowledge_config)}
-                onChange={(next) => update("knowledge_config", { ...(draft.knowledge_config ?? {}), ...next })}
-              />
-            </TabsContent>
-          </div>
-
-          {/* Right preview panel */}
-          {showPreview && <LivePreview draft={draft} />}
-        </div>
-      </Tabs>
-    </div>
+    </Panel>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export function AgentsPage() {
-  const qc = useQueryClient();
-  const agents = useQuery({ queryKey: ["agents"], queryFn: agentsApi.list });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [agentOrder, setAgentOrder] = useState<string[]>([]);
-
-  // Sync order from server on first load
-  useEffect(() => {
-    if (agents.data && agentOrder.length === 0) {
-      setAgentOrder(agents.data.map((a) => a.id));
-    }
-  }, [agents.data, agentOrder.length]);
-
-  // Auto-select first agent
-  useEffect(() => {
-    if (!selectedId && agents.data?.length) {
-      setSelectedId(agents.data[0]?.id ?? null);
-    }
-  }, [agents.data, selectedId]);
-
-  const orderedAgents = useMemo(() => {
-    if (!agents.data) return [];
-    const map = new Map(agents.data.map((a) => [a.id, a]));
-    const ordered = agentOrder.map((id) => map.get(id)).filter((a): a is AgentItem => !!a);
-    const remaining = agents.data.filter((a) => !agentOrder.includes(a.id));
-    return [...ordered, ...remaining];
-  }, [agents.data, agentOrder]);
-
-  const create = useMutation({
-    mutationFn: () => agentsApi.create({
-      name: "Nuevo agente",
-      role: "custom",
-      active_intents: [],
-      is_default: (agents.data?.length ?? 0) === 0,
-    }),
-    onSuccess: (agent) => {
-      setSelectedId(agent.id);
-      setAgentOrder((prev) => [...prev, agent.id]);
-      void qc.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Agente creado");
-    },
-    onError: (e) => toast.error("No se pudo crear", { description: e.message }),
-  });
-
-  const remove = useMutation({
-    mutationFn: agentsApi.delete,
-    onSuccess: (_, id) => {
-      setSelectedId((prev) => (prev === id ? null : prev));
-      setCompareIds((prev) => prev.filter((x) => x !== id));
-      setAgentOrder((prev) => prev.filter((x) => x !== id));
-      void qc.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Agente eliminado");
-    },
-    onError: (e) => toast.error("No se pudo eliminar", { description: e.message }),
-  });
-
-  const setStar = useMutation({
-    mutationFn: (id: string) => agentsApi.patch(id, { is_default: true }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["agents"] }),
-    onError: (e) => toast.error("Error", { description: e.message }),
-  });
-
-  const selected = orderedAgents.find((a) => a.id === selectedId) ?? null;
-  const compareAgents = compareIds.length === 2
-    ? (compareIds.map((id) => orderedAgents.find((a) => a.id === id)).filter(Boolean) as AgentItem[])
-    : null;
-
-  function toggleCompare(id: string) {
-    setCompareIds((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) return [prev[1]!, id];
-      return [...prev, id];
-    });
+function ValidationPanel({ validation }: { validation: ValidationResult | null }) {
+  if (!validation) {
+    return (
+      <Panel title="Validación antes de publicar" icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}>
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">Sin validación reciente.</div>
+      </Panel>
+    );
   }
-
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="flex w-56 shrink-0 flex-col border-r bg-card overflow-hidden">
-          <div className="flex items-center justify-between border-b px-3 py-2.5">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Bot className="h-4 w-4 text-primary" />
-              Agentes IA
-              {agents.data && (
-                <span className="rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">
-                  {agents.data.length}
-                </span>
+    <Panel title="Validación antes de publicar" icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}>
+      <div className={cn("rounded-lg border p-3 text-sm", validation.status === "ok" ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100" : "border-red-300/30 bg-red-500/10 text-red-100")}>
+        {validation.summary}
+      </div>
+      <div className="mt-2 space-y-1">
+        {validation.checks.map((check) => (
+          <div key={check.label} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+            <span className="text-slate-300">{check.label}</span>
+            <span className={check.status === "ok" ? "text-emerald-300" : check.status === "warning" ? "text-amber-300" : "text-red-300"}>{check.status}</span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function ComparePanel({ comparison, onClose }: { comparison: ComparisonResult; onClose: () => void }) {
+  const first = comparison.agents[0];
+  const second = comparison.agents[1];
+  if (!first || !second) return null;
+  return (
+    <div className="border-t border-white/10 bg-slate-950">
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="text-sm font-semibold text-slate-100">Comparación de agentes</div>
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-300" onClick={onClose}>
+          <X className="mr-1.5 h-3.5 w-3.5" />
+          Cerrar
+        </Button>
+      </div>
+      <div className="grid max-h-64 gap-3 overflow-auto px-4 pb-4 lg:grid-cols-2">
+        <Panel title={`${first.name} vs ${second.name}`}>
+          <table className="w-full text-xs">
+            <tbody>
+              {comparison.differences.length === 0 ? (
+                <tr><td className="py-2 text-slate-400">Sin diferencias críticas.</td></tr>
+              ) : (
+                comparison.differences.map((diff) => (
+                  <tr key={String(diff.field)} className="border-b border-white/5">
+                    <td className="py-2 pr-3 text-slate-400">{String(diff.label ?? diff.field)}</td>
+                    <td className="py-2 pr-3 text-slate-200">{String(diff.from ?? "-")}</td>
+                    <td className="py-2 text-emerald-300">{String(diff.to ?? "-")}</td>
+                  </tr>
+                ))
               )}
-            </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              title="Nuevo agente"
-              aria-label="Crear agente"
-              onClick={() => create.mutate()}
-              disabled={create.isPending}
-            >
-              {create.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            </Button>
-          </div>
-
-          <div className="flex-1 space-y-1 overflow-y-auto p-2">
-            {agents.isLoading ? (
-              Array.from({ length: 4 }, (_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))
-            ) : orderedAgents.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <Bot className="h-8 w-8 text-muted-foreground/30" />
-                <div className="text-xs text-muted-foreground">
-                  Sin agentes. Crea uno para empezar.
-                </div>
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => create.mutate()}>
-                  <Plus className="mr-1.5 h-3 w-3" /> Nuevo agente
-                </Button>
-              </div>
-            ) : (
-              orderedAgents.map((agent, idx) => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  selected={selectedId === agent.id}
-                  compareSelected={compareIds.includes(agent.id)}
-                  onSelect={() => { setSelectedId(agent.id); }}
-                  onShiftClick={() => toggleCompare(agent.id)}
-                  onStar={() => setStar.mutate(agent.id)}
-                  onDuplicate={() => {
-                    void agentsApi.create({
-                      name: `${agent.name} (copia)`,
-                      role: agent.role,
-                      active_intents: agent.active_intents,
-                      system_prompt: agent.system_prompt,
-                      tone: agent.tone,
-                      style: agent.style,
-                      max_sentences: agent.max_sentences,
-                      no_emoji: agent.no_emoji,
-                      goal: agent.goal,
-                      language: agent.language,
-                      return_to_flow: agent.return_to_flow,
-                    }).then((newAgent) => {
-                      setAgentOrder((prev) => [...prev, newAgent.id]);
-                      void qc.invalidateQueries({ queryKey: ["agents"] });
-                      toast.success("Agente duplicado");
-                    });
-                  }}
-                  onExport={() => {
-                    const blob = new Blob([JSON.stringify(agent, null, 2)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `agente-${agent.name.toLowerCase().replace(/\s+/g, "-")}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    toast.success("Agente exportado");
-                  }}
-                  onDelete={() => {
-                    if (confirm(`¿Eliminar agente "${agent.name}"?`)) remove.mutate(agent.id);
-                  }}
-                  dragHandleProps={{
-                    draggable: true,
-                    onDragStart: () => setDragIdx(idx),
-                    onDragOver: (e) => e.preventDefault(),
-                    onDrop: () => {
-                      if (dragIdx === null || dragIdx === idx) return;
-                      const order = orderedAgents.map((a) => a.id);
-                      const [moved] = order.splice(dragIdx, 1);
-                      order.splice(idx, 0, moved!);
-                      setAgentOrder(order);
-                      setDragIdx(null);
-                    },
-                  }}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Keyboard shortcuts */}
-          <div className="border-t p-3 text-[10px] text-muted-foreground space-y-1">
-            <div className="font-medium text-[9px] uppercase tracking-wider mb-1.5">Atajos de teclado</div>
-            {[
-              ["Ctrl/Cmd+Enter", "Guardar / Aplicar"],
-              ["Escape", "Cerrar / Cancelar"],
-              ["Shift+clic", "Modo comparación"],
-              ["Backspace", "Quitar último chip"],
-            ].map(([key, label]) => (
-              <div key={key} className="flex items-center justify-between gap-2">
-                <span>{label}</span>
-                <code className="rounded bg-muted px-1 py-0.5 text-[9px]">{key}</code>
+            </tbody>
+          </table>
+        </Panel>
+        <Panel title="Métricas comparadas">
+          <div className="space-y-2">
+            {comparison.performance.map((metric) => (
+              <div key={String(metric.metric)} className="grid grid-cols-[1fr_70px_70px] items-center rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+                <span className="text-slate-300">{String(metric.metric)}</span>
+                <span className="text-sky-200">{String(metric.a)}</span>
+                <span className="text-emerald-200">{String(metric.b)}</span>
               </div>
             ))}
           </div>
-        </aside>
+        </Panel>
+      </div>
+    </div>
+  );
+}
 
-        {/* Main editor */}
-        {selected ? (
-          <AgentEditor
-            key={selected.id}
-            agent={selected}
-            onDelete={() => { if (confirm(`¿Eliminar agente "${selected.name}"?`)) remove.mutate(selected.id); }}
-            showPreview={true}
-          />
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <Bot className="h-12 w-12 text-muted-foreground/20" />
-            <div className="text-sm font-medium">Selecciona o crea un agente</div>
-            <div className="text-xs text-muted-foreground max-w-xs">
-              Cada agente puede tener su propio rol, tono, campos de extracción e intenciones.
+function ContextMenuLayer({
+  state,
+  selected,
+  onClose,
+  onDuplicate,
+  onDisable,
+  onExport,
+  onDelete,
+  onTestNested,
+}: {
+  state: ContextMenuState | null;
+  selected: AgentItem | null;
+  onClose: () => void;
+  onDuplicate: (agentId: string) => void;
+  onDisable: (agentId: string) => void;
+  onExport: (agentId: string) => void;
+  onDelete: (agentId: string) => void;
+  onTestNested: (kind: "guardrail" | "field", id: string) => void;
+}) {
+  if (!state) return null;
+  const currentAgentId = state.kind === "agent" ? state.agentId : selected?.id;
+  const items = state.kind === "agent"
+    ? [
+        { label: "Duplicar", icon: Copy, action: () => currentAgentId && onDuplicate(currentAgentId) },
+        { label: "Deshabilitar", icon: Pause, action: () => currentAgentId && onDisable(currentAgentId) },
+        { label: "Exportar JSON", icon: FileJson, action: () => currentAgentId && onExport(currentAgentId) },
+        { label: "Eliminar", icon: Trash2, danger: true, action: () => currentAgentId && onDelete(currentAgentId) },
+      ]
+    : [
+        { label: "Probar", icon: TestTube2, action: () => onTestNested(state.kind, state.itemId) },
+        { label: "Copiar ID", icon: Copy, action: () => void navigator.clipboard.writeText(state.itemId).then(() => toast.success("ID copiado")) },
+        { label: "Ver historial", icon: History, action: () => toast.info("Feature en construcción", { description: '"Ver historial" estará disponible próximamente.' }) },
+      ];
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div
+        className="absolute w-44 rounded-lg border border-white/10 bg-slate-950 p-1 text-xs text-slate-200 shadow-2xl shadow-black/40"
+        style={{ left: state.x, top: state.y }}
+      >
+        {items.map(({ label, icon: Icon, danger, action }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              action();
+              onClose();
+            }}
+            className={cn("flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-white/10", danger && "text-red-200 hover:bg-red-500/10")}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CommandPalette({
+  open,
+  onClose,
+  actions,
+}: {
+  open: boolean;
+  onClose: () => void;
+  actions: Array<{ label: string; icon: ReactNode; action: () => void }>;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-start bg-black/45 p-6 pt-24" onClick={onClose}>
+      <div className="mx-auto w-full max-w-xl rounded-xl border border-white/10 bg-slate-950 p-2 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+          <Search className="h-4 w-4 text-slate-500" />
+          <span className="text-sm text-slate-300">Comandos rápidos</span>
+        </div>
+        <div className="max-h-96 overflow-auto py-2">
+          {actions.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                item.action();
+                onClose();
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/10"
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  const rows = [
+    ["Ctrl/Cmd + K", "Abrir comandos"],
+    ["Ctrl/Cmd + S", "Guardar configuración"],
+    ["Shift + clic", "Seleccionar para comparar"],
+    ["?", "Ver atajos"],
+    ["Esc", "Cerrar paneles"],
+  ];
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-6" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-950 p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-100">Atajos</div>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {rows.map(([key, label]) => (
+            <div key={key} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+              <span className="text-slate-300">{label}</span>
+              <code className="rounded bg-black/30 px-2 py-1 text-slate-400">{key}</code>
             </div>
-            <Button size="sm" variant="outline" onClick={() => create.mutate()} disabled={create.isPending}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Nuevo agente
-            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({
+  agents,
+  selectedId,
+  compareIds,
+  search,
+  onSearch,
+  onSelect,
+  onCompare,
+  onContext,
+  onCreate,
+  loading,
+}: {
+  agents: AgentItem[];
+  selectedId: string | null;
+  compareIds: string[];
+  search: string;
+  onSearch: (value: string) => void;
+  onSelect: (id: string) => void;
+  onCompare: (id: string) => void;
+  onContext: (event: React.MouseEvent, agentId: string) => void;
+  onCreate: () => void;
+  loading: boolean;
+}) {
+  return (
+    <aside className="flex w-80 shrink-0 flex-col border-r border-white/10 bg-slate-950">
+      <div className="border-b border-white/10 p-3">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100">
+              Agentes
+              <DemoBadge className="ml-1.5 inline-block" />
+            </div>
+            <div className="text-[11px] text-slate-500">{agents.length} perfiles configurados</div>
           </div>
+          <Button size="sm" className="h-8 bg-blue-600 text-xs hover:bg-blue-500" onClick={onCreate}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Nuevo
+          </Button>
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+          <Input
+            value={search}
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder="Buscar agente..."
+            className="h-8 border-white/10 bg-black/20 pl-8 text-sm text-slate-100"
+          />
+        </div>
+      </div>
+      <div className="flex-1 space-y-2 overflow-auto p-3">
+        {loading ? (
+          Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 rounded-lg bg-white/10" />)
+        ) : agents.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-sm text-slate-400">
+            Sin agentes para este filtro.
+          </div>
+        ) : (
+          agents.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              selected={selectedId === agent.id}
+              compareSelected={compareIds.includes(agent.id)}
+              onSelect={() => onSelect(agent.id)}
+              onCompare={() => onCompare(agent.id)}
+              onMenu={(event) => onContext(event, agent.id)}
+            />
+          ))
+        )}
+      </div>
+      <div className="border-t border-white/10 p-3">
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-xs">
+          <div className="flex items-center justify-between text-slate-300">
+            <span>Modo comparación</span>
+            <span className="text-amber-300">{compareIds.length}/2</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full bg-amber-400" style={{ width: `${Math.min(compareIds.length, 2) * 50}%` }} />
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+export function AgentsPage() {
+  const queryClient = useQueryClient();
+  const agentsQuery = useQuery({ queryKey: ["agents", "operations-center"], queryFn: agentsApi.list });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<AgentItem | null>(null);
+  const [activeTab, setActiveTab] = useState<AgentTab>("Identidad");
+  const [search, setSearch] = useState("");
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [commandsOpen, setCommandsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const agents = agentsQuery.data ?? [];
+  const filteredAgents = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return agents;
+    return agents.filter((agent) => `${agent.name} ${agent.role} ${agent.goal ?? ""}`.toLowerCase().includes(needle));
+  }, [agents, search]);
+  const selected = useMemo(() => agents.find((agent) => agent.id === selectedId) ?? null, [agents, selectedId]);
+  const dirty = Boolean(selected && draft && compactPatchKey(selected) !== compactPatchKey(draft));
+
+  const invalidateAgents = () => queryClient.invalidateQueries({ queryKey: ["agents", "operations-center"] });
+
+  useEffect(() => {
+    if (!selectedId && agents.length > 0) {
+      setSelectedId(agents[0]?.id ?? null);
+    }
+  }, [agents, selectedId]);
+
+  useEffect(() => {
+    setDraft(selected ? cloneAgent(selected) : null);
+    setValidation(null);
+    setPreview(null);
+  }, [selected?.id, selected?.updated_at]);
+
+  const updateDraft = (patch: Partial<AgentItem>) => {
+    setDraft((current) => (current ? { ...current, ...patch } : current));
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: (agent: AgentItem) => agentsApi.patchConfig(agent.id, agentPatch(agent)),
+    onSuccess: (agent) => {
+      setDraft(cloneAgent(agent));
+      void invalidateAgents();
+      toast.success("Agente guardado");
+    },
+    onError: (error: Error) => toast.error("No se pudo guardar", { description: error.message }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      agentsApi.create({
+        name: "Nuevo agente",
+        role: "sales_agent",
+        status: "draft",
+        behavior_mode: "normal",
+        goal: "Calificar lead, responder con claridad y escalar cuando falte contexto.",
+        tone: "Cálido",
+        style: "Claro y conciso",
+        language: "es",
+        max_sentences: 3,
+        active_intents: ["GREETING", "ASK_INFO", "ASK_PRICE", "HUMAN_REQUESTED"],
+      }),
+    onSuccess: (agent) => {
+      setSelectedId(agent.id);
+      void invalidateAgents();
+      toast.success("Agente creado");
+    },
+    onError: (error: Error) => toast.error("No se pudo crear", { description: error.message }),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: agentsApi.duplicate,
+    onSuccess: (agent) => {
+      setSelectedId(agent.id);
+      void invalidateAgents();
+      toast.success("Agente duplicado");
+    },
+    onError: (error: Error) => toast.error("No se pudo duplicar", { description: error.message }),
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: agentsApi.disable,
+    onSuccess: () => {
+      void invalidateAgents();
+      toast.success("Agente pausado");
+    },
+    onError: (error: Error) => toast.error("No se pudo pausar", { description: error.message }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: agentsApi.delete,
+    onSuccess: (_, id) => {
+      if (selectedId === id) setSelectedId(null);
+      setCompareIds((current) => current.filter((item) => item !== id));
+      void invalidateAgents();
+      toast.success("Agente eliminado");
+    },
+    onError: (error: Error) => toast.error("No se pudo eliminar", { description: error.message }),
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: agentsApi.publish,
+    onSuccess: (agent) => {
+      setDraft(cloneAgent(agent));
+      void invalidateAgents();
+      toast.success("Publicado en producción");
+    },
+    onError: (error: Error) => toast.error("Publicación bloqueada", { description: error.message }),
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (id: string) => agentsApi.rollback(id),
+    onSuccess: (agent) => {
+      setDraft(cloneAgent(agent));
+      void invalidateAgents();
+      toast.success("Rollback aplicado");
+    },
+    onError: (error: Error) => toast.error("No se pudo revertir", { description: error.message }),
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: (agent: AgentItem) => agentsApi.validateConfig(agent.id, agentPatch(agent)),
+    onSuccess: (result) => {
+      setValidation(result);
+      toast[result.status === "ok" ? "success" : "warning"](result.summary);
+    },
+    onError: (error: Error) => toast.error("No se pudo validar", { description: error.message }),
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: (agent: AgentItem) => agentsApi.previewResponse(agent.id, "¿Me aprueban con buró malo si gano por nómina?", agentPatch(agent)),
+    onSuccess: (result) => {
+      setPreview(result);
+      toast.success("Preview generado");
+    },
+    onError: (error: Error) => toast.error("No se pudo probar", { description: error.message }),
+  });
+
+  const createGuardrailMutation = useMutation({
+    mutationFn: (agentId: string) =>
+      agentsApi.createGuardrail(agentId, {
+        severity: "high",
+        name: "No prometer aprobación",
+        rule_text: "No prometer aprobación, tasa, monto ni entrega sin validación humana.",
+        allowed_examples: ["Puedo revisar requisitos contigo."],
+        forbidden_examples: ["Ya estás aprobado."],
+        active: true,
+        enforcement_mode: "rewrite",
+      }),
+    onSuccess: () => {
+      void invalidateAgents();
+      toast.success("Guardrail creado");
+    },
+    onError: (error: Error) => toast.error("No se pudo crear la regla", { description: error.message }),
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: (agentId: string) =>
+      agentsApi.createExtractionField(agentId, {
+        field_key: `campo_${Date.now().toString().slice(-4)}`,
+        label: "Campo nuevo",
+        description: "Dato capturado durante la conversación",
+        type: "text",
+        required: false,
+        confidence_threshold: 0.9,
+        auto_save: true,
+        requires_confirmation: true,
+        source_message_tracking: true,
+        validation_regex: null,
+        enum_options: [],
+      }),
+    onSuccess: () => {
+      void invalidateAgents();
+      toast.success("Campo creado");
+    },
+    onError: (error: Error) => toast.error("No se pudo crear el campo", { description: error.message }),
+  });
+
+  const compareMutation = useMutation({
+    mutationFn: agentsApi.compare,
+    onSuccess: (result) => {
+      setComparison(result);
+      toast.success("Comparación generada");
+    },
+    onError: (error: Error) => toast.error("No se pudo comparar", { description: error.message }),
+  });
+
+  const decisionMapMutation = useMutation({
+    mutationFn: (agent: AgentItem) => agentsApi.updateDecisionMap(agent.id, agent.decision_map),
+    onSuccess: (agent) => {
+      setDraft(cloneAgent(agent));
+      void invalidateAgents();
+      toast.success("Decision Map guardado");
+    },
+    onError: (error: Error) => toast.error("No se pudo guardar mapa", { description: error.message }),
+  });
+
+  const validateMapMutation = useMutation({
+    mutationFn: (agent: AgentItem) => agentsApi.validateDecisionMap(agent.id, agent.decision_map),
+    onSuccess: (result) => toast[result.status === "ok" ? "success" : "warning"](result.summary),
+    onError: (error: Error) => toast.error("No se pudo validar mapa", { description: error.message }),
+  });
+
+  const runScenarioMutation = useMutation({
+    mutationFn: ({ agentId, scenarioId }: { agentId: string; scenarioId: string }) => agentsApi.runScenario(agentId, scenarioId),
+    onSuccess: (result) => toast.success(`Escenario ${String(result.status ?? "ejecutado")}`),
+    onError: (error: Error) => toast.error("No se pudo ejecutar", { description: error.message }),
+  });
+
+  const stressMutation = useMutation({
+    mutationFn: agentsApi.stressTest,
+    onSuccess: (result) => toast.success(`Suite ejecutada: ${result.passed}/${result.queued} aprobadas`),
+    onError: (error: Error) => toast.error("No se pudo ejecutar suite", { description: error.message }),
+  });
+
+  const exportAgent = async (agentId: string) => {
+    try {
+      const payload = await agentsApi.exportJson(agentId);
+      const name = String(payload.name ?? "agente").toLowerCase().replace(/\s+/g, "-");
+      downloadJson(`agent-${name}.json`, payload);
+      toast.success("JSON exportado");
+    } catch (error) {
+      toast.error("No se pudo exportar", { description: error instanceof Error ? error.message : "Error desconocido" });
+    }
+  };
+
+  const deleteAgent = (agentId: string) => {
+    const agent = agents.find((item) => item.id === agentId);
+    if (window.confirm(`¿Eliminar "${agent?.name ?? "este agente"}"?`)) deleteMutation.mutate(agentId);
+  };
+
+  const toggleCompare = (id: string) => {
+    setCompareIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      if (current.length >= 2) return [current[1] ?? id, id];
+      return [...current, id];
+    });
+  };
+
+  const openContext = (event: React.MouseEvent, state: ContextMenuTarget) => {
+    event.preventDefault();
+    setContextMenu({ ...state, x: event.clientX, y: event.clientY });
+  };
+
+  const activeAgent = draft ?? selected;
+  const saveActive = () => {
+    if (draft && dirty) saveMutation.mutate(draft);
+  };
+
+  const runCompare = () => {
+    if (compareIds.length < 2) {
+      toast.warning("Selecciona dos agentes para comparar");
+      return;
+    }
+    compareMutation.mutate(compareIds.slice(0, 2));
+  };
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandsOpen(true);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        saveActive();
+      }
+      if (event.key === "?" && !isTyping) {
+        setShortcutsOpen(true);
+      }
+      if (event.key === "Escape") {
+        setCommandsOpen(false);
+        setShortcutsOpen(false);
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [draft, dirty]);
+
+  const commandActions = [
+    { label: "Crear agente", icon: <Plus className="h-4 w-4 text-sky-300" />, action: () => createMutation.mutate() },
+    { label: "Guardar configuración", icon: <Save className="h-4 w-4 text-emerald-300" />, action: saveActive },
+    { label: "Validar antes de publicar", icon: <ClipboardCheck className="h-4 w-4 text-amber-300" />, action: () => activeAgent && validateMutation.mutate(activeAgent) },
+    { label: "Publicar agente", icon: <UploadCloud className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && publishMutation.mutate(activeAgent.id) },
+    { label: "Generar preview WhatsApp", icon: <MessageCircle className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && previewMutation.mutate(activeAgent) },
+    { label: "Comparar seleccionados", icon: <GitBranch className="h-4 w-4 text-violet-300" />, action: runCompare },
+    { label: "Ver atajos", icon: <Sparkles className="h-4 w-4 text-sky-300" />, action: () => setShortcutsOpen(true) },
+  ];
+
+  return (
+    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-slate-950 text-slate-100">
+      <TopBar
+        selected={activeAgent}
+        dirty={dirty}
+        saving={saveMutation.isPending}
+        onSave={saveActive}
+        onDiscard={() => selected && setDraft(cloneAgent(selected))}
+        onCreate={() => createMutation.mutate()}
+        onValidate={() => activeAgent && validateMutation.mutate(activeAgent)}
+        onPublish={() => activeAgent && publishMutation.mutate(activeAgent.id)}
+        onRollback={() => activeAgent && rollbackMutation.mutate(activeAgent.id)}
+        onOpenCommands={() => setCommandsOpen(true)}
+      />
+
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          agents={filteredAgents}
+          selectedId={selectedId}
+          compareIds={compareIds}
+          search={search}
+          onSearch={setSearch}
+          onSelect={setSelectedId}
+          onCompare={toggleCompare}
+          onContext={(event, agentId) => openContext(event, { kind: "agent", agentId })}
+          onCreate={() => createMutation.mutate()}
+          loading={agentsQuery.isLoading}
+        />
+
+        {activeAgent ? (
+          <main className="min-w-0 flex-1 overflow-auto">
+            <div className="border-b border-white/10 bg-slate-950/95 px-4 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="truncate text-2xl font-semibold tracking-normal">{activeAgent.name}</h1>
+                    <Badge variant="outline" className={cn("border", statusClass(activeAgent.status))}>{statusLabel(activeAgent.status)}</Badge>
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.035] text-slate-300">{activeAgent.version}</Badge>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">{roleLabel(activeAgent.role)} · {roleDetail(activeAgent.role)}</div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MetricTile label="Salud" value={`${activeAgent.health.score}/100`} tone={activeAgent.health.score >= 88 ? "good" : "warn"} />
+                  <MetricTile label="Precisión" value={pct(activeAgent.metrics.response_accuracy)} tone="good" />
+                  <MetricTile label="Riesgo" value={String(activeAgent.metrics.risk_score)} tone={activeAgent.metrics.risk_score > 65 ? "bad" : "warn"} />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+                  {(["normal", "conservative", "strict"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateDraft({ behavior_mode: mode })}
+                      className={cn("rounded-md px-3 py-1.5 text-xs transition", activeAgent.behavior_mode === mode ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-100")}
+                    >
+                      {modeLabel(mode)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={() => duplicateMutation.mutate(activeAgent.id)}>
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    Duplicar
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={() => exportAgent(activeAgent.id)}>
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                    Exportar
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 border-red-300/20 bg-red-500/10 text-xs text-red-100" onClick={() => disableMutation.mutate(activeAgent.id)}>
+                    <Pause className="mr-1.5 h-3.5 w-3.5" />
+                    Pausar
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-1 overflow-auto">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={cn("whitespace-nowrap rounded-md px-3 py-1.5 text-xs transition", activeTab === tab ? "bg-sky-600 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-100")}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+              <div className="space-y-3">
+                {activeTab === "Identidad" ? <IdentityPanel draft={activeAgent} onChange={updateDraft} /> : null}
+                {activeTab === "Guardrails" ? (
+                  <GuardrailsPanel
+                    guardrails={activeAgent.guardrails}
+                    onAdd={() => createGuardrailMutation.mutate(activeAgent.id)}
+                    onTest={(guardrail) => agentsApi.testGuardrail(guardrail.id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`))}
+                    onContext={(event, guardrail) => openContext(event, { kind: "guardrail", itemId: guardrail.id })}
+                  />
+                ) : null}
+                {activeTab === "Extracción" ? (
+                  <ExtractionPanel
+                    fields={activeAgent.extraction_fields}
+                    onAdd={() => createFieldMutation.mutate(activeAgent.id)}
+                    onTest={(field) => agentsApi.testExtractionField(field.id, "Me llamo Juan Pérez y gano por nómina").then((result) => toast.success(`${field.label}: ${result.value}`))}
+                    onContext={(event, field) => openContext(event, { kind: "field", itemId: field.id })}
+                  />
+                ) : null}
+                {activeTab === "Monitor" ? <MonitorPanel agent={activeAgent} /> : null}
+                {activeTab === "Knowledge" ? <KnowledgePanel agent={activeAgent} /> : null}
+                {activeTab === "Decision Map" ? (
+                  <DecisionMapPanel
+                    map={activeAgent.decision_map}
+                    onValidate={() => validateMapMutation.mutate(activeAgent)}
+                    onSave={() => decisionMapMutation.mutate(activeAgent)}
+                  />
+                ) : null}
+                {activeTab === "Pruebas" ? (
+                  <ScenarioPanel
+                    agent={activeAgent}
+                    onRun={(scenarioId) => runScenarioMutation.mutate({ agentId: activeAgent.id, scenarioId })}
+                    onStress={() => stressMutation.mutate(activeAgent.id)}
+                  />
+                ) : null}
+                {activeTab === "Identidad" ? (
+                  <GuardrailsPanel
+                    guardrails={activeAgent.guardrails}
+                    onAdd={() => createGuardrailMutation.mutate(activeAgent.id)}
+                    onTest={(guardrail) => agentsApi.testGuardrail(guardrail.id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`))}
+                    onContext={(event, guardrail) => openContext(event, { kind: "guardrail", itemId: guardrail.id })}
+                  />
+                ) : null}
+              </div>
+
+              <div className="space-y-3">
+                <WhatsAppPreview
+                  draft={activeAgent}
+                  preview={preview}
+                  onRunPreview={() => previewMutation.mutate(activeAgent)}
+                  loading={previewMutation.isPending}
+                />
+                <SupervisorPanel agent={activeAgent} />
+                <ValidationPanel validation={validation} />
+                {activeTab !== "Decision Map" ? (
+                  <DecisionMapPanel
+                    map={activeAgent.decision_map}
+                    onValidate={() => validateMapMutation.mutate(activeAgent)}
+                    onSave={() => decisionMapMutation.mutate(activeAgent)}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </main>
+        ) : (
+          <main className="grid flex-1 place-items-center">
+            <div className="text-center">
+              <Bot className="mx-auto h-12 w-12 text-slate-700" />
+              <div className="mt-3 text-sm font-semibold text-slate-200">Selecciona un agente</div>
+              <Button className="mt-4 bg-blue-600 hover:bg-blue-500" onClick={() => createMutation.mutate()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Crear agente
+              </Button>
+            </div>
+          </main>
         )}
       </div>
 
-      {/* Compare panel */}
-      {compareAgents && compareAgents.length === 2 && (
-        <ComparePanel
-          agents={[compareAgents[0]!, compareAgents[1]!]}
-          onClose={() => setCompareIds([])}
-        />
-      )}
+      {comparison ? <ComparePanel comparison={comparison} onClose={() => setComparison(null)} /> : null}
+      <ContextMenuLayer
+        state={contextMenu}
+        selected={activeAgent}
+        onClose={() => setContextMenu(null)}
+        onDuplicate={(agentId) => duplicateMutation.mutate(agentId)}
+        onDisable={(agentId) => disableMutation.mutate(agentId)}
+        onExport={exportAgent}
+        onDelete={deleteAgent}
+        onTestNested={(kind, id) => {
+          if (kind === "guardrail") {
+            void agentsApi.testGuardrail(id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`));
+          } else {
+            void agentsApi.testExtractionField(id, "Me llamo Juan Pérez y gano por nómina").then((result) => toast.success(`Extraído: ${result.value}`));
+          }
+        }}
+      />
+      <CommandPalette open={commandsOpen} onClose={() => setCommandsOpen(false)} actions={commandActions} />
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }

@@ -1239,9 +1239,9 @@ function CmdPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Acciones rápidas">
-          <CommandItem onSelect={() => { toast.info("Abriendo nueva conversación..."); onClose(); }}>Nueva conversación</CommandItem>
-          <CommandItem onSelect={() => { toast.info("Abriendo agenda..."); onClose(); }}>Crear cita</CommandItem>
-          <CommandItem onSelect={() => { toast.info("Exportando clientes..."); onClose(); }}>Exportar clientes</CommandItem>
+          <CommandItem onSelect={() => { toast.info("Feature en construcción", { description: '"Nueva conversación" estará disponible próximamente.' }); onClose(); }}>Nueva conversación</CommandItem>
+          <CommandItem onSelect={() => { toast.info("Feature en construcción", { description: '"Crear cita" estará disponible próximamente.' }); onClose(); }}>Crear cita</CommandItem>
+          <CommandItem onSelect={() => { toast.info("Feature en construcción", { description: '"Exportar clientes" estará disponible próximamente.' }); onClose(); }}>Exportar clientes</CommandItem>
         </CommandGroup>
       </CommandList>
     </CommandDialog>

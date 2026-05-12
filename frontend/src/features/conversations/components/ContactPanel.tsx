@@ -12,34 +12,43 @@
  * Toda la lógica de negocio (hooks, mutations) se preserva intacta.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Activity,
+  AlertTriangle,
   ArrowUpRight,
+  BrainCircuit,
+  CalendarClock,
   Check,
   ChevronLeft,
   ChevronRight,
   Copy,
   ExternalLink,
+  FileText,
+  Info,
+  Mail,
   MessageCircle,
-  MoreHorizontal,
   Pencil,
   Phone,
   Pin,
   PinOff,
   Plus,
   Save,
+  Send,
+  Sparkles,
   StickyNote,
+  Target,
   Trash2,
+  UserCheck,
   X,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { NYIButton } from "@/components/NYIButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,8 +64,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantsApi } from "@/features/config/api";
-import { conversationsApi, type ConversationDetail } from "@/features/conversations/api";
-import type { CustomerNote, FieldDefinition } from "@/features/customers/api";
+import { type ConversationDetail, conversationsApi } from "@/features/conversations/api";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -68,6 +76,11 @@ import {
   usePutFieldValues,
   useUpdateNote,
 } from "@/features/conversations/hooks/useContactPanel";
+import type {
+  CustomerNote,
+  CustomerDetail as CustomerRecord,
+  FieldDefinition,
+} from "@/features/customers/api";
 import { cn } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +110,152 @@ function scoreLabel(score: number): { text: string; cn: string } {
   if (score >= 70) return { text: "Alto", cn: "text-emerald-500" };
   if (score >= 40) return { text: "Medio", cn: "text-amber-500" };
   return { text: "Bajo", cn: "text-red-500" };
+}
+
+function closeProbability(score: number): { label: string; helper: string; cn: string } {
+  if (score >= 85) {
+    return {
+      label: "Excelente",
+      helper: "Alta probabilidad de cierre",
+      cn: "text-emerald-500",
+    };
+  }
+  if (score >= 65) {
+    return {
+      label: "Media-Alta",
+      helper: "Buen potencial si se atiende hoy",
+      cn: "text-blue-500",
+    };
+  }
+  if (score >= 40) {
+    return {
+      label: "Media",
+      helper: "Requiere seguimiento claro",
+      cn: "text-amber-500",
+    };
+  }
+  return {
+    label: "Baja",
+    helper: "Necesita reactivacion",
+    cn: "text-red-500",
+  };
+}
+
+function rawValue(value: unknown): unknown {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "value" in value
+  ) {
+    return (value as { value?: unknown }).value;
+  }
+  return value;
+}
+
+function toDisplayValue(value: unknown): string | null {
+  const raw = rawValue(value);
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+  if (Array.isArray(raw)) {
+    const parts = raw.map(toDisplayValue).filter(Boolean);
+    return parts.length ? parts.join(", ") : null;
+  }
+  return null;
+}
+
+function getPathValue(source: Record<string, unknown> | null | undefined, path: string): unknown {
+  if (!source) return undefined;
+  let current: unknown = source;
+  for (const part of path.split(".")) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+function pickValue(
+  sources: Array<Record<string, unknown> | null | undefined>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    for (const source of sources) {
+      const value = toDisplayValue(getPathValue(source, key));
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+function pickNumber(
+  sources: Array<Record<string, unknown> | null | undefined>,
+  keys: string[],
+): number | null {
+  for (const key of keys) {
+    for (const source of sources) {
+      const raw = rawValue(getPathValue(source, key));
+      if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+      if (typeof raw === "string") {
+        const parsed = Number(raw.replace(/[^\d.-]/g, ""));
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function formatMoney(value: number | null): string | null {
+  if (value === null) return null;
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatShortDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatElapsed(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true, locale: es });
+  } catch {
+    return null;
+  }
+}
+
+function normalizeIntent(intent: string | null | undefined): string {
+  return (intent ?? "").trim().toUpperCase();
+}
+
+function getDetailSources(
+  customer: CustomerRecord | undefined,
+  conversation: ConversationDetail | undefined,
+): Array<Record<string, unknown> | null | undefined> {
+  return [
+    conversation?.extracted_data,
+    customer?.last_extracted_data,
+    customer?.attrs,
+  ];
+}
+
+function stageLabel(stage: string | null | undefined): string {
+  if (!stage) return "Sin etapa";
+  return stage
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -346,16 +505,7 @@ function ContactIdentitySection({ customerId }: { customerId: string }) {
 function QuickActionsSection({ phone }: { phone: string }) {
   return (
     <div className="flex gap-1.5 px-3 pb-3">
-      <Button
-        variant="outline"
-        size="sm"
-        className="flex-1 h-7 gap-1 text-xs"
-        onClick={() => toast.info("Abriendo conversación de WhatsApp")}
-        aria-label="WhatsApp"
-      >
-        <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
-        WhatsApp
-      </Button>
+      <NYIButton label="Abrir WhatsApp" icon={MessageCircle} className="flex-1 h-7" />
       <Button
         variant="outline"
         size="sm"
@@ -366,6 +516,474 @@ function QuickActionsSection({ phone }: { phone: string }) {
         <Phone className="h-3.5 w-3.5" />
         Llamar
       </Button>
+    </div>
+  );
+}
+
+function MiniSparkline({ score }: { score: number }) {
+  const points = [42, 51, 49, 58, 62, 60, 72, Math.max(40, Math.min(96, score))];
+  const width = 78;
+  const height = 34;
+  const step = width / (points.length - 1);
+  const path = points
+    .map((point, index) => {
+      const x = index * step;
+      const y = height - (point / 100) * height;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="h-8 w-20 overflow-visible"
+      aria-hidden="true"
+    >
+      <path
+        d={`${path} L ${width} ${height} L 0 ${height} Z`}
+        className="fill-emerald-500/10"
+      />
+      <path d={path} className="fill-none stroke-emerald-500" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function IntelligenceScoreSection({
+  customer,
+}: {
+  customer: CustomerRecord | undefined;
+}) {
+  if (!customer) {
+    return (
+      <div className="px-3 py-3">
+        <Skeleton className="h-24 rounded-lg" />
+      </div>
+    );
+  }
+
+  const probability = closeProbability(customer.score);
+
+  return (
+    <div className="px-3 py-3">
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/8 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <BrainCircuit className="h-3 w-3" />
+              Lead score
+            </div>
+            <div className="mt-2 flex items-end gap-2">
+              <span className="text-4xl font-bold leading-none text-emerald-500 tabular-nums">
+                {customer.score}
+              </span>
+              <span className={cn("pb-1 text-xs font-semibold", probability.cn)}>
+                {probability.label}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {probability.helper}
+            </p>
+          </div>
+          <MiniSparkline score={customer.score} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | null | undefined;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        {Icon && <Icon className="h-3 w-3 shrink-0" />}
+        <span>{label}</span>
+      </div>
+      <div className="mt-0.5 truncate text-[11px] font-medium">
+        {value || "Sin dato"}
+      </div>
+    </div>
+  );
+}
+
+function ContactDetailGridSection({
+  customer,
+  conversation,
+}: {
+  customer: CustomerRecord | undefined;
+  conversation: ConversationDetail | undefined;
+}) {
+  if (!customer) {
+    return (
+      <div className="px-3 py-3 space-y-2">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-16 rounded-lg" />
+      </div>
+    );
+  }
+
+  const sources = getDetailSources(customer, conversation);
+  const source =
+    pickValue(sources, [
+      "source",
+      "fuente",
+      "lead_source",
+      "origen",
+      "utm_source",
+      "campaign.source",
+    ]) ?? "WhatsApp";
+  const campaign = pickValue(sources, [
+    "campaign",
+    "campana",
+    "campaign_name",
+    "nombre_campana",
+    "campaign.name",
+  ]);
+  const estimatedValue =
+    formatMoney(
+      pickNumber(sources, [
+        "estimated_value",
+        "valor_estimado",
+        "valor_estimate",
+        "precio",
+        "price",
+        "product.price",
+        "producto.precio",
+      ]),
+    ) ?? pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
+  const creditType = pickValue(sources, [
+    "tipo_credito",
+    "tipo_de_credito",
+    "credit_type",
+    "financing.type",
+  ]);
+  const creditPlan = pickValue(sources, [
+    "plan_credito",
+    "plan_de_credito",
+    "credit_plan",
+    "financing.plan",
+  ]);
+  const product = pickValue(sources, [
+    "modelo_interes",
+    "modelo_moto",
+    "interes_producto",
+    "product.name",
+    "producto.modelo",
+  ]);
+  const city = pickValue(sources, ["ciudad", "city", "estado", "state"]);
+  const advisor =
+    conversation?.assigned_agent_name ??
+    conversation?.assigned_user_email ??
+    pickValue(sources, ["advisor", "asesor", "assigned_to"]);
+
+  return (
+    <div className="px-3 py-3 space-y-2.5">
+      <SectionLabel icon={Info}>Datos de contacto</SectionLabel>
+      <div className="grid grid-cols-2 gap-1.5">
+        <DetailRow label="Etapa" value={stageLabel(conversation?.current_stage ?? customer.effective_stage)} icon={Target} />
+        <DetailRow label="Fuente" value={campaign ? `${source} · ${campaign}` : source} icon={Sparkles} />
+        <DetailRow label="Asesor" value={advisor} icon={UserCheck} />
+        <DetailRow label="Valor estimado" value={estimatedValue} icon={Zap} />
+        <DetailRow label="Tipo de credito" value={creditType} />
+        <DetailRow label="Plan de credito" value={creditPlan} />
+        <DetailRow label="Producto" value={product} />
+        <DetailRow label="Ubicacion" value={city} />
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <DetailRow label="Telefono" value={customer.phone_e164} icon={Phone} />
+        <DetailRow label="Email" value={customer.email} icon={Mail} />
+      </div>
+      <div className="text-[10px] text-muted-foreground">
+        Ultima actividad: {formatElapsed(customer.last_activity_at) ?? "sin registro"}
+      </div>
+    </div>
+  );
+}
+
+function missingDocs(conversation: ConversationDetail | undefined) {
+  return conversation?.required_docs.filter((doc) => !doc.present) ?? [];
+}
+
+function completedDocs(conversation: ConversationDetail | undefined) {
+  return conversation?.required_docs.filter((doc) => doc.present) ?? [];
+}
+
+function MissingDocumentsSection({
+  customerId,
+  conversation,
+}: {
+  customerId: string;
+  conversation: ConversationDetail | undefined;
+}) {
+  const missing = missingDocs(conversation);
+  const completed = completedDocs(conversation);
+  const total = conversation?.required_docs.length ?? 0;
+
+  return (
+    <div className="px-3 py-3">
+      <div
+        className={cn(
+          "rounded-lg border p-3",
+          missing.length > 0
+            ? "border-red-500/25 bg-red-500/8"
+            : "border-emerald-500/20 bg-emerald-500/8",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <FileText
+              className={cn(
+                "h-3.5 w-3.5",
+                missing.length > 0 ? "text-red-500" : "text-emerald-500",
+              )}
+            />
+            Documentos
+          </div>
+          {total > 0 && (
+            <span className="rounded-full border border-border bg-background/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {completed.length}/{total}
+            </span>
+          )}
+        </div>
+
+        {total === 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Sin checklist asignado para este contacto.
+          </p>
+        ) : missing.length === 0 ? (
+          <p className="mt-2 text-[11px] text-emerald-600">
+            Documentacion completa para avanzar.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {missing.slice(0, 3).map((doc) => (
+              <li key={doc.field_name} className="flex items-center gap-1.5 text-[11px]">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                <span className="min-w-0 truncate">{doc.label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <Link
+          to="/customers/$customerId"
+          params={{ customerId }}
+          className="mt-2 inline-flex text-[11px] font-medium text-primary hover:underline"
+        >
+          Ver detalle del contacto
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function suggestedNextAction(
+  customer: CustomerRecord | undefined,
+  conversation: ConversationDetail | undefined,
+): string {
+  const missing = missingDocs(conversation);
+  const intent = normalizeIntent(conversation?.last_intent);
+  const stage = normalizeIntent(conversation?.current_stage);
+
+  if (conversation?.has_pending_handoff) {
+    return "Asignar a un humano y revisar el motivo del handoff antes de responder.";
+  }
+  if (missing.length > 0) {
+    return `Solicitar ${missing[0]?.label ?? "documentos faltantes"} para continuar la evaluacion.`;
+  }
+  if (customer && customer.score >= 80 && !stage.includes("CITA") && !stage.includes("APPOINTMENT")) {
+    return "Agendar prueba de manejo y confirmar disponibilidad del asesor.";
+  }
+  if (intent.includes("ASK_PRICE") || intent.includes("PRICE")) {
+    return "Enviar cotizacion personalizada y resolver dudas de financiamiento.";
+  }
+  if (conversation?.bot_paused) {
+    return "Dar seguimiento humano y definir si se reactiva la IA.";
+  }
+  return "Enviar seguimiento breve con la siguiente pregunta comercial.";
+}
+
+function NextBestActionSection({
+  customer,
+  conversation,
+}: {
+  customer: CustomerRecord | undefined;
+  conversation: ConversationDetail | undefined;
+}) {
+  const action = suggestedNextAction(customer, conversation);
+
+  return (
+    <div className="px-3 py-3">
+      <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/8 p-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold">
+          <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+          Next Best Action
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          {action}
+        </p>
+        <Button
+          size="sm"
+          className="mt-3 h-7 w-full gap-1.5 text-xs"
+          onClick={() => toast.success("Accion preparada", { description: action })}
+        >
+          <Send className="h-3 w-3" />
+          Ejecutar accion
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function buildRisks(
+  customer: CustomerRecord | undefined,
+  conversation: ConversationDetail | undefined,
+): string[] {
+  const risks: string[] = [];
+  const lastActivityAt = conversation?.last_activity_at ?? customer?.last_activity_at;
+  const lastActivityMs = lastActivityAt ? Date.now() - new Date(lastActivityAt).getTime() : 0;
+
+  if (lastActivityMs > 2 * 60 * 60 * 1000) {
+    risks.push("Tiempo sin respuesta mayor a 2 horas.");
+  }
+  if (conversation?.assigned_user_id === null && conversation?.assigned_agent_id === null) {
+    risks.push("Conversacion sin asesor asignado.");
+  }
+  if (conversation?.has_pending_handoff) {
+    risks.push("Handoff pendiente de revision.");
+  }
+  if (conversation?.bot_paused) {
+    risks.push("IA pausada; el seguimiento depende del operador.");
+  }
+  if (missingDocs(conversation).length > 0) {
+    risks.push("Documentos faltantes bloquean el avance.");
+  }
+  if (customer && customer.score < 45) {
+    risks.push("Lead score bajo; requiere reactivacion.");
+  }
+
+  return risks.slice(0, 4);
+}
+
+function RisksDetectedSection({
+  customer,
+  conversation,
+}: {
+  customer: CustomerRecord | undefined;
+  conversation: ConversationDetail | undefined;
+}) {
+  const risks = buildRisks(customer, conversation);
+
+  return (
+    <div className="px-3 py-3">
+      <div
+        className={cn(
+          "rounded-lg border p-3",
+          risks.length > 0
+            ? "border-amber-500/25 bg-amber-500/8"
+            : "border-emerald-500/20 bg-emerald-500/8",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <AlertTriangle
+              className={cn(
+                "h-3.5 w-3.5",
+                risks.length > 0 ? "text-amber-500" : "text-emerald-500",
+              )}
+            />
+            Riesgos detectados
+          </div>
+          {risks.length > 0 && (
+            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-600">
+              {risks.length}
+            </span>
+          )}
+        </div>
+        {risks.length === 0 ? (
+          <p className="mt-2 text-[11px] text-emerald-600">
+            Sin riesgos operativos relevantes.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {risks.map((risk) => (
+              <li key={risk} className="flex items-start gap-1.5 text-[11px] leading-relaxed">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span>{risk}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="mt-2 text-[11px] font-medium text-primary hover:underline"
+          onClick={() => toast.info("Recomendaciones listas", { description: suggestedNextAction(customer, conversation) })}
+        >
+          Ver recomendaciones
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EventTimelineSection({
+  conversation,
+}: {
+  conversation: ConversationDetail | undefined;
+}) {
+  const entries = [
+    {
+      label: "Conversacion iniciada",
+      time: formatShortDateTime(conversation?.created_at),
+      tone: "bg-blue-500",
+    },
+    {
+      label: `Etapa actual: ${stageLabel(conversation?.current_stage)}`,
+      time: formatShortDateTime(conversation?.last_activity_at),
+      tone: "bg-purple-500",
+    },
+    ...completedDocs(conversation).slice(0, 2).map((doc) => ({
+      label: `${doc.label} recibido`,
+      time: formatShortDateTime(conversation?.last_activity_at),
+      tone: "bg-emerald-500",
+    })),
+    {
+      label: conversation?.last_intent
+        ? `${normalizeIntent(conversation.last_intent)} detectado`
+        : "Intencion pendiente",
+      time: formatShortDateTime(conversation?.last_inbound_at ?? conversation?.last_activity_at),
+      tone: "bg-amber-500",
+    },
+  ].filter((entry) => entry.time || entry.label);
+
+  return (
+    <div className="px-3 py-3 space-y-2.5">
+      <SectionLabel icon={CalendarClock}>Historial de eventos</SectionLabel>
+      <ol className="space-y-2">
+        {entries.slice(0, 5).map((entry, index) => (
+          <li key={`${entry.label}-${entry.time ?? "pending"}`} className="flex gap-2 text-[11px]">
+            <div className="flex flex-col items-center">
+              <span className={cn("mt-1 h-2 w-2 rounded-full", entry.tone)} />
+              {index < Math.min(entries.length, 5) - 1 && (
+                <span className="mt-1 h-full min-h-4 w-px bg-border" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{entry.label}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {entry.time ?? "Sin fecha"}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -1008,7 +1626,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        aria-label="Expandir panel de contacto"
+        aria-label="Expandir inteligencia del cliente"
         className="flex h-full w-3 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-muted/40 transition-colors hover:bg-muted"
       >
         <ChevronLeft className="h-3 w-3 text-muted-foreground" />
@@ -1017,10 +1635,17 @@ export function ContactPanel({ customerId, conversation }: Props) {
   }
 
   return (
-    <div className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground">
+    <div className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground">
       {/* ── Panel header ─────────────────────────────────────────────── */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-xs font-semibold">Contacto</span>
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+        <div className="min-w-0">
+          <span className="block truncate text-xs font-semibold">
+            Inteligencia del cliente
+          </span>
+          <span className="block truncate text-[10px] text-muted-foreground">
+            contacto, riesgo y siguiente accion
+          </span>
+        </div>
         <div className="flex items-center gap-0.5">
           {customerId && (
             <Link
@@ -1048,7 +1673,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
         <div>
           {customerId ? (
             <>
-              {/* Contact identity + score */}
+              {/* Contact identity */}
               <ContactIdentitySection customerId={customerId} />
 
               {/* Quick actions */}
@@ -1056,7 +1681,37 @@ export function ContactPanel({ customerId, conversation }: Props) {
                 <QuickActionsSection phone={customer.data.phone_e164} />
               )}
 
-              {/* Conversation meta */}
+              <Separator />
+              <IntelligenceScoreSection customer={customer.data} />
+
+              <Separator />
+              <ContactDetailGridSection
+                customer={customer.data}
+                conversation={conversation}
+              />
+
+              <Separator />
+              <MissingDocumentsSection
+                customerId={customerId}
+                conversation={conversation}
+              />
+
+              <Separator />
+              <NextBestActionSection
+                customer={customer.data}
+                conversation={conversation}
+              />
+
+              <Separator />
+              <RisksDetectedSection
+                customer={customer.data}
+                conversation={conversation}
+              />
+
+              <Separator />
+              <EventTimelineSection conversation={conversation} />
+
+              {/* Conversation controls */}
               {conversation && (
                 <>
                   <Separator />

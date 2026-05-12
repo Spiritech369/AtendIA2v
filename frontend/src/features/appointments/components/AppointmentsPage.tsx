@@ -1,1295 +1,941 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
-  CalendarCheck,
+  Bot,
   CalendarDays,
   CalendarPlus,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  ExternalLink,
+  Clock3,
+  Copy,
+  Download,
+  Filter,
   LayoutList,
-  Pencil,
-  Settings2,
+  MapPin,
+  MessageCircle,
+  MoreVertical,
+  PauseCircle,
+  Phone,
+  RefreshCw,
+  Route,
+  Search,
+  Send,
+  ShieldCheck,
   Sparkles,
-  Trash2,
+  Upload,
+  UserRound,
+  Users,
   X,
+  Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { create } from "zustand";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  type AppointmentConflict,
-  type AppointmentItem,
   appointmentsApi,
+  type AdvisorOption,
+  type AppointmentItem,
+  type AppointmentStatus,
+  type AppointmentType,
+  type FunnelStage,
+  type NaturalParse,
+  type PriorityItem,
+  type SupervisorRecommendations,
+  type VehicleOption,
 } from "@/features/appointments/api";
-import { customersApi } from "@/features/customers/api";
-import { AppointmentsFeatureSettings } from "./AppointmentsFeatureSettings";
+import { customersApi, type CustomerListItem } from "@/features/customers/api";
+import { DemoBadge } from "@/components/DemoBadge";
+import { NYIButton } from "@/components/NYIButton";
+import { cn } from "@/lib/utils";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+type ViewMode = "operation" | "list" | "day" | "week" | "advisor";
+type QuickFilter = "all" | "unconfirmed" | "high_risk" | "missing_advisor" | "missing_vehicle" | "incomplete_docs";
 
-const STATUSES = ["scheduled", "completed", "cancelled", "no_show"] as const;
-type AppointmentStatus = (typeof STATUSES)[number];
+interface AppointmentUiState {
+  selectedAppointmentId: string | null;
+  activeView: ViewMode;
+  quickFilter: QuickFilter;
+  contextMenu: { x: number; y: number; appointmentId: string } | null;
+  setSelectedAppointmentId: (id: string | null) => void;
+  setActiveView: (view: ViewMode) => void;
+  setQuickFilter: (filter: QuickFilter) => void;
+  setContextMenu: (state: { x: number; y: number; appointmentId: string } | null) => void;
+}
 
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Programada",
-  completed: "Completada",
-  cancelled: "Cancelada",
-  no_show: "No asistió",
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  scheduled: "#3b82f6",
-  completed: "#10b981",
-  cancelled: "#6b7280",
-  no_show: "#f59e0b",
-};
-
-const STATUS_BG: Record<string, string> = {
-  scheduled: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  completed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  cancelled: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-  no_show: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-};
+const useAppointmentUi = create<AppointmentUiState>((set) => ({
+  selectedAppointmentId: null,
+  activeView: "operation",
+  quickFilter: "all",
+  contextMenu: null,
+  setSelectedAppointmentId: (id) => set({ selectedAppointmentId: id }),
+  setActiveView: (view) => set({ activeView: view }),
+  setQuickFilter: (filter) => set({ quickFilter: filter }),
+  setContextMenu: (state) => set({ contextMenu: state }),
+}));
 
 const HOUR_START = 8;
 const HOUR_END = 20;
-const TOTAL_HOURS = HOUR_END - HOUR_START;
-const HOUR_PX = 56;
-const GRID_HEIGHT = TOTAL_HOURS * HOUR_PX;
+const HOUR_HEIGHT = 58;
+const DAY_MS = 86_400_000;
 
-const DAY_NAMES_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const DAY_NAMES_FULL = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+const viewLabels: Array<{ id: ViewMode; label: string; icon: ReactNode }> = [
+  { id: "operation", label: "Operación", icon: <Zap className="h-3.5 w-3.5" /> },
+  { id: "list", label: "Lista", icon: <LayoutList className="h-3.5 w-3.5" /> },
+  { id: "day", label: "Día", icon: <Clock3 className="h-3.5 w-3.5" /> },
+  { id: "week", label: "Semana", icon: <CalendarDays className="h-3.5 w-3.5" /> },
+  { id: "advisor", label: "Asesor", icon: <Users className="h-3.5 w-3.5" /> },
+];
 
-const BUCKET_ORDER = ["Pasadas", "Hoy", "Mañana", "Esta semana", "Este mes", "Más adelante"];
+const filterLabels: Array<{ id: QuickFilter; label: string }> = [
+  { id: "all", label: "Todas" },
+  { id: "unconfirmed", label: "Sin confirmar" },
+  { id: "high_risk", label: "Alto riesgo" },
+  { id: "missing_advisor", label: "Sin asesor" },
+  { id: "missing_vehicle", label: "Sin unidad" },
+  { id: "incomplete_docs", label: "Docs incompletos" },
+];
 
-// ─── Date utilities ────────────────────────────────────────────────────────────
+const statusLabel: Record<AppointmentStatus, string> = {
+  scheduled: "Programada",
+  confirmed: "Confirmada",
+  arrived: "Llegó",
+  completed: "Completada",
+  cancelled: "Cancelada",
+  no_show: "No asistió",
+  rescheduled: "Reprogramada",
+};
 
-function getMondayOf(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
+const typeLabel: Record<AppointmentType, string> = {
+  test_drive: "Prueba de manejo",
+  quote: "Cotización",
+  documents: "Documentos",
+  delivery: "Entrega",
+  follow_up: "Seguimiento",
+  financing: "Financiamiento",
+  call: "Llamada",
+};
+
+const typeTone: Record<AppointmentType, string> = {
+  test_drive: "border-blue-400/60 bg-blue-500/12 text-blue-100",
+  quote: "border-violet-400/60 bg-violet-500/12 text-violet-100",
+  documents: "border-fuchsia-400/60 bg-fuchsia-500/12 text-fuchsia-100",
+  delivery: "border-amber-400/60 bg-amber-500/12 text-amber-100",
+  follow_up: "border-emerald-400/60 bg-emerald-500/12 text-emerald-100",
+  financing: "border-sky-400/60 bg-sky-500/12 text-sky-100",
+  call: "border-purple-400/60 bg-purple-500/12 text-purple-100",
+};
+
+function startOfWeek(date: Date): Date {
+  const next = new Date(date);
+  const day = next.getDay();
   const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  next.setDate(next.getDate() + diff);
+  next.setHours(0, 0, 0, 0);
+  return next;
 }
 
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function fmtTime(value: string | Date): string {
+  return new Date(value).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function fmtDay(value: string | Date): string {
+  return new Date(value).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function currency(value: number): string {
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(value);
+}
+
+function appointmentTop(item: AppointmentItem): number {
+  const date = new Date(item.scheduled_at);
+  const minutes = (date.getHours() - HOUR_START) * 60 + date.getMinutes();
+  return Math.max(0, (minutes / 60) * HOUR_HEIGHT);
+}
+
+function appointmentHeight(item: AppointmentItem): number {
+  const start = new Date(item.scheduled_at).getTime();
+  const end = new Date(item.ends_at ?? start + 45 * 60_000).getTime();
+  return Math.max(44, ((end - start) / 3_600_000) * HOUR_HEIGHT);
+}
+
+function riskClass(level: string): string {
+  if (level === "critical") return "border-red-400/50 bg-red-500/15 text-red-100";
+  if (level === "high") return "border-orange-400/50 bg-orange-500/15 text-orange-100";
+  if (level === "medium") return "border-amber-400/50 bg-amber-500/15 text-amber-100";
+  return "border-emerald-400/50 bg-emerald-500/15 text-emerald-100";
+}
+
+function statusClass(status: AppointmentStatus): string {
+  if (status === "completed") return "bg-emerald-500/20 text-emerald-100";
+  if (status === "confirmed" || status === "arrived") return "bg-blue-500/20 text-blue-100";
+  if (status === "no_show" || status === "cancelled") return "bg-red-500/20 text-red-100";
+  if (status === "rescheduled") return "bg-amber-500/20 text-amber-100";
+  return "bg-slate-600/30 text-slate-200";
+}
+
+function matchesFilter(item: AppointmentItem, filter: QuickFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "unconfirmed") return item.status === "scheduled";
+  if (filter === "high_risk") return item.risk_level === "high" || item.risk_level === "critical";
+  if (filter === "missing_advisor") return !item.advisor_name;
+  if (filter === "missing_vehicle") return item.appointment_type === "test_drive" && !item.vehicle_label;
+  if (filter === "incomplete_docs") return !item.documents_complete;
+  return true;
+}
+
+function Panel({ title, icon, action, children, className }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
+    <section className={cn("min-w-0 rounded-lg border border-white/10 bg-slate-950/78 shadow-sm shadow-black/20", className)}>
+      <div className="flex min-h-10 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+          {icon}
+          {title}
+        </div>
+        {action}
+      </div>
+      <div className="p-3">{children}</div>
+    </section>
   );
 }
 
-function fmtShort(date: Date): string {
-  return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
-}
-
-function fmtTime(date: Date): string {
-  return date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function bucketLabel(scheduled: Date, now: Date): string {
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const day = new Date(scheduled);
-  day.setHours(0, 0, 0, 0);
-  const diff = Math.round((day.getTime() - today.getTime()) / 86_400_000);
-  if (diff < 0) return "Pasadas";
-  if (diff === 0) return "Hoy";
-  if (diff === 1) return "Mañana";
-  if (diff < 7) return "Esta semana";
-  if (diff < 30) return "Este mes";
-  return "Más adelante";
-}
-
-// ─── Smart input parser ────────────────────────────────────────────────────────
-
-interface ParsedApt {
-  date: Date;
-  service: string;
-}
-
-function parseSmartInput(text: string): ParsedApt | null {
-  if (!text.trim()) return null;
-  const now = new Date();
-  const date = new Date(now);
-  date.setHours(9, 0, 0, 0);
-
-  const lower = text.toLowerCase();
-
-  if (lower.includes("mañana")) {
-    date.setDate(date.getDate() + 1);
-  } else if (!lower.includes("hoy")) {
-    for (let i = 0; i < DAY_NAMES_FULL.length; i++) {
-      if (lower.includes(DAY_NAMES_FULL[i]!)) {
-        const targetJs = (i + 1) % 7; // Mon=1..Sun=0
-        const todayJs = now.getDay();
-        let diff = targetJs - todayJs;
-        if (diff <= 0) diff += 7;
-        date.setDate(date.getDate() + diff);
-        break;
-      }
-    }
-  }
-
-  const timeRe = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|hrs?)?/i;
-  const tm = timeRe.exec(text);
-  if (tm) {
-    let h = parseInt(tm[1]!, 10);
-    const m = tm[2] ? parseInt(tm[2], 10) : 0;
-    const mer = tm[3]?.toLowerCase() ?? "";
-    if (mer === "pm" && h < 12) h += 12;
-    else if (mer === "am" && h === 12) h = 0;
-    else if (!mer && h >= 1 && h <= 7) h += 12; // 1-7 no meridiem → PM
-    date.setHours(h, m, 0, 0);
-  }
-
-  const service = text
-    .replace(/\b(hoy|mañana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/gi, "")
-    .replace(/\d{1,2}(?::\d{2})?\s*(?:am|pm|hrs?)?/gi, "")
-    .trim()
-    .replace(/\s{2,}/g, " ");
-
-  if (!service) return null;
-  return { date, service };
-}
-
-// ─── Conflict detection ────────────────────────────────────────────────────────
-
-function detectConflicts(items: AppointmentItem[]): Set<string> {
-  const ids = new Set<string>();
-  const scheduled = items.filter((a) => a.status === "scheduled");
-  for (let i = 0; i < scheduled.length; i++) {
-    for (let j = i + 1; j < scheduled.length; j++) {
-      const a = scheduled[i]!;
-      const b = scheduled[j]!;
-      if (a.customer_id !== b.customer_id) continue;
-      const diff = Math.abs(
-        new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime(),
-      );
-      if (diff < 2 * 60 * 60 * 1000) {
-        ids.add(a.id);
-        ids.add(b.id);
-      }
-    }
-  }
-  return ids;
-}
-
-// ─── KPI Tile ─────────────────────────────────────────────────────────────────
-
-function KPITile({
-  label,
-  value,
-  icon: Icon,
-  colorClass,
-}: {
-  label: string;
-  value: number;
-  icon: typeof CalendarDays;
-  colorClass: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shrink-0">
-      <div className={`grid h-9 w-9 place-items-center rounded-lg ${colorClass}`}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <div>
-        <div className="text-xl font-bold tabular-nums">{value}</div>
-        <div className="text-xs text-muted-foreground">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Appointment block (week/day views) ───────────────────────────────────────
-
-function aptTop(iso: string): number {
-  const d = new Date(iso);
-  const mins = (d.getHours() - HOUR_START) * 60 + d.getMinutes();
-  return Math.max(0, (mins / (TOTAL_HOURS * 60)) * GRID_HEIGHT);
-}
-
-function AppointmentBlock({
-  item,
-  hasConflict,
-  onClick,
-}: {
-  item: AppointmentItem;
-  hasConflict: boolean;
-  onClick: () => void;
-}) {
-  const color = STATUS_COLOR[item.status] ?? "#6366f1";
-  const top = aptTop(item.scheduled_at);
-
+function KpiCard({ label, value, detail, tone = "slate" }: { label: string; value: string | number; detail?: string; tone?: "slate" | "green" | "amber" | "red" | "blue" | "violet" }) {
+  const color = {
+    slate: "text-slate-100",
+    green: "text-emerald-300",
+    amber: "text-amber-300",
+    red: "text-red-300",
+    blue: "text-sky-300",
+    violet: "text-violet-300",
+  }[tone];
   return (
     <button
       type="button"
-      onClick={onClick}
-      style={{ top, height: 48, borderLeftColor: color }}
-      className="absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md border-l-4 bg-background p-1 text-left text-xs shadow-sm transition-shadow hover:shadow-md"
+      onClick={() => toast.info(`${label}: ${value}`)}
+      className="min-w-[132px] rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-sky-300/40 hover:bg-sky-500/10"
     >
-      <div className="flex items-start justify-between gap-1">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className={cn("mt-1 text-2xl font-semibold leading-none", color)}>{value}</div>
+      {detail ? <div className="mt-1 truncate text-[10px] text-slate-500">{detail}</div> : null}
+    </button>
+  );
+}
+
+function AppointmentCard({ item, onSelect, onContext, onDragStart }: { item: AppointmentItem; onSelect: () => void; onContext: (event: React.MouseEvent) => void; onDragStart?: (event: React.DragEvent) => void }) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={onDragStart}
+      onClick={onSelect}
+      onContextMenu={onContext}
+      className={cn("absolute left-1 right-1 overflow-hidden rounded-md border p-2 text-left text-[11px] shadow-lg transition hover:-translate-y-0.5", typeTone[item.appointment_type])}
+      style={{ top: appointmentTop(item), height: appointmentHeight(item) }}
+    >
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-medium leading-tight">
-            {item.customer_name ?? item.customer_phone}
-          </div>
-          <div className="truncate text-muted-foreground">{item.service}</div>
+          <div className="font-semibold leading-tight">{fmtTime(item.scheduled_at)} - {fmtTime(item.ends_at ?? item.scheduled_at)}</div>
+          <div className="mt-0.5 truncate text-slate-100">{typeLabel[item.appointment_type]}</div>
+          <div className="truncate text-slate-300">{item.customer_name ?? item.customer_phone}</div>
+          <div className="truncate text-slate-400">{item.vehicle_label ?? item.advisor_name ?? "Sin asignar"}</div>
         </div>
-        {hasConflict && <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />}
+        <div className="flex flex-col items-end gap-1">
+          {item.conflict_count > 0 ? <AlertTriangle className="h-3.5 w-3.5 text-red-300" /> : null}
+          <span className={cn("rounded-full px-1.5 py-0.5 text-[10px]", statusClass(item.status))}>{statusLabel[item.status]}</span>
+        </div>
       </div>
     </button>
   );
 }
 
-// ─── Week View ─────────────────────────────────────────────────────────────────
-
-function WeekView({
-  weekStart,
+function WeekCalendar({
   items,
-  conflicts,
+  weekStart,
   onSelect,
+  onContext,
+  onDropAppointment,
 }: {
-  weekStart: Date;
   items: AppointmentItem[];
-  conflicts: Set<string>;
+  weekStart: Date;
   onSelect: (item: AppointmentItem) => void;
+  onContext: (event: React.MouseEvent, item: AppointmentItem) => void;
+  onDropAppointment: (id: string, nextStart: Date) => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const now = new Date();
-  const nowMins = (now.getHours() - HOUR_START) * 60 + now.getMinutes();
-  const nowTop = (nowMins / (TOTAL_HOURS * 60)) * GRID_HEIGHT;
-  const showNowLine = now.getHours() >= HOUR_START && now.getHours() < HOUR_END;
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, nowTop - 100);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  const byDay = useMemo(() => {
-    const map = new Map<string, AppointmentItem[]>();
-    for (const item of items) {
-      const d = new Date(item.scheduled_at);
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      const arr = map.get(key) ?? [];
-      arr.push(item);
-      map.set(key, arr);
-    }
-    return map;
-  }, [items]);
-
+  const gridHeight = (HOUR_END - HOUR_START) * HOUR_HEIGHT;
+  const nowTop = ((now.getHours() - HOUR_START) * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 border-b">
-        <div className="w-14 shrink-0 border-r" />
-        {days.map((day, i) => {
-          const isToday = isSameDay(day, now);
+    <Panel title={`${fmtDay(weekStart)} - ${fmtDay(addDays(weekStart, 6))}`} icon={<CalendarDays className="h-4 w-4 text-sky-300" />} className="overflow-hidden">
+      <div className="grid grid-cols-[52px_repeat(7,minmax(120px,1fr))] overflow-auto">
+        <div />
+        {days.map((day) => (
+          <div key={day.toISOString()} className={cn("border-l border-white/10 px-2 pb-2 text-center text-xs text-slate-400", isSameDay(day, now) && "text-sky-200")}>
+            <span>{day.toLocaleDateString("es-MX", { weekday: "short" })}</span>
+            <span className={cn("ml-1 inline-grid h-6 w-6 place-items-center rounded-full", isSameDay(day, now) && "bg-blue-600 text-white")}>{day.getDate()}</span>
+          </div>
+        ))}
+        <div className="relative border-r border-white/10" style={{ height: gridHeight }}>
+          {Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, index) => (
+            <div key={index} className="absolute right-2 text-[10px] text-slate-500" style={{ top: index * HOUR_HEIGHT - 7 }}>
+              {String(HOUR_START + index).padStart(2, "0")}:00
+            </div>
+          ))}
+        </div>
+        {days.map((day) => {
+          const dayItems = items.filter((item) => isSameDay(new Date(item.scheduled_at), day));
           return (
             <div
-              key={i}
-              className={`flex-1 border-r px-2 py-2 text-center text-xs last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
+              key={day.toISOString()}
+              className={cn("relative border-l border-white/10", isSameDay(day, now) && "bg-sky-500/[0.03]")}
+              style={{ height: gridHeight }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const id = event.dataTransfer.getData("appointment/id");
+                if (!id) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const y = Math.max(0, Math.min(gridHeight, event.clientY - rect.top));
+                const minutes = Math.round((y / HOUR_HEIGHT) * 60 / 15) * 15;
+                const next = new Date(day);
+                next.setHours(HOUR_START, minutes, 0, 0);
+                onDropAppointment(id, next);
+              }}
             >
-              <div
-                className={`font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}
-              >
-                {DAY_NAMES_SHORT[i]}
+              {Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, index) => (
+                <div key={index} className="absolute left-0 right-0 border-t border-white/5" style={{ top: index * HOUR_HEIGHT }} />
+              ))}
+              {isSameDay(day, now) && now.getHours() >= HOUR_START && now.getHours() <= HOUR_END ? (
+                <div className="absolute left-0 right-0 z-10 flex items-center" style={{ top: nowTop }}>
+                  <span className="rounded-r bg-red-500 px-1 text-[10px] font-semibold text-white">{fmtTime(now)}</span>
+                  <span className="flex-1 border-t border-red-500" />
+                </div>
+              ) : null}
+              {dayItems.length === 0 ? (
+                <div className="absolute inset-x-2 bottom-3 rounded-lg border border-dashed border-white/10 p-3 text-center text-xs text-slate-500">
+                  Día sin citas
+                </div>
+              ) : null}
+              {dayItems.map((item) => (
+                <AppointmentCard
+                  key={item.id}
+                  item={item}
+                  onSelect={() => onSelect(item)}
+                  onContext={(event) => onContext(event, item)}
+                  onDragStart={(event) => event.dataTransfer.setData("appointment/id", item.id)}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function ListView({ items, onSelect, onContext }: { items: AppointmentItem[]; onSelect: (item: AppointmentItem) => void; onContext: (event: React.MouseEvent, item: AppointmentItem) => void }) {
+  const grouped = useMemo(() => {
+    const map = new Map<string, AppointmentItem[]>();
+    for (const item of items) {
+      const key = new Date(item.scheduled_at).toDateString();
+      map.set(key, [...(map.get(key) ?? []), item]);
+    }
+    return Array.from(map.entries()).map(([key, rows]) => ({ key, date: new Date(key), rows }));
+  }, [items]);
+  return (
+    <Panel title="Vista: Lista" icon={<LayoutList className="h-4 w-4 text-sky-300" />}>
+      <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
+        {grouped.map((group) => (
+          <div key={group.key}>
+            <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
+              <span>{fmtDay(group.date)}</span>
+              <span>{group.rows.length} citas</span>
+            </div>
+            <div className="space-y-1.5">
+              {group.rows.map((item) => (
+                <button key={item.id} type="button" onClick={() => onSelect(item)} onContextMenu={(event) => onContext(event, item)} className="grid w-full grid-cols-[80px_1fr_120px_100px] items-center gap-3 rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs hover:border-sky-300/40">
+                  <span className="font-mono text-slate-400">{fmtTime(item.scheduled_at)}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-slate-100">{item.customer_name ?? item.customer_phone}</span>
+                    <span className="block truncate text-slate-500">{typeLabel[item.appointment_type]} · {item.vehicle_label ?? "Sin unidad"}</span>
+                  </span>
+                  <span className="truncate text-slate-300">{item.advisor_name ?? "Sin asesor"}</span>
+                  <span className={cn("rounded px-2 py-1 text-center", statusClass(item.status))}>{statusLabel[item.status]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function AdvisorView({ items, advisors, onSelect, onContext }: { items: AppointmentItem[]; advisors: AdvisorOption[]; onSelect: (item: AppointmentItem) => void; onContext: (event: React.MouseEvent, item: AppointmentItem) => void }) {
+  return (
+    <Panel title="Vista: Asesor" icon={<Users className="h-4 w-4 text-emerald-300" />} action={<DemoBadge className="ml-1.5 inline-block" />}>
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {advisors.map((advisor) => {
+          const rows = items.filter((item) => item.advisor_name === advisor.name);
+          return (
+            <div key={advisor.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-slate-100">{advisor.name}</div>
+                  <div className="text-[11px] text-slate-500">{rows.length}/{advisor.max_per_day} citas · cierre {Math.round(advisor.close_rate * 100)}%</div>
+                </div>
+                <Badge variant="outline" className={rows.length > advisor.max_per_day ? "border-red-300/30 text-red-200" : "border-emerald-300/30 text-emerald-200"}>
+                  {rows.length > advisor.max_per_day ? "Saturado" : "Disponible"}
+                </Badge>
               </div>
-              <div className={`text-sm ${isToday ? "font-bold text-primary" : ""}`}>
-                {day.getDate()}
+              <div className="mt-3 space-y-1.5">
+                {rows.slice(0, 5).map((item) => (
+                  <button key={item.id} type="button" onClick={() => onSelect(item)} onContextMenu={(event) => onContext(event, item)} className="w-full rounded-md border border-white/10 bg-black/20 px-2 py-2 text-left text-xs hover:border-sky-300/40">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-slate-400">{fmtTime(item.scheduled_at)}</span>
+                      <span className={cn("rounded px-1.5 py-0.5 text-[10px]", riskClass(item.risk_level))}>{item.risk_score}</span>
+                    </div>
+                    <div className="mt-1 truncate text-slate-100">{item.customer_name ?? item.customer_phone}</div>
+                    <div className="truncate text-slate-500">{item.vehicle_label ?? typeLabel[item.appointment_type]}</div>
+                  </button>
+                ))}
               </div>
             </div>
           );
         })}
       </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="flex" style={{ height: GRID_HEIGHT }}>
-          <div className="relative w-14 shrink-0 border-r">
-            {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-              <div
-                key={h}
-                style={{ top: h * HOUR_PX - 7 }}
-                className="absolute right-2 text-[10px] text-muted-foreground tabular-nums"
-              >
-                {String(HOUR_START + h).padStart(2, "0")}:00
-              </div>
-            ))}
-          </div>
-
-          {days.map((day, i) => {
-            const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
-            const dayItems = byDay.get(key) ?? [];
-            const isToday = isSameDay(day, now);
-            return (
-              <div
-                key={i}
-                className={`relative flex-1 border-r last:border-r-0 ${isToday ? "bg-primary/[0.02]" : ""}`}
-              >
-                {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-                  <div
-                    key={h}
-                    style={{ top: h * HOUR_PX }}
-                    className="absolute left-0 right-0 border-t border-border/40"
-                  />
-                ))}
-                {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-                  <div
-                    key={`hh${h}`}
-                    style={{ top: h * HOUR_PX + HOUR_PX / 2 }}
-                    className="absolute left-0 right-0 border-t border-border/20 border-dashed"
-                  />
-                ))}
-                {showNowLine && isToday && (
-                  <div
-                    style={{ top: nowTop }}
-                    className="absolute left-0 right-0 z-10 flex items-center"
-                  >
-                    <div className="-ml-1 h-2 w-2 rounded-full bg-red-500" />
-                    <div className="flex-1 border-t-2 border-red-500" />
-                  </div>
-                )}
-                {dayItems.map((item) => (
-                  <AppointmentBlock
-                    key={item.id}
-                    item={item}
-                    hasConflict={conflicts.has(item.id)}
-                    onClick={() => onSelect(item)}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    </Panel>
   );
 }
 
-// ─── Day View ──────────────────────────────────────────────────────────────────
-
-function DayView({
-  date,
-  items,
-  conflicts,
-  onSelect,
-}: {
-  date: Date;
-  items: AppointmentItem[];
-  conflicts: Set<string>;
-  onSelect: (item: AppointmentItem) => void;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const now = new Date();
-  const nowMins = (now.getHours() - HOUR_START) * 60 + now.getMinutes();
-  const nowTop = (nowMins / (TOTAL_HOURS * 60)) * GRID_HEIGHT;
-  const showNowLine =
-    isSameDay(date, now) && now.getHours() >= HOUR_START && now.getHours() < HOUR_END;
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, nowTop - 100);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const dayItems = useMemo(
-    () => items.filter((a) => isSameDay(new Date(a.scheduled_at), date)),
-    [items, date],
-  );
-
+function PriorityFeed({ items, onAction, onSelect }: { items: PriorityItem[]; onAction: (id: string, action: string) => void; onSelect: (id: string) => void }) {
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2">
-        <div className="text-sm font-medium capitalize">
-          {date.toLocaleDateString("es-MX", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-        </div>
-        <div className="text-xs text-muted-foreground">{dayItems.length} cita(s)</div>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="flex" style={{ height: GRID_HEIGHT }}>
-          <div className="relative w-14 shrink-0 border-r">
-            {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-              <div
-                key={h}
-                style={{ top: h * HOUR_PX - 7 }}
-                className="absolute right-2 text-[10px] text-muted-foreground tabular-nums"
-              >
-                {String(HOUR_START + h).padStart(2, "0")}:00
+    <Panel title="Qué requiere atención ahora" icon={<AlertTriangle className="h-4 w-4 text-amber-300" />}>
+      <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+        {items.map((item) => (
+          <div key={item.id} className={cn("rounded-lg border p-3", riskClass(item.severity))}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">{item.reason}</div>
+                <div className="mt-1 text-xs text-slate-300">{item.customer} · {fmtDay(item.time)} {fmtTime(item.time)}</div>
+                <div className="text-xs text-slate-400">{item.vehicle ?? "Sin unidad"} · {item.recommended_action}</div>
               </div>
-            ))}
-          </div>
-          <div className="relative flex-1">
-            {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-              <div
-                key={h}
-                style={{ top: h * HOUR_PX }}
-                className="absolute left-0 right-0 border-t border-border/40"
-              />
-            ))}
-            {Array.from({ length: TOTAL_HOURS }, (_, h) => (
-              <div
-                key={`hh${h}`}
-                style={{ top: h * HOUR_PX + HOUR_PX / 2 }}
-                className="absolute left-0 right-0 border-t border-border/20 border-dashed"
-              />
-            ))}
-            {showNowLine && (
-              <div
-                style={{ top: nowTop }}
-                className="absolute left-0 right-0 z-10 flex items-center"
-              >
-                <div className="-ml-1 h-2 w-2 rounded-full bg-red-500" />
-                <div className="flex-1 border-t-2 border-red-500" />
-              </div>
-            )}
-            {dayItems.map((item) => (
-              <AppointmentBlock
-                key={item.id}
-                item={item}
-                hasConflict={conflicts.has(item.id)}
-                onClick={() => onSelect(item)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── List View ─────────────────────────────────────────────────────────────────
-
-function ListView({
-  items,
-  conflicts,
-  onSelect,
-}: {
-  items: AppointmentItem[];
-  conflicts: Set<string>;
-  onSelect: (item: AppointmentItem) => void;
-}) {
-  const now = new Date();
-  const buckets = useMemo(() => {
-    const map = new Map<string, AppointmentItem[]>();
-    for (const a of items) {
-      const label = bucketLabel(new Date(a.scheduled_at), now);
-      const arr = map.get(label) ?? [];
-      arr.push(a);
-      map.set(label, arr);
-    }
-    return BUCKET_ORDER.filter((b) => map.has(b)).map((b) => ({
-      label: b,
-      items: map.get(b)!,
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
-  if (buckets.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <CalendarDays className="h-12 w-12 text-muted-foreground/30" />
-        <div className="text-sm font-medium text-muted-foreground">Sin citas en este rango</div>
-        <div className="text-xs text-muted-foreground">
-          Crea una manualmente o espera a que el agente las agende.
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
-      {buckets.map((b) => (
-        <div key={b.label}>
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <CalendarDays className="h-3 w-3" />
-            {b.label}
-            <span className="font-normal">({b.items.length})</span>
-          </div>
-          <div className="space-y-1.5">
-            {b.items.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => onSelect(a)}
-                className="flex w-full items-start gap-3 rounded-lg border bg-card px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/50"
-              >
-                <div
-                  className="mt-0.5 h-9 w-1 shrink-0 rounded-full"
-                  style={{ backgroundColor: STATUS_COLOR[a.status] ?? "#6b7280" }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{a.customer_name ?? a.customer_phone}</span>
-                    {conflicts.has(a.id) && (
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                    )}
-                    {a.created_by_type === "ai" && (
-                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                        AI
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(a.scheduled_at).toLocaleString("es-MX", {
-                      weekday: "short",
-                      day: "2-digit",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    · {a.service}
-                  </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_BG[a.status] ?? ""}`}
-                >
-                  {STATUS_LABEL[a.status] ?? a.status}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Smart Input Panel ─────────────────────────────────────────────────────────
-
-function SmartInputPanel({ onCreated }: { onCreated: () => void }) {
-  const qc = useQueryClient();
-  const [text, setText] = useState("");
-  const [parsed, setParsed] = useState<ParsedApt | null>(null);
-  const [customerId, setCustomerId] = useState("");
-  const [customerQ, setCustomerQ] = useState("");
-  const [conflicts, setConflicts] = useState<AppointmentConflict[]>([]);
-
-  const customers = useQuery({
-    queryKey: ["customers", "lookup", customerQ],
-    queryFn: () => customersApi.list({ q: customerQ || undefined, limit: 20 }),
-    enabled: customerQ.length > 1,
-  });
-
-  const create = useMutation({
-    mutationFn: appointmentsApi.create,
-    onSuccess: (data) => {
-      if (data.conflicts.length > 0) {
-        setConflicts(data.conflicts);
-        toast.warning(`Cita creada con ${data.conflicts.length} conflicto(s)`);
-      } else {
-        toast.success("Cita creada");
-        onCreated();
-        setText("");
-        setParsed(null);
-        setCustomerId("");
-        setCustomerQ("");
-        setConflicts([]);
-      }
-      void qc.invalidateQueries({ queryKey: ["appointments"] });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-    },
-    onError: (e: Error) => toast.error("No se pudo crear", { description: e.message }),
-  });
-
-  function handleParse() {
-    const result = parseSmartInput(text);
-    setParsed(result);
-    setConflicts([]);
-  }
-
-  function handleSubmit() {
-    if (!parsed || !customerId) return;
-    create.mutate({
-      customer_id: customerId,
-      scheduled_at: parsed.date.toISOString(),
-      service: parsed.service,
-    });
-  }
-
-  return (
-    <div className="flex w-72 shrink-0 flex-col border-l bg-card">
-      <div className="flex items-center gap-2 border-b px-3 py-2.5">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Nueva cita</span>
-      </div>
-
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
-        <div>
-          <Label className="text-xs">Describe la cita</Label>
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={"Mañana 4pm prueba de manejo"}
-            rows={3}
-            className="mt-1 resize-none text-sm"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-1.5 w-full text-xs"
-            onClick={handleParse}
-            disabled={!text.trim()}
-          >
-            <Sparkles className="mr-1.5 h-3 w-3" />
-            Interpretar
-          </Button>
-        </div>
-
-        {parsed && (
-          <div className="space-y-1.5 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-              Interpretación
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onSelect(item.appointment_id)}>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Fecha</span>
-              <span className="font-medium">
-                {parsed.date.toLocaleDateString("es-MX", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Hora</span>
-              <span className="font-medium">{fmtTime(parsed.date)}</span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Servicio</span>
-              <span className="max-w-[140px] truncate text-right font-medium">{parsed.service}</span>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <Label className="text-xs">Cliente</Label>
-          <Input
-            value={customerQ}
-            onChange={(e) => {
-              setCustomerQ(e.target.value);
-              if (e.target.value !== customerQ) setCustomerId("");
-            }}
-            placeholder="Buscar por nombre o tel."
-            className="mt-1 text-xs"
-          />
-          {customerQ.length > 1 && (
-            <div className="mt-1 max-h-36 overflow-y-auto rounded-md border">
-              {(customers.data?.items ?? []).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    setCustomerId(c.id);
-                    setCustomerQ(c.name ?? c.phone_e164);
-                  }}
-                  className={`flex w-full items-center justify-between px-2 py-1.5 text-xs hover:bg-muted ${customerId === c.id ? "bg-muted" : ""}`}
-                >
-                  <span>{c.name ?? "(sin nombre)"}</span>
-                  <span className="text-muted-foreground">{c.phone_e164}</span>
-                </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.actions.map((action) => (
+                <Button key={action} size="sm" variant="outline" className="h-7 border-white/10 bg-black/20 text-[11px]" onClick={() => onAction(item.appointment_id, action)}>
+                  {action === "send-reminder" ? "Enviar WhatsApp" : action === "reschedule" ? "Reprogramar" : action === "confirm" ? "Confirmar" : "Seguimiento"}
+                </Button>
               ))}
-              {customers.data?.items.length === 0 && (
-                <div className="px-2 py-2 text-xs text-muted-foreground">Sin resultados</div>
-              )}
             </div>
-          )}
-        </div>
-
-        {conflicts.length > 0 && (
-          <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
-            <div className="flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-400">
-              <AlertTriangle className="h-3.5 w-3.5" /> Conflictos detectados
-            </div>
-            {conflicts.map((c) => (
-              <div key={c.id} className="text-amber-800 dark:text-amber-300">
-                {new Date(c.scheduled_at).toLocaleString("es-MX", {
-                  day: "2-digit",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                · {c.service}
-              </div>
-            ))}
           </div>
-        )}
-
-        <Button
-          className="w-full"
-          size="sm"
-          onClick={handleSubmit}
-          disabled={!parsed || !customerId || create.isPending}
-        >
-          {create.isPending ? "Creando..." : "Crear cita"}
-        </Button>
+        ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
-// ─── Appointment Detail Panel ──────────────────────────────────────────────────
-
-function AppointmentDetailPanel({
-  item,
-  hasConflict,
-  onClose,
-  onUpdated,
-  onDeleted,
+function SmartAppointmentPanel({
+  parsed,
+  input,
+  setInput,
+  onParse,
+  onCreate,
+  parsing,
+  creating,
 }: {
-  item: AppointmentItem;
-  hasConflict: boolean;
-  onClose: () => void;
-  onUpdated: () => void;
-  onDeleted: () => void;
+  parsed: NaturalParse | null;
+  input: string;
+  setInput: (value: string) => void;
+  onParse: () => void;
+  onCreate: () => void;
+  parsing: boolean;
+  creating: boolean;
 }) {
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState(toLocalInputValue(item.scheduled_at));
-  const [service, setService] = useState(item.service);
-  const [notes, setNotes] = useState(item.notes ?? "");
-  const [statusValue, setStatusValue] = useState(item.status);
-
-  const patchMut = useMutation({
-    mutationFn: () =>
-      appointmentsApi.patch(item.id, {
-        scheduled_at: new Date(scheduledAt).toISOString(),
-        service: service.trim(),
-        status: statusValue,
-        notes: notes.trim() || null,
-      }),
-    onSuccess: () => {
-      toast.success("Cita actualizada");
-      void qc.invalidateQueries({ queryKey: ["appointments"] });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      setEditing(false);
-      onUpdated();
-    },
-    onError: (e: Error) => toast.error("No se pudo actualizar", { description: e.message }),
-  });
-
-  const patchStatusMut = useMutation({
-    mutationFn: (status: string) => appointmentsApi.patch(item.id, { status }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["appointments"] });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      onUpdated();
-    },
-    onError: (e: Error) => toast.error("No se pudo actualizar", { description: e.message }),
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: () => appointmentsApi.delete(item.id),
-    onSuccess: () => {
-      toast.success("Cita eliminada");
-      void qc.invalidateQueries({ queryKey: ["appointments"] });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      onDeleted();
-    },
-    onError: (e: Error) => toast.error("No se pudo eliminar", { description: e.message }),
-  });
-
-  const color = STATUS_COLOR[item.status] ?? "#6b7280";
-
   return (
-    <div className="flex w-72 shrink-0 flex-col border-l bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2.5">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">
-            {item.customer_name ?? item.customer_phone}
-          </div>
-          <div className="text-xs text-muted-foreground">{item.customer_phone}</div>
-        </div>
-        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onClose}>
-          <X className="h-3.5 w-3.5" />
+    <Panel title="Nueva cita inteligente" icon={<Sparkles className="h-4 w-4 text-emerald-300" />}>
+      <Textarea value={input} onChange={(event) => setInput(event.target.value)} className="min-h-20 border-emerald-400/30 bg-emerald-500/5 text-sm text-slate-100" />
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" className="h-8 bg-emerald-600 text-xs hover:bg-emerald-500" onClick={onParse} disabled={parsing || !input.trim()}>
+          {parsing ? "Interpretando..." : "Interpretar"}
+        </Button>
+        <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={() => setInput("Mañana 4pm prueba de manejo para Gabriel, trae 10 mil de enganche")}>
+          Ejemplo
         </Button>
       </div>
+      {parsed ? (
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 text-xs">
+          <div className="mb-2 flex items-center gap-2 text-emerald-300">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Entendido · confianza {Math.round(parsed.confidence * 100)}%
+          </div>
+          {[
+            ["Fecha", parsed.date ?? "-"],
+            ["Hora", parsed.time ?? "-"],
+            ["Tipo", typeLabel[parsed.appointment_type]],
+            ["Cliente", parsed.customer_name ?? "No especificado"],
+            ["Unidad", parsed.vehicle_label ?? "Pendiente"],
+            ["Enganche", parsed.down_payment_amount ? currency(parsed.down_payment_amount) : "No detectado"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-3 border-b border-white/5 py-1.5 last:border-b-0">
+              <span className="text-slate-500">{label}</span>
+              <span className="text-right text-slate-200">{value}</span>
+            </div>
+          ))}
+          {parsed.missing_fields.length > 0 ? <div className="mt-2 text-amber-300">Falta: {parsed.missing_fields.join(", ")}</div> : null}
+        </div>
+      ) : null}
+      <Button className="mt-3 w-full bg-emerald-600 hover:bg-emerald-500" onClick={onCreate} disabled={!parsed || creating}>
+        <CalendarPlus className="mr-2 h-4 w-4" />
+        {creating ? "Creando..." : "Crear cita"}
+      </Button>
+    </Panel>
+  );
+}
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
-        <div className="flex flex-wrap gap-1.5">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => patchStatusMut.mutate(s)}
-              disabled={patchStatusMut.isPending}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                item.status === s
-                  ? STATUS_BG[s]
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {STATUS_LABEL[s]}
-            </button>
+function DetailPanel({ item, advisors, vehicles, onAction, onPatch }: { item: AppointmentItem; advisors: AdvisorOption[]; vehicles: VehicleOption[]; onAction: (id: string, action: string) => void; onPatch: (id: string, body: Partial<AppointmentItem>) => void }) {
+  return (
+    <Panel title="Detalle de cita" icon={<CalendarDays className="h-4 w-4 text-sky-300" />} action={<DemoBadge className="ml-1.5 inline-block" />}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-base font-semibold text-slate-100">{typeLabel[item.appointment_type]}</div>
+          <div className="text-xs text-slate-400">{fmtDay(item.scheduled_at)} · {fmtTime(item.scheduled_at)} · {Math.round((new Date(item.ends_at ?? item.scheduled_at).getTime() - new Date(item.scheduled_at).getTime()) / 60_000)} min</div>
+        </div>
+        <Badge className={statusClass(item.status)}>{statusLabel[item.status]}</Badge>
+      </div>
+      <div className="mt-3 grid gap-2 text-xs">
+        {[
+          ["Cliente", item.customer_name ?? item.customer_phone],
+          ["WhatsApp", item.customer_phone],
+          ["Asesor", item.advisor_name ?? "Sin asesor"],
+          ["Unidad", item.vehicle_label ?? "Sin unidad"],
+          ["Plan", item.credit_plan ?? "Sin plan"],
+          ["Enganche", item.down_payment_amount ? `${currency(item.down_payment_amount)} · ${item.down_payment_confirmed ? "confirmado" : "pendiente"}` : "No aplica"],
+          ["Documentos", item.documents_complete ? "Completos" : "Pendientes"],
+        ].map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-3 rounded-md border border-white/10 bg-white/[0.035] px-3 py-2">
+            <span className="text-slate-500">{label}</span>
+            <span className="text-right text-slate-200">{value}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 text-xs">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-slate-400">Risk score</span>
+          <Badge variant="outline" className={riskClass(item.risk_level)}>{item.risk_score}/100</Badge>
+        </div>
+        <div className="space-y-1">
+          {(item.risk_reasons.length ? item.risk_reasons : [{ code: "ok", message: "Sin riesgos críticos" }]).slice(0, 4).map((reason) => (
+            <div key={reason.code} className="text-slate-300">• {reason.message}</div>
           ))}
         </div>
-
-        {hasConflict && (
-          <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            Conflicto de horario detectado
-          </div>
-        )}
-
-        {!editing ? (
-          <div className="space-y-2.5">
-            <div
-              className="rounded-lg border-l-4 p-2.5"
-              style={{ borderLeftColor: color }}
-            >
-              <div className="text-sm font-medium">{item.service}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {new Date(item.scheduled_at).toLocaleString("es-MX", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-              {item.notes && (
-                <div className="mt-1.5 text-xs italic text-muted-foreground">{item.notes}</div>
-              )}
-            </div>
-
-            <Badge variant="outline" className="text-[10px]">
-              {item.created_by_type === "ai" ? "Creada por IA" : "Creada manualmente"}
-            </Badge>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            <div>
-              <Label className="text-xs">Fecha y hora</Label>
-              <Input
-                type="datetime-local"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                className="mt-1 text-xs"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Servicio</Label>
-              <Input
-                value={service}
-                onChange={(e) => setService(e.target.value)}
-                className="mt-1 text-xs"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Estado</Label>
-              <Select value={statusValue} onValueChange={setStatusValue}>
-                <SelectTrigger className="mt-1 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">
-                      {STATUS_LABEL[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Notas</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="mt-1 resize-none text-xs"
-              />
-            </div>
-          </div>
-        )}
-
-        {item.conversation_id && (
-          <Link
-            to="/conversations/$conversationId"
-            params={{ conversationId: item.conversation_id }}
-            className="flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs text-primary transition-colors hover:bg-muted"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Abrir conversación
-          </Link>
-        )}
       </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button size="sm" className="h-8 bg-blue-600 text-xs hover:bg-blue-500" onClick={() => onAction(item.id, "send-reminder")}><MessageCircle className="mr-1.5 h-3.5 w-3.5" /> WhatsApp</Button>
+        <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs" onClick={() => onAction(item.id, "send-location")}><MapPin className="mr-1.5 h-3.5 w-3.5" /> Ubicación</Button>
+        <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs" onClick={() => onAction(item.id, "request-documents")}>Docs</Button>
+        <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs" onClick={() => onAction(item.id, "create-follow-up")}>Seguimiento</Button>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <select className="h-8 rounded-md border border-white/10 bg-slate-950 px-2" value={item.advisor_name ?? ""} onChange={(event) => {
+          const advisor = advisors.find((entry) => entry.name === event.target.value);
+          if (advisor) onPatch(item.id, { advisor_id: advisor.id, advisor_name: advisor.name } as Partial<AppointmentItem>);
+        }}>
+          <option value="">Cambiar asesor</option>
+          {advisors.map((advisor) => <option key={advisor.id} value={advisor.name}>{advisor.name}</option>)}
+        </select>
+        <select className="h-8 rounded-md border border-white/10 bg-slate-950 px-2" value={item.vehicle_label ?? ""} onChange={(event) => {
+          const vehicle = vehicles.find((entry) => entry.label === event.target.value);
+          if (vehicle) onPatch(item.id, { vehicle_id: vehicle.id, vehicle_label: vehicle.label } as Partial<AppointmentItem>);
+        }}>
+          <option value="">Cambiar unidad</option>
+          {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.label}>{vehicle.label}</option>)}
+        </select>
+      </div>
+      <div className="mt-3 max-h-32 space-y-1 overflow-auto text-[11px] text-slate-400">
+        {item.action_log.slice(0, 5).map((log, index) => (
+          <div key={String(log.id ?? index)} className="rounded border border-white/10 bg-black/20 px-2 py-1">
+            {String(log.action ?? "acción")} · {String(log.actor ?? "Sistema")}
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
 
-      <div className="flex items-center justify-between border-t px-3 py-2.5">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={() => {
-            if (confirm("¿Eliminar esta cita?")) deleteMut.mutate();
-          }}
-          disabled={deleteMut.isPending}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-        <div className="flex items-center gap-1.5">
-          {editing ? (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs"
-                onClick={() => setEditing(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => patchMut.mutate()}
-                disabled={patchMut.isPending || !service.trim()}
-              >
-                {patchMut.isPending ? "Guardando..." : "Guardar"}
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              onClick={() => setEditing(true)}
-            >
-              <Pencil className="mr-1.5 h-3 w-3" /> Editar
-            </Button>
-          )}
-        </div>
+function SupervisorPanel({ data, onRun }: { data: SupervisorRecommendations | undefined; onRun: () => void }) {
+  return (
+    <Panel title="AI Agenda Supervisor" icon={<Bot className="h-4 w-4 text-violet-300" />} action={<Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs" onClick={onRun}>Ejecutar</Button>}>
+      <div className="mb-2 flex items-center justify-between text-xs">
+        <span className="text-slate-400">Salud</span>
+        <span className="font-semibold text-emerald-300">{data?.health ?? "Sin datos"}</span>
+      </div>
+      <div className="space-y-2">
+        {(data?.recommendations ?? []).map((item) => (
+          <div key={item.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-2 text-xs">
+            <div className="font-semibold text-slate-100">{item.title}</div>
+            <div className="mt-1 text-slate-400">{item.detail}</div>
+            <div className="mt-2">
+              <NYIButton label={item.action} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {(data?.open_slots ?? []).map((slot) => (
+          <Badge key={`${slot.advisor}-${slot.time}`} variant="outline" className="border-emerald-300/30 text-emerald-200">{slot.advisor} {slot.time}</Badge>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function FunnelPanel({ stages }: { stages: FunnelStage[] | undefined }) {
+  const max = Math.max(...(stages ?? []).map((stage) => stage.count), 1);
+  return (
+    <div className="border-t border-white/10 bg-slate-950 px-4 py-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">
+        <Route className="h-4 w-4 text-emerald-300" />
+        Embudo de citas a venta
+      </div>
+      <div className="grid gap-2 md:grid-cols-7">
+        {(stages ?? []).map((stage) => (
+          <button key={stage.stage} type="button" onClick={() => toast.info(`${stage.stage}: ${stage.conversion}%`)} className="rounded-lg border border-white/10 bg-white/[0.035] p-2 text-left text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">{stage.stage}</span>
+              <span className={stage.trend >= 0 ? "text-emerald-300" : "text-red-300"}>{stage.trend >= 0 ? "+" : ""}{stage.trend}%</span>
+            </div>
+            <div className="mt-2 text-xl font-semibold text-slate-100">{stage.count}</div>
+            <div className="mt-2 h-1.5 rounded bg-white/10">
+              <div className="h-full rounded bg-emerald-400" style={{ width: `${Math.max(8, (stage.count / max) * 100)}%` }} />
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
-
-type ViewMode = "week" | "day" | "list";
+function ContextMenu({ appointment, x, y, onClose, onAction }: { appointment: AppointmentItem; x: number; y: number; onClose: () => void; onAction: (id: string, action: string) => void }) {
+  const actions = [
+    ["open-chat", "Abrir conversación WhatsApp", MessageCircle],
+    ["confirm", "Confirmar cita", CheckCircle2],
+    ["send-location", "Enviar ubicación", MapPin],
+    ["send-reminder", "Enviar recordatorio", Send],
+    ["request-documents", "Solicitar documentos", Upload],
+    ["mark-arrived", "Marcar como llegó", UserRound],
+    ["mark-completed", "Marcar completada", ShieldCheck],
+    ["mark-no-show", "Marcar no asistió", AlertTriangle],
+    ["reschedule", "Reprogramar", RefreshCw],
+    ["cancel", "Cancelar cita", PauseCircle],
+  ] as const;
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute w-56 rounded-lg border border-white/10 bg-slate-950 p-1 text-xs text-slate-200 shadow-2xl" style={{ left: x, top: y }}>
+        <div className="border-b border-white/10 px-2 py-2 text-[11px] text-slate-500">{appointment.customer_name ?? appointment.customer_phone}</div>
+        {actions.map(([id, label, Icon]) => (
+          <button key={id} type="button" onClick={(event) => { event.stopPropagation(); onAction(appointment.id, id); onClose(); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-white/10">
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AppointmentsPage() {
-  const [view, setView] = useState<ViewMode>("week");
-  const [weekStart, setWeekStart] = useState(() => getMondayOf(new Date()));
-  const [dayDate, setDayDate] = useState(() => new Date());
-  const [selected, setSelected] = useState<AppointmentItem | null>(null);
-  const [showCreate, setShowCreate] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const queryClient = useQueryClient();
+  const { selectedAppointmentId, activeView, quickFilter, contextMenu, setSelectedAppointmentId, setActiveView, setQuickFilter, setContextMenu } = useAppointmentUi();
+  const [anchorDate, setAnchorDate] = useState(new Date());
+  const [query, setQuery] = useState("");
+  const [smartInput, setSmartInput] = useState("Mañana 4pm prueba de manejo para Gabriel, trae 10 mil de enganche");
+  const [parsed, setParsed] = useState<NaturalParse | null>(null);
 
-  const { dateFrom, dateTo } = useMemo(() => {
-    if (view === "list") {
-      const from = addDays(new Date(), -30);
-      from.setHours(0, 0, 0, 0);
-      const to = addDays(new Date(), 90);
-      to.setHours(23, 59, 59, 999);
-      return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
-    }
-    if (view === "day") {
-      const from = new Date(dayDate);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(dayDate);
-      to.setHours(23, 59, 59, 999);
-      return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
-    }
-    const from = new Date(weekStart);
-    const to = addDays(weekStart, 7);
-    return { dateFrom: from.toISOString(), dateTo: to.toISOString() };
-  }, [view, weekStart, dayDate]);
+  const weekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate]);
+  const dateFrom = useMemo(() => {
+    const date = activeView === "day" ? new Date(anchorDate) : weekStart;
+    date.setHours(0, 0, 0, 0);
+    return date.toISOString();
+  }, [activeView, anchorDate, weekStart]);
+  const dateTo = useMemo(() => {
+    const date = activeView === "day" ? addDays(anchorDate, 1) : addDays(weekStart, 7);
+    date.setHours(0, 0, 0, 0);
+    return date.toISOString();
+  }, [activeView, anchorDate, weekStart]);
 
-  const list = useQuery({
-    queryKey: ["appointments", view, dateFrom, dateTo, statusFilter],
-    queryFn: () =>
-      appointmentsApi.list({
-        date_from: dateFrom,
-        date_to: dateTo,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        limit: 300,
-      }),
+  const appointmentsQuery = useQuery({
+    queryKey: ["appointments", "command-center", dateFrom, dateTo],
+    queryFn: () => appointmentsApi.list({ date_from: dateFrom, date_to: dateTo, limit: 300 }),
+  });
+  const kpisQuery = useQuery({ queryKey: ["appointments", "kpis"], queryFn: appointmentsApi.kpis });
+  const priorityQuery = useQuery({ queryKey: ["appointments", "priority"], queryFn: appointmentsApi.priorityFeed });
+  const funnelQuery = useQuery({ queryKey: ["appointments", "funnel"], queryFn: appointmentsApi.funnel });
+  const supervisorQuery = useQuery({ queryKey: ["appointments", "supervisor"], queryFn: appointmentsApi.supervisor });
+  const advisorsQuery = useQuery({ queryKey: ["appointments", "advisors"], queryFn: appointmentsApi.advisors });
+  const vehiclesQuery = useQuery({ queryKey: ["appointments", "vehicles"], queryFn: appointmentsApi.vehicles });
+  const customersQuery = useQuery({ queryKey: ["customers", "appointments"], queryFn: () => customersApi.list({ limit: 200 }) });
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  };
+
+  const items = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return (appointmentsQuery.data?.items ?? [])
+      .filter((item) => matchesFilter(item, quickFilter))
+      .filter((item) => !needle || `${item.customer_name ?? ""} ${item.customer_phone} ${item.service} ${item.vehicle_label ?? ""} ${item.advisor_name ?? ""}`.toLowerCase().includes(needle));
+  }, [appointmentsQuery.data?.items, quickFilter, query]);
+  const selected = (appointmentsQuery.data?.items ?? []).find((item) => item.id === selectedAppointmentId) ?? items[0] ?? null;
+  const menuAppointment = contextMenu ? (appointmentsQuery.data?.items ?? []).find((item) => item.id === contextMenu.appointmentId) : null;
+
+  const actionMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: string }) => {
+      if (action === "confirm") return appointmentsApi.confirm(id);
+      if (action === "send-reminder") return appointmentsApi.sendReminder(id);
+      if (action === "send-location") return appointmentsApi.sendLocation(id);
+      if (action === "request-documents") return appointmentsApi.requestDocuments(id);
+      if (action === "mark-arrived") return appointmentsApi.markArrived(id);
+      if (action === "mark-completed") return appointmentsApi.markCompleted(id);
+      if (action === "mark-no-show") return appointmentsApi.markNoShow(id);
+      if (action === "create-follow-up") return appointmentsApi.createFollowUp(id);
+      if (action === "cancel") return appointmentsApi.patch(id, { status: "cancelled" });
+      if (action === "open-chat") return Promise.resolve(selected);
+      if (action === "reschedule") {
+        const base = new Date();
+        base.setHours(base.getHours() + 2, 0, 0, 0);
+        return appointmentsApi.reschedule(id, base.toISOString());
+      }
+      return Promise.resolve(selected);
+    },
+    onSuccess: (_, variables) => {
+      if (variables.action === "open-chat") toast.info("Conversación de WhatsApp preparada");
+      else toast.success("Acción ejecutada");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error("No se pudo ejecutar", { description: error.message }),
   });
 
-  const kpiQuery = useQuery({
-    queryKey: ["appointments", "kpi"],
-    queryFn: () => {
-      const from = getMondayOf(new Date());
-      const to = addDays(from, 7);
-      return appointmentsApi.list({
-        date_from: from.toISOString(),
-        date_to: to.toISOString(),
-        limit: 300,
+  const patchMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<AppointmentItem> }) => appointmentsApi.patch(id, body),
+    onSuccess: () => {
+      toast.success("Cita actualizada");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error("No se pudo actualizar", { description: error.message }),
+  });
+
+  const parseMutation = useMutation({
+    mutationFn: () => appointmentsApi.parseNatural(smartInput),
+    onSuccess: (result) => {
+      setParsed(result);
+      toast.success("Entrada interpretada");
+    },
+    onError: (error: Error) => toast.error("No se pudo interpretar", { description: error.message }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!parsed?.scheduled_at) throw new Error("Primero interpreta la cita");
+      const customers = customersQuery.data?.items ?? [];
+      const customer = findCustomerForParsed(parsed, customers);
+      if (!customer) throw new Error("No hay cliente disponible para asociar la cita");
+      const vehicle = vehiclesQuery.data?.find((entry) => entry.label === parsed.vehicle_label);
+      const advisor = advisorsQuery.data?.find((entry) => entry.name === parsed.advisor_name);
+      return appointmentsApi.create({
+        customer_id: customer.id,
+        scheduled_at: parsed.scheduled_at,
+        ends_at: parsed.ends_at,
+        appointment_type: parsed.appointment_type,
+        service: parsed.service,
+        source: "ai_parser",
+        ai_confidence: parsed.confidence,
+        vehicle_id: vehicle?.id ?? null,
+        vehicle_label: parsed.vehicle_label,
+        advisor_id: advisor?.id ?? null,
+        advisor_name: parsed.advisor_name,
+        down_payment_amount: parsed.down_payment_amount,
+        documents_complete: false,
+        notes: smartInput,
       });
     },
-    staleTime: 60_000,
+    onSuccess: (result) => {
+      setSelectedAppointmentId(result.appointment.id);
+      toast.success("Cita creada");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error("No se pudo crear", { description: error.message }),
   });
 
-  const items = list.data?.items ?? [];
-  const kpiItems = kpiQuery.data?.items ?? [];
-  const conflicts = useMemo(() => detectConflicts(items), [items]);
-  const kpiConflicts = useMemo(() => detectConflicts(kpiItems), [kpiItems]);
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ id, date }: { id: string; date: Date }) => appointmentsApi.reschedule(id, date.toISOString()),
+    onSuccess: () => {
+      toast.success("Cita reprogramada");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error("No se pudo reprogramar", { description: error.message }),
+  });
 
-  const kpis = useMemo(() => {
-    const now = new Date();
-    return {
-      thisWeek: kpiItems.length,
-      today: kpiItems.filter((a) => isSameDay(new Date(a.scheduled_at), now)).length,
-      conflicts: kpiConflicts.size,
-      completed: kpiItems.filter((a) => a.status === "completed").length,
-    };
-  }, [kpiItems, kpiConflicts]);
-
-  function prevPeriod() {
-    if (view === "week") setWeekStart((d) => addDays(d, -7));
-    else if (view === "day") setDayDate((d) => addDays(d, -1));
+  function handleAction(id: string, action: string) {
+    actionMutation.mutate({ id, action });
   }
 
-  function nextPeriod() {
-    if (view === "week") setWeekStart((d) => addDays(d, 7));
-    else if (view === "day") setDayDate((d) => addDays(d, 1));
-  }
-
-  function goToday() {
-    setWeekStart(getMondayOf(new Date()));
-    setDayDate(new Date());
-  }
-
-  const periodLabel = useMemo(() => {
-    if (view === "week") {
-      return `${fmtShort(weekStart)} – ${fmtShort(addDays(weekStart, 6))}`;
-    }
-    if (view === "day") {
-      return dayDate.toLocaleDateString("es-MX", {
-        weekday: "short",
-        day: "numeric",
-        month: "long",
-      });
-    }
-    return "";
-  }, [view, weekStart, dayDate]);
-
-  const rightPanel = selected ? "detail" : showCreate ? "create" : null;
-
-  function handleSelect(item: AppointmentItem) {
-    setSelected(item);
-    setShowCreate(false);
-  }
-
-  function handleRefetch() {
-    void list.refetch();
-    void kpiQuery.refetch();
-  }
+  const kpis = kpisQuery.data;
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
-      {/* Top bar */}
-      <div className="shrink-0 space-y-3 border-b bg-card px-6 py-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">Citas</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setSelected(null);
-                setShowCreate(true);
-              }}
-            >
-              <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Nueva cita
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              title="Configuración"
-              onClick={() => setShowSettings(true)}
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex gap-3 overflow-x-auto pb-0.5">
-          <KPITile
-            label="Esta semana"
-            value={kpis.thisWeek}
-            icon={CalendarDays}
-            colorClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-          />
-          <KPITile
-            label="Hoy"
-            value={kpis.today}
-            icon={Clock}
-            colorClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          />
-          <KPITile
-            label="Conflictos"
-            value={kpis.conflicts}
-            icon={AlertTriangle}
-            colorClass={
-              kpis.conflicts > 0
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                : "bg-muted text-muted-foreground"
-            }
-          />
-          <KPITile
-            label="Completadas"
-            value={kpis.completed}
-            icon={CalendarCheck}
-            colorClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-          />
-        </div>
-
+    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-slate-950 text-slate-100">
+      <header className="border-b border-white/10 bg-slate-950 px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex rounded-lg border bg-muted/40 p-0.5">
-            {(
-              [
-                { id: "week", label: "Semana", icon: CalendarDays },
-                { id: "day", label: "Día", icon: Clock },
-                { id: "list", label: "Lista", icon: LayoutList },
-              ] as const
-            ).map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setView(id)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all ${
-                  view === id
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
+          <div className="flex min-w-52 items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-sky-300" />
+            <div>
+              <div className="text-xl font-semibold">Citas</div>
+              <div className="text-[11px] text-slate-500">Appointment Command Center</div>
+            </div>
+          </div>
+          <div className="relative min-w-56 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 border-white/10 bg-black/20 pl-9 text-sm text-slate-100" placeholder="Buscar cita, cliente, asesor, unidad..." />
+          </div>
+          <Badge variant="outline" className="h-8 border-emerald-400/30 bg-emerald-500/10 text-emerald-200">En vivo</Badge>
+          <Badge variant="outline" className="h-8 border-sky-400/30 bg-sky-500/10 text-sky-200">IA · {supervisorQuery.data?.health ?? "Sincronizada"}</Badge>
+          <NYIButton label="Importar CSV" icon={Download} />
+          <Button size="sm" className="h-9 bg-blue-600 text-xs hover:bg-blue-500" onClick={() => parseMutation.mutate()}>
+            <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
+            Nueva cita
+          </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-white/10 bg-black/20 p-1">
+            {viewLabels.map((view) => (
+              <button key={view.id} type="button" onClick={() => setActiveView(view.id)} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition", activeView === view.id ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-100")}>
+                {view.icon}
+                {view.label}
               </button>
             ))}
           </div>
-
-          {view !== "list" && (
-            <div className="flex items-center gap-1">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={prevPeriod}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="min-w-[140px] text-center text-sm font-medium">{periodLabel}</span>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={nextPeriod}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="ml-1 h-7 text-xs"
-                onClick={goToday}
-              >
-                Hoy
-              </Button>
-            </div>
-          )}
-
-          {view === "list" && (
-            <div className="flex flex-wrap gap-1.5">
-              {["all", ...STATUSES].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusFilter(s)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                    statusFilter === s
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {s === "all" ? "Todas" : STATUS_LABEL[s]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {list.isLoading ? (
-            <div className="flex flex-1 flex-col gap-2 p-4">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-12 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : view === "week" ? (
-            <WeekView
-              weekStart={weekStart}
-              items={items}
-              conflicts={conflicts}
-              onSelect={handleSelect}
-            />
-          ) : view === "day" ? (
-            <DayView
-              date={dayDate}
-              items={items}
-              conflicts={conflicts}
-              onSelect={handleSelect}
-            />
-          ) : (
-            <ListView items={items} conflicts={conflicts} onSelect={handleSelect} />
-          )}
-        </div>
-
-        {rightPanel === "detail" && selected && (
-          <AppointmentDetailPanel
-            key={selected.id}
-            item={selected}
-            hasConflict={conflicts.has(selected.id)}
-            onClose={() => setSelected(null)}
-            onUpdated={() => {
-              handleRefetch();
-              setSelected(null);
-            }}
-            onDeleted={() => {
-              handleRefetch();
-              setSelected(null);
-            }}
-          />
-        )}
-        {rightPanel === "create" && (
-          <SmartInputPanel onCreated={handleRefetch} />
-        )}
-      </div>
-
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border bg-background shadow-xl">
-            <AppointmentsFeatureSettings onClose={() => setShowSettings(false)} />
+          <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs" onClick={() => setAnchorDate(new Date())}>Hoy</Button>
+          <Button size="icon" variant="outline" className="h-8 w-8 border-white/10 bg-white/[0.035]" onClick={() => setAnchorDate(addDays(anchorDate, activeView === "day" ? -1 : -7))}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button size="icon" variant="outline" className="h-8 w-8 border-white/10 bg-white/[0.035]" onClick={() => setAnchorDate(addDays(anchorDate, activeView === "day" ? 1 : 7))}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="ml-auto flex flex-wrap gap-1.5">
+            {filterLabels.map((filter) => (
+              <button key={filter.id} type="button" onClick={() => setQuickFilter(filter.id)} className={cn("rounded-md border px-2.5 py-1.5 text-xs transition", quickFilter === filter.id ? "border-sky-300/60 bg-sky-500/15 text-sky-100" : "border-white/10 bg-white/[0.035] text-slate-400 hover:text-slate-100")}>
+                {filter.label}
+              </button>
+            ))}
+            <NYIButton label="Filtros avanzados" icon={Filter} />
           </div>
         </div>
-      )}
+        <div className="mt-3 flex gap-2 overflow-x-auto">
+          {kpisQuery.isLoading ? Array.from({ length: 7 }, (_, index) => <Skeleton key={index} className="h-16 min-w-[132px] bg-white/10" />) : (
+            <>
+              <KpiCard label="Citas hoy" value={kpis?.today ?? 0} tone="blue" />
+              <KpiCard label="Confirmadas" value={kpis?.confirmed ?? 0} tone="green" />
+              <KpiCard label="Alto riesgo" value={kpis?.high_risk ?? 0} tone="red" />
+              <KpiCard label="No-show probable" value={kpis?.probable_no_show ?? 0} tone="amber" />
+              <KpiCard label="Sin asesor" value={kpis?.missing_advisor ?? 0} tone="violet" />
+              <KpiCard label="Docs incompletos" value={kpis?.incomplete_docs ?? 0} tone="amber" />
+              <KpiCard label="Oportunidad MXN" value={currency(kpis?.estimated_opportunity_mxn ?? 0)} detail="Pipeline estimado" tone="green" />
+            </>
+          )}
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div className={cn("grid gap-3", activeView === "operation" ? "xl:grid-cols-[330px_minmax(0,1fr)_340px]" : "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+          {activeView === "operation" ? (
+            <PriorityFeed
+              items={priorityQuery.data ?? []}
+              onAction={handleAction}
+              onSelect={setSelectedAppointmentId}
+            />
+          ) : null}
+
+          <div className="min-w-0 space-y-3">
+            {appointmentsQuery.isLoading ? (
+              <Skeleton className="h-[620px] rounded-lg bg-white/10" />
+            ) : activeView === "list" ? (
+              <ListView items={items} onSelect={(item) => setSelectedAppointmentId(item.id)} onContext={(event, item) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, appointmentId: item.id }); }} />
+            ) : activeView === "advisor" ? (
+              <AdvisorView items={items} advisors={advisorsQuery.data ?? []} onSelect={(item) => setSelectedAppointmentId(item.id)} onContext={(event, item) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, appointmentId: item.id }); }} />
+            ) : (
+              <WeekCalendar
+                items={activeView === "day" ? items.filter((item) => isSameDay(new Date(item.scheduled_at), anchorDate)) : items}
+                weekStart={activeView === "day" ? anchorDate : weekStart}
+                onSelect={(item) => setSelectedAppointmentId(item.id)}
+                onContext={(event, item) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, appointmentId: item.id }); }}
+                onDropAppointment={(id, nextStart) => rescheduleMutation.mutate({ id, date: nextStart })}
+              />
+            )}
+            {activeView !== "operation" ? (
+              <PriorityFeed items={priorityQuery.data ?? []} onAction={handleAction} onSelect={setSelectedAppointmentId} />
+            ) : null}
+          </div>
+
+          <aside className="space-y-3">
+            <SmartAppointmentPanel
+              parsed={parsed}
+              input={smartInput}
+              setInput={setSmartInput}
+              onParse={() => parseMutation.mutate()}
+              onCreate={() => createMutation.mutate()}
+              parsing={parseMutation.isPending}
+              creating={createMutation.isPending}
+            />
+            {selected ? (
+              <DetailPanel
+                item={selected}
+                advisors={advisorsQuery.data ?? []}
+                vehicles={vehiclesQuery.data ?? []}
+                onAction={handleAction}
+                onPatch={(id, body) => patchMutation.mutate({ id, body })}
+              />
+            ) : null}
+            <SupervisorPanel data={supervisorQuery.data} onRun={() => toast.success("Sugerencias ejecutadas en modo seguro")} />
+          </aside>
+        </div>
+      </div>
+
+      <FunnelPanel stages={funnelQuery.data} />
+
+      {contextMenu && menuAppointment ? (
+        <ContextMenu
+          appointment={menuAppointment}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onAction={handleAction}
+        />
+      ) : null}
     </div>
   );
+}
+
+function findCustomerForParsed(parsed: NaturalParse, customers: CustomerListItem[]): CustomerListItem | null {
+  if (parsed.customer_name) {
+    const needle = parsed.customer_name.toLowerCase();
+    const exact = customers.find((customer) => (customer.name ?? "").toLowerCase().includes(needle) || needle.includes((customer.name ?? "").toLowerCase()));
+    if (exact) return exact;
+  }
+  return customers[0] ?? null;
 }

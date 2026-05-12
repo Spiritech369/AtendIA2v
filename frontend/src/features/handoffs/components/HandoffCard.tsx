@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, MessageCircle, UserCheck } from "lucide-react";
+
+import { DemoBadge } from "@/components/DemoBadge";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -36,13 +38,17 @@ export function HandoffCard({ handoff }: { handoff: HandoffItem }) {
   const suggestedNextAction = (p["suggested_next_action"] as string | undefined) ?? null;
   const docsRecibidos = (p["docs_recibidos"] as string[] | undefined) ?? [];
   const docsPendientes = (p["docs_pendientes"] as string[] | undefined) ?? [];
+  const isMock = (p["source"] as string | undefined) === "mock";
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 py-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">{customer ?? "(cliente sin nombre)"}</CardTitle>
+            <CardTitle className="text-base">
+              {customer ?? "(cliente sin nombre)"}
+              {isMock && <DemoBadge className="ml-1.5 inline-block" />}
+            </CardTitle>
             {reasonCode && <Badge variant="outline">{reasonCode}</Badge>}
             <Badge
               variant={
