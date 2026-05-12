@@ -15,6 +15,10 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
+from fastapi import status as http_status
+from atendia.providers.advisors import AdvisorProvider
+from atendia.providers.vehicles import VehicleProvider
+from atendia.providers.messaging import MessageActionProvider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -95,3 +99,57 @@ async def demo_tenant(
     result = await session.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
     return bool(tenant and tenant.is_demo)
+
+
+# ── Provider factories ────────────────────────────────────────────────────────
+# Each factory returns a demo implementation when is_demo=True, or raises 501
+# when the real implementation is not yet built. When a real provider is ready,
+# swap the import inside the factory — routes do not change.
+
+
+def _get_advisor_provider_for(is_demo: bool) -> AdvisorProvider:
+    if is_demo:
+        from atendia._demo.providers import DemoAdvisorProvider
+        return DemoAdvisorProvider()
+    raise HTTPException(
+        http_status.HTTP_501_NOT_IMPLEMENTED,
+        "Advisors backed by DB not yet implemented",
+    )
+
+
+def _get_vehicle_provider_for(is_demo: bool) -> VehicleProvider:
+    if is_demo:
+        from atendia._demo.providers import DemoVehicleProvider
+        return DemoVehicleProvider()
+    raise HTTPException(
+        http_status.HTTP_501_NOT_IMPLEMENTED,
+        "Vehicles backed by DB not yet implemented",
+    )
+
+
+def _get_messaging_provider_for(is_demo: bool) -> MessageActionProvider:
+    if is_demo:
+        from atendia._demo.providers import DemoMessageActionProvider
+        return DemoMessageActionProvider()
+    raise HTTPException(
+        http_status.HTTP_501_NOT_IMPLEMENTED,
+        "WhatsApp messaging not yet implemented for this tenant",
+    )
+
+
+async def get_advisor_provider(
+    is_demo: bool = Depends(demo_tenant),
+) -> AdvisorProvider:
+    return _get_advisor_provider_for(is_demo)
+
+
+async def get_vehicle_provider(
+    is_demo: bool = Depends(demo_tenant),
+) -> VehicleProvider:
+    return _get_vehicle_provider_for(is_demo)
+
+
+async def get_messaging_provider(
+    is_demo: bool = Depends(demo_tenant),
+) -> MessageActionProvider:
+    return _get_messaging_provider_for(is_demo)

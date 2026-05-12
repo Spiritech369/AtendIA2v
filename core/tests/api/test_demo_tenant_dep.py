@@ -60,3 +60,39 @@ async def test_demo_tenant_flag_false_for_real_tenant(db_session):
     # cleanup
     await db_session.execute(text(f"DELETE FROM tenants WHERE id = '{tid}'"))
     await db_session.commit()
+
+
+def test_get_advisor_provider_returns_demo_instance_for_demo_tenant():
+    # Import lazily in the test too, in case providers.py isn't created yet
+    from atendia.api._deps import _get_advisor_provider_for
+    provider = _get_advisor_provider_for(is_demo=True)
+    # Should be a DemoAdvisorProvider
+    assert hasattr(provider, "list_advisors")
+    assert hasattr(provider, "get_advisor")
+
+
+def test_get_advisor_provider_raises_501_for_real_tenant():
+    from fastapi import HTTPException
+    from atendia.api._deps import _get_advisor_provider_for
+    import pytest
+    with pytest.raises(HTTPException) as exc_info:
+        _get_advisor_provider_for(is_demo=False)
+    assert exc_info.value.status_code == 501
+
+
+def test_get_vehicle_provider_raises_501_for_real_tenant():
+    from fastapi import HTTPException
+    from atendia.api._deps import _get_vehicle_provider_for
+    import pytest
+    with pytest.raises(HTTPException) as exc_info:
+        _get_vehicle_provider_for(is_demo=False)
+    assert exc_info.value.status_code == 501
+
+
+def test_get_messaging_provider_raises_501_for_real_tenant():
+    from fastapi import HTTPException
+    from atendia.api._deps import _get_messaging_provider_for
+    import pytest
+    with pytest.raises(HTTPException) as exc_info:
+        _get_messaging_provider_for(is_demo=False)
+    assert exc_info.value.status_code == 501
