@@ -15,11 +15,24 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser, get_current_user
+from atendia.db.models.tenant import Tenant
+from atendia.db.session import get_db_session
 
 # Re-export for convenience: routes can `Depends(current_user)`.
 current_user = get_current_user
+
+TENANT_SCOPED_ROLES = {
+    "operator",
+    "tenant_admin",
+    "manager",
+    "supervisor",
+    "sales_agent",
+    "ai_reviewer",
+}
 
 
 async def current_tenant_id(
@@ -36,7 +49,7 @@ async def current_tenant_id(
       400 when ``tid`` was missing, which broke the SPA on every
       conversation-list load (sesión 6 fix).
     """
-    if user.role in ("operator", "tenant_admin"):
+    if user.role in TENANT_SCOPED_ROLES:
         if user.tenant_id is None:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, "operator session missing tenant_id"
@@ -68,3 +81,17 @@ async def require_tenant_admin(
     if user.role not in ("tenant_admin", "superadmin"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "tenant admin only")
     return user
+
+
+async def demo_tenant(
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> bool:
+    """Return True when the current request's tenant is a demo/sandbox tenant.
+
+    Routes use this to gate mock data and simulated actions.
+    Non-demo tenants that hit an unimplemented provider receive 501.
+    """
+    result = await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    return bool(tenant and tenant.is_demo)
