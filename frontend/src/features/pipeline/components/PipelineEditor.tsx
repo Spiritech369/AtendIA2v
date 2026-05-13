@@ -40,6 +40,8 @@ import { tenantsApi } from "@/features/config/api";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
+import { RuleBuilder } from "./RuleBuilder";
+
 // Operators must match the backend Condition.operator literal in
 // core/atendia/contracts/pipeline_definition.py. If you add one here,
 // add it there too (the contract test pins both lists).
@@ -891,6 +893,59 @@ export function PipelineEditor({ onClose }: Props) {
                   </span>
                 </Label>
               </div>
+
+              {/* allow_auto_backward toggle. Greyed out when the stage is
+                  terminal — the validator rejects that combination anyway,
+                  surfaced here so it's obvious why the toggle is disabled. */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={selected.allow_auto_backward === true}
+                  onClick={() =>
+                    updateStage(selectedIdx, {
+                      allow_auto_backward: !(selected.allow_auto_backward === true),
+                    })
+                  }
+                  disabled={!canEdit || selected.is_terminal}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    selected.allow_auto_backward ? "bg-primary" : "bg-muted",
+                    (selected.is_terminal || !canEdit) && "cursor-not-allowed opacity-50",
+                  )}
+                  title={
+                    selected.is_terminal
+                      ? "No disponible en etapas terminales"
+                      : "Permitir que reglas auto-muevan hacia atrás"
+                  }
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block size-4 rounded-full bg-white shadow-lg transition-transform",
+                      selected.allow_auto_backward ? "translate-x-4" : "translate-x-0",
+                    )}
+                  />
+                </button>
+                <Label className="text-xs">
+                  Permitir movimiento hacia atrás automático
+                </Label>
+              </div>
+            </div>
+
+            {/* M2: per-stage auto-enter rules. RuleBuilder owns the toggle,
+                match mode, and condition rows. We hand it the stage's
+                rules and a setter that patches the draft. Live JSON
+                preview below picks the change up because serialise
+                already round-trips auto_enter_rules. */}
+            <div className="mt-4 border-t pt-3">
+              <RuleBuilder
+                stageLabel={selected.label || selected.id}
+                rules={selected.auto_enter_rules}
+                onChange={(next) =>
+                  updateStage(selectedIdx, { auto_enter_rules: next })
+                }
+                disabled={!canEdit}
+              />
             </div>
           </div>
         )}
