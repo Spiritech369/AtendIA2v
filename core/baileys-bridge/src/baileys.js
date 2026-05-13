@@ -1,0 +1,231 @@
+// Baileys lifecycle wrapper — connect / QR / disconnect.
+//
+// Simplificado a propósito vs la WASenderApp original: cero stealth,
+// proxy, classifier IA, blacklist, historial. Solo el ciclo mínimo
+// que un canal SaaS necesita.
+
+import { rmSync } from 'node:fs'
+import QRCode from 'qrcode'
+
+import { sessionFor, updateStatus, dropSession } from './session-manager.js'
+import { postInbound } from './webhook-client.js'
+
+// Auto-reconnect schedule per tenant — clear on disconnect() so the
+// session stays down when the user explicitly logged out.
+const reconnectTimers = new Map()
+
+function clearReconnect(tenantId) {
+  const t = reconnectTimers.get(tenantId)
+  if (t) {
+    clearTimeout(t)
+    reconnectTimers.delete(tenantId)
+  }
+}
+
+function scheduleReconnect(tenantId, logger) {
+  clearReconnect(tenantId)
+  const session = sessionFor(tenantId)
+  if (session.stopReconnect) return
+  const t = setTimeout(() => {
+    logger.info({ tenantId }, 'auto-reconnect attempt')
+    startSession(tenantId, logger).catch((err) =>
+      logger.error({ err, tenantId }, 'auto-reconnect failed'),
+    )
+  }, 5000)
+  reconnectTimers.set(tenantId, t)
+}
+
+/**
+ * Starts (or restarts) the Baileys socket for a tenant. Returns the
+ * current status snapshot once the event loop has settled briefly.
+ */
+export async function startSession(tenantId, logger) {
+  const session = sessionFor(tenantId)
+  session.stopReconnect = false
+
+  if (session.status === 'connected') {
+    return statusOf(session)
+  }
+
+  updateStatus(tenantId, 'connecting', { reason: null })
+
+  const baileys = await import('@whiskeysockets/baileys')
+  const pinoMod = await import('pino')
+  const pino = pinoMod.default
+
+  const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    makeCacheableSignalKeyStore,
+  } = baileys
+
+  const baileysLogger = pino({ level: 'silent' })
+
+  const { state, saveCreds } = await useMultiFileAuthState(session.authDir)
+  const { version } = await fetchLatestBaileysVersion()
+
+  logger.info({ tenantId, waVersion: version.join('.') }, 'starting baileys session')
+
+  const sock = makeWASocket({
+    version,
+    logger: baileysLogger,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
+    },
+    printQRInTerminal: false,
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    generateHighQualityLinkPreview: false,
+    getMessage: async () => ({ conversation: '' }),
+  })
+
+  session.sock = sock
+  sock.ev.on('creds.update', saveCreds)
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      try {
+        const qrDataUrl = await QRCode.toDataURL(qr, { width: 256, margin: 2 })
+        updateStatus(tenantId, 'qr_pending', { qrDataUrl })
+        logger.info({ tenantId }, 'QR generated — waiting for scan')
+      } catch (err) {
+        logger.error({ err, tenantId }, 'failed to encode QR')
+      }
+    }
+
+    if (connection === 'open') {
+      const phone = sock.user?.id?.split(':')[0]?.replace(/\D/g, '') || null
+      updateStatus(tenantId, 'connected', { phone, qrDataUrl: null, reason: null })
+      logger.info({ tenantId, phone }, 'baileys connected')
+    }
+
+    if (connection === 'close') {
+      const code = lastDisconnect?.error?.output?.statusCode
+      const reason = lastDisconnect?.error?.message || `code=${code}`
+      const loggedOut = code === DisconnectReason.loggedOut
+
+      logger.warn({ tenantId, code, reason }, 'baileys connection closed')
+
+      if (loggedOut) {
+        updateStatus(tenantId, 'disconnected', { reason: 'logged_out', phone: null })
+        // Auth invalid; drop it so a fresh QR is required next connect.
+        try {
+          rmSync(session.authDir, { recursive: true, force: true })
+        } catch (err) {
+          logger.warn({ err, tenantId }, 'failed to clear authDir after logout')
+        }
+        dropSession(tenantId)
+      } else if (!session.stopReconnect) {
+        updateStatus(tenantId, 'connecting', { reason })
+        scheduleReconnect(tenantId, logger)
+      } else {
+        updateStatus(tenantId, 'disconnected', { reason: 'user_disconnect' })
+      }
+    }
+  })
+
+  // Inbound listener — POST to AtendIA backend.
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return
+    for (const msg of messages) {
+      if (!msg.message || msg.key?.fromMe) continue
+      const text =
+        msg.message.conversation ||
+        msg.message.extendedTextMessage?.text ||
+        null
+      if (!text) continue
+
+      const fromJid = msg.key.remoteJid || ''
+      const fromPhone = fromJid.split('@')[0]?.replace(/\D/g, '')
+      if (!fromPhone || fromPhone.length < 8) continue
+      if (fromJid.includes('@g.us') || fromJid.includes('@broadcast')) continue
+
+      const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
+      try {
+        await postInbound({
+          tenant_id: tenantId,
+          from_phone: fromPhone,
+          text,
+          ts,
+          message_id: msg.key.id || null,
+        })
+      } catch (err) {
+        logger.error({ err, tenantId, fromPhone }, 'failed to forward inbound')
+      }
+    }
+  })
+
+  return statusOf(session)
+}
+
+export async function stopSession(tenantId, logger) {
+  const session = sessionFor(tenantId)
+  session.stopReconnect = true
+  clearReconnect(tenantId)
+  if (session.sock) {
+    try {
+      await session.sock.logout()
+    } catch (err) {
+      logger.warn({ err, tenantId }, 'logout error (ignored)')
+    }
+    session.sock = null
+  }
+  updateStatus(tenantId, 'disconnected', { reason: 'user_disconnect', phone: null, qrDataUrl: null })
+  try {
+    rmSync(session.authDir, { recursive: true, force: true })
+  } catch (err) {
+    logger.warn({ err, tenantId }, 'failed to clear authDir on disconnect')
+  }
+  dropSession(tenantId)
+  return { status: 'disconnected' }
+}
+
+export function getSession(tenantId) {
+  return statusOf(sessionFor(tenantId))
+}
+
+/**
+ * Send a text message via this tenant's connected Baileys socket.
+ * Includes a short presence/typing dance to feel human; the typing
+ * delay is capped so the AtendIA runner doesn't perceive latency.
+ */
+export async function sendText(tenantId, toPhone, text, logger) {
+  const session = sessionFor(tenantId)
+  if (session.status !== 'connected' || !session.sock) {
+    throw new Error(`session_not_connected (status=${session.status})`)
+  }
+  const cleaned = String(toPhone).replace(/\D/g, '')
+  if (cleaned.length < 8) throw new Error('invalid_phone')
+  const jid = `${cleaned}@s.whatsapp.net`
+  const sock = session.sock
+
+  try {
+    await sock.presenceSubscribe(jid)
+    await sock.sendPresenceUpdate('composing', jid)
+    const typingMs = Math.min(Math.max(text.length * 20, 400), 1500)
+    await new Promise((r) => setTimeout(r, typingMs))
+    await sock.sendPresenceUpdate('paused', jid)
+  } catch (err) {
+    logger?.warn?.({ err, tenantId }, 'presence dance failed (continuing)')
+  }
+
+  const result = await sock.sendMessage(jid, { text })
+  return {
+    message_id: result?.key?.id || null,
+    sent_at: new Date().toISOString(),
+  }
+}
+
+function statusOf(session) {
+  return {
+    status: session.status,
+    phone: session.phone,
+    last_status_at: session.statusAt.toISOString(),
+    reason: session.statusReason,
+  }
+}
