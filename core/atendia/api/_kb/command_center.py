@@ -18,11 +18,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status as http_status
 from pydantic import BaseModel, Field
 
+from sqlalchemy import func, select, text as sql_text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from atendia.api._auth_helpers import AuthUser
-from atendia.api._deps import current_user, demo_tenant
+from atendia.api._deps import current_tenant_id, current_user, demo_tenant
+from atendia.db.session import get_db_session
 
 router = APIRouter()
 AuthenticatedUser = Annotated[AuthUser, Depends(current_user)]
+
+
+def _empty_health() -> "HealthResponse":
+    """Health shape for tenants with no KB data yet. UI shows empty state."""
+    return HealthResponse(
+        overall_score=0,
+        label="Sin contenido",
+        status="warning",
+        change_vs_yesterday=0,
+        metrics=[],
+        updated_at=NOW,
+    )
 
 
 Status = Literal["good", "warning", "critical"]
@@ -702,12 +718,22 @@ AUDIT_LOGS = [
 
 
 @router.get("/health", response_model=HealthResponse)
-async def get_health(_user: AuthenticatedUser) -> HealthResponse:
+async def get_health(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> HealthResponse:
+    if not is_demo:
+        return _empty_health()
     return HEALTH
 
 
 @router.get("/health/history", response_model=list[HealthHistoryPoint])
-async def get_health_history(_user: AuthenticatedUser) -> list[HealthHistoryPoint]:
+async def get_health_history(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> list[HealthHistoryPoint]:
+    if not is_demo:
+        return []
     return [
         HealthHistoryPoint(date="2026-05-04", overall_score=82, retrieval_quality_score=80, answer_confidence_score=84),
         HealthHistoryPoint(date="2026-05-05", overall_score=84, retrieval_quality_score=82, answer_confidence_score=85),
@@ -720,7 +746,12 @@ async def get_health_history(_user: AuthenticatedUser) -> list[HealthHistoryPoin
 
 
 @router.get("/risks", response_model=RiskResponse)
-async def get_risks(_user: AuthenticatedUser) -> RiskResponse:
+async def get_risks(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> RiskResponse:
+    if not is_demo:
+        return RiskResponse(items=[], updated_at=NOW)
     return RiskResponse(items=RISKS, updated_at=NOW)
 
 
@@ -738,7 +769,93 @@ async def get_items(
     risk: str | None = Query(default=None, max_length=40),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    is_demo: bool = Depends(demo_tenant),
+    tenant_id=Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> KnowledgeItemsResponse:
+    if not is_demo:
+        # Real tenants get a unified view across FAQs + Catalog + Documents.
+        # No risk/status filtering yet — those columns don't exist on the
+        # legacy KB tables; the UI shows all items with "good" status.
+        faq_count = (
+            await session.execute(
+                sql_text(
+                    "SELECT COUNT(*) FROM tenant_faqs WHERE tenant_id = :t"
+                ),
+                {"t": str(tenant_id)},
+            )
+        ).scalar_one()
+        catalog_count = (
+            await session.execute(
+                sql_text(
+                    "SELECT COUNT(*) FROM tenant_catalogs WHERE tenant_id = :t"
+                ),
+                {"t": str(tenant_id)},
+            )
+        ).scalar_one()
+        docs_count = (
+            await session.execute(
+                sql_text(
+                    "SELECT COUNT(*) FROM knowledge_documents WHERE tenant_id = :t"
+                ),
+                {"t": str(tenant_id)},
+            )
+        ).scalar_one()
+        # Build a minimal item-list summary; deeper per-row UI happens via
+        # the legacy /knowledge/faqs, /catalog, /documents endpoints.
+        summary_items: list[KnowledgeItem] = []
+        if faq_count > 0:
+            summary_items.append(
+                KnowledgeItem(
+                    id="summary-faqs",
+                    title=f"FAQs ({faq_count})",
+                    type="faq",
+                    collection="FAQs",
+                    status="Publicado",
+                    risk_level="ninguno",
+                    last_updated="—",
+                    owner="—",
+                    coverage_score=100,
+                    excerpt="Administra desde la pestaña Conocimiento.",
+                )
+            )
+        if catalog_count > 0:
+            summary_items.append(
+                KnowledgeItem(
+                    id="summary-catalog",
+                    title=f"Catálogo ({catalog_count})",
+                    type="catalog",
+                    collection="Catálogo",
+                    status="Publicado",
+                    risk_level="ninguno",
+                    last_updated="—",
+                    owner="—",
+                    coverage_score=100,
+                    excerpt="Administra desde la pestaña Conocimiento.",
+                )
+            )
+        if docs_count > 0:
+            summary_items.append(
+                KnowledgeItem(
+                    id="summary-docs",
+                    title=f"Documentos ({docs_count})",
+                    type="document",
+                    collection="Documentos",
+                    status="Publicado",
+                    risk_level="ninguno",
+                    last_updated="—",
+                    owner="—",
+                    coverage_score=100,
+                    excerpt="Administra desde la pestaña Conocimiento.",
+                )
+            )
+        return KnowledgeItemsResponse(
+            items=summary_items,
+            total=len(summary_items),
+            page=page,
+            page_size=page_size,
+        )
+
     items = KNOWLEDGE_ITEMS
     if q:
         needle = q.strip().lower()
@@ -774,7 +891,28 @@ async def reindex_item(item_id: str, _user: AuthenticatedUser) -> dict[str, str]
 
 
 @router.get("/unanswered-questions", response_model=UnansweredQuestionsResponse)
-async def get_unanswered_questions(_user: AuthenticatedUser) -> UnansweredQuestionsResponse:
+async def get_unanswered_questions(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+    tenant_id=Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> UnansweredQuestionsResponse:
+    if not is_demo:
+        # Real tenants: read from kb_unanswered_questions table when it
+        # exists. Empty for fresh tenants — the bot has to be running
+        # and detect unanswered queries before rows appear here.
+        try:
+            total = (
+                await session.execute(
+                    sql_text(
+                        "SELECT COUNT(*) FROM kb_unanswered_questions WHERE tenant_id = :t"
+                    ),
+                    {"t": str(tenant_id)},
+                )
+            ).scalar_one()
+        except Exception:
+            total = 0
+        return UnansweredQuestionsResponse(items=[], total=total or 0)
     return UnansweredQuestionsResponse(items=UNANSWERED, total=118)
 
 
@@ -794,12 +932,22 @@ async def escalate_question(question_id: str, _user: AuthenticatedUser) -> dict[
 
 
 @router.get("/funnel-coverage", response_model=FunnelCoverageResponse)
-async def get_funnel_coverage(_user: AuthenticatedUser) -> FunnelCoverageResponse:
+async def get_funnel_coverage(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> FunnelCoverageResponse:
+    if not is_demo:
+        return FunnelCoverageResponse(stages=[])
     return FunnelCoverageResponse(stages=FUNNEL)
 
 
 @router.get("/dashboard-cards", response_model=DashboardCardsResponse)
-async def get_dashboard_cards(_user: AuthenticatedUser) -> DashboardCardsResponse:
+async def get_dashboard_cards(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> DashboardCardsResponse:
+    if not is_demo:
+        return DashboardCardsResponse(items=[])
     return DashboardCardsResponse(items=CARDS)
 
 
@@ -809,13 +957,30 @@ async def simulate(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
 ) -> SimulationResponse:
-    # Gate: only demo tenants may use mock simulation.
-    # Real tenants should use POST /knowledge/test-query for actual RAG.
+    # Demo tenants get the hardcoded showcase. Real tenants get a
+    # minimal stub that's coherent for an empty KB so the UI doesn't
+    # block on 501. Full RAG-driven simulate lives at /knowledge/test
+    # in knowledge_routes.py — this surface is for the command center
+    # cockpit only.
     if not is_demo:
-        raise HTTPException(
-            http_status.HTTP_501_NOT_IMPLEMENTED,
-            "RAG simulation backed by real KB not yet implemented. "
-            "Use POST /knowledge/test-query for real retrieval.",
+        return SimulationResponse(
+            id="sim-stub",
+            agent=body.agent,
+            model=body.model,
+            user_message=body.message,
+            prompt_preview="(sin contenido en la base de conocimiento)",
+            retrieved_chunks=[],
+            confidence_score=0,
+            coverage_score=0,
+            risk_flags=["no_kb_content"],
+            answer=(
+                "Aún no hay contenido suficiente en la base de "
+                "conocimiento para responder. Carga FAQs, catálogo o "
+                "documentos en la pestaña Conocimiento, o usa "
+                "'/knowledge/test' para correr una consulta RAG real."
+            ),
+            source_summary="0 fuentes",
+            mode="sources_only",
         )
     return DEFAULT_SIMULATION.model_copy(
         update={
@@ -887,7 +1052,25 @@ async def reindex_chunk(chunk_id: str, _user: AuthenticatedUser) -> dict[str, st
 
 
 @router.get("/conflicts", response_model=ConflictsResponse)
-async def get_conflicts(_user: AuthenticatedUser) -> ConflictsResponse:
+async def get_conflicts(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+    tenant_id=Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ConflictsResponse:
+    if not is_demo:
+        try:
+            total = (
+                await session.execute(
+                    sql_text(
+                        "SELECT COUNT(*) FROM kb_conflicts WHERE tenant_id = :t"
+                    ),
+                    {"t": str(tenant_id)},
+                )
+            ).scalar_one()
+        except Exception:
+            total = 0
+        return ConflictsResponse(items=[], total=total or 0)
     return ConflictsResponse(items=CONFLICTS, total=len(CONFLICTS))
 
 
@@ -897,5 +1080,10 @@ async def resolve_conflict(conflict_id: str, _user: AuthenticatedUser) -> dict[s
 
 
 @router.get("/audit-logs", response_model=AuditLogsResponse)
-async def get_audit_logs(_user: AuthenticatedUser) -> AuditLogsResponse:
+async def get_audit_logs(
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+) -> AuditLogsResponse:
+    if not is_demo:
+        return AuditLogsResponse(items=[])
     return AuditLogsResponse(items=AUDIT_LOGS)
