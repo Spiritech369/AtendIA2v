@@ -13,6 +13,7 @@ from atendia.db.models.customer import (
 from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 from atendia.db.models.customer_note import CustomerNote
 from atendia.db.models.event import EventRow
+from atendia.db.models.field_suggestion import FieldSuggestion
 from atendia.db.models.kb_agent_permission import KbAgentPermission
 from atendia.db.models.kb_collection import KbCollection
 from atendia.db.models.kb_conflict import KbConflict
@@ -76,6 +77,7 @@ __all__ = [
     "CustomerScore",
     "CustomerTimelineEvent",
     "EventRow",
+    "FieldSuggestion",
     "FollowupScheduled",
     "HumanHandoff",
     "KbAgentPermission",
