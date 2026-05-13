@@ -36,9 +36,7 @@ describe("useNavBadges", () => {
   });
 
   it("returns undefined data on error without throwing", async () => {
-    const spy = vi
-      .spyOn(navigationApi, "getBadges")
-      .mockRejectedValue(new Error("boom"));
+    const spy = vi.spyOn(navigationApi, "getBadges").mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() => useNavBadges(), {
       wrapper: makeWrapper(),
     });

@@ -61,9 +61,7 @@ export function isItemActive(item: NavItem, path: string): boolean {
   if (item.exactMatch) {
     if (path === item.to) return true;
     if (item.activeAlsoOn) {
-      return item.activeAlsoOn.some(
-        (p) => path === p || path.startsWith(`${p}/`),
-      );
+      return item.activeAlsoOn.some((p) => path === p || path.startsWith(`${p}/`));
     }
     return false;
   }

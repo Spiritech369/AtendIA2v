@@ -24,10 +24,7 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-import {
-  isItemActive,
-  SidebarItem,
-} from "@/components/sidebar/SidebarItem";
+import { isItemActive, SidebarItem } from "@/components/sidebar/SidebarItem";
 import type { NavItem } from "@/features/navigation/types";
 
 const baseItem: NavItem = {
@@ -61,9 +58,7 @@ describe("isItemActive", () => {
 
 describe("SidebarItem", () => {
   it("renders the label and icon when expanded", () => {
-    render(
-      <SidebarItem item={baseItem} active={false} compact={false} />,
-    );
+    render(<SidebarItem item={baseItem} active={false} compact={false} />);
     expect(screen.getByText("Conversaciones")).toBeInTheDocument();
   });
 
@@ -76,24 +71,18 @@ describe("SidebarItem", () => {
   });
 
   it("omits the label and badge in compact mode", () => {
-    render(
-      <SidebarItem item={baseItem} active={false} compact badgeValue={5} />,
-    );
+    render(<SidebarItem item={baseItem} active={false} compact badgeValue={5} />);
     expect(screen.queryByText("Conversaciones")).not.toBeInTheDocument();
     expect(screen.queryByText("5")).not.toBeInTheDocument();
   });
 
   it("renders a badge when value > 0", () => {
-    render(
-      <SidebarItem item={baseItem} active={false} compact={false} badgeValue={7} />,
-    );
+    render(<SidebarItem item={baseItem} active={false} compact={false} badgeValue={7} />);
     expect(screen.getByText("7")).toBeInTheDocument();
   });
 
   it("does not render the badge when value is 0", () => {
-    render(
-      <SidebarItem item={baseItem} active={false} compact={false} badgeValue={0} />,
-    );
+    render(<SidebarItem item={baseItem} active={false} compact={false} badgeValue={0} />);
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 

@@ -64,42 +64,21 @@ describe("SidebarGroup", () => {
   });
 
   it("renders group label and items when expanded", () => {
-    render(
-      <SidebarGroup
-        group={group}
-        compact={false}
-        activePath="/dashboard"
-        badges={badges}
-      />,
-    );
+    render(<SidebarGroup group={group} compact={false} activePath="/dashboard" badges={badges} />);
     expect(screen.getByText("Operación")).toBeInTheDocument();
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Handoffs")).toBeInTheDocument();
   });
 
   it("renders the handoff badge with destructive variant when overdue > 0", () => {
-    render(
-      <SidebarGroup
-        group={group}
-        compact={false}
-        activePath="/dashboard"
-        badges={badges}
-      />,
-    );
+    render(<SidebarGroup group={group} compact={false} activePath="/dashboard" badges={badges} />);
     const chip = screen.getByText("3");
     expect(chip.className).toContain("text-red-600");
   });
 
   it("toggles expanded state on header click", async () => {
     const user = userEvent.setup();
-    render(
-      <SidebarGroup
-        group={group}
-        compact={false}
-        activePath="/dashboard"
-        badges={badges}
-      />,
-    );
+    render(<SidebarGroup group={group} compact={false} activePath="/dashboard" badges={badges} />);
     const header = screen.getByRole("button", { name: /Operación/i });
     expect(header).toHaveAttribute("aria-expanded", "true");
     await user.click(header);
@@ -109,14 +88,7 @@ describe("SidebarGroup", () => {
   });
 
   it("compact mode hides the header and shows items as icons", () => {
-    render(
-      <SidebarGroup
-        group={group}
-        compact
-        activePath="/dashboard"
-        badges={badges}
-      />,
-    );
+    render(<SidebarGroup group={group} compact activePath="/dashboard" badges={badges} />);
     expect(screen.queryByRole("button", { name: /Operación/i })).not.toBeInTheDocument();
     // Items render but only via icon + title (label not visible)
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();

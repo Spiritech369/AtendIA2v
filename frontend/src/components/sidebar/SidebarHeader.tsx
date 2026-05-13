@@ -1,5 +1,5 @@
-import { WhatsAppStatusBadge } from "@/components/WhatsAppStatusBadge";
 import { Separator } from "@/components/ui/separator";
+import { WhatsAppStatusBadge } from "@/components/WhatsAppStatusBadge";
 
 interface Props {
   tenantId: string | null | undefined;

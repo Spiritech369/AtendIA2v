@@ -51,11 +51,7 @@ export function SidebarFooter() {
           aria-label={compact ? "Expandir menú" : "Compactar menú"}
           onClick={toggleCompact}
         >
-          {compact ? (
-            <PanelLeftOpen className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
+          {compact ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </Button>
         {!compact && (
           <Button

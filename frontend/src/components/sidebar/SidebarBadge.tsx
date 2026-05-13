@@ -19,9 +19,7 @@ export function SidebarBadge({
     <span
       className={cn(
         "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
-        variant === "destructive"
-          ? "bg-red-500/15 text-red-600"
-          : "bg-primary/15 text-primary",
+        variant === "destructive" ? "bg-red-500/15 text-red-600" : "bg-primary/15 text-primary",
       )}
     >
       {value > 99 ? "99+" : value}

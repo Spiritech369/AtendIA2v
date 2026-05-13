@@ -33,20 +33,14 @@ export function SidebarGroup({ group, compact, activePath, badges }: Props) {
           className="flex w-full items-center justify-between rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground"
         >
           <span>{group.label}</span>
-          <ChevronDown
-            className={cn(
-              "h-3 w-3 transition-transform",
-              !expanded && "-rotate-90",
-            )}
-          />
+          <ChevronDown className={cn("h-3 w-3 transition-transform", !expanded && "-rotate-90")} />
         </button>
       )}
       {(compact || expanded) && (
         <div className="mt-0.5 flex flex-col gap-0.5">
           {group.items.map((item) => {
             const value = item.badgeKey ? badges?.[item.badgeKey] : undefined;
-            const isOverdueHandoff =
-              item.id === "handoffs" && (badges?.handoffs_overdue ?? 0) > 0;
+            const isOverdueHandoff = item.id === "handoffs" && (badges?.handoffs_overdue ?? 0) > 0;
             return (
               <SidebarItem
                 key={item.id}

@@ -2,8 +2,8 @@ import { useRouterState } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { filterMenuByRole, NAV_GROUPS } from "@/features/navigation/menu-config";
 import { useNavBadges } from "@/features/navigation/hooks";
+import { filterMenuByRole, NAV_GROUPS } from "@/features/navigation/menu-config";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useSidebarStore } from "@/stores/sidebar-store";
@@ -24,10 +24,7 @@ export function AppSidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const badges = useNavBadges();
 
-  const groups = useMemo(
-    () => filterMenuByRole(NAV_GROUPS, user?.role),
-    [user?.role],
-  );
+  const groups = useMemo(() => filterMenuByRole(NAV_GROUPS, user?.role), [user?.role]);
 
   return (
     <aside
