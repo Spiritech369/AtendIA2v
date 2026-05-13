@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { AIProviderInfo, WhatsAppDetails } from "@/features/config/api";
 import { integrationsApi, tenantsApi } from "@/features/config/api";
+import { BaileysCard } from "@/features/config/components/BaileysCard";
 import { useAuthStore } from "@/stores/auth";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1259,6 +1260,9 @@ export function IntegrationsTab() {
 
         {/* WhatsApp hero — full width */}
         <WhatsAppHeroCard details={details.data} loading={details.isLoading} />
+
+        {/* WhatsApp Personal (Baileys QR) — full width, second */}
+        <BaileysCard />
 
         {/* AI Provider + Timezone — two columns */}
         <div className="grid gap-4 md:grid-cols-2">
