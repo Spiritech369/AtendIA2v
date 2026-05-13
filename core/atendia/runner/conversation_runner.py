@@ -359,6 +359,34 @@ class ConversationRunner:
         for k, field in nlu.entities.items():
             state_obj.extracted_data[k] = field
 
+        # Cascade extractions to customer.attrs / field_suggestions.
+        # Pure side-effect on the same session; never fails the turn.
+        try:
+            from atendia.runner.ai_extraction_service import apply_ai_extractions
+
+            customer_id_for_ext = (
+                await self._session.execute(
+                    text("SELECT customer_id FROM conversations WHERE id = :cid"),
+                    {"cid": conversation_id},
+                )
+            ).scalar_one_or_none()
+            if customer_id_for_ext is not None:
+                await apply_ai_extractions(
+                    session=self._session,
+                    tenant_id=tenant_id,
+                    customer_id=customer_id_for_ext,
+                    conversation_id=conversation_id,
+                    turn_number=turn_number,
+                    entities=nlu.entities,
+                    inbound_text=inbound.text,
+                )
+        except Exception:
+            import logging as _logging
+
+            _logging.getLogger(__name__).exception(
+                "apply_ai_extractions failed for conv=%s", conversation_id
+            )
+
         decision = process_turn(pipeline, state_obj, nlu, turn_number)
 
         # Build the JSONB shape from the now-up-to-date state_obj for persistence.
