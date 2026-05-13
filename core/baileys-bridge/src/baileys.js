@@ -208,8 +208,20 @@ export async function startSession(tenantId, logger) {
   //                    Echo to /outbound-echo so AtendIA mirrors the chat.
   //                    (Without this echo, sending from the phone bypasses
   //                    AtendIA entirely and the dashboard goes silent.)
+  // Freshness window for `type='append'` events. WhatsApp Multi-Device
+  // pushes cross-device sync (operator sending from their phone) with
+  // `type='append'` rather than `'notify'`. We accept those, but only
+  // when the message is recent — otherwise the initial sync after
+  // `connection=open` dumps the whole pending history into AtendIA.
+  const APPEND_FRESHNESS_MS = 5 * 60 * 1000
+
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return
+    // `notify` → real-time push. Always processed.
+    // `append` → cross-device echo + history sync. Only processed for
+    //            fresh `fromMe` events so we can mirror what the
+    //            operator typed on their phone.
+    if (type !== 'notify' && type !== 'append') return
+
     for (const msg of messages) {
       if (!msg.message) continue
       const text = extractMessageText(msg.message)
@@ -232,10 +244,24 @@ export async function startSession(tenantId, logger) {
       const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
       const isOutbound = !!msg.key?.fromMe
 
+      // For `append` events, only forward fresh fromMe messages.
+      // Customer-side `append` is always history (their inbound came in
+      // via `notify` already); skipping them prevents duplicates.
+      if (type === 'append') {
+        if (!isOutbound) continue
+        if (Date.now() - ts > APPEND_FRESHNESS_MS) {
+          logger.debug(
+            { tenantId, peerPhone, ageMs: Date.now() - ts, messageId: msg.key?.id },
+            'skipping stale append (history sync)',
+          )
+          continue
+        }
+      }
+
       // Visible breadcrumb on every routed message so we can confirm the
       // sidecar is actually capturing fromMe events when debugging.
       logger.info(
-        { tenantId, peerPhone, isOutbound, messageId: msg.key?.id },
+        { tenantId, peerPhone, isOutbound, type, messageId: msg.key?.id },
         isOutbound ? 'forwarding outbound echo' : 'forwarding inbound',
       )
 
