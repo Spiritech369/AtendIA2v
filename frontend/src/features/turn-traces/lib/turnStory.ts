@@ -73,7 +73,7 @@ function parseTransition(
 ): { from: string; to: string } | null {
   if (!t) return null;
   const m = t.match(/^(.+?)\s*(?:→|->)\s*(.+)$/);
-  if (m) return { from: m[1].trim(), to: m[2].trim() };
+  if (m && m[1] && m[2]) return { from: m[1].trim(), to: m[2].trim() };
   return null;
 }
 

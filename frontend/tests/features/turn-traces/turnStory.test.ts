@@ -8,6 +8,7 @@ const baseTrace: TurnTraceDetail = {
   conversation_id: "c1",
   turn_number: 1,
   inbound_message_id: "m1",
+  inbound_preview: "¿Cuánto cuesta el Civic?",
   flow_mode: "SALES",
   nlu_model: "gpt-4o-mini",
   composer_model: "gpt-4o",

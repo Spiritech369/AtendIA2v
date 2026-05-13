@@ -98,17 +98,19 @@ function renderStep(step: StoryStep) {
           )}
         </StepRow>
       );
-    case "composer":
+    case "composer": {
+      const first = step.messages[0];
       return (
         <StepRow icon={Sparkles}>
           <span className="text-muted-foreground">Bot decidió responder:</span>{" "}
           <span className="italic">
-            {step.messages.length === 1
-              ? `«${truncate(step.messages[0], 80)}»`
+            {step.messages.length === 1 && first
+              ? `«${truncate(first, 80)}»`
               : `${step.messages.length} mensajes`}
           </span>
         </StepRow>
       );
+    }
     case "outbound":
       return (
         <StepRow icon={SendHorizonal}>
