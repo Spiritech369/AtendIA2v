@@ -117,6 +117,12 @@ services:
     ports:
       - "7755:7755"        # interno; expuesto para debug
     environment:
+      # NODE_ENV=production tells pino to emit structured JSON logs instead
+      # of pretty-printed dev output. Without this, server.js falls back to
+      # `pino-pretty` as the logger transport — which isn't in dependencies,
+      # so the container crash-loops on startup with
+      # "unable to determine transport target for pino-pretty".
+      NODE_ENV: production
       PORT: "7755"
       HOST: "0.0.0.0"
       ATENDIA_API_BASE: "http://backend:8001"
