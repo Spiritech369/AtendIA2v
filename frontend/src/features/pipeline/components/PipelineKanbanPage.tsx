@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Archive,
@@ -37,7 +37,6 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +57,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PipelineEditor } from "@/features/config/components/PipelineEditor";
+import { PipelineEditor } from "@/features/pipeline/components/PipelineEditor";
 import { type PipelineConversationCard, pipelineApi, type StageGroup } from "@/features/pipeline/api";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
@@ -1041,24 +1040,24 @@ export function PipelineKanbanPage() {
   }
 
   if (board.isError) {
+    // No pipeline yet for this tenant. Instead of bouncing the user to
+    // /config (which no longer owns the pipeline editor), show the editor
+    // inline with its built-in seed pre-populated. Saving once activates
+    // the first pipeline and the board query refetches automatically (the
+    // editor's save mutation invalidates ["pipeline"]).
     return (
-      <div className="-m-6 flex h-[calc(100vh-3.5rem)] items-center justify-center">
-        <Card>
-          <CardContent className="flex flex-col items-start gap-3 p-6">
-            <div className="flex items-center gap-2 text-base font-medium">
-              <AlertTriangle className="size-5 text-amber-600" />
-              Sin pipeline activo
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Este tenant no tiene etapas de pipeline configuradas. Agrégalas en Configuración → Pipeline.
-            </p>
-            <Button asChild>
-              <Link to="/config">
-                <Settings className="mr-2 size-4" /> Ir a Configuración
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="-m-6 flex h-[calc(100vh-3.5rem)]">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+          <AlertTriangle className="size-10 text-amber-500" />
+          <h2 className="text-lg font-semibold">Aún no tienes pipeline activo</h2>
+          <p className="max-w-md text-center text-sm text-muted-foreground">
+            Edita las etapas en el panel de la derecha y presiona <span className="font-medium">Guardar</span> para
+            activar tu primer pipeline. Después podrás arrastrar leads entre columnas.
+          </p>
+        </div>
+        <div className="w-80 shrink-0 overflow-hidden border-l bg-background">
+          <PipelineEditor />
+        </div>
       </div>
     );
   }
