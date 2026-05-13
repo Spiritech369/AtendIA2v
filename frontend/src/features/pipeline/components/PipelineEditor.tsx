@@ -364,23 +364,26 @@ export function PipelineEditor({ onClose }: Props) {
             <Save className="mr-1 size-3" />
             {save.isPending ? "Guardando…" : "Guardar"}
           </Button>
-          {/* Eliminar pipeline — only visible when a saved pipeline exists.
-              Disabled while a save/delete is mid-flight or the user is not
-              an admin. Clicks open a confirmation dialog rather than
+          {/* Eliminar pipeline — always visible so the affordance is
+              discoverable. Disabled when there's nothing saved to delete,
+              when the user isn't an admin, or while a save/delete is
+              mid-flight. Clicks open a confirmation dialog instead of
               firing the destructive call directly. */}
-          {query.data && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setConfirmDeleteOpen(true)}
-              disabled={!canEdit || save.isPending || remove.isPending}
-              title="Eliminar todas las versiones del pipeline"
-            >
-              <Trash2 className="mr-1 size-3" />
-              Eliminar
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setConfirmDeleteOpen(true)}
+            disabled={!canEdit || !query.data || save.isPending || remove.isPending}
+            title={
+              !query.data
+                ? "Guarda primero para tener un pipeline que eliminar"
+                : "Eliminar todas las versiones del pipeline"
+            }
+          >
+            <Trash2 className="mr-1 size-3" />
+            Eliminar
+          </Button>
           {onClose && (
             <Button
               variant="ghost"
