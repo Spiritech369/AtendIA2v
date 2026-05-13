@@ -4,6 +4,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clock,
   Code2,
   GripVertical,
   MoreHorizontal,
@@ -40,6 +41,7 @@ import { tenantsApi } from "@/features/config/api";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
+import { AuditLogDrawer } from "./AuditLogDrawer";
 import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { RuleBuilder } from "./RuleBuilder";
 import { StageDeleteDialog } from "./StageDeleteDialog";
@@ -374,6 +376,7 @@ export function PipelineEditor({ onClose }: Props) {
   // user confirms — the row stays in the list until then. Saving the
   // draft afterwards persists the deletion.
   const [stagePendingDelete, setStagePendingDelete] = useState<number | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
   const remove = useMutation({
     mutationFn: () => tenantsApi.deletePipeline(),
     onSuccess: () => {
@@ -535,6 +538,17 @@ export function PipelineEditor({ onClose }: Props) {
             <Save className="mr-1 size-3" />
             {save.isPending ? "Guardando…" : "Guardar"}
           </Button>
+          {/* Audit drawer trigger. Always visible — viewing history is
+              a read-only action, no role gate. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={() => setAuditOpen(true)}
+            title="Ver historial"
+          >
+            <Clock className="size-3.5" />
+          </Button>
           {/* Pipeline-wide reset. The primary delete affordance lives on
               each stage's three-dot menu; this is the "reset to factory"
               escape hatch — small icon-only, secondary visual weight, no
@@ -612,6 +626,8 @@ export function PipelineEditor({ onClose }: Props) {
           setStagePendingDelete(null);
         }}
       />
+
+      <AuditLogDrawer open={auditOpen} onOpenChange={setAuditOpen} />
 
       <div className="flex-1 overflow-y-auto">
         {/* Global error */}

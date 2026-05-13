@@ -53,6 +53,20 @@ export interface StageImpactResponse {
   workflow_references: WorkflowReference[];
 }
 
+export interface AuditLogEntry {
+  id: string;
+  type: string;
+  occurred_at: string;
+  actor_user_id: string | null;
+  payload: Record<string, unknown>;
+  conversation_id: string | null;
+}
+
+export interface AuditLogResponse {
+  entries: AuditLogEntry[];
+  has_more: boolean;
+}
+
 export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
   putPipeline: async (definition: Record<string, unknown>) =>
@@ -62,6 +76,8 @@ export const tenantsApi = {
   },
   getStageImpact: async (stageId: string) =>
     (await api.get<StageImpactResponse>(`/tenants/pipeline/impacted-references/${encodeURIComponent(stageId)}`)).data,
+  getPipelineAuditLog: async (params?: { limit?: number; before?: string }) =>
+    (await api.get<AuditLogResponse>(`/tenants/pipeline/audit-log`, { params })).data,
   getBrandFacts: async () => (await api.get<BrandFactsResponse>("/tenants/brand-facts")).data,
   putBrandFacts: async (brand_facts: Record<string, string>) =>
     (await api.put<BrandFactsResponse>("/tenants/brand-facts", { brand_facts })).data,

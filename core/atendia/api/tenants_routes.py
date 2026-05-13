@@ -14,14 +14,16 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.db.models.conversation import Conversation
@@ -77,7 +79,7 @@ async def get_pipeline(
 @router.put("/pipeline", response_model=PipelineResponse)
 async def put_pipeline(
     body: PipelinePutBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PipelineResponse:
@@ -105,6 +107,22 @@ async def put_pipeline(
         active=True,
     )
     session.add(new_row)
+    # Audit emit before commit so it lands in the same transaction; the
+    # AuditLogDrawer surfaces this. We only record the stage-id list +
+    # high-level shape, not the full definition, to keep the payload
+    # cheap to scan.
+    stage_ids = [
+        str(s.get("id"))
+        for s in (body.definition.get("stages") or [])
+        if isinstance(s, dict) and isinstance(s.get("id"), str)
+    ]
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="pipeline.saved",
+        payload={"version": new_version, "stage_count": len(stage_ids), "stage_ids": stage_ids},
+    )
     await session.commit()
     await session.refresh(new_row)
     return PipelineResponse(
@@ -215,9 +233,79 @@ async def get_stage_impact(
     )
 
 
+class AuditLogEntry(BaseModel):
+    """One entry in the pipeline audit log surfaced to the UI."""
+
+    id: UUID
+    type: str
+    occurred_at: datetime
+    actor_user_id: UUID | None
+    payload: dict
+    conversation_id: UUID | None
+
+
+class AuditLogResponse(BaseModel):
+    entries: list[AuditLogEntry]
+    has_more: bool
+
+
+@router.get("/pipeline/audit-log", response_model=AuditLogResponse)
+async def get_pipeline_audit_log(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+    limit: int = 50,
+    before: datetime | None = None,
+) -> AuditLogResponse:
+    """Pipeline-scoped audit log.
+
+    Returns two flavours of events combined:
+    - ``admin.pipeline.*`` events emitted when the operator saves or
+      deletes a pipeline version.
+    - ``stage_entered`` / ``stage_exited`` events emitted by the runner
+      every time a conversation moves between stages — both FSM and
+      auto_enter_rules transitions land here, so the drawer doubles as
+      a "who moved what when" view.
+
+    Pagination is keyset on ``occurred_at`` for stable scrolling. The
+    last entry's occurred_at becomes the next ``before`` cursor.
+    """
+    if limit < 1 or limit > 200:
+        limit = 50
+    sql = """
+        SELECT id, type, occurred_at, actor_user_id, payload, conversation_id
+        FROM events
+        WHERE tenant_id = :t
+          AND (
+            type LIKE 'admin.pipeline.%'
+            OR type IN ('stage_entered', 'stage_exited')
+          )
+    """
+    params: dict[str, Any] = {"t": tenant_id, "limit": limit + 1}
+    if before is not None:
+        sql += " AND occurred_at < :before"
+        params["before"] = before
+    sql += " ORDER BY occurred_at DESC LIMIT :limit"
+
+    rows = (await session.execute(text(sql), params)).fetchall()
+    has_more = len(rows) > limit
+    entries = [
+        AuditLogEntry(
+            id=row.id,
+            type=row.type,
+            occurred_at=row.occurred_at,
+            actor_user_id=row.actor_user_id,
+            payload=row.payload or {},
+            conversation_id=row.conversation_id,
+        )
+        for row in rows[:limit]
+    ]
+    return AuditLogResponse(entries=entries, has_more=has_more)
+
+
 @router.delete("/pipeline", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_pipeline(
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:
@@ -232,8 +320,23 @@ async def delete_pipeline(
 
     Requires tenant_admin role.
     """
+    # Count what we're about to drop so the audit log has a useful summary.
+    versions = (
+        await session.execute(
+            select(func.count())
+            .select_from(TenantPipeline)
+            .where(TenantPipeline.tenant_id == tenant_id)
+        )
+    ).scalar_one()
     await session.execute(
         delete(TenantPipeline).where(TenantPipeline.tenant_id == tenant_id),
+    )
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="pipeline.deleted",
+        payload={"removed_versions": int(versions or 0)},
     )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
