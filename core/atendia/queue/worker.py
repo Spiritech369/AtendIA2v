@@ -8,10 +8,11 @@ from redis.asyncio import Redis as AsyncRedis
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from atendia.channels.base import OutboundMessage
+from atendia.channels.base import DeliveryReceipt, OutboundMessage
 from atendia.channels.meta_cloud_api import MetaCloudAPIAdapter
 from atendia.channels.tenant_config import load_meta_config
 from atendia.config import get_settings
+from atendia.integrations import baileys_client
 from atendia.db.models.outbound_outbox import OutboundOutbox
 from atendia.queue.circuit_breaker import (
     OPEN_DURATION_SECONDS,
@@ -23,6 +24,65 @@ from atendia.queue.force_summary_job import force_summary
 from atendia.queue.index_document_job import index_document
 from atendia.queue.outbox import get_or_stage_outbound
 from atendia.queue.workflow_jobs import execute_workflow_step, poll_workflow_triggers
+
+
+async def _should_route_baileys(session, tenant_id_str: str) -> bool:
+    """True when the tenant has Baileys enabled, connected and preferred.
+
+    Read-only DB hit; safe to call per outbound. Returns False on any
+    error so the dispatcher falls back to Meta.
+    """
+    try:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT enabled, prefer_over_meta, last_status "
+                    "FROM tenant_baileys_config WHERE tenant_id = :t"
+                ),
+                {"t": tenant_id_str},
+            )
+        ).mappings().first()
+    except Exception:
+        return False
+    if row is None:
+        return False
+    return bool(
+        row["enabled"]
+        and row["prefer_over_meta"]
+        and row["last_status"] == "connected"
+    )
+
+
+async def _send_via_baileys(
+    tenant_id_str: str, msg: OutboundMessage, internal_message_id: str
+) -> DeliveryReceipt:
+    """Send a text message through the Baileys sidecar.
+
+    Templates aren't supported (Baileys is the WhatsApp Web protocol — no
+    Meta-side template registry). If `msg.template` is set, we surface a
+    failed receipt with a helpful error rather than crashing the worker.
+    """
+    if msg.template is not None or not msg.text:
+        return DeliveryReceipt(
+            message_id=internal_message_id,
+            status="failed",
+            error="baileys_does_not_support_templates",
+        )
+    try:
+        result = await baileys_client.send_text(
+            UUID(tenant_id_str), msg.to_phone_e164, msg.text
+        )
+    except baileys_client.BaileysBridgeUnavailable as exc:
+        return DeliveryReceipt(
+            message_id=internal_message_id,
+            status="failed",
+            error=f"transport_error_baileys:{exc}",
+        )
+    return DeliveryReceipt(
+        message_id=internal_message_id,
+        channel_message_id=result.message_id,
+        status="sent",
+    )
 
 
 def _is_transient(err: str | None) -> bool:
@@ -73,21 +133,25 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
             if outbox.status == "sent" and outbox.sent_message_id is not None:
                 return {"message_id": str(outbox.sent_message_id), "status": "sent"}
 
-            cfg = await load_meta_config(session, UUID(msg.tenant_id))
+            use_baileys = await _should_route_baileys(session, msg.tenant_id)
             outbox.status = "sending"
             outbox.attempts += 1
             outbox.last_error = None
             await session.commit()
 
-            adapter = MetaCloudAPIAdapter(
-                access_token=settings.meta_access_token,
-                app_secret=settings.meta_app_secret,
-                api_version=settings.meta_api_version,
-                base_url=settings.meta_base_url,
-            )
-            receipt = await adapter.send(
-                msg, phone_number_id=cfg.phone_number_id, message_id=message_id,
-            )
+            if use_baileys:
+                receipt = await _send_via_baileys(msg.tenant_id, msg, message_id)
+            else:
+                cfg = await load_meta_config(session, UUID(msg.tenant_id))
+                adapter = MetaCloudAPIAdapter(
+                    access_token=settings.meta_access_token,
+                    app_secret=settings.meta_app_secret,
+                    api_version=settings.meta_api_version,
+                    base_url=settings.meta_base_url,
+                )
+                receipt = await adapter.send(
+                    msg, phone_number_id=cfg.phone_number_id, message_id=message_id,
+                )
 
             # Update breaker state from receipt (T20)
             if receipt.status == "sent":
