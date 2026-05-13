@@ -51,8 +51,7 @@ import {
   type VehicleOption,
 } from "@/features/appointments/api";
 import { customersApi, type CustomerListItem } from "@/features/customers/api";
-import { DemoBadge } from "@/components/DemoBadge";
-import { NYIButton } from "@/components/NYIButton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "operation" | "list" | "day" | "week" | "advisor";
@@ -389,7 +388,7 @@ function ListView({ items, onSelect, onContext }: { items: AppointmentItem[]; on
 
 function AdvisorView({ items, advisors, onSelect, onContext }: { items: AppointmentItem[]; advisors: AdvisorOption[]; onSelect: (item: AppointmentItem) => void; onContext: (event: React.MouseEvent, item: AppointmentItem) => void }) {
   return (
-    <Panel title="Vista: Asesor" icon={<Users className="h-4 w-4 text-emerald-300" />} action={<DemoBadge className="ml-1.5 inline-block" />}>
+    <Panel title="Vista: Asesor" icon={<Users className="h-4 w-4 text-emerald-300" />}>
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {advisors.map((advisor) => {
           const rows = items.filter((item) => item.advisor_name === advisor.name);
@@ -514,7 +513,7 @@ function SmartAppointmentPanel({
 
 function DetailPanel({ item, advisors, vehicles, onAction, onPatch }: { item: AppointmentItem; advisors: AdvisorOption[]; vehicles: VehicleOption[]; onAction: (id: string, action: string) => void; onPatch: (id: string, body: Partial<AppointmentItem>) => void }) {
   return (
-    <Panel title="Detalle de cita" icon={<CalendarDays className="h-4 w-4 text-sky-300" />} action={<DemoBadge className="ml-1.5 inline-block" />}>
+    <Panel title="Detalle de cita" icon={<CalendarDays className="h-4 w-4 text-sky-300" />}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-base font-semibold text-slate-100">{typeLabel[item.appointment_type]}</div>
@@ -595,7 +594,26 @@ function SupervisorPanel({ data, onRun }: { data: SupervisorRecommendations | un
             <div className="font-semibold text-slate-100">{item.title}</div>
             <div className="mt-1 text-slate-400">{item.detail}</div>
             <div className="mt-2">
-              <NYIButton label={item.action} />
+              {/* The supervisor outputs free-text recommendations that don't yet
+                  map 1:1 to an automated action. Until that's wired, give the
+                  operator the most useful thing we honestly can: copy the
+                  recommendation so they can paste it into a chat, ticket, or
+                  follow-up note. */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-violet-400/30 bg-violet-500/10 text-xs text-violet-100 hover:bg-violet-500/20"
+                onClick={() => {
+                  const text = `${item.title}\n${item.detail}\n→ ${item.action}`;
+                  void navigator.clipboard
+                    .writeText(text)
+                    .then(() => toast.success("Recomendación copiada", { description: "Pégala donde la vayas a usar." }))
+                    .catch(() => toast.error("No se pudo copiar (permiso denegado)"));
+                }}
+              >
+                <Copy className="mr-1.5 h-3 w-3" />
+                {item.action}
+              </Button>
             </div>
           </div>
         ))}
@@ -670,6 +688,11 @@ export function AppointmentsPage() {
   const [query, setQuery] = useState("");
   const [smartInput, setSmartInput] = useState("Mañana 4pm prueba de manejo para Gabriel, trae 10 mil de enganche");
   const [parsed, setParsed] = useState<NaturalParse | null>(null);
+  // Advanced filters — applied client-side on top of the quickFilter row.
+  // Empty sets mean "no constraint"; non-empty means "must match one of these".
+  const [advStatuses, setAdvStatuses] = useState<Set<AppointmentStatus>>(() => new Set());
+  const [advTypes, setAdvTypes] = useState<Set<AppointmentType>>(() => new Set());
+  const advancedCount = advStatuses.size + advTypes.size;
 
   const weekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate]);
   const dateFrom = useMemo(() => {
@@ -704,8 +727,10 @@ export function AppointmentsPage() {
     const needle = query.trim().toLowerCase();
     return (appointmentsQuery.data?.items ?? [])
       .filter((item) => matchesFilter(item, quickFilter))
+      .filter((item) => advStatuses.size === 0 || advStatuses.has(item.status))
+      .filter((item) => advTypes.size === 0 || advTypes.has(item.appointment_type))
       .filter((item) => !needle || `${item.customer_name ?? ""} ${item.customer_phone} ${item.service} ${item.vehicle_label ?? ""} ${item.advisor_name ?? ""}`.toLowerCase().includes(needle));
-  }, [appointmentsQuery.data?.items, quickFilter, query]);
+  }, [appointmentsQuery.data?.items, quickFilter, query, advStatuses, advTypes]);
   const selected = (appointmentsQuery.data?.items ?? []).find((item) => item.id === selectedAppointmentId) ?? items[0] ?? null;
   const menuAppointment = contextMenu ? (appointmentsQuery.data?.items ?? []).find((item) => item.id === contextMenu.appointmentId) : null;
 
@@ -819,7 +844,50 @@ export function AppointmentsPage() {
           </div>
           <Badge variant="outline" className="h-8 border-emerald-400/30 bg-emerald-500/10 text-emerald-200">En vivo</Badge>
           <Badge variant="outline" className="h-8 border-sky-400/30 bg-sky-500/10 text-sky-200">IA · {supervisorQuery.data?.health ?? "Sincronizada"}</Badge>
-          <NYIButton label="Importar CSV" icon={Download} />
+          {/* "Importar CSV" was a NYI button. A real bulk-import endpoint
+              isn't built yet, so the most useful thing we can offer is a
+              starter CSV template the operator fills in and uploads later.
+              Generated client-side — no roundtrip needed. */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 border-white/10 bg-white/[0.035] text-xs"
+            onClick={() => {
+              const header = [
+                "scheduled_at_iso",
+                "customer_phone",
+                "customer_name",
+                "appointment_type",
+                "advisor_name",
+                "vehicle_label",
+                "credit_plan",
+                "notes",
+              ].join(",");
+              const sample = [
+                "2026-05-15T10:00:00-06:00",
+                "+5215512345678",
+                "Juan Pérez",
+                "test_drive",
+                "Ana Díaz",
+                "DM200 2026",
+                "36 meses",
+                "Confirmar dirección antes",
+              ].join(",");
+              const blob = new Blob([`${header}\n${sample}\n`], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "plantilla-citas-atendia.csv";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              toast.success("Plantilla descargada", { description: "Llénala y avisa cuando lista para importar." });
+            }}
+          >
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Plantilla CSV
+          </Button>
           <Button size="sm" className="h-9 bg-blue-600 text-xs hover:bg-blue-500" onClick={() => parseMutation.mutate()}>
             <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
             Nueva cita
@@ -843,7 +911,96 @@ export function AppointmentsPage() {
                 {filter.label}
               </button>
             ))}
-            <NYIButton label="Filtros avanzados" icon={Filter} />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "h-8 border-white/10 bg-white/[0.035] text-xs",
+                    advancedCount > 0 && "border-sky-400/40 bg-sky-500/10 text-sky-100",
+                  )}
+                >
+                  <Filter className="mr-1.5 h-3.5 w-3.5" />
+                  Filtros avanzados
+                  {advancedCount > 0 && (
+                    <Badge className="ml-1.5 h-4 min-w-4 border-0 bg-sky-400 px-1 text-[10px] text-slate-950">
+                      {advancedCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <div className="mb-2 text-xs font-semibold text-slate-100">Estado</div>
+                <div className="mb-3 grid grid-cols-2 gap-1">
+                  {(Object.keys(statusLabel) as AppointmentStatus[]).map((status) => {
+                    const active = advStatuses.has(status);
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => {
+                          setAdvStatuses((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(status)) next.delete(status);
+                            else next.add(status);
+                            return next;
+                          });
+                        }}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-left text-[11px] transition",
+                          active
+                            ? "border-sky-300/60 bg-sky-500/15 text-sky-100"
+                            : "border-white/10 bg-white/[0.035] text-slate-400 hover:text-slate-100",
+                        )}
+                      >
+                        {statusLabel[status]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mb-2 text-xs font-semibold text-slate-100">Tipo</div>
+                <div className="mb-3 grid grid-cols-2 gap-1">
+                  {(Object.keys(typeLabel) as AppointmentType[]).map((type) => {
+                    const active = advTypes.has(type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          setAdvTypes((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(type)) next.delete(type);
+                            else next.add(type);
+                            return next;
+                          });
+                        }}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-left text-[11px] transition",
+                          active
+                            ? "border-violet-300/60 bg-violet-500/15 text-violet-100"
+                            : "border-white/10 bg-white/[0.035] text-slate-400 hover:text-slate-100",
+                        )}
+                      >
+                        {typeLabel[type]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-full border-white/10 bg-white/[0.035] text-xs"
+                  disabled={advancedCount === 0}
+                  onClick={() => {
+                    setAdvStatuses(new Set());
+                    setAdvTypes(new Set());
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto">

@@ -29,7 +29,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ import {
   type WorkflowItem,
   type WorkflowMetrics,
 } from "@/features/workflows/api";
-import { NYIButton } from "@/components/NYIButton";
+import { Bookmark, FolderOpen, PauseCircle, Save, ZapOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WorkflowEditor } from "./WorkflowEditor";
 
@@ -492,7 +492,19 @@ function ValidationPanel({ workflow }: { workflow: WorkflowItem | null }) {
   );
 }
 
-function SafetyPanel({ workflow, onToggle }: { workflow: WorkflowItem | null; onToggle: (key: string) => void }) {
+type PauseMode = "immediate" | "new_leads" | "after_active" | "handoff_human";
+
+function SafetyPanel({
+  workflow,
+  onToggle,
+  onPause,
+  pausing,
+}: {
+  workflow: WorkflowItem | null;
+  onToggle: (key: string) => void;
+  onPause: (mode: PauseMode) => void;
+  pausing: boolean;
+}) {
   const labels: Record<string, string> = {
     business_hours: "Respetar horario laboral",
     max_3_messages_24h: "Máximo 3 mensajes automáticos en 24h",
@@ -502,6 +514,15 @@ function SafetyPanel({ workflow, onToggle }: { workflow: WorkflowItem | null; on
     stop_on_frustration: "Detener si se detecta frustración",
     pause_on_critical: "Pausar si hay error crítico",
   };
+  // The 4 modes map 1:1 to backend endpoints: /pause (immediate) and
+  // /safe-pause with mode in {new_leads, after_active, handoff_human}.
+  const pauseModes: Array<{ mode: PauseMode; label: string; icon: typeof PauseCircle; tone: string }> = [
+    { mode: "immediate", label: "Pausar inmediatamente", icon: ZapOff, tone: "text-red-200 hover:bg-red-500/10 border-red-500/20" },
+    { mode: "new_leads", label: "Pausar solo nuevos leads", icon: PauseCircle, tone: "text-amber-200 hover:bg-amber-500/10 border-amber-500/20" },
+    { mode: "after_active", label: "Pausar después de ejecuciones activas", icon: PauseCircle, tone: "text-slate-200 hover:bg-white/10 border-white/15" },
+    { mode: "handoff_human", label: "Pausar y enviar a humano", icon: UserRoundCog, tone: "text-violet-200 hover:bg-violet-500/10 border-violet-500/20" },
+  ];
+  const disabled = !workflow || pausing;
   return (
     <section className="rounded-md border border-white/10 bg-[#0d1822]">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
@@ -521,20 +542,52 @@ function SafetyPanel({ workflow, onToggle }: { workflow: WorkflowItem | null; on
           );
         })}
         <div className="mt-2 flex flex-col gap-1.5">
-          <NYIButton label="Pausar inmediatamente" />
-          <NYIButton label="Pausar solo nuevos leads" />
-          <NYIButton label="Pausar después de ejecuciones activas" />
-          <NYIButton label="Pausar y enviar a humano" />
+          {pauseModes.map(({ mode, label, icon: Icon, tone }) => (
+            <button
+              key={mode}
+              type="button"
+              disabled={disabled}
+              onClick={() => onPause(mode)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md border bg-[#0d1822] px-2 py-1.5 text-left text-[11px] transition",
+                tone,
+                disabled && "cursor-not-allowed opacity-50",
+              )}
+              title={!workflow ? "Selecciona un workflow primero" : `Modo: ${mode}`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="flex-1">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
+// Saved-view persistence key. Keeps the operator's last search + selection
+// so refreshing the page or coming back later doesn't make them re-find
+// the workflow they were working on. Only stores trivial UI state — no
+// secrets, no PII, no remote sync.
+const SAVED_VIEW_KEY = "workflows:saved-view-v1";
+
+type SavedView = { search: string; selectedId: string | null };
+
 export function WorkflowsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [savedView, setSavedView] = useState<SavedView | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(SAVED_VIEW_KEY);
+      return raw ? (JSON.parse(raw) as SavedView) : null;
+    } catch {
+      // Corrupt JSON — discard silently, the user can re-save.
+      return null;
+    }
+  });
   const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
   const [menu, setMenu] = useState<ContextState>(null);
   const [simOpen, setSimOpen] = useState(false);
@@ -598,6 +651,25 @@ export function WorkflowsPage() {
     onError: (error) => toast.error("No se pudo activar", { description: error.message }),
   });
   const safePause = useMutation({ mutationFn: (id: string) => workflowsApi.safePause(id, "new_leads"), onSuccess: () => { void invalidate(); toast.success("Pausa segura activada"); } });
+  // Generic pause mutation used by SafetyPanel's 4 mode buttons. `mode="immediate"`
+  // hits /pause (no body); the other 3 modes hit /safe-pause with mode in the body.
+  const pauseControl = useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: PauseMode }) =>
+      mode === "immediate"
+        ? workflowsApi.pause(id)
+        : workflowsApi.safePause(id, mode),
+    onSuccess: (_data, vars) => {
+      void invalidate();
+      const friendly: Record<PauseMode, string> = {
+        immediate: "Pausa inmediata aplicada",
+        new_leads: "Sólo nuevos leads en pausa",
+        after_active: "Pausará al terminar ejecuciones activas",
+        handoff_human: "Pausa con derivación a humano activada",
+      };
+      toast.success(friendly[vars.mode]);
+    },
+    onError: (error) => toast.error("No se pudo pausar", { description: error.message }),
+  });
 
   const patchWorkflow = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Partial<WorkflowItem> }) => workflowsApi.patch(id, body),
@@ -608,6 +680,78 @@ export function WorkflowsPage() {
   const openContextMenu = (event: MouseEvent, actions: ContextAction[]) => {
     event.preventDefault();
     setMenu({ x: event.clientX, y: event.clientY, actions });
+  };
+
+  const saveCurrentView = () => {
+    const view: SavedView = { search, selectedId };
+    try {
+      window.localStorage.setItem(SAVED_VIEW_KEY, JSON.stringify(view));
+      setSavedView(view);
+      toast.success("Vista guardada", { description: search ? `Búsqueda: "${search}"` : "Sin filtro de búsqueda" });
+    } catch {
+      toast.error("No se pudo guardar la vista (almacenamiento bloqueado)");
+    }
+  };
+
+  const restoreSavedView = () => {
+    if (!savedView) {
+      toast.info("Aún no hay vista guardada", { description: "Guarda una primero para poder restaurarla." });
+      return;
+    }
+    setSearch(savedView.search);
+    if (savedView.selectedId) setSelectedId(savedView.selectedId);
+    toast.success("Vista restaurada");
+  };
+
+  const clearSavedView = () => {
+    try {
+      window.localStorage.removeItem(SAVED_VIEW_KEY);
+    } catch {
+      // best effort
+    }
+    setSavedView(null);
+    toast.success("Vista borrada");
+  };
+
+  // JSON import: takes the file the user picked, tries to coerce it into the
+  // shape `workflowsApi.create` expects. We deliberately do NOT trust the
+  // file's `id`, `tenant_id`, or timestamps — those are server-assigned. We
+  // also reject anything that doesn't at least have a name + trigger_type
+  // so we surface a usable error instead of a 422 from the backend.
+  const onPickJsonFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // reset so picking the same file again re-fires
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => toast.error("No se pudo leer el archivo");
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? "")) as Partial<WorkflowItem>;
+        if (!parsed.name || !parsed.trigger_type) {
+          toast.error("JSON inválido", { description: "Falta `name` o `trigger_type`." });
+          return;
+        }
+        const body: Partial<WorkflowItem> = {
+          name: parsed.name,
+          description: parsed.description,
+          trigger_type: parsed.trigger_type,
+          trigger_config: parsed.trigger_config ?? {},
+          definition: parsed.definition ?? { nodes: [], edges: [] },
+          active: false, // imported workflows always land in draft
+        };
+        workflowsApi
+          .create(body)
+          .then((workflow) => {
+            void invalidate();
+            setSelectedId(workflow.id);
+            toast.success("Workflow importado", { description: `"${workflow.name}" creado en borrador.` });
+          })
+          .catch((error) => toast.error("Importación rechazada", { description: error?.message ?? String(error) }));
+      } catch (error) {
+        toast.error("JSON malformado", { description: error instanceof Error ? error.message : String(error) });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const workflowAction = (action: string, workflow: WorkflowItem) => {
@@ -676,8 +820,50 @@ export function WorkflowsPage() {
           />
         </div>
         <Badge className="ml-auto border-emerald-400/30 bg-emerald-500/10 text-emerald-200">● Sincronizado en vivo</Badge>
-        <NYIButton label="Vista guardada" />
-        <NYIButton label="Importar JSON" icon={Import} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10">
+              <Bookmark className="mr-1.5 h-3.5 w-3.5" />
+              Vista guardada
+              {savedView && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-400" aria-label="Tienes una vista guardada" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onSelect={saveCurrentView}>
+              <Save className="mr-2 h-3.5 w-3.5" />
+              Guardar vista actual
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!savedView} onSelect={restoreSavedView}>
+              <FolderOpen className="mr-2 h-3.5 w-3.5" />
+              Restaurar última vista
+            </DropdownMenuItem>
+            {savedView && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={clearSavedView} className="text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Borrar vista guardada
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={onPickJsonFile}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 border-white/10 bg-white/5 text-xs text-slate-200 hover:bg-white/10"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Import className="mr-1.5 h-3.5 w-3.5" />
+          Importar JSON
+        </Button>
         <Button className="h-8 bg-blue-600 text-xs hover:bg-blue-500" onClick={() => create.mutate()}>
           <Plus className="mr-1 h-3.5 w-3.5" /> Nuevo workflow
         </Button>
@@ -753,7 +939,12 @@ export function WorkflowsPage() {
           <ExecutionsPanel workflow={selected} executions={executions} selectedExecution={selectedExecution} onSelectExecution={setSelectedExecution} onContextMenu={openContextMenu} />
           <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2">
             <ValidationPanel workflow={selected} />
-            <SafetyPanel workflow={selected} onToggle={toggleSafety} />
+            <SafetyPanel
+              workflow={selected}
+              onToggle={toggleSafety}
+              onPause={(mode) => selected && pauseControl.mutate({ id: selected.id, mode })}
+              pausing={pauseControl.isPending}
+            />
           </div>
         </div>
       </main>
