@@ -305,20 +305,20 @@ describe("ConditionRow operator switch behaviour", () => {
     const { onChange, applySwitch } = harness("exists");
     applySwitch();
     const next = onChange.mock.lastCall?.[0] as AutoEnterRulesDraft;
-    expect(next.conditions[0].value).toBeUndefined();
+    expect(next.conditions[0]!.value).toBeUndefined();
   });
 
   it("switching to list resets value to []", () => {
     const { onChange, applySwitch } = harness("in");
     applySwitch();
     const next = onChange.mock.lastCall?.[0] as AutoEnterRulesDraft;
-    expect(next.conditions[0].value).toEqual([]);
+    expect(next.conditions[0]!.value).toEqual([]);
   });
 
   it("switching to scalar resets value to ''", () => {
     const { onChange, applySwitch } = harness("contains");
     applySwitch();
     const next = onChange.mock.lastCall?.[0] as AutoEnterRulesDraft;
-    expect(next.conditions[0].value).toBe("");
+    expect(next.conditions[0]!.value).toBe("");
   });
 });

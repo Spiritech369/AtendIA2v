@@ -40,6 +40,7 @@ import { tenantsApi } from "@/features/config/api";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
+import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { RuleBuilder } from "./RuleBuilder";
 
 // Operators must match the backend Condition.operator literal in
@@ -939,6 +940,23 @@ export function PipelineEditor({ onClose }: Props) {
                 already round-trips auto_enter_rules. */}
             <div className="mt-4 border-t pt-3">
               <RuleBuilder
+                stageLabel={selected.label || selected.id}
+                rules={selected.auto_enter_rules}
+                onChange={(next) =>
+                  updateStage(selectedIdx, { auto_enter_rules: next })
+                }
+                disabled={!canEdit}
+              />
+            </div>
+
+            {/* M4: shorthand for "Papelería completa"-style stages. Outputs
+                the same auto_enter_rules shape as RuleBuilder — picking
+                docs in this checklist generates `DOCS_*.status equals
+                "ok"` conditions, all combined with match="all". When the
+                stage already has non-doc conditions, this section locks
+                and points the operator to RuleBuilder instead. */}
+            <div className="mt-4 border-t pt-3">
+              <DocumentRuleBuilder
                 stageLabel={selected.label || selected.id}
                 rules={selected.auto_enter_rules}
                 onChange={(next) =>
