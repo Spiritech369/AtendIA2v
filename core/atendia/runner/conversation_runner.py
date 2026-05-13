@@ -436,7 +436,37 @@ class ConversationRunner:
             {"s": next_stage_id, "cid": conversation_id},
         )
 
-        # Emit transition events
+        # M3 of the pipeline-automation editor plan: declarative rule
+        # evaluation. The FSM (transitioner) just decided a stage based on
+        # the orchestrator's deterministic logic; now we run the operator-
+        # authored `auto_enter_rules` on each stage. If a rule fires and
+        # picks a different stage, that's the final stage for this turn.
+        # Wrapped in try/except so a malformed rule never crashes the
+        # turn — the conversation just stays where the FSM put it.
+        from atendia.state_machine.pipeline_evaluator import evaluate_pipeline_rules
+        try:
+            rules_result = await evaluate_pipeline_rules(
+                self._session,
+                conversation_id,
+                pipeline,
+                trigger_event="field_updated",
+            )
+            if rules_result.moved and rules_result.to_stage:
+                # evaluate_pipeline_rules already persisted current_stage
+                # + stage_entered_at. Sync local vars so subsequent code
+                # (event emission, turn_trace state_after) reflects the
+                # final stage.
+                next_stage_id = rules_result.to_stage
+                new_stage_entered_at = datetime.now(UTC)
+        except Exception as exc:  # noqa: BLE001 — never let rules block a turn
+            import logging
+            logging.getLogger(__name__).warning(
+                "auto_enter_rules evaluation raised; staying at FSM stage %s",
+                next_stage_id,
+                exc_info=exc,
+            )
+
+        # Emit transition events (now reflecting both FSM + rule decisions)
         if next_stage_id != previous_stage:
             await self._emitter.emit(
                 conversation_id=conversation_id,
