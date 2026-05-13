@@ -4,9 +4,12 @@
 // Today (T2) the server only exposes /healthz so we can verify the
 // container starts and the backend can reach it.
 
+import { readdirSync, existsSync } from 'node:fs'
+import path from 'node:path'
 import Fastify from 'fastify'
 import { listSessions } from './src/session-manager.js'
 import { registerRoutes } from './src/routes.js'
+import { startSession } from './src/baileys.js'
 
 const PORT = Number(process.env.PORT || 7755)
 const HOST = process.env.HOST || '0.0.0.0'
@@ -36,10 +39,28 @@ app.get('/healthz', async () => ({
 
 registerRoutes(app)
 
+const AUTH_ROOT = process.env.AUTH_DIR || '/app/auth_info'
+
+async function autoResumeSessions(logger) {
+  if (!existsSync(AUTH_ROOT)) return
+  const dirs = readdirSync(AUTH_ROOT, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(path.join(AUTH_ROOT, d.name, 'creds.json')))
+  for (const d of dirs) {
+    const tid = d.name
+    logger.info({ tenantId: tid }, 'auto-resuming saved session')
+    try {
+      await startSession(tid, logger)
+    } catch (err) {
+      logger.error({ err, tenantId: tid }, 'auto-resume failed')
+    }
+  }
+}
+
 app
   .listen({ port: PORT, host: HOST })
-  .then(() => {
+  .then(async () => {
     app.log.info({ port: PORT }, 'baileys-bridge listening')
+    await autoResumeSessions(app.log)
   })
   .catch((err) => {
     app.log.error({ err }, 'baileys-bridge failed to start')

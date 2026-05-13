@@ -307,4 +307,78 @@ async def baileys_inbound(
         {"c": conv_id},
     )
     await session.commit()
+
+    # Publish to Redis Pub/Sub for real-time dashboard updates.
+    from redis.asyncio import Redis as AsyncRedis
+
+    from atendia.realtime.publisher import publish_event
+
+    redis_client = AsyncRedis.from_url(get_settings().redis_url)
+    try:
+        await publish_event(
+            redis_client,
+            tenant_id=str(body.tenant_id),
+            conversation_id=str(conv_id),
+            event={
+                "type": "message_received",
+                "data": {
+                    "channel_message_id": body.message_id,
+                    "text": body.text,
+                    "conversation_id": str(conv_id),
+                },
+            },
+        )
+    finally:
+        await redis_client.aclose()
+
+    # Run conversation turn — drives the state machine, NLU, composer, and
+    # enqueues the outbound response.  Mirrors meta_routes._persist_inbound.
+    import logging
+    from datetime import datetime as _dt
+    from uuid import uuid4 as _uuid4
+
+    from arq.connections import RedisSettings, create_pool
+
+    from atendia.contracts.message import Message as CanonicalMessage
+    from atendia.contracts.message import MessageDirection
+    from atendia.runner.conversation_runner import ConversationRunner
+    from atendia.webhooks.meta_routes import build_composer, build_nlu
+
+    next_turn = (
+        await session.execute(
+            text(
+                "SELECT COALESCE(MAX(turn_number), 0) + 1 FROM turn_traces "
+                "WHERE conversation_id = :c"
+            ),
+            {"c": conv_id},
+        )
+    ).scalar()
+
+    settings = get_settings()
+    runner = ConversationRunner(session, build_nlu(settings), build_composer(settings))
+    inbound_canonical = CanonicalMessage(
+        id=str(_uuid4()),
+        conversation_id=str(conv_id),
+        tenant_id=str(body.tenant_id),
+        direction=MessageDirection.INBOUND,
+        text=body.text,
+        sent_at=_dt.now(UTC),
+        attachments=[],
+    )
+
+    arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    try:
+        await runner.run_turn(
+            conversation_id=conv_id,
+            tenant_id=body.tenant_id,
+            inbound=inbound_canonical,
+            turn_number=next_turn,
+            arq_pool=arq_pool,
+            to_phone_e164=phone,
+        )
+    except Exception:
+        logging.getLogger(__name__).exception("baileys run_turn failed")
+    finally:
+        await arq_pool.aclose()
+
     return {"status": "ok", "conversation_id": str(conv_id), "message_id": str(inserted)}

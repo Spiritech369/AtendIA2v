@@ -4,7 +4,8 @@
 // proxy, classifier IA, blacklist, historial. Solo el ciclo mínimo
 // que un canal SaaS necesita.
 
-import { rmSync } from 'node:fs'
+import { rmSync, readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import QRCode from 'qrcode'
 
 import { sessionFor, updateStatus, dropSession } from './session-manager.js'
@@ -13,6 +14,45 @@ import { postInbound } from './webhook-client.js'
 // Auto-reconnect schedule per tenant — clear on disconnect() so the
 // session stays down when the user explicitly logged out.
 const reconnectTimers = new Map()
+
+// Per-tenant LID→phone cache. WhatsApp sometimes sends messages from
+// Linked Identity IDs instead of real phone numbers; we resolve them here.
+const lidCaches = new Map()
+
+function getLidCache(tenantId) {
+  let cache = lidCaches.get(tenantId)
+  if (!cache) {
+    cache = new Map()
+    lidCaches.set(tenantId, cache)
+  }
+  return cache
+}
+
+function loadLidMappingsFromDisk(authDir, cache, logger) {
+  try {
+    const files = readdirSync(authDir).filter(
+      (f) => f.startsWith('lid-mapping-') && f.endsWith('_reverse.json'),
+    )
+    for (const f of files) {
+      const lid = f.replace('lid-mapping-', '').replace('_reverse.json', '')
+      try {
+        const phone = JSON.parse(readFileSync(path.join(authDir, f), 'utf8'))
+        if (typeof phone === 'string' && phone.length >= 8) {
+          cache.set(lid, phone)
+        }
+      } catch { /* skip malformed files */ }
+    }
+    if (cache.size > 0) {
+      logger.info({ count: cache.size }, 'loaded LID mappings from disk')
+    }
+  } catch { /* authDir may not exist yet */ }
+}
+
+function resolveLid(fromJid, cache) {
+  if (!fromJid.includes('@lid')) return fromJid.split('@')[0]?.replace(/\D/g, '')
+  const lid = fromJid.split(':')[0]?.replace(/\D/g, '')
+  return cache.get(lid) || lid
+}
 
 function clearReconnect(tenantId) {
   const t = reconnectTimers.get(tenantId)
@@ -65,6 +105,9 @@ export async function startSession(tenantId, logger) {
 
   const { state, saveCreds } = await useMultiFileAuthState(session.authDir)
   const { version } = await fetchLatestBaileysVersion()
+
+  const lidCache = getLidCache(tenantId)
+  loadLidMappingsFromDisk(session.authDir, lidCache, logger)
 
   logger.info({ tenantId, waVersion: version.join('.') }, 'starting baileys session')
 
@@ -141,9 +184,9 @@ export async function startSession(tenantId, logger) {
       if (!text) continue
 
       const fromJid = msg.key.remoteJid || ''
-      const fromPhone = fromJid.split('@')[0]?.replace(/\D/g, '')
-      if (!fromPhone || fromPhone.length < 8) continue
       if (fromJid.includes('@g.us') || fromJid.includes('@broadcast')) continue
+      const fromPhone = resolveLid(fromJid, lidCache)
+      if (!fromPhone || fromPhone.length < 8) continue
 
       const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
       try {

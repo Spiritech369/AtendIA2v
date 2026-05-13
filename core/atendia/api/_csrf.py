@@ -34,6 +34,7 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 EXEMPT_PREFIXES: tuple[str, ...] = (
     "/api/v1/auth/login",
     "/api/v1/runner/",
+    "/api/v1/internal/",
 )
 
 
