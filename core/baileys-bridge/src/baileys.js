@@ -54,6 +54,36 @@ function resolveLid(fromJid, cache) {
   return cache.get(lid) || lid
 }
 
+// Extract a human-readable text out of any of the message variants WhatsApp
+// emits. Plain text + extendedText covers the common case; the rest catch
+// media captions and replies so an operator's photo with caption or a quote
+// reply doesn't silently disappear from the AtendIA mirror.
+//
+// Returns the text or a placeholder marker like "[image]" when the message
+// is media without a caption (so the conversation still reflects something
+// happened, even if the media payload itself is out of scope for v1).
+function extractMessageText(m) {
+  if (!m) return null
+  if (typeof m.conversation === 'string' && m.conversation) return m.conversation
+  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text
+  if (m.imageMessage) return m.imageMessage.caption || '[imagen]'
+  if (m.videoMessage) return m.videoMessage.caption || '[video]'
+  if (m.documentMessage) {
+    return m.documentMessage.caption || m.documentMessage.fileName || '[documento]'
+  }
+  if (m.audioMessage) return m.audioMessage.ptt ? '[nota de voz]' : '[audio]'
+  if (m.stickerMessage) return '[sticker]'
+  if (m.locationMessage) return '[ubicación]'
+  if (m.contactMessage || m.contactsArrayMessage) return '[contacto]'
+  // Some replies / forwards wrap the real content under
+  // `ephemeralMessage.message` or `viewOnceMessage.message`. Unwrap one
+  // level so captions still come through.
+  if (m.ephemeralMessage?.message) return extractMessageText(m.ephemeralMessage.message)
+  if (m.viewOnceMessage?.message) return extractMessageText(m.viewOnceMessage.message)
+  if (m.viewOnceMessageV2?.message) return extractMessageText(m.viewOnceMessageV2.message)
+  return null
+}
+
 function clearReconnect(tenantId) {
   const t = reconnectTimers.get(tenantId)
   if (t) {
@@ -182,15 +212,18 @@ export async function startSession(tenantId, logger) {
     if (type !== 'notify') return
     for (const msg of messages) {
       if (!msg.message) continue
-      const text =
-        msg.message.conversation ||
-        msg.message.extendedTextMessage?.text ||
-        null
-      if (!text) continue
+      const text = extractMessageText(msg.message)
+      if (!text) {
+        logger.debug(
+          { tenantId, messageId: msg.key?.id, keys: Object.keys(msg.message || {}) },
+          'skipping message with no extractable text',
+        )
+        continue
+      }
 
       const fromJid = msg.key.remoteJid || ''
       if (fromJid.includes('@g.us') || fromJid.includes('@broadcast')) continue
-      // LID-aware peer resolution (main): WhatsApp sometimes addresses by
+      // LID-aware peer resolution: WhatsApp sometimes addresses by
       // Linked Identity instead of phone — resolveLid falls back to the
       // raw digits when no mapping is cached.
       const peerPhone = resolveLid(fromJid, lidCache)
@@ -198,6 +231,13 @@ export async function startSession(tenantId, logger) {
 
       const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
       const isOutbound = !!msg.key?.fromMe
+
+      // Visible breadcrumb on every routed message so we can confirm the
+      // sidecar is actually capturing fromMe events when debugging.
+      logger.info(
+        { tenantId, peerPhone, isOutbound, messageId: msg.key?.id },
+        isOutbound ? 'forwarding outbound echo' : 'forwarding inbound',
+      )
 
       try {
         if (isOutbound) {
