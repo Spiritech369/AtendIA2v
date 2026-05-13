@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -5,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.contracts.pipeline_definition import PipelineDefinition
 from atendia.db.models import TenantPipeline
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineNotFoundError(Exception):
@@ -42,7 +45,24 @@ async def resolve_initial_stage(session: AsyncSession, tenant_id: UUID) -> str:
     try:
         pipeline = await load_active_pipeline(session, tenant_id)
     except PipelineNotFoundError:
+        logger.warning(
+            "resolve_initial_stage: no active pipeline for tenant=%s; "
+            "falling back to 'greeting'",
+            tenant_id,
+        )
         return "greeting"
     if not pipeline.stages:
+        logger.warning(
+            "resolve_initial_stage: active pipeline for tenant=%s has empty "
+            "stages list; falling back to 'greeting'",
+            tenant_id,
+        )
         return "greeting"
-    return pipeline.stages[0].id
+    stage_id = pipeline.stages[0].id
+    logger.info(
+        "resolve_initial_stage: tenant=%s pipeline_version=%s first_stage=%s",
+        tenant_id,
+        pipeline.version,
+        stage_id,
+    )
+    return stage_id
