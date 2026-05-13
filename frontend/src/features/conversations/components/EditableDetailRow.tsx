@@ -27,8 +27,8 @@ export interface EditableDetailRowProps {
   options?: EditableDetailRowOption[];
   placeholder?: string;
   validate?: (raw: string) => string | null;
-  onSave: (newValue: string | null) => Promise<void> | void;
-  onDelete?: () => Promise<void> | void;
+  onSave: (newValue: string | null) => Promise<unknown> | void;
+  onDelete?: () => Promise<unknown> | void;
 }
 
 export function EditableDetailRow({

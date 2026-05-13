@@ -63,8 +63,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
+import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
 import { tenantsApi } from "@/features/config/api";
 import { type ConversationDetail, conversationsApi } from "@/features/conversations/api";
+import { useCustomerAttrs } from "@/features/conversations/hooks/useCustomerAttrs";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -72,6 +75,7 @@ import {
   useDeleteNote,
   useFieldDefinitions,
   useFieldValues,
+  usePatchConversation,
   usePatchCustomer,
   usePutFieldValues,
   useUpdateNote,
@@ -613,13 +617,70 @@ function DetailRow({
   );
 }
 
+const CREDIT_TYPE_OPTIONS = [
+  { value: "sin_dato", label: "Sin dato" },
+  { value: "nomina_tarjeta", label: "Nómina tarjeta" },
+  { value: "nomina_recibos", label: "Nómina recibos" },
+  { value: "pensionado_imss", label: "Pensionado IMSS" },
+  { value: "negocio_sat", label: "Negocio SAT" },
+  { value: "sin_comprobantes", label: "Sin comprobantes" },
+];
+
+const PLAN_OPTIONS = [
+  { value: "10", label: "10" },
+  { value: "15", label: "15" },
+  { value: "20", label: "20" },
+  { value: "25", label: "25" },
+  { value: "30", label: "30" },
+];
+
+// Keys that the canonical 5 attr-backed cards already render; the ad-hoc
+// grid filters them out so users don't see them twice.
+const CANONICAL_ATTR_KEYS = new Set([
+  "estimated_value",
+  "valor_estimado",
+  "tipo_credito",
+  "tipo_de_credito",
+  "plan_credito",
+  "plan_de_credito",
+  "modelo_interes",
+  "producto",
+  "modelo_moto",
+  "city",
+  "ciudad",
+  "advisor_label",
+]);
+// Internal seed metadata — hide from ad-hoc grid.
+const META_ATTR_KEYS = new Set([
+  "mock_seed",
+  "slug",
+  "model_sku",
+  "campaign",
+]);
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function ContactDetailGridSection({
+  customerId,
   customer,
   conversation,
 }: {
+  customerId: string;
   customer: CustomerRecord | undefined;
   conversation: ConversationDetail | undefined;
 }) {
+  const patchCustomer = usePatchCustomer(customerId);
+  const patchConversation = usePatchConversation(conversation?.id);
+  const { patchAttr, deleteAttr } = useCustomerAttrs(customerId);
+  const pipeline = useQuery({
+    queryKey: ["tenants", "pipeline"],
+    queryFn: tenantsApi.getPipeline,
+    retry: false,
+  });
+  const [addOpen, setAddOpen] = useState(false);
+
   if (!customer) {
     return (
       <div className="px-3 py-3 space-y-2">
@@ -638,7 +699,7 @@ function ContactDetailGridSection({
       "origen",
       "utm_source",
       "campaign.source",
-    ]) ?? "WhatsApp";
+    ]) ?? customer.source ?? null;
   const campaign = pickValue(sources, [
     "campaign",
     "campana",
@@ -646,63 +707,216 @@ function ContactDetailGridSection({
     "nombre_campana",
     "campaign.name",
   ]);
-  const estimatedValue =
-    formatMoney(
-      pickNumber(sources, [
-        "estimated_value",
-        "valor_estimado",
-        "valor_estimate",
-        "precio",
-        "price",
-        "product.price",
-        "producto.precio",
-      ]),
-    ) ?? pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
+  const estimatedRaw = pickNumber(sources, [
+    "estimated_value",
+    "valor_estimado",
+    "precio",
+    "price",
+  ]);
+  const estimatedDisplay =
+    formatMoney(estimatedRaw) ??
+    pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
   const creditType = pickValue(sources, [
     "tipo_credito",
     "tipo_de_credito",
     "credit_type",
-    "financing.type",
   ]);
   const creditPlan = pickValue(sources, [
     "plan_credito",
     "plan_de_credito",
     "credit_plan",
-    "financing.plan",
   ]);
   const product = pickValue(sources, [
     "modelo_interes",
     "modelo_moto",
-    "interes_producto",
+    "producto",
     "product.name",
     "producto.modelo",
   ]);
-  const city = pickValue(sources, ["ciudad", "city", "estado", "state"]);
+  const city = pickValue(sources, ["ciudad", "city"]);
   const advisor =
     conversation?.assigned_agent_name ??
     conversation?.assigned_user_email ??
-    pickValue(sources, ["advisor", "asesor", "assigned_to"]);
+    pickValue(sources, ["advisor", "asesor", "advisor_label"]);
+
+  const stages =
+    (pipeline.data?.definition?.stages as
+      | Array<{ id: string; label?: string }>
+      | undefined) ?? [];
+  const stageOptions = stages.map((s) => ({
+    value: s.id,
+    label: s.label ?? s.id,
+  }));
+
+  const customAttrs = isPlainRecord(customer.attrs)
+    ? Object.entries(customer.attrs).filter(
+        ([k]) => !CANONICAL_ATTR_KEYS.has(k) && !META_ATTR_KEYS.has(k),
+      )
+    : [];
 
   return (
     <div className="px-3 py-3 space-y-2.5">
-      <SectionLabel icon={Info}>Datos de contacto</SectionLabel>
-      <div className="grid grid-cols-2 gap-1.5">
-        <DetailRow label="Etapa" value={stageLabel(conversation?.current_stage ?? customer.effective_stage)} icon={Target} />
-        <DetailRow label="Fuente" value={campaign ? `${source} · ${campaign}` : source} icon={Sparkles} />
-        <DetailRow label="Asesor" value={advisor} icon={UserCheck} />
-        <DetailRow label="Valor estimado" value={estimatedValue} icon={Zap} />
-        <DetailRow label="Tipo de credito" value={creditType} />
-        <DetailRow label="Plan de credito" value={creditPlan} />
-        <DetailRow label="Producto" value={product} />
-        <DetailRow label="Ubicacion" value={city} />
+      <div className="flex items-center justify-between">
+        <SectionLabel icon={Info}>Datos de contacto</SectionLabel>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[11px]"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Agregar campo
+        </Button>
       </div>
+
       <div className="grid grid-cols-2 gap-1.5">
-        <DetailRow label="Telefono" value={customer.phone_e164} icon={Phone} />
-        <DetailRow label="Email" value={customer.email} icon={Mail} />
+        <EditableDetailRow
+          label="Etapa"
+          value={stageLabel(conversation?.current_stage ?? customer.effective_stage)}
+          icon={Target}
+          editable={!!conversation && stageOptions.length > 0}
+          deletable={false}
+          inputType="select"
+          options={stageOptions}
+          onSave={(v) =>
+            v ? patchConversation.mutateAsync({ current_stage: v }) : undefined
+          }
+        />
+        <EditableDetailRow
+          label="Fuente"
+          value={campaign ? `${source ?? "WhatsApp"} · ${campaign}` : (source ?? "WhatsApp")}
+          icon={Sparkles}
+          editable
+          deletable
+          onSave={(v) => patchCustomer.mutateAsync({ source: v })}
+          onDelete={() => patchCustomer.mutateAsync({ source: null })}
+        />
+        <EditableDetailRow
+          label="Asesor"
+          value={advisor}
+          icon={UserCheck}
+          editable
+          deletable
+          onSave={(v) => patchAttr.mutateAsync({ key: "advisor_label", value: v })}
+          onDelete={() => deleteAttr.mutateAsync("advisor_label")}
+        />
+        <EditableDetailRow
+          label="Valor estimado"
+          value={estimatedDisplay}
+          icon={Zap}
+          editable
+          deletable
+          inputType="number"
+          onSave={(v) =>
+            patchAttr.mutateAsync({
+              key: "estimated_value",
+              value: v == null ? null : Number(v),
+            })
+          }
+          onDelete={() => deleteAttr.mutateAsync("estimated_value")}
+        />
+        <EditableDetailRow
+          label="Tipo de crédito"
+          value={creditType}
+          editable
+          deletable
+          inputType="select"
+          options={CREDIT_TYPE_OPTIONS}
+          onSave={(v) => patchAttr.mutateAsync({ key: "tipo_credito", value: v })}
+          onDelete={() => deleteAttr.mutateAsync("tipo_credito")}
+        />
+        <EditableDetailRow
+          label="Plan de crédito"
+          value={creditPlan}
+          editable
+          deletable
+          inputType="select"
+          options={PLAN_OPTIONS}
+          onSave={(v) => patchAttr.mutateAsync({ key: "plan_credito", value: v })}
+          onDelete={() => deleteAttr.mutateAsync("plan_credito")}
+        />
+        <EditableDetailRow
+          label="Producto"
+          value={product}
+          editable
+          deletable
+          onSave={(v) => patchAttr.mutateAsync({ key: "modelo_interes", value: v })}
+          onDelete={() => deleteAttr.mutateAsync("modelo_interes")}
+        />
+        <EditableDetailRow
+          label="Ubicación"
+          value={city}
+          editable
+          deletable
+          onSave={(v) => patchAttr.mutateAsync({ key: "city", value: v })}
+          onDelete={() => deleteAttr.mutateAsync("city")}
+        />
       </div>
+
+      <div className="grid grid-cols-2 gap-1.5">
+        <EditableDetailRow
+          label="Teléfono"
+          value={customer.phone_e164}
+          icon={Phone}
+          editable={false}
+          deletable={false}
+          onSave={() => {}}
+        />
+        <EditableDetailRow
+          label="Email"
+          value={customer.email}
+          icon={Mail}
+          editable
+          deletable
+          inputType="email"
+          validate={(v) =>
+            v === "" || /^.+@.+\..+$/.test(v) ? null : "Email inválido"
+          }
+          onSave={(v) => patchCustomer.mutateAsync({ email: v })}
+          onDelete={() => patchCustomer.mutateAsync({ email: null })}
+        />
+      </div>
+
+      {customAttrs.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5 pt-1">
+          {customAttrs.map(([k, v]) => (
+            <EditableDetailRow
+              key={k}
+              label={k.replace(/_/g, " ")}
+              value={
+                v == null
+                  ? null
+                  : typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+                    ? String(v)
+                    : JSON.stringify(v)
+              }
+              editable
+              deletable
+              onSave={(next) => patchAttr.mutateAsync({ key: k, value: next })}
+              onDelete={() => deleteAttr.mutateAsync(k)}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="text-[10px] text-muted-foreground">
-        Ultima actividad: {formatElapsed(customer.last_activity_at) ?? "sin registro"}
+        Última actividad: {formatElapsed(customer.last_activity_at) ?? "sin registro"}
       </div>
+
+      <AddCustomAttrDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={(payload) =>
+          patchAttr.mutate({
+            key: payload.key,
+            value:
+              payload.field_type === "number"
+                ? Number(payload.value)
+                : payload.field_type === "boolean"
+                  ? payload.value === "true" || payload.value === "1"
+                  : payload.value,
+          })
+        }
+      />
     </div>
   );
 }
@@ -1686,6 +1900,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
 
               <Separator />
               <ContactDetailGridSection
+                customerId={customerId}
                 customer={customer.data}
                 conversation={conversation}
               />
