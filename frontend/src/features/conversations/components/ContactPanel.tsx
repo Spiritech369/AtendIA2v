@@ -67,6 +67,7 @@ import { tenantsApi } from "@/features/config/api";
 import { type ConversationDetail, conversationsApi } from "@/features/conversations/api";
 import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
 import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
+import { FieldSuggestionsPanel } from "@/features/conversations/components/FieldSuggestionsPanel";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -1802,6 +1803,9 @@ export function ContactPanel({ customerId, conversation }: Props) {
 
               <Separator />
               <IntelligenceScoreSection customer={customer.data} />
+
+              <Separator />
+              <FieldSuggestionsPanel customerId={customerId} />
 
               <Separator />
               <ContactDetailGridSection

@@ -47,9 +47,7 @@ describe("useFieldSuggestions", () => {
   });
 
   it("accept calls the accept endpoint", async () => {
-    const spy = vi
-      .spyOn(fieldSuggestionsApi, "accept")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(fieldSuggestionsApi, "accept").mockResolvedValue({} as never);
     const { result } = renderHook(() => useAcceptFieldSuggestion(customerId), {
       wrapper: wrap(),
     });
@@ -61,9 +59,7 @@ describe("useFieldSuggestions", () => {
   });
 
   it("reject calls the reject endpoint", async () => {
-    const spy = vi
-      .spyOn(fieldSuggestionsApi, "reject")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(fieldSuggestionsApi, "reject").mockResolvedValue({} as never);
     const { result } = renderHook(() => useRejectFieldSuggestion(customerId), {
       wrapper: wrap(),
     });

@@ -35,10 +35,9 @@ const sample = {
 describe("FieldSuggestionsPanel", () => {
   it("renders nothing when there are no suggestions", async () => {
     vi.spyOn(fieldSuggestionsApi, "list").mockResolvedValue([]);
-    const { container } = render(
-      <FieldSuggestionsPanel customerId={customerId} />,
-      { wrapper: wrap() },
-    );
+    const { container } = render(<FieldSuggestionsPanel customerId={customerId} />, {
+      wrapper: wrap(),
+    });
     await waitFor(() => expect(fieldSuggestionsApi.list).toHaveBeenCalled());
     expect(container.textContent).toBe("");
   });
@@ -58,32 +57,24 @@ describe("FieldSuggestionsPanel", () => {
 
   it("clicking Aceptar calls the accept api", async () => {
     vi.spyOn(fieldSuggestionsApi, "list").mockResolvedValue([sample]);
-    const acceptSpy = vi
-      .spyOn(fieldSuggestionsApi, "accept")
-      .mockResolvedValue({} as never);
+    const acceptSpy = vi.spyOn(fieldSuggestionsApi, "accept").mockResolvedValue({} as never);
     const user = userEvent.setup();
     render(<FieldSuggestionsPanel customerId={customerId} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByText("Plan de crédito")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Plan de crédito")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /aceptar/i }));
     expect(acceptSpy).toHaveBeenCalledWith("s1");
   });
 
   it("clicking Rechazar calls the reject api", async () => {
     vi.spyOn(fieldSuggestionsApi, "list").mockResolvedValue([sample]);
-    const rejectSpy = vi
-      .spyOn(fieldSuggestionsApi, "reject")
-      .mockResolvedValue({} as never);
+    const rejectSpy = vi.spyOn(fieldSuggestionsApi, "reject").mockResolvedValue({} as never);
     const user = userEvent.setup();
     render(<FieldSuggestionsPanel customerId={customerId} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByText("Plan de crédito")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Plan de crédito")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /rechazar/i }));
     expect(rejectSpy).toHaveBeenCalledWith("s1");
   });

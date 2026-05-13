@@ -100,7 +100,12 @@ export const conversationsApi = {
   },
   patchConversation: async (
     id: string,
-    body: { current_stage?: string; assigned_user_id?: string | null; assigned_agent_id?: string | null; tags?: string[] },
+    body: {
+      current_stage?: string;
+      assigned_user_id?: string | null;
+      assigned_agent_id?: string | null;
+      tags?: string[];
+    },
   ): Promise<unknown> => {
     const { data } = await api.patch(`/conversations/${id}`, body);
     return data;
@@ -135,21 +140,9 @@ export interface FieldSuggestion {
 
 export const fieldSuggestionsApi = {
   list: async (customerId: string): Promise<FieldSuggestion[]> =>
-    (
-      await api.get<FieldSuggestion[]>(
-        `/customers/${customerId}/field-suggestions`,
-      )
-    ).data,
+    (await api.get<FieldSuggestion[]>(`/customers/${customerId}/field-suggestions`)).data,
   accept: async (suggestionId: string): Promise<FieldSuggestion> =>
-    (
-      await api.post<FieldSuggestion>(
-        `/field-suggestions/${suggestionId}/accept`,
-      )
-    ).data,
+    (await api.post<FieldSuggestion>(`/field-suggestions/${suggestionId}/accept`)).data,
   reject: async (suggestionId: string): Promise<FieldSuggestion> =>
-    (
-      await api.post<FieldSuggestion>(
-        `/field-suggestions/${suggestionId}/reject`,
-      )
-    ).data,
+    (await api.post<FieldSuggestion>(`/field-suggestions/${suggestionId}/reject`)).data,
 };

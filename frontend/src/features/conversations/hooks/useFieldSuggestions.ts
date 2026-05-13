@@ -20,8 +20,7 @@ export function useFieldSuggestions(customerId: string | undefined) {
 export function useAcceptFieldSuggestion(customerId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (suggestionId: string) =>
-      fieldSuggestionsApi.accept(suggestionId),
+    mutationFn: (suggestionId: string) => fieldSuggestionsApi.accept(suggestionId),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: ["field-suggestions", customerId],
@@ -29,22 +28,19 @@ export function useAcceptFieldSuggestion(customerId: string) {
       void qc.invalidateQueries({ queryKey: ["customer", customerId] });
       toast.success("Sugerencia aplicada");
     },
-    onError: (e) =>
-      toast.error("Error al aceptar", { description: e.message }),
+    onError: (e) => toast.error("Error al aceptar", { description: e.message }),
   });
 }
 
 export function useRejectFieldSuggestion(customerId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (suggestionId: string) =>
-      fieldSuggestionsApi.reject(suggestionId),
+    mutationFn: (suggestionId: string) => fieldSuggestionsApi.reject(suggestionId),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: ["field-suggestions", customerId],
       });
     },
-    onError: (e) =>
-      toast.error("Error al rechazar", { description: e.message }),
+    onError: (e) => toast.error("Error al rechazar", { description: e.message }),
   });
 }
