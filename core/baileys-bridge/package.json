@@ -1,0 +1,21 @@
+{
+  "name": "atendia-baileys-bridge",
+  "version": "0.1.0",
+  "description": "Sidecar Node.js que expone Baileys (WhatsApp QR) como HTTP API para el backend AtendIA",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "fastify": "^5.4.0",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.3"
+  }
+}
