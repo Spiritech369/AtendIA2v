@@ -39,6 +39,20 @@ export interface AIProviderInfo {
   has_openai_key: boolean;
 }
 
+export interface WorkflowReference {
+  workflow_id: string;
+  name: string;
+  active: boolean;
+  reference_kind: "trigger" | "move_stage_node";
+  detail: string;
+}
+
+export interface StageImpactResponse {
+  stage_id: string;
+  conversation_count: number;
+  workflow_references: WorkflowReference[];
+}
+
 export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
   putPipeline: async (definition: Record<string, unknown>) =>
@@ -46,6 +60,8 @@ export const tenantsApi = {
   deletePipeline: async () => {
     await api.delete("/tenants/pipeline");
   },
+  getStageImpact: async (stageId: string) =>
+    (await api.get<StageImpactResponse>(`/tenants/pipeline/impacted-references/${encodeURIComponent(stageId)}`)).data,
   getBrandFacts: async () => (await api.get<BrandFactsResponse>("/tenants/brand-facts")).data,
   putBrandFacts: async (brand_facts: Record<string, string>) =>
     (await api.put<BrandFactsResponse>("/tenants/brand-facts", { brand_facts })).data,

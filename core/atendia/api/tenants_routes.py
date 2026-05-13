@@ -19,13 +19,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.db.models.conversation import Conversation
 from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
+from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
 
 router = APIRouter()
@@ -110,6 +112,106 @@ async def put_pipeline(
         definition=new_row.definition,
         active=new_row.active,
         created_at=new_row.created_at,
+    )
+
+
+class WorkflowReference(BaseModel):
+    """A single workflow that references the queried stage_id, plus where
+    it referenced (trigger config, move_stage node, etc.)."""
+
+    workflow_id: UUID
+    name: str
+    active: bool
+    reference_kind: str  # "trigger" | "move_stage_node"
+    detail: str = ""  # e.g. "trigger_config.to" or "node_id=action_3"
+
+
+class ImpactedReferencesResponse(BaseModel):
+    stage_id: str
+    conversation_count: int
+    workflow_references: list[WorkflowReference]
+
+
+@router.get(
+    "/pipeline/impacted-references/{stage_id}",
+    response_model=ImpactedReferencesResponse,
+)
+async def get_stage_impact(
+    stage_id: str,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ImpactedReferencesResponse:
+    """Surface what would break if this stage was deleted or renamed.
+
+    Returns: how many conversations are currently sitting in the stage,
+    plus every workflow (active and inactive) that mentions it either
+    as a transition target or in a move_stage action. The frontend uses
+    this to render an honest impact summary before destructive ops.
+
+    Cheap by design — single conversation count + a Python scan over the
+    workflow definitions for the tenant. Tenants with hundreds of
+    workflows will pay a small JSON-load cost; if it ever matters we can
+    push the predicate into Postgres with a JSONB path expression.
+    """
+    conv_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(Conversation)
+            .where(
+                Conversation.tenant_id == tenant_id,
+                Conversation.current_stage == stage_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one()
+
+    workflows = (
+        await session.execute(
+            select(Workflow).where(Workflow.tenant_id == tenant_id),
+        )
+    ).scalars().all()
+
+    refs: list[WorkflowReference] = []
+    for wf in workflows:
+        trigger_cfg = wf.trigger_config or {}
+        # 1) Trigger config references — stage_changed/stage_entered triggers
+        #    use `from` and `to` keys to filter on stage transitions.
+        for key in ("from", "to"):
+            if trigger_cfg.get(key) == stage_id:
+                refs.append(
+                    WorkflowReference(
+                        workflow_id=wf.id,
+                        name=wf.name,
+                        active=wf.active,
+                        reference_kind="trigger",
+                        detail=f"trigger_config.{key}",
+                    )
+                )
+
+        # 2) move_stage nodes inside the workflow definition.
+        definition = wf.definition or {}
+        for node in definition.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            if node.get("type") != "move_stage":
+                continue
+            config = node.get("config") or {}
+            if config.get("stage_id") == stage_id:
+                refs.append(
+                    WorkflowReference(
+                        workflow_id=wf.id,
+                        name=wf.name,
+                        active=wf.active,
+                        reference_kind="move_stage_node",
+                        detail=f"node_id={node.get('id') or 'unknown'}",
+                    )
+                )
+
+    return ImpactedReferencesResponse(
+        stage_id=stage_id,
+        conversation_count=int(conv_count or 0),
+        workflow_references=refs,
     )
 
 

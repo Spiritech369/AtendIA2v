@@ -42,6 +42,8 @@ import { cn } from "@/lib/utils";
 
 import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { RuleBuilder } from "./RuleBuilder";
+import { StageDeleteDialog } from "./StageDeleteDialog";
+import { UnsavedChangesGuard } from "./UnsavedChangesGuard";
 
 // Operators must match the backend Condition.operator literal in
 // core/atendia/contracts/pipeline_definition.py. If you add one here,
@@ -321,6 +323,20 @@ export function PipelineEditor({ onClose }: Props) {
   }, [query.data, query.isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const globalError = useMemo(() => (draft ? validate(draft) : null), [draft]);
+  // Dirty detection: serialise the draft and compare against the loaded
+  // definition. Doing it via JSON.stringify is cheap (the pipeline def
+  // is small), and avoids carrying a separate "lastSavedSnapshot" state.
+  const isDirty = useMemo(() => {
+    if (!draft) return false;
+    const loaded = query.data?.definition;
+    if (!loaded) return draft.stages.length > 0;
+    try {
+      return JSON.stringify(serialise(draft)) !== JSON.stringify(loaded);
+    } catch {
+      // Defensive — JSON.stringify on cyclic data would throw; treat as dirty.
+      return true;
+    }
+  }, [draft, query.data?.definition]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -486,6 +502,9 @@ export function PipelineEditor({ onClose }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {/* Guards against navigating away with unsaved local edits. Renders
+          no DOM — only attaches a beforeunload listener while dirty. */}
+      <UnsavedChangesGuard dirty={isDirty} />
       {/* Panel header */}
       <div className="flex h-10 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
@@ -493,6 +512,15 @@ export function PipelineEditor({ onClose }: Props) {
           {query.data && (
             <Badge variant="outline" className="text-[10px]">
               v{query.data.version}
+            </Badge>
+          )}
+          {isDirty && (
+            <Badge
+              variant="outline"
+              className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300"
+              title="Tienes cambios sin guardar"
+            >
+              Sin guardar
             </Badge>
           )}
         </div>
@@ -572,59 +600,18 @@ export function PipelineEditor({ onClose }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Per-stage delete confirmation. Mutates the local draft so the
-          change isn't persisted until the user hits Guardar. Conversations
-          currently in this stage_id become orphaned in the board until
-          moved — surfaced in the dialog copy so the operator knows the
-          downstream impact before confirming. */}
-      <Dialog
-        open={stagePendingDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setStagePendingDelete(null);
+      <StageDeleteDialog
+        stage={
+          stagePendingDelete !== null ? draft.stages[stagePendingDelete] ?? null : null
+        }
+        onCancel={() => setStagePendingDelete(null)}
+        onConfirm={() => {
+          if (stagePendingDelete !== null) {
+            removeStage(stagePendingDelete);
+          }
+          setStagePendingDelete(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              ¿Eliminar la etapa{" "}
-              <span className="font-mono text-sm">
-                {stagePendingDelete !== null
-                  ? draft.stages[stagePendingDelete]?.id ?? ""
-                  : ""}
-              </span>
-              ?
-            </DialogTitle>
-            <DialogDescription>
-              Las conversaciones que estén actualmente en esta etapa
-              aparecerán como <span className="font-medium">huérfanas</span>{" "}
-              en el board hasta que las muevas a otra etapa. Los workflows
-              que referencien este <span className="font-mono">stage_id</span>{" "}
-              dejarán de disparar. El cambio se aplica al pulsar{" "}
-              <span className="font-medium">Guardar</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setStagePendingDelete(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (stagePendingDelete !== null) {
-                  removeStage(stagePendingDelete);
-                }
-                setStagePendingDelete(null);
-              }}
-            >
-              <Trash2 className="mr-1.5 size-3.5" />
-              Eliminar etapa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
 
       <div className="flex-1 overflow-y-auto">
         {/* Global error */}
