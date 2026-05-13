@@ -803,9 +803,11 @@ async def reindex_documents(
 # Sub-routers ship incrementally — those not yet implemented will land in
 # follow-up sessions per docs/runbook/knowledge-base.md §7.
 from atendia.api._kb.collections import router as _kb_collections_router  # noqa: E402
+from atendia.api._kb.command_center import router as _kb_command_center_router  # noqa: E402
 from atendia.api._kb.search import router as _kb_search_router  # noqa: E402
 from atendia.api._kb.test_query import router as _kb_test_query_router  # noqa: E402
 
+router.include_router(_kb_command_center_router)
 router.include_router(_kb_search_router)
 router.include_router(_kb_test_query_router)
 router.include_router(_kb_collections_router)

@@ -60,7 +60,9 @@ from atendia.queue.outbox import stage_outbound
 TRIGGERS: frozenset[str] = frozenset({
     "message_received",
     "field_extracted",
+    "field_updated",
     "stage_entered",
+    "stage_changed",
     "conversation_created",
     "appointment_created",
     "bot_paused",
@@ -69,13 +71,25 @@ TRIGGERS: frozenset[str] = frozenset({
 NODE_TYPES: frozenset[str] = frozenset({
     "trigger",
     "message",
+    "template_message",
     "move_stage",
     "assign_agent",
+    "advisor_pool",
     "notify_agent",
     "update_field",
     "pause_bot",
     "delay",
     "condition",
+    # Operations Center visual/editor node aliases. The execution engine
+    # treats unknown side-effect aliases as pass-through actions, while the
+    # API validation/simulation layer gives operators richer diagnostics.
+    "detect_intent",
+    "classify_credit",
+    "request_documents",
+    "create_task",
+    "followup",
+    "escalate_manager",
+    "end",
 })
 
 VALID_ROLES: frozenset[str] = frozenset({"operator", "tenant_admin", "superadmin"})

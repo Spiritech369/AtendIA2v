@@ -1,7 +1,15 @@
 from atendia.db.models.agent import Agent
 from atendia.db.models.appointment import Appointment
 from atendia.db.models.conversation import Conversation, ConversationRead, ConversationStateRow
-from atendia.db.models.customer import Customer
+from atendia.db.models.customer import (
+    Customer,
+    CustomerAIReviewItem,
+    CustomerDocument,
+    CustomerNextBestAction,
+    CustomerRisk,
+    CustomerScore,
+    CustomerTimelineEvent,
+)
 from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 from atendia.db.models.customer_note import CustomerNote
 from atendia.db.models.event import EventRow
@@ -31,22 +39,41 @@ from atendia.db.models.tenant_config import (
 )
 from atendia.db.models.turn_trace import ToolCallRow, TurnTrace
 from atendia.db.models.workflow import (
+    AIAgent,
+    AdvisorPool,
+    BusinessHoursRule,
+    KnowledgeBaseSource,
+    SafetyRule,
+    WhatsAppTemplate,
     Workflow,
     WorkflowActionRun,
+    WorkflowDependency,
     WorkflowEventCursor,
     WorkflowExecution,
+    WorkflowExecutionStep,
+    WorkflowVariable,
+    WorkflowVersion,
 )
 
 __all__ = [
     "Agent",
+    "AIAgent",
     "Appointment",
+    "AdvisorPool",
+    "BusinessHoursRule",
     "Conversation",
     "ConversationRead",
     "ConversationStateRow",
     "Customer",
+    "CustomerAIReviewItem",
+    "CustomerDocument",
     "CustomerFieldDefinition",
     "CustomerFieldValue",
+    "CustomerNextBestAction",
     "CustomerNote",
+    "CustomerRisk",
+    "CustomerScore",
+    "CustomerTimelineEvent",
     "EventRow",
     "FollowupScheduled",
     "HumanHandoff",
@@ -60,11 +87,13 @@ __all__ = [
     "KbTestRun",
     "KbUnansweredQuestion",
     "KbVersion",
+    "KnowledgeBaseSource",
     "KnowledgeChunk",
     "KnowledgeDocument",
     "MessageRow",
     "Notification",
     "OutboundOutbox",
+    "SafetyRule",
     "Tenant",
     "TenantBranding",
     "TenantCatalogItem",
@@ -75,8 +104,13 @@ __all__ = [
     "TenantUser",
     "ToolCallRow",
     "TurnTrace",
+    "WhatsAppTemplate",
     "Workflow",
     "WorkflowActionRun",
+    "WorkflowDependency",
     "WorkflowEventCursor",
     "WorkflowExecution",
+    "WorkflowExecutionStep",
+    "WorkflowVariable",
+    "WorkflowVersion",
 ]

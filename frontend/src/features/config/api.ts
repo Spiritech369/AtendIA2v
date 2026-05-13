@@ -1,5 +1,5 @@
+import { type InboxConfig, normalizeInboxConfig } from "@/features/inbox-settings/types";
 import { api } from "@/lib/api-client";
-import type { InboxConfig } from "@/features/inbox-settings/types";
 
 export interface PipelineResponse {
   version: number;
@@ -56,18 +56,20 @@ export const tenantsApi = {
 
 export const inboxConfigApi = {
   get: async (): Promise<InboxConfig> => {
-    const r = await api.get<{ inbox_config: InboxConfig }>("/tenants/inbox-config");
-    return r.data.inbox_config;
+    const r = await api.get<{ inbox_config: unknown }>("/tenants/inbox-config");
+    return normalizeInboxConfig(r.data.inbox_config);
   },
   put: async (inbox_config: InboxConfig): Promise<InboxConfig> => {
-    const r = await api.put<{ inbox_config: InboxConfig }>("/tenants/inbox-config", { inbox_config });
-    return r.data.inbox_config;
+    const normalized = normalizeInboxConfig(inbox_config);
+    const r = await api.put<{ inbox_config: unknown }>("/tenants/inbox-config", {
+      inbox_config: normalized,
+    });
+    return normalizeInboxConfig(r.data.inbox_config);
   },
 };
 
 export const integrationsApi = {
   getWhatsAppDetails: async () =>
     (await api.get<WhatsAppDetails>("/integrations/whatsapp/details")).data,
-  getAIProvider: async () =>
-    (await api.get<AIProviderInfo>("/integrations/ai-provider")).data,
+  getAIProvider: async () => (await api.get<AIProviderInfo>("/integrations/ai-provider")).data,
 };

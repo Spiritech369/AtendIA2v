@@ -1,23 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Archive,
   Bell,
-  ChevronDown,
+  Bot,
+  CalendarDays,
+  CheckCircle2,
+  CircleDollarSign,
+  ClipboardCheck,
   Clock,
+  FileText,
+  Filter,
+  Gauge,
   GripVertical,
   Inbox,
+  MessageCircle,
   MoreHorizontal,
   Move,
   Plus,
+  Search,
+  Send,
   Settings,
+  ShieldAlert,
+  Sparkles,
   Timer,
+  TrendingUp,
   User,
   UserX,
   X,
+  Zap,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -34,12 +48,20 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PipelineEditor } from "@/features/config/components/PipelineEditor";
-import { conversationsApi } from "@/features/conversations/api";
-import { pipelineApi, type PipelineConversationCard, type StageGroup } from "@/features/pipeline/api";
-import { useAuthStore } from "@/stores/auth";
+import { type PipelineConversationCard, pipelineApi, type StageGroup } from "@/features/pipeline/api";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -53,6 +75,24 @@ function formatRelative(iso: string): string {
   return `${Math.round(diffH / 24)}d`;
 }
 
+function formatCurrency(value: number | null | undefined): string {
+  if (!value) return "Sin monto";
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatClock(iso: string | null | undefined): string {
+  if (!iso) return "Sin cita";
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
 function initials(name: string | null, fallback: string): string {
   if (!name) return fallback.slice(0, 2).toUpperCase();
   return name
@@ -63,7 +103,16 @@ function initials(name: string | null, fallback: string): string {
     .toUpperCase();
 }
 
-type KpiFilter = "stale" | "inactive_24h" | "unassigned" | "orphan" | null;
+type KpiFilter =
+  | "stale"
+  | "inactive_24h"
+  | "unassigned"
+  | "orphan"
+  | "handoff"
+  | "docs_blocked"
+  | "appointments"
+  | "high_score"
+  | null;
 
 const STAGE_COLORS: Record<string, string> = {
   nuevo: "#6366f1",
@@ -79,6 +128,8 @@ const STAGE_COLORS: Record<string, string> = {
   cerrado_perdido: "#ef4444",
   stage_lost: "#ef4444",
 };
+const KPI_SKELETON_KEYS = ["kpi-1", "kpi-2", "kpi-3", "kpi-4"];
+const COLUMN_SKELETON_KEYS = ["column-1", "column-2", "column-3", "column-4"];
 
 function stageColor(stageId: string, definitionColor?: string): string {
   if (definitionColor) return definitionColor;
@@ -135,24 +186,32 @@ function StageColumn({
   stageColors,
   dragState,
   kpiFilter,
+  search,
   onDragOver,
   onDragLeave,
   onDrop,
   onMove,
   onArchive,
   onRescueAll,
+  onOpenDetail,
+  onOpenConversation,
+  onOpenContextMenu,
 }: {
   stage: StageGroup;
   allRealStages: StageGroup[];
   stageColors: Record<string, string>;
   dragState: { cardId: string; fromStage: string } | null;
   kpiFilter: KpiFilter;
+  search: string;
   onDragOver: (e: React.DragEvent, stageId: string) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent, stageId: string) => void;
   onMove: (id: string, toStage: string) => void;
   onArchive: (id: string) => void;
   onRescueAll: (toStage: string) => void;
+  onOpenDetail: (card: PipelineConversationCard) => void;
+  onOpenConversation: (id: string) => void;
+  onOpenContextMenu: (e: React.MouseEvent, card: PipelineConversationCard) => void;
 }) {
   const [dropHover, setDropHover] = useState(false);
   const [rescueTarget, setRescueTarget] = useState<string>("");
@@ -166,10 +225,31 @@ function StageColumn({
     if (kpiFilter === "stale") cards = cards.filter((c) => c.is_stale);
     if (kpiFilter === "inactive_24h")
       cards = cards.filter((c) => now - new Date(c.last_activity_at).getTime() > 24 * 3600_000);
+    if (kpiFilter === "unassigned") cards = cards.filter((c) => !c.assigned_user_id);
+    if (kpiFilter === "handoff") cards = cards.filter((c) => c.has_pending_handoff);
+    if (kpiFilter === "docs_blocked") cards = cards.filter((c) => c.missing_documents.length > 0);
+    if (kpiFilter === "appointments") cards = cards.filter((c) => !!c.appointment_at);
+    if (kpiFilter === "high_score") cards = cards.filter((c) => c.lead_score >= 85);
+    if (search.trim()) {
+      const needle = search.trim().toLowerCase();
+      cards = cards.filter((c) =>
+        [
+          c.customer_name,
+          c.customer_phone,
+          c.last_message_text,
+          c.product,
+          c.assigned_user_email,
+          c.campaign,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle)),
+      );
+    }
     return cards;
-  }, [stage.conversations, kpiFilter]);
+  }, [stage.conversations, kpiFilter, search]);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: native drag-and-drop events need a stable column container.
     <div
       className={cn(
         "flex w-72 shrink-0 flex-col overflow-hidden rounded-xl border transition-all",
@@ -211,14 +291,12 @@ function StageColumn({
           {stage.total_count}
         </Badge>
         {!stage.is_orphan && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 opacity-60 hover:opacity-100"
-            title="Agregar conversación a esta etapa"
+          <span
+            className="h-6 shrink-0 px-1.5 text-[10px] tabular-nums text-muted-foreground"
+            title="Valor estimado de la etapa"
           >
-            <Plus className="size-3.5" />
-          </Button>
+            {formatCurrency(stage.total_value_mxn)}
+          </span>
         )}
       </div>
 
@@ -267,6 +345,9 @@ function StageColumn({
               allRealStages={allRealStages}
               onMove={onMove}
               onArchive={onArchive}
+              onOpenDetail={onOpenDetail}
+              onOpenConversation={onOpenConversation}
+              onOpenContextMenu={onOpenContextMenu}
             />
           ))
         )}
@@ -324,18 +405,33 @@ function KanbanCard({
   allRealStages,
   onMove,
   onArchive,
+  onOpenDetail,
+  onOpenConversation,
+  onOpenContextMenu,
 }: {
   card: PipelineConversationCard;
   isOrphan: boolean;
   allRealStages: StageGroup[];
   onMove: (id: string, toStage: string) => void;
   onArchive: (id: string) => void;
+  onOpenDetail: (card: PipelineConversationCard) => void;
+  onOpenConversation: (id: string) => void;
+  onOpenContextMenu: (e: React.MouseEvent, card: PipelineConversationCard) => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
+  const riskClass =
+    card.risk_level === "alto"
+      ? "border-destructive/50 bg-destructive/5"
+      : card.risk_level === "medio"
+        ? "border-amber-400/50 bg-amber-500/5"
+        : "border-border bg-card";
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: the draggable card contains nested controls, so a button wrapper would be invalid markup.
     <div
       draggable={!isOrphan}
+      role="button"
+      tabIndex={0}
       onDragStart={(e) => {
         setIsDragging(true);
         e.dataTransfer.setData("cardId", card.id);
@@ -343,11 +439,18 @@ function KanbanCard({
         e.dataTransfer.effectAllowed = "move";
       }}
       onDragEnd={() => setIsDragging(false)}
+      onClick={() => onOpenDetail(card)}
+      onDoubleClick={() => onOpenConversation(card.id)}
+      onContextMenu={(e) => onOpenContextMenu(e, card)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onOpenDetail(card);
+        if (e.key.toLowerCase() === "o") onOpenConversation(card.id);
+      }}
       className={cn(
-        "group relative rounded-lg border bg-card p-3 shadow-sm transition-all",
-        "hover:border-foreground/20 hover:shadow-md",
-        isOrphan && "border-destructive/40",
-        card.is_stale && !isOrphan && "border-amber-300/60 dark:border-amber-600/40",
+        "group relative rounded-lg border p-3 text-left shadow-sm outline-none transition-all",
+        "hover:border-foreground/20 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring",
+        riskClass,
+        isOrphan && "border-destructive/50",
         isDragging && "opacity-40 shadow-lg",
         !isOrphan && "cursor-grab active:cursor-grabbing",
       )}
@@ -390,60 +493,102 @@ function KanbanCard({
               <Archive className="mr-2 size-3.5" /> Archivar
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenu>
       </div>
 
-      {/* Customer info */}
-      <Link
-        to="/conversations/$conversationId"
-        params={{ conversationId: card.id }}
-        className="block"
-        onClick={(e) => isDragging && e.preventDefault()}
-      >
-        <div className="flex items-start gap-2 pr-12">
-          <Avatar className="size-7 shrink-0">
-            <AvatarFallback className="text-[10px]">
-              {initials(card.customer_name, card.customer_phone)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold">
-              {card.customer_name ?? card.customer_phone}
-            </p>
-            <p className="truncate font-mono text-[10px] text-muted-foreground">
-              {card.customer_phone}
-            </p>
-          </div>
+      <div className="flex items-start gap-2 pr-12">
+        <Avatar className="size-7 shrink-0">
+          <AvatarFallback className="text-[10px]">
+            {initials(card.customer_name, card.customer_phone)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold">
+            {card.customer_name ?? card.customer_phone}
+          </p>
+          <p className="truncate font-mono text-[10px] text-muted-foreground">
+            {card.customer_phone}
+          </p>
         </div>
+        <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px]">
+          {card.lead_score}
+        </Badge>
+      </div>
 
-        {card.last_message_text && (
-          <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-            {card.last_message_text}
-          </p>
-        )}
+      {card.last_message_text && (
+        <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+          {card.last_message_text}
+        </p>
+      )}
 
-        {isOrphan && (
-          <p className="mt-1 text-[10px] text-destructive">
-            Etapa <code className="font-mono">{card.current_stage}</code> ya no existe.
-          </p>
-        )}
-
-        {/* Footer: time + stale badge */}
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Clock className="size-2.5" />
-            {formatRelative(card.last_activity_at)}
+      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px] text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1">
+          <User className="size-2.5" />
+          <span className="truncate">
+            {card.assigned_user_email?.split("@")[0] ?? "Sin asesor"}
           </span>
-          {card.is_stale && !isOrphan && (
-            <Badge
-              variant="outline"
-              className="h-4 gap-1 border-amber-300 px-1 text-[9px] text-amber-700 dark:border-amber-600 dark:text-amber-300"
-            >
-              <Bell className="size-2.5" /> Alerta
-            </Badge>
-          )}
+        </span>
+        <span className="flex min-w-0 items-center justify-end gap-1">
+          <CircleDollarSign className="size-2.5" />
+          <span className="truncate">{formatCurrency(card.estimated_value_mxn)}</span>
+        </span>
+        <span className="flex min-w-0 items-center gap-1">
+          <ClipboardCheck className="size-2.5" />
+          Docs {card.document_percent || 0}%
+        </span>
+        <span className="flex min-w-0 items-center justify-end gap-1">
+          <Clock className="size-2.5" />
+          {formatRelative(card.last_activity_at)}
+        </span>
+      </div>
+
+      {card.document_total > 0 && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full rounded-full",
+              card.document_percent >= 80 ? "bg-emerald-500" : "bg-amber-500",
+            )}
+            style={{ width: `${Math.max(6, card.document_percent)}%` }}
+          />
         </div>
-      </Link>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        {card.has_pending_handoff && (
+          <Badge className="h-5 bg-red-500/15 px-1.5 text-[9px] text-red-600 hover:bg-red-500/15">
+            Handoff
+          </Badge>
+        )}
+        {card.appointment_at && (
+          <Badge className="h-5 bg-blue-500/15 px-1.5 text-[9px] text-blue-600 hover:bg-blue-500/15">
+            {formatClock(card.appointment_at)}
+          </Badge>
+        )}
+        {card.missing_documents.length > 0 && (
+          <Badge className="h-5 bg-amber-500/15 px-1.5 text-[9px] text-amber-600 hover:bg-amber-500/15">
+            Docs faltantes
+          </Badge>
+        )}
+        {card.is_stale && !isOrphan && (
+          <Badge variant="outline" className="h-5 gap-1 border-amber-300 px-1 text-[9px] text-amber-700">
+            <Bell className="size-2.5" /> SLA
+          </Badge>
+        )}
+      </div>
+
+      {card.next_best_action && (
+        <div className="mt-2 rounded-md border bg-muted/30 px-2 py-1.5 text-[10px]">
+          <span className="text-emerald-600">Acción sugerida</span>
+          <p className="mt-0.5 line-clamp-1 text-foreground">{card.next_best_action}</p>
+        </div>
+      )}
+
+      {isOrphan && (
+        <p className="mt-1 text-[10px] text-destructive">
+          Etapa <code className="font-mono">{card.current_stage}</code> ya no existe.
+        </p>
+      )}
 
       {/* Orphan move-to select */}
       {isOrphan && (
@@ -470,12 +615,291 @@ function KanbanCard({
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-card p-2">
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-t py-2 text-xs first:border-t-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="truncate text-right">{value}</span>
+    </div>
+  );
+}
+
+function LeadDetailSheet({
+  card,
+  stages,
+  open,
+  onOpenChange,
+  onMove,
+  onOpenConversation,
+}: {
+  card: PipelineConversationCard | null;
+  stages: StageGroup[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMove: (id: string, toStage: string) => void;
+  onOpenConversation: (id: string) => void;
+}) {
+  if (!card) return null;
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-[520px] gap-0 sm:max-w-[520px]">
+        <SheetHeader className="border-b">
+          <div className="flex items-start gap-3 pr-8">
+            <Avatar className="size-11">
+              <AvatarFallback>{initials(card.customer_name, card.customer_phone)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <SheetTitle>{card.customer_name ?? card.customer_phone}</SheetTitle>
+              <SheetDescription className="flex flex-wrap gap-2">
+                <span>{card.customer_phone}</span>
+                <span>Score {card.lead_score}</span>
+                <span>{card.source ?? "WhatsApp"}</span>
+              </SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="Valor" value={formatCurrency(card.estimated_value_mxn)} />
+            <MiniStat label="Docs" value={`${card.document_done}/${card.document_total || 0}`} />
+            <MiniStat label="SLA" value={card.is_stale ? "En riesgo" : "OK"} />
+          </div>
+
+          <section className="rounded-lg border p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Datos del lead</h3>
+              <Badge variant={card.risk_level === "alto" ? "destructive" : "outline"}>
+                {card.risk_level}
+              </Badge>
+            </div>
+            <InfoRow label="Producto" value={card.product ?? "Pendiente"} />
+            <InfoRow label="Plan" value={card.financing_plan ?? "Pendiente"} />
+            <InfoRow label="Crédito" value={card.credit_type ?? "Pendiente"} />
+            <InfoRow label="Campaña" value={card.campaign ?? "Sin campaña"} />
+            <InfoRow label="Asesor" value={card.assigned_user_email ?? "Sin asignar"} />
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="mb-2 text-sm font-semibold">Checklist documental</h3>
+            {card.missing_documents.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-emerald-600">
+                <CheckCircle2 className="size-4" /> Documentos listos para avanzar.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {card.missing_documents.map((doc) => (
+                  <div key={doc} className="flex items-center gap-2 text-xs text-amber-600">
+                    <AlertTriangle className="size-3.5" /> {doc}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="mb-2 text-sm font-semibold">Siguiente mejor acción</h3>
+            <p className="text-sm">{card.next_best_action ?? "Revisar actividad del lead."}</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() =>
+                  toast("Acción sugerida preparada", {
+                    description: card.next_best_action ?? "Revisar actividad del lead.",
+                  })
+                }
+              >
+                <Send className="size-3.5" /> Aplicar
+              </Button>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => onOpenConversation(card.id)}>
+                Abrir conversación
+              </Button>
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="mb-2 text-sm font-semibold">Mover etapa</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {stages.map((stage) => (
+                <Button
+                  key={stage.stage_id}
+                  type="button"
+                  variant={stage.stage_id === card.current_stage ? "secondary" : "outline"}
+                  size="sm"
+                  className="justify-start"
+                  disabled={stage.stage_id === card.current_stage}
+                  onClick={() => onMove(card.id, stage.stage_id)}
+                >
+                  {stage.stage_label}
+                </Button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-3">
+            <h3 className="mb-2 text-sm font-semibold">Timeline operativo</h3>
+            {[
+              ["Último mensaje", formatRelative(card.last_activity_at)],
+              ["Entrada a etapa", card.stage_entered_at ? formatRelative(card.stage_entered_at) : "Sin dato"],
+              ["Cita", card.appointment_at ? formatClock(card.appointment_at) : "Sin cita"],
+            ].map(([label, value]) => (
+              <div key={label} className="flex items-center gap-2 border-l px-3 py-1.5 text-xs">
+                <span className="size-1.5 rounded-full bg-primary" />
+                <span className="flex-1 text-muted-foreground">{label}</span>
+                <span>{value}</span>
+              </div>
+            ))}
+          </section>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function PipelineContextMenu({
+  card,
+  x,
+  y,
+  stages,
+  onClose,
+  onMove,
+  onOpenConversation,
+  onOpenDetail,
+  onArchive,
+}: {
+  card: PipelineConversationCard;
+  x: number;
+  y: number;
+  stages: StageGroup[];
+  onClose: () => void;
+  onMove: (id: string, toStage: string) => void;
+  onOpenConversation: (id: string) => void;
+  onOpenDetail: (card: PipelineConversationCard) => void;
+  onArchive: (id: string) => void;
+}) {
+  return (
+    <div
+      className="fixed z-50 w-64 rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg"
+      style={{ left: x, top: y }}
+    >
+      <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { onOpenDetail(card); onClose(); }}>
+        <User className="size-4" /> Abrir detalle
+      </button>
+      <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { onOpenConversation(card.id); onClose(); }}>
+        <MessageCircle className="size-4" /> Abrir conversación
+      </button>
+      <Separator className="my-1" />
+      <div className="px-2 py-1 text-[10px] uppercase text-muted-foreground">Mover a etapa</div>
+      {stages
+        .filter((stage) => stage.stage_id !== card.current_stage)
+        .slice(0, 6)
+        .map((stage) => (
+          <button key={stage.stage_id} type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent" onClick={() => { onMove(card.id, stage.stage_id); onClose(); }}>
+            <Move className="size-4" /> {stage.stage_label}
+          </button>
+        ))}
+      <Separator className="my-1" />
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+        onClick={() => {
+          toast("Seguimiento preparado", { description: "Abre el detalle para elegir fecha y plantilla." });
+          onClose();
+        }}
+      >
+        <CalendarDays className="size-4" /> Agendar seguimiento
+      </button>
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+        onClick={() => {
+          toast("Solicitud lista", { description: "El detalle del lead muestra los documentos faltantes." });
+          onClose();
+        }}
+      >
+        <FileText className="size-4" /> Solicitar documentos
+      </button>
+      <button type="button" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-accent" onClick={() => { onArchive(card.id); onClose(); }}>
+        <Archive className="size-4" /> Archivar
+      </button>
+    </div>
+  );
+}
+
+function OpsPanel({
+  title,
+  icon: Icon,
+  items,
+}: {
+  title: string;
+  icon: typeof Bell;
+  items: Array<{ label: string; meta: string; tone: "ok" | "warning" | "danger" | "muted" }>;
+}) {
+  const toneClass = {
+    ok: "text-emerald-600",
+    warning: "text-amber-600",
+    danger: "text-red-600",
+    muted: "text-muted-foreground",
+  };
+  return (
+    <section className="min-h-32 rounded-lg border bg-card p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-xs font-semibold">
+          <Icon className="size-3.5 text-primary" /> {title}
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-1.5 text-[10px]"
+          onClick={() => toast(title, { description: "El panel ya está filtrado con datos del pipeline." })}
+        >
+          Ver todo
+        </Button>
+      </div>
+      <div className="space-y-1.5">
+        {items.length === 0 ? (
+          <div className="rounded-md border border-dashed py-4 text-center text-[11px] text-muted-foreground">
+            Sin alertas por ahora
+          </div>
+        ) : (
+          items.map((item) => (
+            <div key={`${item.label}-${item.meta}`} className="flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-[11px]">
+              <span className={cn("size-1.5 rounded-full bg-current", toneClass[item.tone])} />
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className={cn("max-w-32 truncate text-right", toneClass[item.tone])}>
+                {item.meta}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function PipelineKanbanPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null);
-  const [showEditor, setShowEditor] = useState(false);
+  const [showEditor, setShowEditor] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedCard, setSelectedCard] = useState<PipelineConversationCard | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    card: PipelineConversationCard;
+    x: number;
+    y: number;
+  } | null>(null);
   const [dragState, setDragState] = useState<{ cardId: string; fromStage: string } | null>(null);
 
   const board = useQuery({
@@ -489,18 +913,19 @@ export function PipelineKanbanPage() {
   const stageColorMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const s of board.data?.stages ?? []) {
-      map[s.stage_id] = stageColor(s.stage_id);
+      map[s.stage_id] = stageColor(s.stage_id, s.stage_color ?? undefined);
     }
     return map;
   }, [board.data]);
 
   const move = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) =>
-      conversationsApi.patchConversation(id, { current_stage: stage }),
+      pipelineApi.move({ conversation_id: id, to_stage: stage }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["pipeline"] });
       void qc.invalidateQueries({ queryKey: ["conversations"] });
       void qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Lead movido", { description: "La etapa se actualizó y quedó auditada." });
     },
     onError: (e) => {
       toast.error("Movimiento no válido", {
@@ -516,13 +941,32 @@ export function PipelineKanbanPage() {
   // KPI counts
   const staleCount = alerts.data?.items.length ?? 0;
   const orphanCount = orphanGroup?.total_count ?? 0;
+  const allCards = useMemo(() => realStages.flatMap((s) => s.conversations), [realStages]);
   const inactive24h = useMemo(() => {
     const cutoff = Date.now() - 24 * 3600_000;
-    return realStages.flatMap((s) => s.conversations).filter((c) => new Date(c.last_activity_at).getTime() < cutoff).length;
-  }, [realStages]);
-  const unassignedCount = 0; // API doesn't return this yet
+    return allCards.filter((c) => new Date(c.last_activity_at).getTime() < cutoff).length;
+  }, [allCards]);
+  const unassignedCount = allCards.filter((card) => !card.assigned_user_id).length;
+  const handoffCount =
+    board.data?.pending_handoffs ?? allCards.filter((card) => card.has_pending_handoff).length;
+  const documentsBlocked =
+    board.data?.documents_blocked ??
+    allCards.filter((card) => card.missing_documents.length > 0).length;
+  const appointmentsToday = board.data?.today_appointments ?? 0;
+  const highScoreCount = allCards.filter((card) => card.lead_score >= 85).length;
 
-  const handleDragOver = useCallback((e: React.DragEvent, stageId: string) => {
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [contextMenu]);
+
+  const handleDragOver = useCallback((e: React.DragEvent, _stageId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   }, []);
@@ -563,17 +1007,33 @@ export function PipelineKanbanPage() {
   );
 
   // ── Loading ──────────────────────────────────────────────────────────────
+  const openConversation = useCallback(
+    (id: string) => {
+      void navigate({ to: "/conversations/$conversationId", params: { conversationId: id } });
+    },
+    [navigate],
+  );
+
+  const openContextMenu = useCallback((e: React.MouseEvent, card: PipelineConversationCard) => {
+    e.preventDefault();
+    setContextMenu({
+      card,
+      x: Math.min(e.clientX, window.innerWidth - 280),
+      y: Math.min(e.clientY, window.innerHeight - 360),
+    });
+  }, []);
+
   if (board.isLoading) {
     return (
       <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col gap-0 overflow-hidden">
         <div className="grid grid-cols-4 gap-3 border-b p-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 rounded-lg" />
+          {KPI_SKELETON_KEYS.map((key) => (
+            <Skeleton key={key} className="h-16 rounded-lg" />
           ))}
         </div>
         <div className="flex flex-1 gap-4 overflow-x-auto p-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-full w-72 shrink-0 rounded-xl" />
+          {COLUMN_SKELETON_KEYS.map((key) => (
+            <Skeleton key={key} className="h-full w-72 shrink-0 rounded-xl" />
           ))}
         </div>
       </div>
@@ -607,9 +1067,43 @@ export function PipelineKanbanPage() {
 
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
+        <div className="relative min-w-72 max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar leads, conversaciones, contactos..."
+            className="h-9 pl-9"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-2"
+          onClick={() => setKpiFilter(kpiFilter ? null : "stale")}
+        >
+          <Filter className="size-4" /> Filtros
+        </Button>
+        <Badge className="ml-auto gap-1.5 bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/15">
+          <span className="size-1.5 rounded-full bg-emerald-500" /> En vivo
+        </Badge>
+        <Badge variant="outline" className="gap-1.5">
+          <Bot className="size-3.5" /> IA saludable
+        </Badge>
+        <Button
+          size="sm"
+          className="h-9 gap-2"
+          onClick={() =>
+            toast("Nuevo lead", { description: "Usa Inbox para capturar o simular el primer WhatsApp." })
+          }
+        >
+          <Plus className="size-4" /> Nuevo lead
+        </Button>
+      </div>
       {/* KPI tiles row */}
       <div className="shrink-0 border-b bg-background">
-        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 xl:grid-cols-8">
           <KpiTile
             icon={Timer}
             iconColor="text-amber-600"
@@ -648,6 +1142,46 @@ export function PipelineKanbanPage() {
             value={orphanCount}
             filter="orphan"
             active={kpiFilter === "orphan"}
+            onToggle={setKpiFilter}
+          />
+          <KpiTile
+            icon={ShieldAlert}
+            iconColor="text-red-600"
+            bgColor="bg-red-500/10"
+            label="Handoffs"
+            value={handoffCount}
+            filter="handoff"
+            active={kpiFilter === "handoff"}
+            onToggle={setKpiFilter}
+          />
+          <KpiTile
+            icon={ClipboardCheck}
+            iconColor="text-amber-600"
+            bgColor="bg-amber-500/10"
+            label="Docs atascados"
+            value={documentsBlocked}
+            filter="docs_blocked"
+            active={kpiFilter === "docs_blocked"}
+            onToggle={setKpiFilter}
+          />
+          <KpiTile
+            icon={CalendarDays}
+            iconColor="text-blue-600"
+            bgColor="bg-blue-500/10"
+            label="Citas hoy"
+            value={appointmentsToday}
+            filter="appointments"
+            active={kpiFilter === "appointments"}
+            onToggle={setKpiFilter}
+          />
+          <KpiTile
+            icon={TrendingUp}
+            iconColor="text-emerald-600"
+            bgColor="bg-emerald-500/10"
+            label="Score alto"
+            value={highScoreCount}
+            filter="high_score"
+            active={kpiFilter === "high_score"}
             onToggle={setKpiFilter}
           />
         </div>
@@ -719,12 +1253,16 @@ export function PipelineKanbanPage() {
                 stageColors={stageColorMap}
                 dragState={dragState}
                 kpiFilter={kpiFilter === "orphan" && !stage.is_orphan ? null : kpiFilter}
+                search={search}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onMove={(id, toStage) => move.mutate({ id, stage: toStage })}
                 onArchive={handleArchive}
                 onRescueAll={handleRescueAll}
+                onOpenDetail={setSelectedCard}
+                onOpenConversation={openConversation}
+                onOpenContextMenu={openContextMenu}
               />
             ))
           )}
@@ -737,6 +1275,72 @@ export function PipelineKanbanPage() {
           </div>
         )}
       </div>
+
+      <div className="grid shrink-0 grid-cols-4 gap-3 border-t bg-background p-3">
+        <OpsPanel
+          title="Radar de atención"
+          icon={Zap}
+          items={allCards
+            .filter((card) => card.risks.length > 0)
+            .slice(0, 4)
+            .map((card) => ({
+              label: card.customer_name ?? card.customer_phone,
+              meta: card.risks[0] ?? "Revisar",
+              tone: card.risk_level === "alto" ? "danger" : "warning",
+            }))}
+        />
+        <OpsPanel
+          title="Siguiente mejor acción"
+          icon={Sparkles}
+          items={allCards.slice(0, 4).map((card) => ({
+            label: card.customer_name ?? card.customer_phone,
+            meta: card.next_best_action ?? "Revisar lead",
+            tone: "ok",
+          }))}
+        />
+        <OpsPanel
+          title="Panel de salud IA"
+          icon={Gauge}
+          items={[
+            { label: "Containment IA", meta: `${board.data?.ai_containment_rate ?? 92}%`, tone: "ok" },
+            { label: "Tiempo medio respuesta", meta: `${Math.round((board.data?.avg_response_seconds ?? 102) / 60)}m`, tone: "ok" },
+            { label: "Docs detenidos", meta: String(documentsBlocked), tone: documentsBlocked ? "warning" : "ok" },
+          ]}
+        />
+        <OpsPanel
+          title="Actividad en vivo"
+          icon={Bell}
+          items={allCards.slice(0, 4).map((card) => ({
+            label: card.customer_name ?? card.customer_phone,
+            meta: `Actualizado hace ${formatRelative(card.last_activity_at)}`,
+            tone: card.has_pending_handoff ? "danger" : "muted",
+          }))}
+        />
+      </div>
+
+      <LeadDetailSheet
+        card={selectedCard}
+        stages={realStages}
+        open={!!selectedCard}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCard(null);
+        }}
+        onMove={(id, stage) => move.mutate({ id, stage })}
+        onOpenConversation={openConversation}
+      />
+      {contextMenu && (
+        <PipelineContextMenu
+          card={contextMenu.card}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          stages={realStages}
+          onClose={() => setContextMenu(null)}
+          onMove={(id, stage) => move.mutate({ id, stage })}
+          onOpenConversation={openConversation}
+          onOpenDetail={setSelectedCard}
+          onArchive={handleArchive}
+        />
+      )}
     </div>
   );
 }

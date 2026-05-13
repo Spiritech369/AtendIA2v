@@ -14,18 +14,20 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
+from atendia.api._handoffs.command_center import router as _handoff_command_center_router
 from atendia.config import get_settings
 from atendia.db.models.lifecycle import HumanHandoff
 from atendia.db.session import get_db_session
 from atendia.realtime.publisher import publish_event
-from redis.asyncio import Redis
 
 router = APIRouter()
+router.include_router(_handoff_command_center_router)
 
 
 # ---------- Response shapes ----------

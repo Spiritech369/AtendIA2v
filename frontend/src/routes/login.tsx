@@ -23,6 +23,7 @@ const loginSchema = z.object({
   password: z.string().min(1, "Requerido"),
 });
 type LoginValues = z.infer<typeof loginSchema>;
+const DEMO_LOGIN = { email: "admin@demo.com", password: "admin123" } satisfies LoginValues;
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -100,6 +101,20 @@ function LoginPage() {
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Iniciando…" : "Entrar"}
               </Button>
+              {import.meta.env.DEV && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={form.formState.isSubmitting}
+                  onClick={() => {
+                    form.reset(DEMO_LOGIN);
+                    void onSubmit(DEMO_LOGIN);
+                  }}
+                >
+                  Entrar con demo
+                </Button>
+              )}
             </form>
           </Form>
         </CardContent>

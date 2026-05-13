@@ -71,13 +71,16 @@ async def tenant_ws(websocket: WebSocket, tenant_id: str) -> None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # RBAC: operator → tid in URL must equal user.tenant_id.
-    # Superadmin → can subscribe to any tenant.
-    if user.role == "operator":
+    # RBAC: tenant-scoped operational roles must match tenant_id.
+    # Superadmin can subscribe to any tenant.
+    tenant_scoped_roles = {"operator", "tenant_admin", "manager", "ai_supervisor", "supervisor"}
+    if user.role == "superadmin":
+        pass
+    elif user.role in tenant_scoped_roles:
         if user.tenant_id is None or str(user.tenant_id) != tenant_id:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
-    elif user.role != "superadmin":
+    else:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

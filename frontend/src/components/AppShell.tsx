@@ -1,5 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BarChart3,
   Bell,
@@ -58,8 +58,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/knowledge", label: "Conocimiento", icon: BookOpen },
   { to: "/analytics", label: "Analítica", icon: BarChart3 },
   { to: "/turn-traces", label: "Debug de turnos", icon: Bug },
-  { to: "/config",          label: "Configuración",    icon: Settings            },
-  { to: "/inbox-settings", label: "Config. Bandeja",  icon: SlidersHorizontal   },
+  { to: "/config", label: "Configuración", icon: Settings },
+  { to: "/inbox-settings", label: "Config. Bandeja", icon: SlidersHorizontal },
   { to: "/agents", label: "Agentes IA", icon: Sparkles, tenantAdminOnly: true },
   { to: "/workflows", label: "Workflows", icon: Network },
   { to: "/users", label: "Usuarios", icon: UserRound, tenantAdminOnly: true },
@@ -71,6 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const isHandoffCommandCenter = path === "/handoffs" || path.startsWith("/handoffs/");
 
   const visible = NAV_ITEMS.filter((item) => {
     if (item.superadminOnly) return user?.role === "superadmin";
@@ -81,15 +82,39 @@ export function AppShell({ children }: { children: ReactNode }) {
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? "??";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
-        <div className="flex h-14 items-center gap-2 px-4 font-semibold tracking-tight">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground text-xs">
+    <div
+      className={cn(
+        "flex h-screen overflow-hidden",
+        isHandoffCommandCenter ? "bg-[#050b14]" : "bg-background",
+      )}
+    >
+      <aside
+        className={cn(
+          "flex w-60 shrink-0 flex-col border-r",
+          isHandoffCommandCenter
+            ? "border-slate-800 bg-[#050b14] text-slate-300"
+            : "bg-sidebar text-sidebar-foreground",
+        )}
+      >
+        <div
+          className={cn(
+            "flex h-14 items-center gap-2 px-4 font-semibold",
+            isHandoffCommandCenter && "text-white",
+          )}
+        >
+          <span
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-md text-xs",
+              isHandoffCommandCenter
+                ? "border border-blue-400/30 bg-blue-600 text-white shadow-lg shadow-blue-950/40"
+                : "bg-primary text-primary-foreground",
+            )}
+          >
             AI
           </span>
           AtendIA
         </div>
-        <Separator />
+        <Separator className={isHandoffCommandCenter ? "bg-slate-800" : undefined} />
         <ScrollArea className="flex-1 px-2 py-3">
           <nav className="flex flex-col gap-1">
             {visible.map((item) => {
@@ -101,9 +126,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   to={item.to}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                    isHandoffCommandCenter
+                      ? active
+                        ? "bg-blue-600/20 text-white ring-1 ring-blue-500/30"
+                        : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
+                      : active
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -116,9 +145,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 items-center justify-between border-b px-6">
+        <header
+          className={cn(
+            "flex h-14 items-center justify-between border-b px-6",
+            isHandoffCommandCenter
+              ? "border-slate-800 bg-[#07101b] text-slate-200"
+              : "bg-background",
+          )}
+        >
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
+            <span
+              className={cn(
+                "text-sm",
+                isHandoffCommandCenter ? "text-slate-400" : "text-muted-foreground",
+              )}
+            >
               {user?.role === "superadmin" ? "Superadmin" : `Tenant: ${user?.tenant_id ?? "—"}`}
             </span>
             <WhatsAppStatusBadge />

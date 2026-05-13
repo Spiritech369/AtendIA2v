@@ -12,6 +12,7 @@ Three pairs of endpoints, all tenant-scoped via `current_tenant_id`:
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -287,6 +288,30 @@ class InboxConfigResponse(BaseModel):
     inbox_config: dict
 
 
+def _normalize_inbox_config(config: object) -> dict:
+    if not isinstance(config, dict):
+        return deepcopy(DEFAULT_INBOX_CONFIG)
+
+    normalized = deepcopy(DEFAULT_INBOX_CONFIG)
+
+    layout = config.get("layout")
+    if isinstance(layout, dict):
+        normalized["layout"].update(
+            {key: value for key, value in layout.items() if key in normalized["layout"]}
+        )
+
+    for key in ("filter_chips", "stage_rings", "handoff_rules"):
+        value = config.get(key)
+        if isinstance(value, list):
+            normalized[key] = value
+
+    for key, value in config.items():
+        if key not in normalized:
+            normalized[key] = value
+
+    return normalized
+
+
 @router.get("/inbox-config", response_model=InboxConfigResponse)
 async def get_inbox_config(
     user: AuthUser = Depends(current_user),  # noqa: ARG001
@@ -296,7 +321,7 @@ async def get_inbox_config(
     tenant = (
         await session.execute(select(Tenant).where(Tenant.id == tenant_id))
     ).scalar_one()
-    cfg = (tenant.config or {}).get("inbox_config", DEFAULT_INBOX_CONFIG)
+    cfg = _normalize_inbox_config((tenant.config or {}).get("inbox_config"))
     return InboxConfigResponse(inbox_config=cfg)
 
 
@@ -310,13 +335,14 @@ async def put_inbox_config(
     tenant = (
         await session.execute(select(Tenant).where(Tenant.id == tenant_id))
     ).scalar_one()
+    inbox_config = _normalize_inbox_config(body.inbox_config)
     new_config = dict(tenant.config or {})
-    new_config["inbox_config"] = body.inbox_config
+    new_config["inbox_config"] = inbox_config
     await session.execute(
         update(Tenant).where(Tenant.id == tenant_id).values(config=new_config)
     )
     await session.commit()
-    return InboxConfigResponse(inbox_config=body.inbox_config)
+    return InboxConfigResponse(inbox_config=inbox_config)
 
 
 # Suppress unused-import warning when we don't actually use UTC anywhere

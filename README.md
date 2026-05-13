@@ -61,6 +61,45 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python scripts/smoke_test_phase2.py
 
 Full setup, run, and test instructions: [`core/README.md`](core/README.md).
 
+### Workflows Operations Center
+
+The Workflows module now ships as an operational command center at `/workflows`.
+It auto-seeds realistic demo workflows for an empty tenant, then persists CRUD,
+safe pause, node edits, draft/publish, validation, simulation, dependency,
+variable, execution replay and retry flows through the FastAPI API.
+
+Useful local checks:
+
+```bash
+cd core && uv run alembic upgrade head
+cd core && uv run pytest tests/api/test_workflows_routes.py tests/workflows -q
+cd frontend && pnpm build
+```
+
+Demo login after `scripts/start-demo.ps1`:
+`admin@demo.com / admin123`.
+
+### Handoff Command Center
+
+The Handoffs module now ships as a real-time AI-to-human escalation command
+center at `/handoffs`. The backend exposes the command-center API under
+`/api/v1/handoffs/command-center`, analytics under `/api/v1/analytics/handoffs/*`,
+and tenant-wide live invalidation through `/ws/tenants/:tenant_id`.
+
+The local snapshot auto-enriches existing `human_handoffs` rows and appends
+deterministic demo cases when the tenant has sparse data, so a fresh local
+workspace opens with an operational queue, SLA/priority scoring, smart
+assignment, AI explanations, suggested replies, feedback, timelines, and risk
+radar data.
+
+Useful local checks:
+
+```bash
+cd core && uv run ruff check atendia/api/_handoffs/command_center.py atendia/realtime/ws_routes.py
+cd frontend && npm run typecheck
+cd frontend && npm run build
+```
+
 ## Repo layout
 
 ```

@@ -37,8 +37,6 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { inboxConfigApi } from "@/features/config/api";
-import { DEFAULT_INBOX_CONFIG, type FilterChip, type StageRing } from "@/features/inbox-settings/types";
 import {
   CommandDialog,
   CommandEmpty,
@@ -53,6 +51,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { inboxConfigApi } from "@/features/config/api";
 import type { ConversationListItem, MessageItem } from "@/features/conversations/api";
 import { conversationsApi } from "@/features/conversations/api";
 import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
@@ -62,9 +61,15 @@ import {
   useMessages,
 } from "@/features/conversations/hooks/useConversations";
 import { useTenantStream } from "@/features/conversations/hooks/useTenantStream";
+import {
+  DEFAULT_INBOX_CONFIG,
+  type FilterChip,
+  type StageRing,
+} from "@/features/inbox-settings/types";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { type AuthUser, useAuthStore } from "@/stores/auth";
+import { ContactPanel } from "./ContactPanel";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 200;
@@ -249,19 +254,21 @@ function railHint(): string {
 function groupMessages(
   messages: MessageItem[],
 ): Array<{ key: string; label: string; items: MessageItem[] }> {
+  const messageTime = (message: MessageItem) => message.sent_at ?? message.created_at;
   const sorted = [...messages].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    (a, b) => new Date(messageTime(a)).getTime() - new Date(messageTime(b)).getTime(),
   );
   const groups: Array<{ key: string; label: string; items: MessageItem[] }> = [];
 
   for (const message of sorted) {
-    const date = new Date(message.created_at);
+    const timestamp = messageTime(message);
+    const date = new Date(timestamp);
     const key = date.toISOString().slice(0, 10);
     const last = groups.at(-1);
     if (last?.key === key) {
       last.items.push(message);
     } else {
-      groups.push({ key, label: formatDateDivider(message.created_at), items: [message] });
+      groups.push({ key, label: formatDateDivider(timestamp), items: [message] });
     }
   }
 
@@ -832,6 +839,7 @@ function ConversationListPane({
   counts,
   commandShortcut,
   search,
+  hasActiveFilters,
   onSearchChange,
   onOpenCommand,
   onToggleFilter,
@@ -850,6 +858,7 @@ function ConversationListPane({
   counts: Record<QuickFilterId, number>;
   commandShortcut: string;
   search: string;
+  hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
   onOpenCommand: () => void;
   onToggleFilter: (filter: QuickFilterId) => void;
@@ -871,7 +880,20 @@ function ConversationListPane({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h1 className="text-base font-semibold leading-5">Conversaciones</h1>
-            <p className="text-xs text-muted-foreground">{items.length} visibles</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">{items.length} visibles</p>
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1.5 text-xs"
+                  onClick={onClearFilters}
+                >
+                  Ver todo
+                </Button>
+              )}
+            </div>
           </div>
           <Button
             type="button"
@@ -1168,6 +1190,7 @@ function Composer({
   const [pillDismissed, setPillDismissed] = useState(false);
 
   // Reset pill dismiss when conversation changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: this effect intentionally keys off the active conversation id.
   useEffect(() => {
     setPillDismissed(false);
   }, [conversationId]);
@@ -1594,6 +1617,13 @@ export function ConversationsPage() {
 
   const conversations = useConversations({ limit: LIST_LIMIT });
   const allItems = conversations.data?.pages.flatMap((page) => page.items) ?? [];
+  const selectedConversation = useConversation(selectedConversationId ?? "");
+  const selectedListItem = useMemo(
+    () => allItems.find((item) => item.id === selectedConversationId),
+    [allItems, selectedConversationId],
+  );
+  const selectedCustomerId =
+    selectedConversation.data?.customer_id ?? selectedListItem?.customer_id;
 
   const inboxConfigQuery = useQuery({
     queryKey: ["tenants", "inbox-config"],
@@ -1763,6 +1793,7 @@ export function ConversationsPage() {
           counts={counts}
           commandShortcut={commandHint()}
           search={search}
+          hasActiveFilters={hasActiveFilters}
           onSearchChange={setSearch}
           onOpenCommand={() => setCommandOpen(true)}
           onToggleFilter={toggleFilter}
@@ -1779,6 +1810,12 @@ export function ConversationsPage() {
           conversationId={selectedConversationId}
           onOpenCommand={() => setCommandOpen(true)}
         />
+        <div className="hidden min-h-0 shrink-0 p-2 xl:flex">
+          <ContactPanel
+            customerId={selectedCustomerId}
+            conversation={selectedConversation.data}
+          />
+        </div>
       </div>
 
       {/* Keyboard shortcuts bar */}
