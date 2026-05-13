@@ -215,6 +215,13 @@ export function PipelineEditor({ onClose }: Props) {
   // backend endpoint is admin-only — we still gate the button on canEdit
   // for the same reason.
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // Per-stage delete confirmation. Tracks which stage in the local draft
+  // is pending deletion so the Dialog can show its name. `null` = no
+  // dialog open. The actual mutation of the draft happens only after the
+  // user confirms — the row stays in the list until then. Saving the
+  // draft afterwards persists the deletion.
+  const [stagePendingDelete, setStagePendingDelete] = useState<number | null>(null);
   const remove = useMutation({
     mutationFn: () => tenantsApi.deletePipeline(),
     onSuccess: () => {
@@ -364,25 +371,24 @@ export function PipelineEditor({ onClose }: Props) {
             <Save className="mr-1 size-3" />
             {save.isPending ? "Guardando…" : "Guardar"}
           </Button>
-          {/* Eliminar pipeline — always visible so the affordance is
-              discoverable. Disabled when there's nothing saved to delete,
-              when the user isn't an admin, or while a save/delete is
-              mid-flight. Clicks open a confirmation dialog instead of
-              firing the destructive call directly. */}
+          {/* Pipeline-wide reset. The primary delete affordance lives on
+              each stage's three-dot menu; this is the "reset to factory"
+              escape hatch — small icon-only, secondary visual weight, no
+              text label. Disabled when there's nothing saved or the user
+              isn't an admin. */}
           <Button
-            variant="outline"
-            size="sm"
-            className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             onClick={() => setConfirmDeleteOpen(true)}
             disabled={!canEdit || !query.data || save.isPending || remove.isPending}
             title={
               !query.data
-                ? "Guarda primero para tener un pipeline que eliminar"
-                : "Eliminar todas las versiones del pipeline"
+                ? "Sin pipeline guardado"
+                : "Eliminar todas las versiones del pipeline (reset)"
             }
           >
-            <Trash2 className="mr-1 size-3" />
-            Eliminar
+            <Trash2 className="size-3.5" />
           </Button>
           {onClose && (
             <Button
@@ -425,6 +431,60 @@ export function PipelineEditor({ onClose }: Props) {
             >
               <Trash2 className="mr-1.5 size-3.5" />
               {remove.isPending ? "Eliminando…" : "Eliminar pipeline"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-stage delete confirmation. Mutates the local draft so the
+          change isn't persisted until the user hits Guardar. Conversations
+          currently in this stage_id become orphaned in the board until
+          moved — surfaced in the dialog copy so the operator knows the
+          downstream impact before confirming. */}
+      <Dialog
+        open={stagePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setStagePendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              ¿Eliminar la etapa{" "}
+              <span className="font-mono text-sm">
+                {stagePendingDelete !== null
+                  ? draft.stages[stagePendingDelete]?.id ?? ""
+                  : ""}
+              </span>
+              ?
+            </DialogTitle>
+            <DialogDescription>
+              Las conversaciones que estén actualmente en esta etapa
+              aparecerán como <span className="font-medium">huérfanas</span>{" "}
+              en el board hasta que las muevas a otra etapa. Los workflows
+              que referencien este <span className="font-mono">stage_id</span>{" "}
+              dejarán de disparar. El cambio se aplica al pulsar{" "}
+              <span className="font-medium">Guardar</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setStagePendingDelete(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (stagePendingDelete !== null) {
+                  removeStage(stagePendingDelete);
+                }
+                setStagePendingDelete(null);
+              }}
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              Eliminar etapa
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -487,14 +547,14 @@ export function PipelineEditor({ onClose }: Props) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                      className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
                       title="Opciones de etapa"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreHorizontal className="size-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem onClick={() => moveStage(idx, -1)} disabled={idx === 0}>
                       Subir
                     </DropdownMenuItem>
@@ -506,11 +566,52 @@ export function PipelineEditor({ onClose }: Props) {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => removeStage(idx)}
-                      disabled={draft.stages.length === 1}
+                      onClick={() => {
+                        void navigator.clipboard.writeText(stage.id);
+                        toast.success("stage_id copiado", { description: stage.id });
+                      }}
                     >
-                      <Trash2 className="mr-2 size-3.5" /> Eliminar
+                      Copiar stage_id
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        // Duplicate by appending "(copia)" to the label and a
+                        // numeric suffix to the id until unique. Save-on-edit
+                        // will reject duplicates anyway, but we pre-empt that.
+                        const existingIds = new Set(draft.stages.map((s) => s.id));
+                        let suffix = 2;
+                        let newId = `${stage.id}_copia`;
+                        while (existingIds.has(newId)) {
+                          newId = `${stage.id}_copia_${suffix++}`;
+                        }
+                        setDraft((prev) => {
+                          if (!prev) return prev;
+                          const copy: StageDraft = {
+                            ...stage,
+                            id: newId,
+                            label: `${stage.label} (copia)`,
+                          };
+                          const stages = [
+                            ...prev.stages.slice(0, idx + 1),
+                            copy,
+                            ...prev.stages.slice(idx + 1),
+                          ];
+                          return { ...prev, stages };
+                        });
+                        setSelectedIdx(idx + 1);
+                      }}
+                      disabled={!canEdit}
+                    >
+                      Duplicar etapa
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => setStagePendingDelete(idx)}
+                      disabled={!canEdit || draft.stages.length === 1}
+                      title={draft.stages.length === 1 ? "No puedes eliminar la última etapa" : undefined}
+                    >
+                      <Trash2 className="mr-2 size-3.5" /> Eliminar etapa
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
