@@ -111,30 +111,30 @@ def _get_advisor_provider_for(is_demo: bool) -> AdvisorProvider:
     if is_demo:
         from atendia._demo.providers import DemoAdvisorProvider
         return DemoAdvisorProvider()
-    raise HTTPException(
-        http_status.HTTP_501_NOT_IMPLEMENTED,
-        "Advisors backed by DB not yet implemented",
-    )
+    # Non-demo tenants get an empty provider instead of 501 — keeps the
+    # appointments UI usable (empty advisor list) until a DB-backed
+    # advisor provider lands.
+    from atendia.providers.empty import EmptyAdvisorProvider
+    return EmptyAdvisorProvider()
 
 
 def _get_vehicle_provider_for(is_demo: bool) -> VehicleProvider:
     if is_demo:
         from atendia._demo.providers import DemoVehicleProvider
         return DemoVehicleProvider()
-    raise HTTPException(
-        http_status.HTTP_501_NOT_IMPLEMENTED,
-        "Vehicles backed by DB not yet implemented",
-    )
+    from atendia.providers.empty import EmptyVehicleProvider
+    return EmptyVehicleProvider()
 
 
 def _get_messaging_provider_for(is_demo: bool) -> MessageActionProvider:
     if is_demo:
         from atendia._demo.providers import DemoMessageActionProvider
         return DemoMessageActionProvider()
-    raise HTTPException(
-        http_status.HTTP_501_NOT_IMPLEMENTED,
-        "WhatsApp messaging not yet implemented for this tenant",
-    )
+    # No-op messaging — the appointment side-effect (send reminder etc.)
+    # acks as "noop" so the UI doesn't error. When real Meta-backed
+    # messaging lands we swap this for the real adapter.
+    from atendia.providers.empty import EmptyMessageActionProvider
+    return EmptyMessageActionProvider()
 
 
 async def get_advisor_provider(
