@@ -5,8 +5,10 @@ import { BrandFactsEditor } from "@/features/config/components/BrandFactsEditor"
 import { IntegrationsTab } from "@/features/config/components/IntegrationsTab";
 import { PipelineEditor } from "@/features/config/components/PipelineEditor";
 import { ToneEditor } from "@/features/config/components/ToneEditor";
+import { requireRole } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/config")({
+  beforeLoad: requireRole(["tenant_admin", "superadmin"]),
   component: ConfigPage,
 });
 
