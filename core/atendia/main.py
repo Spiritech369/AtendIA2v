@@ -42,6 +42,10 @@ from atendia.api.baileys_routes import (
     integrations_router as baileys_integrations_router,
     internal_router as baileys_internal_router,
 )
+from atendia.api.field_suggestions_routes import (
+    actions_router as field_suggestions_actions_router,
+    per_customer_router as field_suggestions_per_customer_router,
+)
 from atendia.api.navigation_routes import router as navigation_router
 from atendia.api.notifications_routes import router as notifications_router
 from atendia.api.pipeline_routes import router as pipeline_router
@@ -107,6 +111,16 @@ app.include_router(
 )
 app.include_router(
     baileys_internal_router, prefix="/api/v1/internal/baileys", tags=["baileys"]
+)
+app.include_router(
+    field_suggestions_per_customer_router,
+    prefix="/api/v1/customers/{customer_id}/field-suggestions",
+    tags=["field-suggestions"],
+)
+app.include_router(
+    field_suggestions_actions_router,
+    prefix="/api/v1/field-suggestions",
+    tags=["field-suggestions"],
 )
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(pipeline_router, prefix="/api/v1/pipeline", tags=["pipeline"])
