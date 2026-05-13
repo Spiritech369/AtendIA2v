@@ -32,6 +32,10 @@ class TurnTraceListItem(BaseModel):
     conversation_id: UUID
     turn_number: int
     inbound_message_id: UUID | None
+    # First 120 chars of inbound_text so operators can scan the list view
+    # without opening every row. None when the turn had no inbound text
+    # (image/audio adjuncts, system-triggered turns).
+    inbound_preview: str | None
     flow_mode: str | None
     nlu_model: str | None
     composer_model: str | None
@@ -117,6 +121,7 @@ async def list_turn_traces(
                 conversation_id=r.conversation_id,
                 turn_number=r.turn_number,
                 inbound_message_id=r.inbound_message_id,
+                inbound_preview=(r.inbound_text[:120] if r.inbound_text else None),
                 flow_mode=r.flow_mode,
                 nlu_model=r.nlu_model,
                 composer_model=r.composer_model,
@@ -154,6 +159,7 @@ async def get_turn_trace(
         conversation_id=row.conversation_id,
         turn_number=row.turn_number,
         inbound_message_id=row.inbound_message_id,
+        inbound_preview=(row.inbound_text[:120] if row.inbound_text else None),
         flow_mode=row.flow_mode,
         nlu_model=row.nlu_model,
         composer_model=row.composer_model,

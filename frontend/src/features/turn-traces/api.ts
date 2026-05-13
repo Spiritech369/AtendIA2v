@@ -5,6 +5,8 @@ export interface TurnTraceListItem {
   conversation_id: string;
   turn_number: number;
   inbound_message_id: string | null;
+  /** First 120 chars of inbound_text — for scanning the list view. */
+  inbound_preview: string | null;
   flow_mode: string | null;
   nlu_model: string | null;
   composer_model: string | null;

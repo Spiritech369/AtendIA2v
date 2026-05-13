@@ -121,6 +121,8 @@ def test_list_turn_traces(operator_with_traces):
     assert [it["turn_number"] for it in body["items"]] == [1, 2, 3]
     # Metadata only — payloads not in list response
     assert "nlu_output" not in body["items"][0]
+    # Inbound preview is included so operators can scan without opening rows
+    assert body["items"][0]["inbound_preview"] == "hola turn 0"
 
 
 def test_list_turn_traces_404_other_tenant(operator_with_traces):

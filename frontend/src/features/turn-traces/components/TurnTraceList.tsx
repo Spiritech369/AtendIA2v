@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { turnTracesApi } from "@/features/turn-traces/api";
 
+import { FlowModeBadge } from "./FlowModeBadge";
 import { TurnTraceInspector } from "./TurnTraceInspector";
 
 export function TurnTraceList({ conversationId }: { conversationId: string }) {
@@ -47,6 +48,7 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
             <TableRow>
               <TableHead className="w-[60px]">#</TableHead>
               <TableHead>Modo</TableHead>
+              <TableHead>Mensaje</TableHead>
               <TableHead>NLU</TableHead>
               <TableHead>Composer</TableHead>
               <TableHead className="text-right">Latencia</TableHead>
@@ -56,7 +58,7 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                   Sin trazas todavía.
                 </TableCell>
               </TableRow>
@@ -72,7 +74,12 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
                     {t.bot_paused ? (
                       <Badge variant="secondary">paused</Badge>
                     ) : (
-                      <Badge variant="outline">{t.flow_mode ?? "—"}</Badge>
+                      <FlowModeBadge mode={t.flow_mode} />
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-[260px] truncate text-xs text-muted-foreground">
+                    {t.inbound_preview ?? (
+                      <span className="italic">(sin texto)</span>
                     )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
