@@ -16,7 +16,11 @@ RUN mkdir -p /app/auth_info
 
 EXPOSE 7755
 
+# Use 127.0.0.1 explicitly: in this slim Alpine image, `localhost` doesn't
+# always resolve (no /etc/hosts entry on some node:20-alpine builds), so
+# wget can hit "Connection refused" even when the server is listening
+# fine. 127.0.0.1 is unambiguous and never depends on resolver state.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -q -O - http://localhost:7755/healthz || exit 1
+  CMD wget -q -O - http://127.0.0.1:7755/healthz || exit 1
 
 CMD ["node", "server.js"]
