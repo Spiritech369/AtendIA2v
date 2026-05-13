@@ -63,11 +63,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
-import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
 import { tenantsApi } from "@/features/config/api";
 import { type ConversationDetail, conversationsApi } from "@/features/conversations/api";
-import { useCustomerAttrs } from "@/features/conversations/hooks/useCustomerAttrs";
+import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
+import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -80,6 +79,7 @@ import {
   usePutFieldValues,
   useUpdateNote,
 } from "@/features/conversations/hooks/useContactPanel";
+import { useCustomerAttrs } from "@/features/conversations/hooks/useCustomerAttrs";
 import type {
   CustomerNote,
   CustomerDetail as CustomerRecord,
@@ -146,12 +146,7 @@ function closeProbability(score: number): { label: string; helper: string; cn: s
 }
 
 function rawValue(value: unknown): unknown {
-  if (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    "value" in value
-  ) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "value" in value) {
     return (value as { value?: unknown }).value;
   }
   return value;
@@ -247,11 +242,7 @@ function getDetailSources(
   customer: CustomerRecord | undefined,
   conversation: ConversationDetail | undefined,
 ): Array<Record<string, unknown> | null | undefined> {
-  return [
-    conversation?.extracted_data,
-    customer?.last_extracted_data,
-    customer?.attrs,
-  ];
+  return [conversation?.extracted_data, customer?.last_extracted_data, customer?.attrs];
 }
 
 function stageLabel(stage: string | null | undefined): string {
@@ -281,11 +272,7 @@ function CopyBtn({ text }: { text: string }) {
       onClick={handle}
       className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
-      {copied ? (
-        <Check className="h-3 w-3 text-emerald-500" />
-      ) : (
-        <Copy className="h-3 w-3" />
-      )}
+      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
     </button>
   );
 }
@@ -315,8 +302,7 @@ function SectionLabel({
 
 function ScoreBar({ value }: { value: number }) {
   const pct = Math.min(100, Math.max(0, value));
-  const color =
-    pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
+  const color = pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
       <div
@@ -400,16 +386,12 @@ function ContactIdentitySection({ customerId }: { customerId: string }) {
 
           <div className="flex items-center gap-1 mt-0.5">
             <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="text-xs font-mono text-muted-foreground truncate">
-              {c.phone_e164}
-            </span>
+            <span className="text-xs font-mono text-muted-foreground truncate">{c.phone_e164}</span>
             <CopyBtn text={c.phone_e164} />
           </div>
 
           {c.email && (
-            <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-              {c.email}
-            </div>
+            <div className="text-[11px] text-muted-foreground truncate mt-0.5">{c.email}</div>
           )}
         </div>
 
@@ -543,20 +525,13 @@ function MiniSparkline({ score }: { score: number }) {
       className="h-8 w-20 overflow-visible"
       aria-hidden="true"
     >
-      <path
-        d={`${path} L ${width} ${height} L 0 ${height} Z`}
-        className="fill-emerald-500/10"
-      />
+      <path d={`${path} L ${width} ${height} L 0 ${height} Z`} className="fill-emerald-500/10" />
       <path d={path} className="fill-none stroke-emerald-500" strokeWidth="2" />
     </svg>
   );
 }
 
-function IntelligenceScoreSection({
-  customer,
-}: {
-  customer: CustomerRecord | undefined;
-}) {
+function IntelligenceScoreSection({ customer }: { customer: CustomerRecord | undefined }) {
   if (!customer) {
     return (
       <div className="px-3 py-3">
@@ -610,9 +585,7 @@ function DetailRow({
         {Icon && <Icon className="h-3 w-3 shrink-0" />}
         <span>{label}</span>
       </div>
-      <div className="mt-0.5 truncate text-[11px] font-medium">
-        {value || "Sin dato"}
-      </div>
+      <div className="mt-0.5 truncate text-[11px] font-medium">{value || "Sin dato"}</div>
     </div>
   );
 }
@@ -651,12 +624,7 @@ const CANONICAL_ATTR_KEYS = new Set([
   "advisor_label",
 ]);
 // Internal seed metadata — hide from ad-hoc grid.
-const META_ATTR_KEYS = new Set([
-  "mock_seed",
-  "slug",
-  "model_sku",
-  "campaign",
-]);
+const META_ATTR_KEYS = new Set(["mock_seed", "slug", "model_sku", "campaign"]);
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -699,7 +667,9 @@ function ContactDetailGridSection({
       "origen",
       "utm_source",
       "campaign.source",
-    ]) ?? customer.source ?? null;
+    ]) ??
+    customer.source ??
+    null;
   const campaign = pickValue(sources, [
     "campaign",
     "campana",
@@ -716,16 +686,8 @@ function ContactDetailGridSection({
   const estimatedDisplay =
     formatMoney(estimatedRaw) ??
     pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
-  const creditType = pickValue(sources, [
-    "tipo_credito",
-    "tipo_de_credito",
-    "credit_type",
-  ]);
-  const creditPlan = pickValue(sources, [
-    "plan_credito",
-    "plan_de_credito",
-    "credit_plan",
-  ]);
+  const creditType = pickValue(sources, ["tipo_credito", "tipo_de_credito", "credit_type"]);
+  const creditPlan = pickValue(sources, ["plan_credito", "plan_de_credito", "credit_plan"]);
   const product = pickValue(sources, [
     "modelo_interes",
     "modelo_moto",
@@ -740,9 +702,7 @@ function ContactDetailGridSection({
     pickValue(sources, ["advisor", "asesor", "advisor_label"]);
 
   const stages =
-    (pipeline.data?.definition?.stages as
-      | Array<{ id: string; label?: string }>
-      | undefined) ?? [];
+    (pipeline.data?.definition?.stages as Array<{ id: string; label?: string }> | undefined) ?? [];
   const stageOptions = stages.map((s) => ({
     value: s.id,
     label: s.label ?? s.id,
@@ -777,9 +737,7 @@ function ContactDetailGridSection({
           deletable={false}
           inputType="select"
           options={stageOptions}
-          onSave={(v) =>
-            v ? patchConversation.mutateAsync({ current_stage: v }) : undefined
-          }
+          onSave={(v) => (v ? patchConversation.mutateAsync({ current_stage: v }) : undefined)}
         />
         <EditableDetailRow
           label="Fuente"
@@ -868,9 +826,7 @@ function ContactDetailGridSection({
           editable
           deletable
           inputType="email"
-          validate={(v) =>
-            v === "" || /^.+@.+\..+$/.test(v) ? null : "Email inválido"
-          }
+          validate={(v) => (v === "" || /^.+@.+\..+$/.test(v) ? null : "Email inválido")}
           onSave={(v) => patchCustomer.mutateAsync({ email: v })}
           onDelete={() => patchCustomer.mutateAsync({ email: null })}
         />
@@ -972,9 +928,7 @@ function MissingDocumentsSection({
             Sin checklist asignado para este contacto.
           </p>
         ) : missing.length === 0 ? (
-          <p className="mt-2 text-[11px] text-emerald-600">
-            Documentacion completa para avanzar.
-          </p>
+          <p className="mt-2 text-[11px] text-emerald-600">Documentacion completa para avanzar.</p>
         ) : (
           <ul className="mt-2 space-y-1.5">
             {missing.slice(0, 3).map((doc) => (
@@ -1012,7 +966,12 @@ function suggestedNextAction(
   if (missing.length > 0) {
     return `Solicitar ${missing[0]?.label ?? "documentos faltantes"} para continuar la evaluacion.`;
   }
-  if (customer && customer.score >= 80 && !stage.includes("CITA") && !stage.includes("APPOINTMENT")) {
+  if (
+    customer &&
+    customer.score >= 80 &&
+    !stage.includes("CITA") &&
+    !stage.includes("APPOINTMENT")
+  ) {
     return "Agendar prueba de manejo y confirmar disponibilidad del asesor.";
   }
   if (intent.includes("ASK_PRICE") || intent.includes("PRICE")) {
@@ -1040,9 +999,7 @@ function NextBestActionSection({
           <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
           Next Best Action
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-          {action}
-        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{action}</p>
         <Button
           size="sm"
           className="mt-3 h-7 w-full gap-1.5 text-xs"
@@ -1122,9 +1079,7 @@ function RisksDetectedSection({
           )}
         </div>
         {risks.length === 0 ? (
-          <p className="mt-2 text-[11px] text-emerald-600">
-            Sin riesgos operativos relevantes.
-          </p>
+          <p className="mt-2 text-[11px] text-emerald-600">Sin riesgos operativos relevantes.</p>
         ) : (
           <ul className="mt-2 space-y-1.5">
             {risks.map((risk) => (
@@ -1138,7 +1093,11 @@ function RisksDetectedSection({
         <button
           type="button"
           className="mt-2 text-[11px] font-medium text-primary hover:underline"
-          onClick={() => toast.info("Recomendaciones listas", { description: suggestedNextAction(customer, conversation) })}
+          onClick={() =>
+            toast.info("Recomendaciones listas", {
+              description: suggestedNextAction(customer, conversation),
+            })
+          }
         >
           Ver recomendaciones
         </button>
@@ -1147,11 +1106,7 @@ function RisksDetectedSection({
   );
 }
 
-function EventTimelineSection({
-  conversation,
-}: {
-  conversation: ConversationDetail | undefined;
-}) {
+function EventTimelineSection({ conversation }: { conversation: ConversationDetail | undefined }) {
   const entries = [
     {
       label: "Conversacion iniciada",
@@ -1163,11 +1118,13 @@ function EventTimelineSection({
       time: formatShortDateTime(conversation?.last_activity_at),
       tone: "bg-purple-500",
     },
-    ...completedDocs(conversation).slice(0, 2).map((doc) => ({
-      label: `${doc.label} recibido`,
-      time: formatShortDateTime(conversation?.last_activity_at),
-      tone: "bg-emerald-500",
-    })),
+    ...completedDocs(conversation)
+      .slice(0, 2)
+      .map((doc) => ({
+        label: `${doc.label} recibido`,
+        time: formatShortDateTime(conversation?.last_activity_at),
+        tone: "bg-emerald-500",
+      })),
     {
       label: conversation?.last_intent
         ? `${normalizeIntent(conversation.last_intent)} detectado`
@@ -1191,9 +1148,7 @@ function EventTimelineSection({
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{entry.label}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {entry.time ?? "Sin fecha"}
-              </div>
+              <div className="text-[10px] text-muted-foreground">{entry.time ?? "Sin fecha"}</div>
             </div>
           </li>
         ))}
@@ -1206,11 +1161,7 @@ function EventTimelineSection({
 // ConversationSummarySection
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ConversationSummarySection({
-  conversation,
-}: {
-  conversation: ConversationDetail;
-}) {
+function ConversationSummarySection({ conversation }: { conversation: ConversationDetail }) {
   const qc = useQueryClient();
   const pipeline = useQuery({
     queryKey: ["tenants", "pipeline"],
@@ -1229,11 +1180,7 @@ function ConversationSummarySection({
   });
 
   const stages =
-    (
-      pipeline.data?.definition?.stages as
-        | Array<{ id: string; label?: string }>
-        | undefined
-    ) ?? [];
+    (pipeline.data?.definition?.stages as Array<{ id: string; label?: string }> | undefined) ?? [];
 
   const completedDocs = conversation.required_docs.filter((d) => d.present).length;
   const totalDocs = conversation.required_docs.length;
@@ -1245,10 +1192,7 @@ function ConversationSummarySection({
       {/* Stage selector */}
       <div>
         <Label className="text-[11px] text-muted-foreground">Etapa</Label>
-        <Select
-          value={conversation.current_stage}
-          onValueChange={(stage) => patch.mutate(stage)}
-        >
+        <Select value={conversation.current_stage} onValueChange={(stage) => patch.mutate(stage)}>
           <SelectTrigger className="mt-0.5 h-7 text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -1270,9 +1214,7 @@ function ConversationSummarySection({
             <span
               className={cn(
                 "text-[11px] font-medium",
-                completedDocs === totalDocs
-                  ? "text-emerald-500"
-                  : "text-amber-500",
+                completedDocs === totalDocs ? "text-emerald-500" : "text-amber-500",
               )}
             >
               {completedDocs}/{totalDocs}
@@ -1361,12 +1303,7 @@ function CustomFieldsSection({ customerId }: { customerId: string }) {
       <SectionLabel>Campos personalizados</SectionLabel>
       <div className="space-y-2">
         {defs.data.map((d) => (
-          <FieldInput
-            key={d.id}
-            definition={d}
-            value={draft[d.key] ?? ""}
-            onChange={update}
-          />
+          <FieldInput key={d.id} definition={d} value={draft[d.key] ?? ""} onChange={update} />
         ))}
       </div>
       {dirty && (
@@ -1438,9 +1375,7 @@ function FieldInput({
         <Label className="text-[11px]">{label}</Label>
         <div className="mt-0.5 flex flex-wrap gap-1">
           {choices.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground">
-              (sin opciones)
-            </span>
+            <span className="text-[10px] text-muted-foreground">(sin opciones)</span>
           ) : (
             choices.map((c) => {
               const checked = selected.includes(c);
@@ -1489,12 +1424,7 @@ function FieldInput({
     );
   }
 
-  const inputType =
-    field_type === "number"
-      ? "number"
-      : field_type === "date"
-        ? "date"
-        : "text";
+  const inputType = field_type === "number" ? "number" : field_type === "date" ? "date" : "text";
 
   return (
     <div>
@@ -1607,9 +1537,7 @@ function NotesSection({
             }}
           />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground">
-              Ctrl+Enter para guardar
-            </span>
+            <span className="text-[10px] text-muted-foreground">Ctrl+Enter para guardar</span>
             <div className="flex gap-1">
               <Button
                 size="sm"
@@ -1658,13 +1586,7 @@ function NotesSection({
   );
 }
 
-function NoteCard({
-  note,
-  customerId,
-}: {
-  note: CustomerNote;
-  customerId: string;
-}) {
+function NoteCard({ note, customerId }: { note: CustomerNote; customerId: string }) {
   const updateNote = useUpdateNote(customerId);
   const deleteNote = useDeleteNote(customerId);
   const [editing, setEditing] = useState(false);
@@ -1680,10 +1602,7 @@ function NoteCard({
   const saveEdit = () => {
     const text = editContent.trim();
     if (!text) return;
-    updateNote.mutate(
-      { noteId: note.id, content: text },
-      { onSuccess: () => setEditing(false) },
-    );
+    updateNote.mutate({ noteId: note.id, content: text }, { onSuccess: () => setEditing(false) });
   };
 
   const togglePin = () => {
@@ -1698,9 +1617,7 @@ function NoteCard({
     <div
       className={cn(
         "rounded-lg border p-2.5 text-xs space-y-1.5 transition-colors",
-        note.pinned
-          ? "border-amber-500/30 bg-amber-500/5"
-          : "border-border bg-card",
+        note.pinned ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-card",
       )}
     >
       {/* Header */}
@@ -1709,13 +1626,9 @@ function NoteCard({
           <span className="font-medium truncate max-w-[100px]">
             {note.author_email?.split("@")[0] ?? "Sistema"}
           </span>
-          <span className="text-[10px] text-muted-foreground shrink-0">
-            · {relativeTime}
-          </span>
+          <span className="text-[10px] text-muted-foreground shrink-0">· {relativeTime}</span>
           {wasEdited && (
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              · editada
-            </span>
+            <span className="text-[10px] text-muted-foreground shrink-0">· editada</span>
           )}
           {note.pinned && (
             <span className="inline-flex items-center gap-0.5 rounded border border-amber-500/20 bg-amber-500/10 px-1 py-0 text-[10px] text-amber-600">
@@ -1732,11 +1645,7 @@ function NoteCard({
             onClick={togglePin}
             className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
           >
-            {note.pinned ? (
-              <PinOff className="h-3 w-3" />
-            ) : (
-              <Pin className="h-3 w-3" />
-            )}
+            {note.pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
           </button>
           <button
             type="button"
@@ -1853,9 +1762,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
       {/* ── Panel header ─────────────────────────────────────────────── */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
         <div className="min-w-0">
-          <span className="block truncate text-xs font-semibold">
-            Inteligencia del cliente
-          </span>
+          <span className="block truncate text-xs font-semibold">Inteligencia del cliente</span>
           <span className="block truncate text-[10px] text-muted-foreground">
             contacto, riesgo y siguiente accion
           </span>
@@ -1891,9 +1798,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
               <ContactIdentitySection customerId={customerId} />
 
               {/* Quick actions */}
-              {customer.data && (
-                <QuickActionsSection phone={customer.data.phone_e164} />
-              )}
+              {customer.data && <QuickActionsSection phone={customer.data.phone_e164} />}
 
               <Separator />
               <IntelligenceScoreSection customer={customer.data} />
@@ -1906,22 +1811,13 @@ export function ContactPanel({ customerId, conversation }: Props) {
               />
 
               <Separator />
-              <MissingDocumentsSection
-                customerId={customerId}
-                conversation={conversation}
-              />
+              <MissingDocumentsSection customerId={customerId} conversation={conversation} />
 
               <Separator />
-              <NextBestActionSection
-                customer={customer.data}
-                conversation={conversation}
-              />
+              <NextBestActionSection customer={customer.data} conversation={conversation} />
 
               <Separator />
-              <RisksDetectedSection
-                customer={customer.data}
-                conversation={conversation}
-              />
+              <RisksDetectedSection customer={customer.data} conversation={conversation} />
 
               <Separator />
               <EventTimelineSection conversation={conversation} />
@@ -1940,10 +1836,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
 
               {/* Notes */}
               <Separator />
-              <NotesSection
-                customerId={customerId}
-                conversationId={conversation?.id}
-              />
+              <NotesSection customerId={customerId} conversationId={conversation?.id} />
             </>
           ) : (
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">

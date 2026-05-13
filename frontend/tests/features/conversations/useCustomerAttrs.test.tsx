@@ -23,9 +23,7 @@ function makeWrapper(seed?: Record<string, unknown>) {
 
 describe("useCustomerAttrs", () => {
   it("patchAttr merges with current attrs (read-modify-write)", async () => {
-    const spy = vi
-      .spyOn(customersApi, "patch")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(customersApi, "patch").mockResolvedValue({} as never);
     const { Wrapper } = makeWrapper({ foo: "1", bar: "2" });
     const { result } = renderHook(() => useCustomerAttrs(customerId), {
       wrapper: Wrapper,
@@ -40,9 +38,7 @@ describe("useCustomerAttrs", () => {
   });
 
   it("deleteAttr removes the key from current attrs", async () => {
-    const spy = vi
-      .spyOn(customersApi, "patch")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(customersApi, "patch").mockResolvedValue({} as never);
     const { Wrapper } = makeWrapper({ foo: "1", bar: "2" });
     const { result } = renderHook(() => useCustomerAttrs(customerId), {
       wrapper: Wrapper,
@@ -55,9 +51,7 @@ describe("useCustomerAttrs", () => {
   });
 
   it("patchAttr handles missing customer in cache (treats as empty attrs)", async () => {
-    const spy = vi
-      .spyOn(customersApi, "patch")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(customersApi, "patch").mockResolvedValue({} as never);
     const { Wrapper } = makeWrapper(undefined);
     const { result } = renderHook(() => useCustomerAttrs(customerId), {
       wrapper: Wrapper,
@@ -70,9 +64,7 @@ describe("useCustomerAttrs", () => {
   });
 
   it("patchAttr overwrites existing key, preserving siblings", async () => {
-    const spy = vi
-      .spyOn(customersApi, "patch")
-      .mockResolvedValue({} as never);
+    const spy = vi.spyOn(customersApi, "patch").mockResolvedValue({} as never);
     const { Wrapper } = makeWrapper({ foo: "old", bar: "keep" });
     const { result } = renderHook(() => useCustomerAttrs(customerId), {
       wrapper: Wrapper,

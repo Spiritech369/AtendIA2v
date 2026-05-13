@@ -25,9 +25,7 @@ describe("slugify", () => {
 describe("AddCustomAttrDialog", () => {
   it("auto-slugifies the key from the label", async () => {
     const user = userEvent.setup();
-    render(
-      <AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />,
-    );
+    render(<AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />);
     const labelInput = screen.getByLabelText("Etiqueta");
     await user.type(labelInput, "Color Favorito");
     const keyInput = screen.getByLabelText("Clave") as HTMLInputElement;
@@ -36,9 +34,7 @@ describe("AddCustomAttrDialog", () => {
 
   it("allows manual key override that sticks despite later label changes", async () => {
     const user = userEvent.setup();
-    render(
-      <AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />,
-    );
+    render(<AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />);
     const labelInput = screen.getByLabelText("Etiqueta");
     const keyInput = screen.getByLabelText("Clave") as HTMLInputElement;
     await user.type(labelInput, "Algo");
@@ -51,9 +47,7 @@ describe("AddCustomAttrDialog", () => {
   it("calls onSubmit with payload on save", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(
-      <AddCustomAttrDialog open onClose={() => {}} onSubmit={onSubmit} />,
-    );
+    render(<AddCustomAttrDialog open onClose={() => {}} onSubmit={onSubmit} />);
     await user.type(screen.getByLabelText("Etiqueta"), "Color");
     await user.type(screen.getByLabelText("Valor"), "Rojo");
     await user.click(screen.getByRole("button", { name: /guardar/i }));
@@ -66,9 +60,7 @@ describe("AddCustomAttrDialog", () => {
   });
 
   it("save button is disabled when key or value is empty", async () => {
-    render(
-      <AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />,
-    );
+    render(<AddCustomAttrDialog open onClose={() => {}} onSubmit={() => {}} />);
     const saveBtn = screen.getByRole("button", { name: /guardar/i });
     expect(saveBtn).toBeDisabled();
   });

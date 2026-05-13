@@ -152,19 +152,10 @@ export function EditableDetailRow({
           )}
           {error && <p className="text-[10px] text-destructive">{error}</p>}
           <div className="flex gap-1">
-            <Button
-              size="sm"
-              className="h-6 px-2 text-[11px]"
-              onClick={() => void save()}
-            >
+            <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => void save()}>
               <Check className="mr-1 h-3 w-3" /> Guardar
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[11px]"
-              onClick={cancel}
-            >
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={cancel}>
               Cancelar
             </Button>
           </div>

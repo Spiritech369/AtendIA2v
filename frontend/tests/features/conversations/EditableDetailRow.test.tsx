@@ -21,13 +21,7 @@ describe("EditableDetailRow", () => {
 
   it("falls back to 'Sin dato' when value is null", () => {
     render(
-      <EditableDetailRow
-        label="Email"
-        value={null}
-        editable
-        deletable={false}
-        onSave={() => {}}
-      />,
+      <EditableDetailRow label="Email" value={null} editable deletable={false} onSave={() => {}} />,
     );
     expect(screen.getByText("Sin dato")).toBeInTheDocument();
   });
@@ -56,15 +50,7 @@ describe("EditableDetailRow", () => {
   it("cancels on Escape without calling onSave", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    render(
-      <EditableDetailRow
-        label="X"
-        value="v"
-        editable
-        deletable={false}
-        onSave={onSave}
-      />,
-    );
+    render(<EditableDetailRow label="X" value="v" editable deletable={false} onSave={onSave} />);
     await user.click(screen.getByLabelText("Editar X"));
     const input = screen.getByDisplayValue("v");
     fireEvent.keyDown(input, { key: "Escape" });
@@ -137,13 +123,7 @@ describe("EditableDetailRow", () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <EditableDetailRow
-        label="X"
-        value="something"
-        editable
-        deletable={false}
-        onSave={onSave}
-      />,
+      <EditableDetailRow label="X" value="something" editable deletable={false} onSave={onSave} />,
     );
     await user.click(screen.getByLabelText("Editar X"));
     const input = screen.getByDisplayValue("something") as HTMLInputElement;

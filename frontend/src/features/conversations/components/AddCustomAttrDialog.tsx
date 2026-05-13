@@ -128,13 +128,7 @@ export function AddCustomAttrDialog({ open, onClose, onSubmit }: Props) {
             <Label htmlFor="custom-attr-value">Valor</Label>
             <Input
               id="custom-attr-value"
-              type={
-                fieldType === "number"
-                  ? "number"
-                  : fieldType === "date"
-                    ? "date"
-                    : "text"
-              }
+              type={fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text"}
               value={value}
               onChange={(e) => setValue(e.target.value)}
             />
@@ -144,10 +138,7 @@ export function AddCustomAttrDialog({ open, onClose, onSubmit }: Props) {
           <Button variant="ghost" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!key.trim() || !value.trim()}
-          >
+          <Button onClick={handleSave} disabled={!key.trim() || !value.trim()}>
             Guardar
           </Button>
         </DialogFooter>

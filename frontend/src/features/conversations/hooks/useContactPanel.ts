@@ -2,12 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { conversationsApi } from "@/features/conversations/api";
-import {
-  type CustomerPatch,
-  customersApi,
-  fieldsApi,
-  notesApi,
-} from "@/features/customers/api";
+import { type CustomerPatch, customersApi, fieldsApi, notesApi } from "@/features/customers/api";
 
 export function useCustomerDetail(customerId: string | undefined) {
   return useQuery({
@@ -41,8 +36,7 @@ export function useCustomerNotes(customerId: string | undefined) {
 export function useCreateNote(customerId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { content: string; pinned?: boolean }) =>
-      notesApi.create(customerId, body),
+    mutationFn: (body: { content: string; pinned?: boolean }) => notesApi.create(customerId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["customer-notes", customerId] });
     },
@@ -91,8 +85,7 @@ export function useFieldValues(customerId: string | undefined) {
 export function usePutFieldValues(customerId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (values: Record<string, string | null>) =>
-      fieldsApi.putValues(customerId, values),
+    mutationFn: (values: Record<string, string | null>) => fieldsApi.putValues(customerId, values),
     onSuccess: () => {
       toast.success("Campos actualizados");
       void qc.invalidateQueries({ queryKey: ["field-values", customerId] });
@@ -123,7 +116,6 @@ export function usePatchConversation(conversationId: string | undefined) {
       }
       void qc.invalidateQueries({ queryKey: ["conversations"] });
     },
-    onError: (e) =>
-      toast.error("Error al actualizar conversación", { description: e.message }),
+    onError: (e) => toast.error("Error al actualizar conversación", { description: e.message }),
   });
 }
