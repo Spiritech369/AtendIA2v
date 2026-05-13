@@ -266,10 +266,14 @@ async def baileys_inbound(
         )
     ).scalar()
 
+    # Exclude soft-deleted conversations so an event after the operator
+    # deleted the chat opens a fresh one instead of attaching to the
+    # hidden tombstone.
     conv_id = (
         await session.execute(
             text(
                 "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                "AND deleted_at IS NULL "
                 "ORDER BY last_activity_at DESC NULLS LAST LIMIT 1"
             ),
             {"t": body.tenant_id, "c": cust_id},
@@ -524,10 +528,14 @@ async def baileys_outbound_echo(
         )
     ).scalar()
 
+    # Exclude soft-deleted conversations so an event after the operator
+    # deleted the chat opens a fresh one instead of attaching to the
+    # hidden tombstone.
     conv_id = (
         await session.execute(
             text(
                 "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                "AND deleted_at IS NULL "
                 "ORDER BY last_activity_at DESC NULLS LAST LIMIT 1"
             ),
             {"t": body.tenant_id, "c": cust_id},

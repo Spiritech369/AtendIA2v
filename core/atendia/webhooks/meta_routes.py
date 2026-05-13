@@ -238,9 +238,13 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
         ),
         {"t": tenant_id, "p": m.from_phone_e164},
     )).scalar()
+    # Soft-deleted conversations are excluded so an inbound after a
+    # `DELETE /conversations/:id` opens a fresh conversation instead of
+    # attaching the message to the ghosted one (which the UI hides).
     conv_id = (await session.execute(
         text(
             "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+            "AND deleted_at IS NULL "
             "ORDER BY last_activity_at DESC LIMIT 1"
         ),
         {"t": tenant_id, "c": cust_id},
