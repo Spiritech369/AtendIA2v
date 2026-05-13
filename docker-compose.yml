@@ -48,6 +48,8 @@ services:
       # Sobreescribir solo las URLs que cambian dentro de Docker
       ATENDIA_V2_DATABASE_URL: postgresql+asyncpg://atendia:atendia@postgres-v2:5432/atendia_v2
       ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
+      ATENDIA_V2_BAILEYS_BRIDGE_URL: http://baileys-bridge:7755
+      ATENDIA_V2_BAILEYS_INTERNAL_TOKEN: ${BAILEYS_INTERNAL_TOKEN:-dev-only-baileys-token-change-me}
     volumes:
       - ./core:/app        # hot-reload: cambios en código se reflejan al instante
       - /app/.venv         # el .venv del contenedor no es sobreescrito por el volumen
@@ -56,6 +58,26 @@ services:
         condition: service_healthy
       redis-v2:
         condition: service_healthy
+
+  # ── Baileys sidecar (canal WhatsApp QR no oficial) ─────────────────────────
+
+  baileys-bridge:
+    build:
+      context: ./core/baileys-bridge
+      dockerfile: Dockerfile
+    container_name: atendia_baileys_bridge
+    restart: unless-stopped
+    ports:
+      - "7755:7755"        # interno; expuesto para debug
+    environment:
+      PORT: "7755"
+      HOST: "0.0.0.0"
+      ATENDIA_API_BASE: "http://backend:8001"
+      INTERNAL_TOKEN: ${BAILEYS_INTERNAL_TOKEN:-dev-only-baileys-token-change-me}
+      AUTH_DIR: /app/auth_info
+      LOG_LEVEL: info
+    volumes:
+      - baileys_auth:/app/auth_info  # persist QR session across restarts
 
   # ── Frontend (Vite dev server con hot-reload) ──────────────────────────────
 
@@ -81,3 +103,6 @@ volumes:
   atendia_v2_pg_data:
     external: true
     name: v2-nucleo-conversacional_atendia_v2_pg_data
+  baileys_auth:
+    # Persist Baileys auth_info across restarts — losing this volume means
+    # the user must re-scan the QR.
