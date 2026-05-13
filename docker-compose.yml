@@ -59,6 +59,53 @@ services:
       redis-v2:
         condition: service_healthy
 
+  # ── arq workers ────────────────────────────────────────────────────────────
+  # Two pools so a slow workflow can't starve send_outbound. Both reuse the
+  # backend image + bind-mount of ./core so any code change is picked up on
+  # restart (no rebuild needed).
+
+  worker:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: atendia_worker
+    restart: unless-stopped
+    command: ["uv", "run", "arq", "atendia.queue.worker.WorkerSettings"]
+    env_file:
+      - ./core/.env
+    environment:
+      ATENDIA_V2_DATABASE_URL: postgresql+asyncpg://atendia:atendia@postgres-v2:5432/atendia_v2
+      ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
+    volumes:
+      - ./core:/app
+      - /app/.venv
+    depends_on:
+      postgres-v2:
+        condition: service_healthy
+      redis-v2:
+        condition: service_healthy
+
+  workflow-worker:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: atendia_workflow_worker
+    restart: unless-stopped
+    command: ["uv", "run", "arq", "atendia.queue.worker.WorkflowWorkerSettings"]
+    env_file:
+      - ./core/.env
+    environment:
+      ATENDIA_V2_DATABASE_URL: postgresql+asyncpg://atendia:atendia@postgres-v2:5432/atendia_v2
+      ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
+    volumes:
+      - ./core:/app
+      - /app/.venv
+    depends_on:
+      postgres-v2:
+        condition: service_healthy
+      redis-v2:
+        condition: service_healthy
+
   # ── Baileys sidecar (canal WhatsApp QR no oficial) ─────────────────────────
 
   baileys-bridge:
