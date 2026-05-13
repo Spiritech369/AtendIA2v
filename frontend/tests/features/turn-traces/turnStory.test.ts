@@ -117,9 +117,7 @@ describe("buildTurnStory", () => {
     const steps = buildTurnStory(trace);
     const tool = steps.find((s) => s.kind === "tool");
     expect(tool).toMatchObject({ kind: "tool", toolName: "search_catalog" });
-    expect(
-      (tool as { kind: "tool"; summary: string }).summary,
-    ).toContain("Civic");
+    expect((tool as { kind: "tool"; summary: string }).summary).toContain("Civic");
   });
 
   it("flags hasMedia when inbound_text is null but a message id exists", () => {

@@ -33,11 +33,7 @@ function extractEntities(nluOutput: unknown): Record<string, unknown> {
   return out;
 }
 
-function summarizeTool(
-  name: string,
-  input: unknown,
-  output: unknown,
-): string {
+function summarizeTool(name: string, input: unknown, output: unknown): string {
   if (name === "search_catalog" && output && typeof output === "object") {
     const results = (output as { results?: unknown }).results;
     if (Array.isArray(results) && results.length > 0) {
@@ -60,20 +56,15 @@ function summarizeTool(
   }
   if (input && typeof input === "object") {
     const entries = Object.entries(input).slice(0, 2);
-    return (
-      entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ") ||
-      "(sin datos)"
-    );
+    return entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ") || "(sin datos)";
   }
   return "(sin datos)";
 }
 
-function parseTransition(
-  t: string | null,
-): { from: string; to: string } | null {
+function parseTransition(t: string | null): { from: string; to: string } | null {
   if (!t) return null;
   const m = t.match(/^(.+?)\s*(?:→|->)\s*(.+)$/);
-  if (m && m[1] && m[2]) return { from: m[1].trim(), to: m[2].trim() };
+  if (m?.[1] && m[2]) return { from: m[1].trim(), to: m[2].trim() };
   return null;
 }
 
@@ -123,9 +114,7 @@ export function buildTurnStory(trace: TurnTraceDetail): StoryStep[] {
 
   if (trace.composer_output) {
     const out = trace.composer_output as Record<string, unknown>;
-    const messages = Array.isArray(out.messages)
-      ? out.messages.map((m) => String(m))
-      : [];
+    const messages = Array.isArray(out.messages) ? out.messages.map((m) => String(m)) : [];
     if (messages.length > 0) steps.push({ kind: "composer", messages });
   }
 

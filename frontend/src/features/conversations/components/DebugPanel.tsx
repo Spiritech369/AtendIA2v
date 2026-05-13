@@ -102,12 +102,7 @@ function PanelShell({
             </Badge>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={onClose}
-        >
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
       </div>

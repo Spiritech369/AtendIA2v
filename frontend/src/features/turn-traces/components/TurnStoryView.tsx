@@ -54,9 +54,7 @@ function renderStep(step: StoryStep) {
               <span className="italic">«{step.text}»</span>
             </>
           ) : step.hasMedia ? (
-            <span className="text-muted-foreground">
-              Cliente envió un adjunto (sin texto).
-            </span>
+            <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>
           ) : (
             <span className="text-muted-foreground">Sin mensaje entrante.</span>
           )}
@@ -64,9 +62,7 @@ function renderStep(step: StoryStep) {
       );
     case "nlu": {
       const entities = Object.entries(step.extracted ?? {});
-      const intentLabel = step.intent
-        ? (INTENT_LABELS[step.intent] ?? step.intent)
-        : "—";
+      const intentLabel = step.intent ? (INTENT_LABELS[step.intent] ?? step.intent) : "—";
       return (
         <StepRow icon={Brain}>
           <span className="text-muted-foreground">Bot entendió:</span>{" "}
@@ -82,8 +78,7 @@ function renderStep(step: StoryStep) {
     case "mode":
       return (
         <StepRow icon={Target}>
-          <span className="text-muted-foreground">Modo:</span>{" "}
-          <FlowModeBadge mode={step.mode} />
+          <span className="text-muted-foreground">Modo:</span> <FlowModeBadge mode={step.mode} />
         </StepRow>
       );
     case "tool":
@@ -119,10 +114,8 @@ function renderStep(step: StoryStep) {
           </span>
           <ul className="mt-1 space-y-0.5">
             {step.previews.map((p, i) => (
-              <li
-                key={`${i}-${p.slice(0, 12)}`}
-                className="text-xs text-muted-foreground"
-              >
+              // biome-ignore lint/suspicious/noArrayIndexKey: previews are derived from immutable trace JSON, never reordered.
+              <li key={`${i}-${p.slice(0, 12)}`} className="text-xs text-muted-foreground">
                 · {truncate(p, 100)}
               </li>
             ))}
@@ -152,6 +145,7 @@ export function TurnStoryView({ steps }: { steps: StoryStep[] }) {
   return (
     <div className="divide-y rounded-md border">
       {steps.map((step, idx) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: story steps are derived deterministically from the trace and never reordered.
         <div key={`${idx}-${step.kind}`} className="px-3">
           {renderStep(step)}
         </div>

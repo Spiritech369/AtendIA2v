@@ -1,23 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { turnTracesApi } from "@/features/turn-traces/api";
 
 import { buildTurnStory } from "../lib/turnStory";
 import { FlowModeBadge } from "./FlowModeBadge";
+import { TurnStoryView } from "./TurnStoryView";
 import {
   ComposerSection,
   ErrorsSection,
@@ -27,7 +18,6 @@ import {
   StateSection,
   ToolCallsSection,
 } from "./TurnTraceSections";
-import { TurnStoryView } from "./TurnStoryView";
 
 export function TurnTraceInspector({
   traceId,
@@ -40,8 +30,7 @@ export function TurnTraceInspector({
 }) {
   const query = useQuery({
     queryKey: ["turn-trace", traceId],
-    queryFn: () =>
-      traceId ? turnTracesApi.getOne(traceId) : Promise.reject(),
+    queryFn: () => (traceId ? turnTracesApi.getOne(traceId) : Promise.reject()),
     enabled: !!traceId && open,
   });
 
@@ -51,9 +40,7 @@ export function TurnTraceInspector({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Turn {query.data?.turn_number ?? "…"}
-            {query.data?.flow_mode && (
-              <FlowModeBadge mode={query.data.flow_mode} />
-            )}
+            {query.data?.flow_mode && <FlowModeBadge mode={query.data.flow_mode} />}
           </DialogTitle>
         </DialogHeader>
         {query.isLoading || !query.data ? (

@@ -19,9 +19,7 @@ describe("TurnStoryView", () => {
   });
 
   it("renders inbound media note when text is missing and hasMedia is true", () => {
-    const steps: StoryStep[] = [
-      { kind: "inbound", text: null, hasMedia: true },
-    ];
+    const steps: StoryStep[] = [{ kind: "inbound", text: null, hasMedia: true }];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText(/adjunto/i)).toBeInTheDocument();
   });
@@ -71,9 +69,7 @@ describe("TurnStoryView", () => {
   });
 
   it("renders stage transition with from and to", () => {
-    const steps: StoryStep[] = [
-      { kind: "transition", from: "lead_warm", to: "quote_sent" },
-    ];
+    const steps: StoryStep[] = [{ kind: "transition", from: "lead_warm", to: "quote_sent" }];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText("lead_warm")).toBeInTheDocument();
     expect(screen.getByText("quote_sent")).toBeInTheDocument();

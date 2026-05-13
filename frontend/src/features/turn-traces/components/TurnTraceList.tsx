@@ -78,9 +78,7 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
                     )}
                   </TableCell>
                   <TableCell className="max-w-[260px] truncate text-xs text-muted-foreground">
-                    {t.inbound_preview ?? (
-                      <span className="italic">(sin texto)</span>
-                    )}
+                    {t.inbound_preview ?? <span className="italic">(sin texto)</span>}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {t.nlu_model ?? "—"}
