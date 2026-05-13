@@ -1,20 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { turnTracesApi } from "@/features/turn-traces/api";
 
-function JsonBlock({ value }: { value: unknown }) {
-  if (value == null) {
-    return <div className="text-xs text-muted-foreground">(vacío)</div>;
-  }
-  return (
-    <pre className="overflow-auto rounded bg-muted p-2 text-xs">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
+import { buildTurnStory } from "../lib/turnStory";
+import { FlowModeBadge } from "./FlowModeBadge";
+import {
+  ComposerSection,
+  ErrorsSection,
+  NluSection,
+  OverviewSection,
+  PipelineSection,
+  StateSection,
+  ToolCallsSection,
+} from "./TurnTraceSections";
+import { TurnStoryView } from "./TurnStoryView";
 
 export function TurnTraceInspector({
   traceId,
@@ -27,80 +40,57 @@ export function TurnTraceInspector({
 }) {
   const query = useQuery({
     queryKey: ["turn-trace", traceId],
-    queryFn: () => (traceId ? turnTracesApi.getOne(traceId) : Promise.reject()),
+    queryFn: () =>
+      traceId ? turnTracesApi.getOne(traceId) : Promise.reject(),
     enabled: !!traceId && open,
   });
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
             Turn {query.data?.turn_number ?? "…"}
-            {query.data?.flow_mode && ` · ${query.data.flow_mode}`}
+            {query.data?.flow_mode && (
+              <FlowModeBadge mode={query.data.flow_mode} />
+            )}
           </DialogTitle>
         </DialogHeader>
         {query.isLoading || !query.data ? (
           <Skeleton className="h-64 w-full" />
         ) : (
-          <Tabs defaultValue="nlu">
+          <Tabs defaultValue="story">
             <TabsList>
-              <TabsTrigger value="nlu">NLU</TabsTrigger>
-              <TabsTrigger value="composer">Composer</TabsTrigger>
-              <TabsTrigger value="state">Estado</TabsTrigger>
-              <TabsTrigger value="outbound">Outbound</TabsTrigger>
+              <TabsTrigger value="story">Resumen</TabsTrigger>
+              <TabsTrigger value="detail">Detalle técnico</TabsTrigger>
               <TabsTrigger value="raw">Raw</TabsTrigger>
             </TabsList>
-            <TabsContent value="nlu" className="space-y-3">
-              <div>
-                <div className="text-xs text-muted-foreground">Inbound</div>
-                <div className="rounded-md bg-muted p-2 text-sm italic">
-                  {query.data.inbound_text ?? "(sin texto)"}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">NLU input</div>
-                <JsonBlock value={query.data.nlu_input} />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">NLU output</div>
-                <JsonBlock value={query.data.nlu_output} />
-              </div>
+            <TabsContent value="story" className="space-y-3">
+              <TurnStoryView steps={buildTurnStory(query.data)} />
             </TabsContent>
-            <TabsContent value="composer" className="space-y-3">
-              <div className="text-xs text-muted-foreground">
-                {query.data.composer_model ?? "(sin composer)"}
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Composer input</div>
-                <JsonBlock value={query.data.composer_input} />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Composer output</div>
-                <JsonBlock value={query.data.composer_output} />
-              </div>
-            </TabsContent>
-            <TabsContent value="state" className="space-y-3">
-              <div>
-                <div className="text-xs text-muted-foreground">Antes</div>
-                <JsonBlock value={query.data.state_before} />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Después</div>
-                <JsonBlock value={query.data.state_after} />
-              </div>
-              {query.data.stage_transition && (
-                <div className="text-sm">
-                  <span className="text-xs text-muted-foreground">Transición: </span>
-                  {query.data.stage_transition}
-                </div>
+            <TabsContent value="detail" className="space-y-0">
+              <OverviewSection trace={query.data} />
+              <Separator />
+              <PipelineSection trace={query.data} />
+              <Separator />
+              <NluSection trace={query.data} />
+              <Separator />
+              <ComposerSection trace={query.data} />
+              {query.data.tool_calls.length > 0 && (
+                <>
+                  <Separator />
+                  <ToolCallsSection trace={query.data} />
+                </>
               )}
-            </TabsContent>
-            <TabsContent value="outbound">
-              <JsonBlock value={query.data.outbound_messages} />
+              <Separator />
+              <StateSection trace={query.data} />
+              <Separator />
+              <ErrorsSection trace={query.data} />
             </TabsContent>
             <TabsContent value="raw">
-              <JsonBlock value={query.data} />
+              <pre className="overflow-auto rounded bg-muted p-2 text-xs">
+                {JSON.stringify(query.data, null, 2)}
+              </pre>
             </TabsContent>
           </Tabs>
         )}
