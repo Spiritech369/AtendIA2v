@@ -18,6 +18,14 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -201,6 +209,31 @@ export function PipelineEditor({ onClose }: Props) {
     onError: (e) => toast.error("Error al guardar", { description: e.message }),
   });
 
+  // Destructive: blow away every pipeline version for this tenant. The
+  // operator is then bounced back to the empty-state seed (the editor's
+  // useEffect refills draft from the seed when query.isError fires). The
+  // backend endpoint is admin-only — we still gate the button on canEdit
+  // for the same reason.
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => tenantsApi.deletePipeline(),
+    onSuccess: () => {
+      toast.success("Pipeline eliminado", {
+        description: "Edita el seed y guarda para crear uno nuevo.",
+      });
+      setConfirmDeleteOpen(false);
+      // Force the editor back to its empty-state path by clearing local
+      // draft and refetching. The query will 404, which the useEffect
+      // catches and replaces draft with the seed defaults.
+      setDraft(null);
+      setSelectedIdx(null);
+      void qc.invalidateQueries({ queryKey: ["tenants", "pipeline"] });
+      void qc.invalidateQueries({ queryKey: ["pipeline"] });
+    },
+    onError: (e) =>
+      toast.error("No se pudo eliminar", { description: e.message }),
+  });
+
   if (query.isLoading || !draft) {
     return (
       <div className="flex flex-col gap-3 p-4">
@@ -331,6 +364,23 @@ export function PipelineEditor({ onClose }: Props) {
             <Save className="mr-1 size-3" />
             {save.isPending ? "Guardando…" : "Guardar"}
           </Button>
+          {/* Eliminar pipeline — only visible when a saved pipeline exists.
+              Disabled while a save/delete is mid-flight or the user is not
+              an admin. Clicks open a confirmation dialog rather than
+              firing the destructive call directly. */}
+          {query.data && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setConfirmDeleteOpen(true)}
+              disabled={!canEdit || save.isPending || remove.isPending}
+              title="Eliminar todas las versiones del pipeline"
+            >
+              <Trash2 className="mr-1 size-3" />
+              Eliminar
+            </Button>
+          )}
           {onClose && (
             <Button
               variant="ghost"
@@ -344,6 +394,38 @@ export function PipelineEditor({ onClose }: Props) {
           )}
         </div>
       </div>
+
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar el pipeline?</DialogTitle>
+            <DialogDescription>
+              Esto borra <span className="font-medium">todas las versiones</span> del
+              pipeline para este tenant. Las conversaciones existentes
+              conservarán su etapa actual, pero el bot dejará de procesar
+              nuevos turnos hasta que guardes un pipeline nuevo. No se puede
+              deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteOpen(false)}
+              disabled={remove.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => remove.mutate()}
+              disabled={remove.isPending}
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              {remove.isPending ? "Eliminando…" : "Eliminar pipeline"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 overflow-y-auto">
         {/* Global error */}

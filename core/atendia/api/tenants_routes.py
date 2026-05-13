@@ -17,9 +17,9 @@ from datetime import UTC, datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
@@ -111,6 +111,30 @@ async def put_pipeline(
         active=new_row.active,
         created_at=new_row.created_at,
     )
+
+
+@router.delete("/pipeline", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pipeline(
+    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """Wipe every pipeline version for the requesting tenant.
+
+    Destructive but tenant-scoped: this is a "reset to factory" the operator
+    uses when their current pipeline shape is wrong enough that editing is
+    slower than starting over. Runtime impact: the runner's next call to
+    ``load_active_pipeline`` will raise ``PipelineNotFoundError`` until the
+    operator publishes a fresh version, so the UI must immediately surface
+    the empty-state flow (which it does, on the Kanban page).
+
+    Requires tenant_admin role.
+    """
+    await session.execute(
+        delete(TenantPipeline).where(TenantPipeline.tenant_id == tenant_id),
+    )
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------- Branding (brand_facts + tone) ----------

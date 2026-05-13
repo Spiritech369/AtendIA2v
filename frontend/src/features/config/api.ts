@@ -43,6 +43,9 @@ export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
   putPipeline: async (definition: Record<string, unknown>) =>
     (await api.put<PipelineResponse>("/tenants/pipeline", { definition })).data,
+  deletePipeline: async () => {
+    await api.delete("/tenants/pipeline");
+  },
   getBrandFacts: async () => (await api.get<BrandFactsResponse>("/tenants/brand-facts")).data,
   putBrandFacts: async (brand_facts: Record<string, string>) =>
     (await api.put<BrandFactsResponse>("/tenants/brand-facts", { brand_facts })).data,
