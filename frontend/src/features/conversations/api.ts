@@ -62,6 +62,7 @@ export interface MessageItem {
   metadata: Record<string, unknown>;
   created_at: string;
   sent_at: string | null;
+  delivery_status?: "queued" | "sent" | "delivered" | "read" | "failed" | null;
 }
 
 export interface MessageListResponse {

@@ -213,6 +213,18 @@ class BaileysInboundBody(BaseModel):
     message_id: str | None = None
 
 
+class BaileysOutboundEchoBody(BaseModel):
+    """Body for messages the operator sent from their own phone /
+    WhatsApp Web — Baileys sees them via `fromMe=true` and forwards them
+    here so AtendIA can mirror the conversation in the dashboard."""
+
+    tenant_id: UUID
+    to_phone: str = Field(min_length=8, max_length=24)
+    text: str
+    ts: int
+    message_id: str | None = None
+
+
 async def _validate_internal_token(
     x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
 ) -> None:
@@ -228,11 +240,14 @@ async def baileys_inbound(
     request: Request,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    """Persist an inbound message + run conversation turn.
+    """Full inbound pipeline for messages received via Baileys.
 
-    Mirrors meta_routes._persist_inbound (the meaningful subset for v1):
-    find/create customer + conversation, INSERT message, run turn. Skips
-    Event/Workflow/Publish wiring — Phase 2 work, tracked in design doc.
+    Same contract as the Meta webhook: persist the message, emit the
+    `MESSAGE_RECEIVED` event, evaluate workflow triggers, run the
+    conversation turn (NLU + composer + outbound enqueue), and publish a
+    realtime notification so the dashboard updates instantly.
+
+    Idempotent on `(tenant_id, channel_message_id)`.
     """
     # Normalize phone to E.164 with leading '+' if missing
     phone = body.from_phone
@@ -243,7 +258,8 @@ async def baileys_inbound(
         await session.execute(
             text(
                 "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
-                "ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164 "
+                "ON CONFLICT (tenant_id, phone_e164) DO UPDATE "
+                "SET phone_e164 = EXCLUDED.phone_e164 "
                 "RETURNING id"
             ),
             {"t": body.tenant_id, "p": phone},
@@ -306,79 +322,306 @@ async def baileys_inbound(
         text("UPDATE conversations SET unread_count = unread_count + 1 WHERE id = :c"),
         {"c": conv_id},
     )
+
+    started_executions = await _run_inbound_pipeline(
+        session=session,
+        tenant_id=body.tenant_id,
+        conversation_id=conv_id,
+        channel_message_id=body.message_id,
+        from_phone_e164=phone,
+        text_body=body.text,
+    )
     await session.commit()
 
-    # Publish to Redis Pub/Sub for real-time dashboard updates.
-    from redis.asyncio import Redis as AsyncRedis
+    # Dispatch workflow executions outside the request transaction.
+    if started_executions:
+        from arq.connections import RedisSettings, create_pool
 
-    from atendia.realtime.publisher import publish_event
+        from atendia.workflows.engine import enqueue_executions_to_workflows_queue
 
-    redis_client = AsyncRedis.from_url(get_settings().redis_url)
-    try:
-        await publish_event(
-            redis_client,
-            tenant_id=str(body.tenant_id),
-            conversation_id=str(conv_id),
-            event={
-                "type": "message_received",
-                "data": {
-                    "channel_message_id": body.message_id,
-                    "text": body.text,
-                    "conversation_id": str(conv_id),
-                },
-            },
-        )
-    finally:
-        await redis_client.aclose()
+        try:
+            arq_pool = await create_pool(
+                RedisSettings.from_dsn(get_settings().redis_url)
+            )
+            try:
+                await enqueue_executions_to_workflows_queue(
+                    arq_pool, started_executions
+                )
+            finally:
+                await arq_pool.aclose()
+        except Exception:  # pragma: no cover
+            pass
 
-    # Run conversation turn — drives the state machine, NLU, composer, and
-    # enqueues the outbound response.  Mirrors meta_routes._persist_inbound.
-    import logging
+    return {
+        "status": "ok",
+        "conversation_id": str(conv_id),
+        "message_id": str(inserted),
+    }
+
+
+async def _run_inbound_pipeline(
+    *,
+    session: AsyncSession,
+    tenant_id: UUID,
+    conversation_id,
+    channel_message_id: str | None,
+    from_phone_e164: str,
+    text_body: str,
+) -> list:
+    """Event emission + workflow evaluation + runner turn + realtime publish.
+
+    Returns the list of workflow execution IDs the caller should enqueue
+    on the workflows queue after the request transaction commits.
+    """
     from datetime import datetime as _dt
     from uuid import uuid4 as _uuid4
 
     from arq.connections import RedisSettings, create_pool
+    from redis.asyncio import Redis as _Redis
 
-    from atendia.contracts.message import Message as CanonicalMessage
-    from atendia.contracts.message import MessageDirection
+    from atendia.contracts.event import EventType
+    from atendia.contracts.message import (
+        Message as CanonicalMessage,
+    )
+    from atendia.contracts.message import (
+        MessageDirection,
+    )
+    from atendia.realtime.publisher import publish_event
     from atendia.runner.conversation_runner import ConversationRunner
+    from atendia.state_machine.event_emitter import EventEmitter
     from atendia.webhooks.meta_routes import build_composer, build_nlu
+    from atendia.workflows.engine import evaluate_event
 
+    settings = get_settings()
+
+    # 1. Emit MESSAGE_RECEIVED event so workflows + analytics see it.
+    emitter = EventEmitter(session)
+    event_row = await emitter.emit(
+        conversation_id=conversation_id,
+        tenant_id=tenant_id,
+        event_type=EventType.MESSAGE_RECEIVED,
+        payload={
+            "channel_message_id": channel_message_id,
+            "text": text_body,
+        },
+    )
+
+    # 2. Evaluate workflow triggers in the same transaction. Execution IDs
+    #    are returned so the caller can enqueue them after commit.
+    started_executions = await evaluate_event(session, event_row.id)
+
+    # 3. Live notification (best-effort).
+    try:
+        redis = _Redis.from_url(settings.redis_url)
+        try:
+            await publish_event(
+                redis,
+                tenant_id=str(tenant_id),
+                conversation_id=str(conversation_id),
+                event={
+                    "type": "message_received",
+                    "data": {
+                        "channel_message_id": channel_message_id,
+                        "text": text_body,
+                        "conversation_id": str(conversation_id),
+                    },
+                },
+            )
+        finally:
+            await redis.aclose()
+    except Exception:  # pragma: no cover
+        pass
+
+    # 4. Run the conversation turn. The runner short-circuits on
+    #    `bot_paused`, so if the operator already took control we just
+    #    persist the inbound and stop here.
     next_turn = (
         await session.execute(
             text(
                 "SELECT COALESCE(MAX(turn_number), 0) + 1 FROM turn_traces "
                 "WHERE conversation_id = :c"
             ),
-            {"c": conv_id},
+            {"c": conversation_id},
         )
     ).scalar()
 
-    settings = get_settings()
-    runner = ConversationRunner(session, build_nlu(settings), build_composer(settings))
+    nlu = build_nlu(settings)
+    composer = build_composer(settings)
+    runner = ConversationRunner(session, nlu, composer)
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),
-        conversation_id=str(conv_id),
-        tenant_id=str(body.tenant_id),
+        conversation_id=str(conversation_id),
+        tenant_id=str(tenant_id),
         direction=MessageDirection.INBOUND,
-        text=body.text,
+        text=text_body,
         sent_at=_dt.now(UTC),
         attachments=[],
     )
 
-    arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
-        await runner.run_turn(
-            conversation_id=conv_id,
-            tenant_id=body.tenant_id,
-            inbound=inbound_canonical,
-            turn_number=next_turn,
-            arq_pool=arq_pool,
-            to_phone_e164=phone,
-        )
-    except Exception:
-        logging.getLogger(__name__).exception("baileys run_turn failed")
+        arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    except Exception:  # pragma: no cover - worker unreachable, runner can't dispatch
+        arq_pool = None
+
+    try:
+        try:
+            await runner.run_turn(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                inbound=inbound_canonical,
+                turn_number=next_turn,
+                arq_pool=arq_pool,
+                to_phone_e164=from_phone_e164,
+            )
+        except Exception:
+            # Never crash the webhook — log via event and let Baileys retry-free.
+            await emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.ERROR_OCCURRED,
+                payload={
+                    "where": "baileys_inbound_runner",
+                    "message": "run_turn failed",
+                },
+            )
     finally:
-        await arq_pool.aclose()
+        if arq_pool is not None:
+            await arq_pool.aclose()
+
+    return started_executions
+
+
+@internal_router.post(
+    "/outbound-echo", dependencies=[Depends(_validate_internal_token)]
+)
+async def baileys_outbound_echo(
+    body: BaileysOutboundEchoBody,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Mirror a message the operator sent from their own phone.
+
+    Baileys is a real WhatsApp Web client, so when the operator types
+    from their phone the sidecar sees the event with `fromMe=true` and
+    posts it here. We persist it as a `direction='outbound'` message so
+    the dashboard reflects what's already on WhatsApp.
+
+    We do NOT enqueue a `send_outbound` — the message has already been
+    sent by the operator's own client; doubling it would deliver twice.
+    """
+    phone = body.to_phone
+    if not phone.startswith("+"):
+        phone = "+" + phone
+
+    cust_id = (
+        await session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
+                "ON CONFLICT (tenant_id, phone_e164) DO UPDATE "
+                "SET phone_e164 = EXCLUDED.phone_e164 "
+                "RETURNING id"
+            ),
+            {"t": body.tenant_id, "p": phone},
+        )
+    ).scalar()
+
+    conv_id = (
+        await session.execute(
+            text(
+                "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                "ORDER BY last_activity_at DESC NULLS LAST LIMIT 1"
+            ),
+            {"t": body.tenant_id, "c": cust_id},
+        )
+    ).scalar()
+    if conv_id is None:
+        conv_id = (
+            await session.execute(
+                text(
+                    "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) "
+                    "RETURNING id"
+                ),
+                {"t": body.tenant_id, "c": cust_id},
+            )
+        ).scalar()
+        await session.execute(
+            text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
+            {"c": conv_id},
+        )
+
+    # The operator just took control from their phone — pause the bot so
+    # the runner doesn't reply on top of them.
+    await session.execute(
+        text(
+            "UPDATE conversation_state SET bot_paused = TRUE "
+            "WHERE conversation_id = :c"
+        ),
+        {"c": conv_id},
+    )
+
+    sent_at = datetime.fromtimestamp(body.ts / 1000, tz=UTC)
+    inserted = (
+        await session.execute(
+            text(
+                "INSERT INTO messages "
+                "(conversation_id, tenant_id, direction, text, channel_message_id, "
+                " sent_at, delivery_status, metadata_json) "
+                "VALUES (:c, :t, 'outbound', :txt, :cmid, :ts, 'sent', "
+                "        CAST(:meta AS JSONB)) "
+                "ON CONFLICT (tenant_id, channel_message_id) "
+                "WHERE channel_message_id IS NOT NULL DO NOTHING "
+                "RETURNING id"
+            ),
+            {
+                "c": conv_id,
+                "t": body.tenant_id,
+                "txt": body.text,
+                "cmid": body.message_id,
+                "ts": sent_at,
+                "meta": _json.dumps(
+                    {"channel": "baileys", "source": "operator_device"}
+                ),
+            },
+        )
+    ).scalar_one_or_none()
+
+    if inserted is None:
+        await session.commit()
+        return {"status": "duplicate"}
+
+    await session.execute(
+        text(
+            "UPDATE conversations SET last_activity_at = :ts WHERE id = :c"
+        ),
+        {"ts": sent_at, "c": conv_id},
+    )
+    await session.commit()
+
+    # Push to the dashboard.
+    try:
+        from redis.asyncio import Redis as _Redis
+
+        from atendia.realtime.publisher import publish_event
+
+        redis = _Redis.from_url(get_settings().redis_url)
+        try:
+            await publish_event(
+                redis,
+                tenant_id=str(body.tenant_id),
+                conversation_id=str(conv_id),
+                event={
+                    "type": "message_sent",
+                    "source": "operator_device",
+                    "data": {
+                        "channel_message_id": body.message_id,
+                        "text": body.text,
+                        "conversation_id": str(conv_id),
+                        "status": "sent",
+                    },
+                },
+            )
+        finally:
+            await redis.aclose()
+    except Exception:  # pragma: no cover
+        pass
 
     return {"status": "ok", "conversation_id": str(conv_id), "message_id": str(inserted)}

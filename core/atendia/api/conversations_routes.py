@@ -25,6 +25,7 @@ from sqlalchemy.orm import aliased
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
+from atendia.channels.base import OutboundMessage
 from atendia.config import get_settings
 from atendia.db.models.conversation import Conversation, ConversationRead, ConversationStateRow
 from atendia.db.models.customer import Customer
@@ -33,6 +34,8 @@ from atendia.db.models.customer_note import CustomerNote
 from atendia.db.models.lifecycle import HumanHandoff
 from atendia.db.models.message import MessageRow
 from atendia.db.session import get_db_session
+from atendia.queue.enqueue import enqueue_outbound
+from atendia.queue.outbox import stage_outbound
 from atendia.realtime.publisher import publish_event
 
 router = APIRouter()
@@ -127,6 +130,7 @@ class MessageItem(BaseModel):
     metadata: dict
     created_at: datetime
     sent_at: datetime | None
+    delivery_status: str | None = None
 
 
 class MessageListResponse(BaseModel):
@@ -587,6 +591,7 @@ async def list_messages(
             MessageRow.metadata_json,
             MessageRow.created_at,
             MessageRow.sent_at,
+            MessageRow.delivery_status,
         )
         .where(MessageRow.conversation_id == conversation_id)
         .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
@@ -615,6 +620,7 @@ async def list_messages(
             metadata=r.metadata_json or {},
             created_at=r.created_at,
             sent_at=r.sent_at,
+            delivery_status=r.delivery_status,
         )
         for r in page
     ]
@@ -658,30 +664,35 @@ async def intervene(
 
     1. Sets `conversation_state.bot_paused = True`. The runner short-circuits
        on next inbound (T24).
-    2. Inserts an outbound message row attributed to the operator
-       (`metadata.source = "operator"`, `metadata.operator_user_id`).
-    3. Publishes a `message_sent` event so the frontend list+detail
+    2. Stages an outbox row (deterministic UUID) and persists the outbound
+       message row with that same UUID + `delivery_status='queued'`. The
+       worker later UPDATEs the row via `ON CONFLICT (id)` with the real
+       channel_message_id and delivery_status.
+    3. Best-effort: enqueues `send_outbound` on arq so the worker actually
+       hands the message to Meta / Baileys. Failure to enqueue does NOT
+       fail the route — the cron `dispatch_outbox` will pick up the
+       pending outbox row on its next tick.
+    4. Publishes a `message_sent` event so the frontend list+detail
        refresh in real time.
-    4. Best-effort: enqueues the actual WhatsApp send via arq if a pool
-       is available. In tests / dev without arq the row is still
-       persisted, but the customer won't physically receive it. The
-       outbound dispatcher worker is a separate process; this route
-       does NOT block on its delivery.
     """
     if not body.text.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "text is required")
 
     # Existence check — also guards against operator → other tenant.
-    own = (
+    # Also fetch the customer's phone so we can address the WhatsApp send.
+    row = (
         await session.execute(
-            select(Conversation.id).where(
+            select(Conversation.id, Customer.phone_e164)
+            .join(Customer, Customer.id == Conversation.customer_id)
+            .where(
                 Conversation.id == conversation_id,
                 Conversation.tenant_id == tenant_id,
             )
         )
-    ).scalar_one_or_none()
-    if own is None:
+    ).one_or_none()
+    if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    to_phone_e164 = row.phone_e164
 
     now = datetime.now(UTC)
 
@@ -692,24 +703,41 @@ async def intervene(
         .values(bot_paused=True)
     )
 
-    # 2. Persist the outbound message attributed to the operator.
-    msg_id = (
-        await session.execute(
-            MessageRow.__table__.insert()
-            .values(
-                tenant_id=tenant_id,
-                conversation_id=conversation_id,
-                direction="outbound",
-                text=body.text,
-                sent_at=now,
-                metadata_json={
-                    "source": "operator",
-                    "operator_user_id": str(user.user_id),
-                },
-            )
-            .returning(MessageRow.id)
+    # 2. Stage the outbox row + persist the outbound message under the same UUID.
+    #    Using the outbox.id as the message.id lets the worker's
+    #    `INSERT ... ON CONFLICT (id) DO UPDATE` hit our pre-inserted row
+    #    instead of creating a duplicate.
+    idempotency_key = (
+        f"intervene:{conversation_id}:{int(now.timestamp() * 1000)}"
+    )
+    outbound_msg = OutboundMessage(
+        tenant_id=str(tenant_id),
+        to_phone_e164=to_phone_e164,
+        text=body.text,
+        idempotency_key=idempotency_key,
+        metadata={
+            "source": "operator",
+            "operator_user_id": str(user.user_id),
+            "conversation_id": str(conversation_id),
+        },
+    )
+    msg_id = await stage_outbound(session, outbound_msg)
+
+    await session.execute(
+        MessageRow.__table__.insert().values(
+            id=msg_id,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            direction="outbound",
+            text=body.text,
+            sent_at=now,
+            delivery_status="queued",
+            metadata_json={
+                "source": "operator",
+                "operator_user_id": str(user.user_id),
+            },
         )
-    ).scalar_one()
+    )
 
     await session.execute(
         update(Conversation)
@@ -718,7 +746,19 @@ async def intervene(
     )
     await session.commit()
 
-    # 3. Best-effort live notification.
+    # 3. Enqueue the actual WhatsApp send. Best-effort: if the arq pool is
+    #    unreachable the outbox row stays `pending` and the
+    #    `dispatch_outbox` cron picks it up within ~5s.
+    try:
+        arq_pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
+        try:
+            await enqueue_outbound(arq_pool, outbound_msg)
+        finally:
+            await arq_pool.aclose()
+    except Exception:  # pragma: no cover - worker unavailable, cron will retry
+        pass
+
+    # 4. Best-effort live notification.
     try:
         redis = Redis.from_url(get_settings().redis_url)
         try:
@@ -736,9 +776,6 @@ async def intervene(
             await redis.aclose()
     except Exception:  # pragma: no cover
         pass
-
-    # 4. Actual WhatsApp send is the outbound worker's job (Phase 2).
-    # The route stays sync-fast; the worker reads its own queue.
 
     return MessageSentResponse(
         id=msg_id,

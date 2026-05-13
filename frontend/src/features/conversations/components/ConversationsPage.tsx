@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  AlertCircle,
   Bookmark,
   Bot,
   Braces,
+  Check,
   CheckCheck,
   ChevronDown,
   ChevronRight,
+  Clock,
   Copy,
   Filter,
   Inbox,
@@ -1078,6 +1081,33 @@ function ConversationHeader({ conversation }: { conversation: ConversationListIt
   );
 }
 
+function DeliveryTick({ status }: { status: MessageItem["delivery_status"] }) {
+  // Tri-state read off the real channel callback. No more hardcoded
+  // "entregado" — if Meta/Baileys hasn't acked, we say so.
+  switch (status) {
+    case "read":
+      return (
+        <CheckCheck className="size-3 text-sky-300" aria-label="Mensaje leído" />
+      );
+    case "delivered":
+      return <CheckCheck className="size-3" aria-label="Mensaje entregado" />;
+    case "sent":
+      return <Check className="size-3" aria-label="Mensaje enviado" />;
+    case "failed":
+      return (
+        <AlertCircle
+          className="size-3 text-red-300"
+          aria-label="Envío fallido"
+        />
+      );
+    case "queued":
+    case null:
+    case undefined:
+    default:
+      return <Clock className="size-3 opacity-70" aria-label="Encolado" />;
+  }
+}
+
 function MessageBubble({ message }: { message: MessageItem }) {
   const isInbound = message.direction === "inbound";
   const isSystem = message.direction === "system";
@@ -1111,7 +1141,7 @@ function MessageBubble({ message }: { message: MessageItem }) {
           )}
         >
           <span>{formatMessageTime(message.sent_at ?? message.created_at)}</span>
-          {!isInbound && <CheckCheck className="size-3" aria-label="Mensaje entregado" />}
+          {!isInbound && <DeliveryTick status={message.delivery_status ?? null} />}
         </div>
       </div>
     </div>

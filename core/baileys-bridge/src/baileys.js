@@ -9,7 +9,7 @@ import path from 'node:path'
 import QRCode from 'qrcode'
 
 import { sessionFor, updateStatus, dropSession } from './session-manager.js'
-import { postInbound } from './webhook-client.js'
+import { postInbound, postOutboundEcho } from './webhook-client.js'
 
 // Auto-reconnect schedule per tenant — clear on disconnect() so the
 // session stays down when the user explicitly logged out.
@@ -172,11 +172,16 @@ export async function startSession(tenantId, logger) {
     }
   })
 
-  // Inbound listener — POST to AtendIA backend.
+  // Message listener — forwards both directions to AtendIA.
+  //   * fromMe=false → customer wrote to us. Goes to /inbound.
+  //   * fromMe=true  → operator wrote from their own phone / WhatsApp Web.
+  //                    Echo to /outbound-echo so AtendIA mirrors the chat.
+  //                    (Without this echo, sending from the phone bypasses
+  //                    AtendIA entirely and the dashboard goes silent.)
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const msg of messages) {
-      if (!msg.message || msg.key?.fromMe) continue
+      if (!msg.message) continue
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
@@ -185,20 +190,38 @@ export async function startSession(tenantId, logger) {
 
       const fromJid = msg.key.remoteJid || ''
       if (fromJid.includes('@g.us') || fromJid.includes('@broadcast')) continue
-      const fromPhone = resolveLid(fromJid, lidCache)
-      if (!fromPhone || fromPhone.length < 8) continue
+      // LID-aware peer resolution (main): WhatsApp sometimes addresses by
+      // Linked Identity instead of phone — resolveLid falls back to the
+      // raw digits when no mapping is cached.
+      const peerPhone = resolveLid(fromJid, lidCache)
+      if (!peerPhone || peerPhone.length < 8) continue
 
       const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
+      const isOutbound = !!msg.key?.fromMe
+
       try {
-        await postInbound({
-          tenant_id: tenantId,
-          from_phone: fromPhone,
-          text,
-          ts,
-          message_id: msg.key.id || null,
-        })
+        if (isOutbound) {
+          await postOutboundEcho({
+            tenant_id: tenantId,
+            to_phone: peerPhone,
+            text,
+            ts,
+            message_id: msg.key.id || null,
+          })
+        } else {
+          await postInbound({
+            tenant_id: tenantId,
+            from_phone: peerPhone,
+            text,
+            ts,
+            message_id: msg.key.id || null,
+          })
+        }
       } catch (err) {
-        logger.error({ err, tenantId, fromPhone }, 'failed to forward inbound')
+        logger.error(
+          { err, tenantId, peerPhone, isOutbound },
+          'failed to forward message',
+        )
       }
     }
   })

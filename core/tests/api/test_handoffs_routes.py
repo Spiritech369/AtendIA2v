@@ -227,7 +227,8 @@ def test_intervene_pauses_bot_and_inserts_outbound(operator_with_handoffs):
     detail = client.get(f"/api/v1/conversations/{conv}").json()
     assert detail["bot_paused"] is True
 
-    # Outbound message persisted
+    # Outbound message persisted with delivery_status='queued' so the UI
+    # shows a real "encolado" state, not a fake double check.
     msgs = client.get(f"/api/v1/conversations/{conv}/messages").json()
     operator_msg = next(
         (m for m in msgs["items"] if m["text"] == "Hola, soy Francisco. Yo te ayudo."),
@@ -235,6 +236,50 @@ def test_intervene_pauses_bot_and_inserts_outbound(operator_with_handoffs):
     )
     assert operator_msg is not None
     assert operator_msg["direction"] == "outbound"
+    assert operator_msg["delivery_status"] == "queued"
+
+
+def test_intervene_enqueues_send_outbound(operator_with_handoffs, monkeypatch):
+    """Regression for the bug where /intervene persisted the row but never
+    actually sent the message to WhatsApp.
+
+    We can't reach a live arq worker from a unit test, so we patch the
+    route's `enqueue_outbound` binding and assert it was invoked with an
+    OutboundMessage carrying the operator's text + the customer's phone.
+    """
+    from atendia.api import conversations_routes
+
+    captured: list = []
+
+    async def _fake_enqueue(_redis, msg):
+        captured.append(msg)
+        return msg.idempotency_key
+
+    class _FakePool:
+        async def aclose(self):
+            return None
+
+    async def _fake_create_pool(_settings):
+        return _FakePool()
+
+    monkeypatch.setattr(conversations_routes, "enqueue_outbound", _fake_enqueue)
+    monkeypatch.setattr(conversations_routes, "create_pool", _fake_create_pool)
+
+    _, _, email, plain, conv, _ = operator_with_handoffs
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    resp = client.post(
+        f"/api/v1/conversations/{conv}/intervene",
+        json={"text": "Voy en camino."},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 200, resp.text
+    assert len(captured) == 1, "send_outbound should have been enqueued exactly once"
+    out_msg = captured[0]
+    assert out_msg.text == "Voy en camino."
+    assert out_msg.to_phone_e164.startswith("+")
+    assert out_msg.metadata.get("source") == "operator"
 
 
 def test_intervene_404_for_other_tenant(operator_with_handoffs):
