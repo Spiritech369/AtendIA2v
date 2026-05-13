@@ -29,6 +29,7 @@ from atendia.db.models.message import MessageRow
 from atendia.db.models.notification import Notification
 from atendia.db.models.outbound_outbox import OutboundOutbox
 from atendia.db.models.tenant import Tenant, TenantUser
+from atendia.db.models.tenant_baileys_config import TenantBaileysConfig
 from atendia.db.models.tenant_config import (
     TenantBranding,
     TenantCatalogItem,
@@ -101,6 +102,7 @@ __all__ = [
     "TenantPipeline",
     "TenantTemplateMeta",
     "TenantToolConfig",
+    "TenantBaileysConfig",
     "TenantUser",
     "ToolCallRow",
     "TurnTrace",
