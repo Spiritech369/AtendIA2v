@@ -38,6 +38,7 @@ from atendia.api.exports_routes import router as exports_router
 from atendia.api.handoffs_routes import router as handoffs_router
 from atendia.api.integrations_routes import router as integrations_router
 from atendia.api.knowledge_routes import router as knowledge_router
+from atendia.api.navigation_routes import router as navigation_router
 from atendia.api.notifications_routes import router as notifications_router
 from atendia.api.pipeline_routes import router as pipeline_router
 from atendia.api.runner_routes import router as runner_router
@@ -94,6 +95,7 @@ app.include_router(exports_router, prefix="/api/v1/exports", tags=["exports"])
 app.include_router(handoffs_router, prefix="/api/v1/handoffs", tags=["handoffs"])
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["integrations"])
 app.include_router(knowledge_router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(navigation_router, prefix="/api/v1/navigation", tags=["navigation"])
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(pipeline_router, prefix="/api/v1/pipeline", tags=["pipeline"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
