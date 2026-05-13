@@ -40,12 +40,55 @@ import { tenantsApi } from "@/features/config/api";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 
+// Operators must match the backend Condition.operator literal in
+// core/atendia/contracts/pipeline_definition.py. If you add one here,
+// add it there too (the contract test pins both lists).
+export type RuleOperator =
+  | "exists"
+  | "not_exists"
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "greater_than"
+  | "less_than"
+  | "in"
+  | "not_in";
+
+export const OPERATORS_WITHOUT_VALUE: ReadonlySet<RuleOperator> = new Set([
+  "exists",
+  "not_exists",
+]);
+
+export const OPERATORS_NEEDING_LIST: ReadonlySet<RuleOperator> = new Set([
+  "in",
+  "not_in",
+]);
+
+export interface ConditionDraft {
+  field: string;
+  operator: RuleOperator;
+  // string for scalars, string[] for in/not_in. Undefined for presence ops.
+  value?: string | string[];
+}
+
+export interface AutoEnterRulesDraft {
+  enabled: boolean;
+  match: "all" | "any";
+  conditions: ConditionDraft[];
+}
+
 interface StageDraft {
   id: string;
   label: string;
   timeout_hours: number;
   is_terminal: boolean;
   color: string;
+  // M1: declarative auto-enter rules. Undefined means "no rules set" —
+  // distinct from `enabled=false` (rules authored but turned off).
+  auto_enter_rules?: AutoEnterRulesDraft;
+  // M1: never let auto-rules move a conversation backward unless this is
+  // explicitly true. Terminal stages always block backward regardless.
+  allow_auto_backward?: boolean;
 }
 
 interface PipelineDraft {
@@ -65,6 +108,56 @@ function defaultColor(idx: number): string {
   return STAGE_COLORS[idx % STAGE_COLORS.length] ?? "#6366f1";
 }
 
+function parseAutoEnterRules(raw: unknown): AutoEnterRulesDraft | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const match = obj.match === "any" ? "any" : "all";
+  const enabled = obj.enabled === true;
+  const rawConditions = Array.isArray(obj.conditions) ? obj.conditions : [];
+  const conditions: ConditionDraft[] = rawConditions.flatMap((c) => {
+    if (typeof c !== "object" || c === null) return [];
+    const co = c as Record<string, unknown>;
+    if (typeof co.field !== "string" || typeof co.operator !== "string") return [];
+    const op = co.operator as RuleOperator;
+    if (OPERATORS_WITHOUT_VALUE.has(op)) {
+      return [{ field: co.field, operator: op }];
+    }
+    if (OPERATORS_NEEDING_LIST.has(op)) {
+      // Accept already-parsed list or comma-separated string for forward
+      // compat with seed pipelines stored either way.
+      const list = Array.isArray(co.value)
+        ? co.value.map((x) => String(x))
+        : typeof co.value === "string"
+          ? co.value.split(",").map((x) => x.trim()).filter(Boolean)
+          : [];
+      return [{ field: co.field, operator: op, value: list }];
+    }
+    const scalar = co.value === null || co.value === undefined ? "" : String(co.value);
+    return [{ field: co.field, operator: op, value: scalar }];
+  });
+  return { enabled, match, conditions };
+}
+
+function serializeAutoEnterRules(rules: AutoEnterRulesDraft | undefined): Record<string, unknown> | undefined {
+  if (!rules) return undefined;
+  const conditions = rules.conditions.map((c) => {
+    if (OPERATORS_WITHOUT_VALUE.has(c.operator)) {
+      // Backend rejects presence ops carrying a value, so don't send one.
+      return { field: c.field, operator: c.operator };
+    }
+    if (OPERATORS_NEEDING_LIST.has(c.operator)) {
+      const list = Array.isArray(c.value)
+        ? c.value
+        : typeof c.value === "string"
+          ? c.value.split(",").map((x) => x.trim()).filter(Boolean)
+          : [];
+      return { field: c.field, operator: c.operator, value: list };
+    }
+    return { field: c.field, operator: c.operator, value: c.value ?? "" };
+  });
+  return { enabled: rules.enabled, match: rules.match, conditions };
+}
+
 function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft {
   const def = raw ?? {};
   const rawStages = Array.isArray(def.stages) ? def.stages : [];
@@ -79,6 +172,8 @@ function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft 
         timeout_hours: typeof obj.timeout_hours === "number" ? obj.timeout_hours : 0,
         is_terminal: obj.is_terminal === true,
         color: typeof obj.color === "string" ? obj.color : defaultColor(idx),
+        auto_enter_rules: parseAutoEnterRules(obj.auto_enter_rules),
+        allow_auto_backward: obj.allow_auto_backward === true,
       },
     ];
   });
@@ -97,17 +192,26 @@ function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft 
 function serialise(draft: PipelineDraft): Record<string, unknown> {
   return {
     ...draft.extra,
-    stages: draft.stages.map((s) => ({
-      id: s.id,
-      label: s.label,
-      timeout_hours: s.timeout_hours,
-      color: s.color,
-      ...(s.is_terminal ? { is_terminal: true } : {}),
-    })),
+    stages: draft.stages.map((s) => {
+      const rulesSerialized = serializeAutoEnterRules(s.auto_enter_rules);
+      return {
+        id: s.id,
+        label: s.label,
+        timeout_hours: s.timeout_hours,
+        color: s.color,
+        ...(s.is_terminal ? { is_terminal: true } : {}),
+        ...(s.allow_auto_backward ? { allow_auto_backward: true } : {}),
+        ...(rulesSerialized ? { auto_enter_rules: rulesSerialized } : {}),
+      };
+    }),
     docs_per_plan: draft.docs_per_plan,
     ...(draft.fallback ? { fallback: draft.fallback } : {}),
   };
 }
+
+// Mirrors backend _RULE_FIELD_RE in pipeline_definition.py. Accepts
+// dot-separated identifiers (DOCS_INE.status, modelo_interes).
+const RULE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 
 function validate(draft: PipelineDraft): string | null {
   if (draft.stages.length === 0) return "El pipeline debe tener al menos una etapa.";
@@ -121,6 +225,35 @@ function validate(draft: PipelineDraft): string | null {
     if (!s.label.trim()) return `Etiqueta vacía en "${s.id}".`;
     if (s.timeout_hours < 0 || s.timeout_hours > 8760) {
       return `timeout_hours en "${s.id}" debe estar entre 0 y 8760.`;
+    }
+    if (s.is_terminal && s.allow_auto_backward) {
+      return `"${s.id}": una etapa terminal no puede permitir movimiento hacia atrás.`;
+    }
+    const rules = s.auto_enter_rules;
+    if (rules?.enabled) {
+      if (rules.conditions.length === 0) {
+        return `"${s.id}": auto-entrada habilitada requiere al menos una condición.`;
+      }
+      for (const [i, c] of rules.conditions.entries()) {
+        if (!RULE_FIELD_RE.test(c.field)) {
+          return `"${s.id}": condición #${i + 1} tiene un campo inválido (${c.field || "vacío"}).`;
+        }
+        if (OPERATORS_WITHOUT_VALUE.has(c.operator)) continue;
+        if (OPERATORS_NEEDING_LIST.has(c.operator)) {
+          const list = Array.isArray(c.value)
+            ? c.value
+            : typeof c.value === "string"
+              ? c.value.split(",").map((x) => x.trim()).filter(Boolean)
+              : [];
+          if (list.length === 0) {
+            return `"${s.id}": condición #${i + 1} (${c.operator}) requiere una lista de valores.`;
+          }
+          continue;
+        }
+        if (c.value === undefined || c.value === null || c.value === "") {
+          return `"${s.id}": condición #${i + 1} (${c.operator}) requiere un valor.`;
+        }
+      }
     }
   }
   return null;
