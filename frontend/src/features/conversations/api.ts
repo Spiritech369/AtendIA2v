@@ -114,3 +114,42 @@ export const conversationsApi = {
   forceSummary: async (id: string): Promise<{ status: string }> =>
     (await api.post<{ status: string }>(`/conversations/${id}/force-summary`)).data,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Field suggestions (NLU-derived pending values for customer.attrs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface FieldSuggestion {
+  id: string;
+  customer_id: string;
+  conversation_id: string | null;
+  turn_number: number | null;
+  key: string;
+  suggested_value: string;
+  confidence: string;
+  evidence_text: string | null;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+  decided_at: string | null;
+}
+
+export const fieldSuggestionsApi = {
+  list: async (customerId: string): Promise<FieldSuggestion[]> =>
+    (
+      await api.get<FieldSuggestion[]>(
+        `/customers/${customerId}/field-suggestions`,
+      )
+    ).data,
+  accept: async (suggestionId: string): Promise<FieldSuggestion> =>
+    (
+      await api.post<FieldSuggestion>(
+        `/field-suggestions/${suggestionId}/accept`,
+      )
+    ).data,
+  reject: async (suggestionId: string): Promise<FieldSuggestion> =>
+    (
+      await api.post<FieldSuggestion>(
+        `/field-suggestions/${suggestionId}/reject`,
+      )
+    ).data,
+};
