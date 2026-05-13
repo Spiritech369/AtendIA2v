@@ -177,3 +177,43 @@ def test_patch_preserves_phone(seed):
     c.patch(f"/api/v1/customers/{cust_id}", json={"name": "New Name"})
     detail = c.get(f"/api/v1/customers/{cust_id}").json()
     assert detail["phone_e164"].startswith("+521555")
+
+
+def test_patch_customer_attrs_replaces_whole_dict(seed):
+    """PATCH /customers/:id with `attrs` REPLACES the dict entirely — keys not
+    in the payload are dropped.
+
+    Frontend hooks (useCustomerAttrs) MUST read-modify-write to update a
+    single key without losing the rest. This test documents the contract.
+    """
+    tid, _, cust_id, email, plain = seed
+    c = TestClient(app)
+    csrf = _login(c, email, plain)
+    c.headers["X-CSRF-Token"] = csrf
+
+    # Seed initial attrs via PATCH (so we don't bypass the route under test).
+    resp = c.patch(
+        f"/api/v1/customers/{cust_id}",
+        json={"attrs": {"foo": "1", "bar": "2"}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["attrs"] == {"foo": "1", "bar": "2"}
+
+    # PATCH with only foo=99 → expect bar to be dropped (full overwrite).
+    resp = c.patch(
+        f"/api/v1/customers/{cust_id}",
+        json={"attrs": {"foo": "99"}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["attrs"] == {"foo": "99"}, (
+        "Backend replaces the whole attrs dict on PATCH; "
+        "frontend hooks must merge client-side."
+    )
+
+    # PATCH with empty attrs → result is empty dict.
+    resp = c.patch(
+        f"/api/v1/customers/{cust_id}",
+        json={"attrs": {}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["attrs"] == {}
