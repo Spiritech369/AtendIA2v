@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Cpu, X } from "lucide-react";
+import { Cpu, MessageSquareText, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,15 +7,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { turnTracesApi } from "@/features/turn-traces/api";
+import { TurnStoryView } from "@/features/turn-traces/components/TurnStoryView";
 import {
   ComposerSection,
   ErrorsSection,
   NluSection,
   OverviewSection,
   PipelineSection,
+  SectionHeader,
   StateSection,
   ToolCallsSection,
 } from "@/features/turn-traces/components/TurnTraceSections";
+import { buildTurnStory } from "@/features/turn-traces/lib/turnStory";
 
 interface Props {
   traceId: string;
@@ -48,6 +51,11 @@ export function DebugPanel({ traceId, onClose }: Props) {
     >
       <ScrollArea className="flex-1">
         <div className="space-y-0">
+          <div className="space-y-2 p-3">
+            <SectionHeader icon={MessageSquareText} label="Resumen" />
+            <TurnStoryView steps={buildTurnStory(t)} />
+          </div>
+          <Separator />
           <OverviewSection trace={t} />
           <Separator />
           <PipelineSection trace={t} />
