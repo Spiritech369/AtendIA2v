@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { conversationsApi } from "@/features/conversations/api";
 import {
   type CustomerPatch,
   customersApi,
@@ -97,5 +98,32 @@ export function usePutFieldValues(customerId: string) {
       void qc.invalidateQueries({ queryKey: ["field-values", customerId] });
     },
     onError: (e) => toast.error("Error al guardar campos", { description: e.message }),
+  });
+}
+
+/**
+ * PATCH /conversations/:id — for editing stage/assigned_user/assigned_agent
+ * from the contact panel. Invalidates both the per-conversation query and
+ * the conversations list so the inbox refreshes.
+ */
+export function usePatchConversation(conversationId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      current_stage?: string;
+      assigned_user_id?: string | null;
+      assigned_agent_id?: string | null;
+    }) => {
+      if (!conversationId) throw new Error("conversationId required");
+      return conversationsApi.patchConversation(conversationId, body);
+    },
+    onSuccess: () => {
+      if (conversationId) {
+        void qc.invalidateQueries({ queryKey: ["conversation", conversationId] });
+      }
+      void qc.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e) =>
+      toast.error("Error al actualizar conversación", { description: e.message }),
   });
 }
