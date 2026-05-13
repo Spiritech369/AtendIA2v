@@ -250,12 +250,15 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
         {"t": tenant_id, "c": cust_id},
     )).scalar()
     if conv_id is None:
+        from atendia.state_machine.pipeline_loader import resolve_initial_stage
+
+        initial_stage = await resolve_initial_stage(session, tenant_id)
         conv_id = (await session.execute(
             text(
-                "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) "
-                "RETURNING id"
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, :s) RETURNING id"
             ),
-            {"t": tenant_id, "c": cust_id},
+            {"t": tenant_id, "c": cust_id, "s": initial_stage},
         )).scalar()
         await session.execute(
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),

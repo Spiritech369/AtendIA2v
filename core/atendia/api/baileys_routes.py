@@ -280,13 +280,16 @@ async def baileys_inbound(
         )
     ).scalar()
     if conv_id is None:
+        from atendia.state_machine.pipeline_loader import resolve_initial_stage
+
+        initial_stage = await resolve_initial_stage(session, body.tenant_id)
         conv_id = (
             await session.execute(
                 text(
-                    "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) "
-                    "RETURNING id"
+                    "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                    "VALUES (:t, :c, :s) RETURNING id"
                 ),
-                {"t": body.tenant_id, "c": cust_id},
+                {"t": body.tenant_id, "c": cust_id, "s": initial_stage},
             )
         ).scalar()
         await session.execute(
@@ -542,13 +545,16 @@ async def baileys_outbound_echo(
         )
     ).scalar()
     if conv_id is None:
+        from atendia.state_machine.pipeline_loader import resolve_initial_stage
+
+        initial_stage = await resolve_initial_stage(session, body.tenant_id)
         conv_id = (
             await session.execute(
                 text(
-                    "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) "
-                    "RETURNING id"
+                    "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                    "VALUES (:t, :c, :s) RETURNING id"
                 ),
-                {"t": body.tenant_id, "c": cust_id},
+                {"t": body.tenant_id, "c": cust_id, "s": initial_stage},
             )
         ).scalar()
         await session.execute(

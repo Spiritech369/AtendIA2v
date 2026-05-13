@@ -228,9 +228,15 @@ async def _persist_outbound(session, msg: OutboundMessage, message_id: str, rece
         {"t": msg.tenant_id, "c": cust_id},
     )).scalar()
     if conv_id is None:
+        from atendia.state_machine.pipeline_loader import resolve_initial_stage
+
+        initial_stage = await resolve_initial_stage(session, UUID(msg.tenant_id))
         conv_id = (await session.execute(
-            text("INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"),
-            {"t": msg.tenant_id, "c": cust_id},
+            text(
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, :s) RETURNING id"
+            ),
+            {"t": msg.tenant_id, "c": cust_id, "s": initial_stage},
         )).scalar()
         await session.execute(
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
