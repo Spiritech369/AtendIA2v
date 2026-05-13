@@ -20,8 +20,11 @@
 | Suite | Resultado | Lectura |
 |---|---:|---|
 | Backend `uv run pytest -q` | 821 passed, 16 skipped | Suite backend verde. Incluye `tests/db/test_migrations_roundtrip.py::test_full_roundtrip_drops_and_recreates_all_tables`; el downgrade de `039_appointment_command_center` ya normaliza estados nuevos antes de restaurar constraints legacy. |
+| Backend `pytest core/tests/api/test_rbac_matrix.py` | 5/5 passed | Matriz parametrizada operator vs tenant_admin vs superadmin sobre workflows, agents, customer-fields, tenants y knowledge. |
+| Backend `pytest core/tests/api/test_turn_traces_routes.py` | 4/4 passed | List + detail incluyen `inbound_preview` (120 chars). |
 | Frontend `pnpm -s typecheck` | Passed | TypeScript compila sin errores. |
-| Frontend `pnpm -s test -- --run` | 6 files, 14 tests passed | DemoBadge + NYIButton suman 5 nuevos tests; todos verdes. |
+| Frontend `pnpm exec vitest run` | 11 files, 44 tests passed | Incluye los nuevos: `auth-guards` (4), `RoleGate` (4), `turnStory` (10), `FlowModeBadge` (4), `TurnStoryView` (8). |
+| Frontend `pnpm exec biome check` (archivos tocados) | Sin errores | 15 archivos auto-formateados; 3 suppressions inline `noArrayIndexKey` documentadas en listas derivadas de JSON inmutable. |
 | Mock isolation guard tests | 17/17 passed | `test_demo_tenant_dep`, `test_handoff_cc_demo_gate`, `test_kb_cc_demo_gate`, `test_demo_providers`. |
 | Seed full mock `uv run python -m compileall scripts\seed_full_mock_data.py` | Passed | El script compila sin errores. |
 | Seed full mock `uv run python scripts\seed_full_mock_data.py` | Passed 2 veces | Seed idempotente para el tenant `demo`; refresca filas `mock-full` sin duplicar datos. |
@@ -88,7 +91,7 @@ Limitacion de la simulacion: los datos prueban pantallas, filtros, relaciones, a
 | Area | Score | Resumen |
 |---|---:|---|
 | Core conversacional | 88 | Motor, NLU, composer, tools, queue, realtime y webhooks estan bien cubiertos; el riesgo principal esta en integraciones externas y suites live/e2e omitidas. |
-| Workspace operador | 81 | Las pantallas principales existen y consumen APIs reales; varias experiencias nuevas tienen datos demo, acciones mock o botones con `toast.info`. |
+| Workspace operador | 84 | Las pantallas principales existen y consumen APIs reales; el panel de debug ahora tiene narrativa en español y la lista de turnos muestra preview del mensaje. Varias experiencias nuevas siguen con datos demo, acciones mock o botones con `toast.info`. |
 | Configuracion bot | 79 | Pipeline, agentes, workflows e integraciones estan montados; Agents y Workflows tienen UI rica pero con partes operativas todavia simuladas. |
 | Knowledge Base | 74 | CRUD legacy + RAG foundation + command center ya existen; varias acciones avanzadas devuelven estados mock/stub y los workers cron no estan completos. |
 | Infra / deploy / migraciones | 78 | DB, contracts, storage local y serving SPA estan montados; el roundtrip completo de Alembic ya pasa tras corregir la migracion 039. |
@@ -113,7 +116,7 @@ Limitacion de la simulacion: los datos prueban pantallas, filtros, relaciones, a
 |---|---|---|---|---:|---|---|
 | Auth / sesiones | Login de operadores, JWT en cookie httponly, CSRF, refresh/logout y `me`. | `core/atendia/api/auth_routes.py`, `core/atendia/api/_auth_helpers.py`, `core/atendia/api/_csrf.py`, `core/atendia/api/_deps.py` | `frontend/src/routes/login.tsx`, `frontend/src/stores/auth.ts`, `frontend/src/routes/(auth)/route.tsx` | 90 | Login, session guard, CSRF en cliente API, roles cargados en shell. | Quedan warnings de secret corto en tests JWT; revisar hardening de prod. |
 | Tenants / multi-tenancy | Aislar datos por tenant y exponer configuraciones base del tenant. | `core/atendia/api/tenants_routes.py`, `core/atendia/db/models/tenant.py`, `core/atendia/db/models/tenant_config.py` | Usado indirectamente por config, inbox settings, AppShell | 88 | `current_tenant_id`, rutas tenant-scoped, config de pipeline, tone, timezone, inbox. | No hay pantalla dedicada de administracion de tenants; impersonation sigue siendo mas tecnico que UX. |
-| Users / RBAC | Gestionar usuarios del tenant, roles y acceso tenant-admin/superadmin. | `core/atendia/api/users_routes.py`, `core/atendia/db/models/tenant.py`, dependencias RBAC en `_deps.py` | `frontend/src/features/users/components/UsersPage.tsx`, `frontend/src/features/users/api.ts`, `frontend/src/routes/(auth)/users.tsx` | 86 | CRUD de usuarios y restricciones por rol en navegacion. | Falta mas evidencia e2e de permisos por pantalla y flujos de reset. |
+| Users / RBAC | Gestionar usuarios del tenant, roles y acceso tenant-admin/superadmin. | `core/atendia/api/users_routes.py`, `core/atendia/db/models/tenant.py`, dependencias RBAC en `_deps.py`, `core/tests/api/test_rbac_matrix.py` | `frontend/src/features/users/components/UsersPage.tsx`, `frontend/src/features/users/api.ts`, `frontend/src/routes/(auth)/users.tsx`, `frontend/src/lib/auth-guards.ts`, `frontend/src/components/RoleGate.tsx` | 91 | CRUD de usuarios y restricciones por rol; route-level guards (`requireRole`) en `/users`, `/agents`, `/audit-log`, `/inbox-settings`, `/config`; matriz E2E backend cubre operator/tenant_admin/superadmin sobre 5 endpoints admin-gated; `<RoleGate>` disponible para gating in-page. | `<RoleGate>` aun sin callers (componente listo, no usado). El cambio de guard en `/config` e `/inbox-settings` redirige a operadores que antes podian ver esas pantallas — confirmar con producto si era intencional o si se quiere lectura read-only para operadores. Falta flujo de reset/forgot-password. |
 | Audit log | Registrar acciones administrativas y consultarlas con filtros. | `core/atendia/api/audit_log_routes.py`, `core/atendia/api/_audit.py`, `core/atendia/db/models/event.py` | `frontend/src/features/audit-log/AuditLogPage.tsx`, `frontend/src/routes/(auth)/audit-log.tsx` | 84 | Emision via `emit_admin_event` en muchos endpoints state-changing y pantalla de auditoria. | Algunas acciones nuevas tipo mock/toast no generan audit real porque no llegan a backend. |
 
 ---
@@ -173,7 +176,7 @@ Limitacion de la simulacion: los datos prueban pantallas, filtros, relaciones, a
 
 | Feature | Proposito | Logica | UI/UX | Score | Funciona | No funciona / riesgo |
 |---|---|---|---|---:|---|---|
-| Turn traces | Investigar cada turno: NLU, composer, tools, costos, latencias y payloads. | `core/atendia/api/turn_traces_routes.py`, `core/atendia/db/models/turn_trace.py` | `frontend/src/features/turn-traces/components/TurnTraceList.tsx`, `TurnTraceInspector.tsx`, `frontend/src/routes/(auth)/turn-traces.tsx` | 84 | Lista/detalle y persistencia de traces. | UX sigue siendo mas JSON/debug que inspector narrativo; gap de DebugPanel rich pendiente. |
+| Turn traces | Investigar cada turno: NLU, composer, tools, costos, latencias y payloads, ahora con narrativa en español. | `core/atendia/api/turn_traces_routes.py` (ahora expone `inbound_preview`), `core/atendia/db/models/turn_trace.py` | `frontend/src/features/turn-traces/components/TurnTraceList.tsx`, `TurnTraceInspector.tsx`, `TurnStoryView.tsx`, `TurnTraceSections.tsx`, `FlowModeBadge.tsx`, `lib/turnStory.ts`, `frontend/src/routes/(auth)/turn-traces.tsx` | 92 | Lista con preview del mensaje + badges coloreados por flow_mode. Inspector con 3 tabs: Resumen (timeline narrativo en español derivado de `TurnTraceDetail`), Detalle técnico (secciones compartidas con DebugPanel) y Raw JSON. `DebugPanel` de Conversaciones tambien muestra la narrativa arriba. 26 tests unitarios cubren derivación y rendering. | Cross-conversation explorer aun no aterriza; `/turn-traces` exige `?conversation_id=<uuid>` en URL (placeholder hasta T56). Los intent labels solo traducen 8 valores (greeting/ask_info/ask_price/buy/schedule/complain/off_topic/unclear); intents fuera de la lista caen al string raw. |
 | Analytics | Medir funnel, volumen, costos y handoffs. | `core/atendia/api/analytics_routes.py`, modelos conversations/handoffs/turn_traces | `frontend/src/features/analytics/components/AnalyticsDashboard.tsx`, `frontend/src/features/analytics/api.ts`, `frontend/src/routes/(auth)/analytics.tsx` | 78 | Endpoints de funnel, cost, volume y handoff analytics. | Riesgo de scaffolding: validar con datos reales y rangos largos. |
 | Audit/debug frontend | Fallbacks de ruta, errores y cliente API consistente. | `frontend/src/components/RouteErrorFallback.tsx`, `frontend/src/lib/api-client.ts`, `frontend/src/lib/error-detail.ts` | Global en Router/AppShell | 82 | API client testeado para CSRF; error detail helper usado por features. | Falta cobertura visual de estados de error en pantallas grandes. |
 
@@ -213,6 +216,43 @@ Limitacion de la simulacion: los datos prueban pantallas, filtros, relaciones, a
 ## Pendientes prioritarios sugeridos por el score
 
 1. ~~Separar claramente modo demo/mock de modo produccion en Agents, Workflows, Handoffs, Appointments y Knowledge command center.~~ **Completado 2026-05-11** — `tenants.is_demo` flag, `_demo/` module, provider protocols, `DemoBadge` + `NYIButton` components. Ver `docs/plans/2026-05-11-mock-demo-isolation-design.md`.
-2. Alinear `docs/runbooks/knowledge-base.md` con el `KnowledgeBasePage.tsx` actual, porque el runbook todavia describe un frontend B2 diferido que ya cambio en el workspace.
-3. Agregar Playwright smoke de navegacion para las rutas principales: conversations, handoffs, customers, appointments, knowledge, agents y workflows.
-4. ~~Convertir botones `toast.info` de command centers en acciones reales o marcarlos visualmente como placeholders internos.~~ **Completado 2026-05-11** — `toast.info` stubs reemplazados por `<NYIButton>` en 7 archivos de features.
+2. ~~Endurecer permisos y RBAC por pantalla con evidencia E2E.~~ **Completado 2026-05-13** — `requireRole` route guards en 5 rutas admin, `<RoleGate>` componente y `test_rbac_matrix.py` parametrizado. Ver `docs/plans/2026-05-12-rbac-and-observability-design.md`.
+3. ~~Mejorar observabilidad UX del DebugPanel/turn-traces (menos JSON, mas legible).~~ **Completado 2026-05-13** — Narrativa en español derivada de `TurnTraceDetail`, `FlowModeBadge` coloreado, preview de inbound en lista, inspector rediseñado con 3 tabs (Resumen/Detalle/Raw) y mismo Resumen al tope del `DebugPanel`.
+4. Alinear `docs/runbooks/knowledge-base.md` con el `KnowledgeBasePage.tsx` actual, porque el runbook todavia describe un frontend B2 diferido que ya cambio en el workspace.
+5. Agregar Playwright smoke de navegacion para las rutas principales: conversations, handoffs, customers, appointments, knowledge, agents y workflows.
+6. ~~Convertir botones `toast.info` de command centers en acciones reales o marcarlos visualmente como placeholders internos.~~ **Completado 2026-05-11** — `toast.info` stubs reemplazados por `<NYIButton>` en 7 archivos de features.
+
+## Como probar localmente las features de este sprint (RBAC + observabilidad)
+
+1. Levantar infra: `docker compose up -d postgres-v2 redis-v2`.
+2. Aplicar migraciones (si no es ambiente fresco las skipea): desde `core/`, `uv run alembic upgrade head`.
+3. Sembrar datos mock: desde `core/`, `uv run python scripts/seed_full_mock_data.py`. Idempotente.
+4. Backend dev: desde `core/`, `uv run uvicorn atendia.main:app --reload --port 8001`.
+5. Frontend dev: desde `frontend/`, `pnpm dev`. Abre en `http://localhost:5173`.
+
+Cuentas demo (todas con password `admin123`):
+
+| Email | Rol | Que probar |
+|---|---|---|
+| `superadmin@demo.com` | `superadmin` | Acceso total incluyendo `/audit-log`. |
+| `admin@demo.com` | `tenant_admin` | Acceso a `/users`, `/agents`, `/config`, `/inbox-settings`; redirect en `/audit-log`. |
+| `ana.garcia@demo.com` | `operator` | Redirect a `/` al tipear `/users`, `/agents`, `/audit-log`, `/inbox-settings`, `/config`. |
+| `paola.soto@demo.com` | `supervisor` | Mismo trato que operator para guards admin-only. |
+
+Smoke manual sugerido:
+
+- Como operator, intentar abrir `/users`, `/agents`, `/audit-log`, `/inbox-settings`, `/config` por URL directa — todas deben redirigir a `/`. El sidebar tampoco debe mostrar esos items.
+- Como tenant_admin, todas las anteriores cargan excepto `/audit-log` (redirige).
+- Abrir una conversacion del inbox: el panel "Debug" lateral debe abrir con la seccion "Resumen" arriba mostrando: cliente → bot entendió → modo → tools → composer → outbound → transición de etapa, antes de las secciones técnicas existentes.
+- Navegar a `/turn-traces?conversation_id=<uuid>` (copia un UUID desde la URL del inbox detalle): la tabla muestra columna "Mensaje" con preview, y los modos como badges coloreados. Al click, el inspector abre con tres tabs.
+- Como tenant_admin/superadmin, probar el endpoint backend gated: `curl` o vía UI ejecutar POST a `/api/v1/workflows` con body válido — debe retornar != 403. Como operator, debe retornar 403.
+
+## Que mas necesitaria arreglar para probar end-to-end
+
+Nada bloqueante para validar lo entregado en este sprint. Friciones menores que el usuario puede toparse:
+
+1. **Operador no listado en el output del seed**: `scripts/seed_full_mock_data.py` solo imprime credenciales de `admin@demo.com` y `superadmin@demo.com`. Para probar RBAC, el operador a usar es `ana.garcia@demo.com` (no hay output que lo diga). Mejora barata si quieres: agregar un `print` extra al final del seed.
+2. **Cross-conversation /turn-traces**: la pantalla `/turn-traces` sin `?conversation_id=` muestra una nota de placeholder ("UI cross-conversation aterriza en T56"). El nuevo inspector y `TurnStoryView` ya estan integrados al panel de Conversaciones, asi que no es bloqueante — pero si quieres scanear traces sin abrir cada conversación, falta esa pantalla.
+3. **Cambio de `/config` e `/inbox-settings` a tenant_admin+**: antes el sidebar las ocultaba pero la URL era libre. Ahora redirigen. Confirmar que es el comportamiento deseado; si producto quiere que el operador vea config en read-only, hay que partir las pantallas en una vista pública + secciones de escritura gated con `<RoleGate>` (que ya existe pero no esta cableado).
+4. **`<RoleGate>` sin callers todavia**: el componente esta listo y testeado, pero ninguna pantalla actual lo usa. Si producto necesita gating granular dentro de una pantalla operator-visible (ej. botón "Borrar workflow" solo para admin), envolver el botón en `<RoleGate roles={["tenant_admin","superadmin"]}>...</RoleGate>`.
+5. **Reset/forgot password**: sigue sin existir flujo. Los demo users hashean en seed, pero en producción los tenant_admins no tienen UI para resetear password de un operator. Punch-list separada.
