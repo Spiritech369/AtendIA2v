@@ -1268,6 +1268,131 @@ async def validate_workflow_for_publish(
     return _operational_validate(row)
 
 
+def _substitute_vars(text: str, variables: dict) -> str:
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1).strip()
+        if name in variables and variables[name] is not None:
+            return str(variables[name])
+        return match.group(0)
+    return re.sub(r"{{\s*([a-zA-Z0-9_]+)\s*}}", replace, text)
+
+
+def _dry_run_workflow(definition: dict, incoming_message: str) -> dict:
+    """Walk the workflow graph from the trigger as a pure dry-run.
+
+    No DB side effects. Returns the actual node ids that would execute, the
+    final ``message`` text after variable substitution (or empty if no
+    ``message`` node fires), variables collected from ``update_field`` nodes,
+    advisors set by ``assign_agent``/``advisor_pool``, and tasks queued by
+    ``create_task``/``followup`` nodes.
+
+    Condition nodes are evaluated against a synthetic context that only
+    contains ``incoming_message``; when a condition can't be resolved
+    deterministically the traversal prefers the ``true`` branch and records a
+    warning so operators know the path is an assumption.
+    """
+    nodes = [n for n in definition.get("nodes", []) if isinstance(n, dict)]
+    edges = [e for e in definition.get("edges", []) if isinstance(e, dict)]
+    nodes_by_id: dict[str, dict] = {str(n.get("id")): n for n in nodes if n.get("id")}
+    edges_from: dict[str, list[tuple[str | None, str]]] = {}
+    for edge in edges:
+        src = str(edge.get("from") or "")
+        dst = str(edge.get("to") or "")
+        if not src or not dst:
+            continue
+        label = edge.get("label")
+        edges_from.setdefault(src, []).append((str(label) if label else None, dst))
+
+    activated: list[str] = []
+    warnings: list[str] = []
+    variables: dict[str, Any] = {}
+    if incoming_message:
+        variables["incoming_message"] = incoming_message
+    generated_response = ""
+    assigned_advisor: str | None = None
+    created_tasks: list[str] = []
+
+    trigger = next((n for n in nodes if str(n.get("type")) == "trigger"), None)
+    if trigger is None:
+        warnings.append("Sin nodo disparador: no hay punto de entrada")
+        return {
+            "activated_nodes": activated,
+            "generated_response": "",
+            "variables_saved": variables,
+            "assigned_advisor": None,
+            "created_tasks": [],
+            "warnings": warnings,
+        }
+
+    visited: set[str] = set()
+    current: str | None = str(trigger.get("id"))
+    steps = 0
+    while current and steps < 100:
+        if current in visited:
+            warnings.append(f"Bucle detectado en nodo {current}")
+            break
+        visited.add(current)
+        steps += 1
+        node = nodes_by_id.get(current)
+        if node is None:
+            warnings.append(f"Nodo {current} referenciado pero no existe")
+            break
+        activated.append(current)
+        ntype = str(node.get("type") or "")
+        config = node.get("config") if isinstance(node.get("config"), dict) else {}
+
+        if ntype in {"message", "template_message"}:
+            text = str(config.get("text") or config.get("template") or "").strip()
+            if text:
+                generated_response = _substitute_vars(text, variables)
+            else:
+                warnings.append(f"Nodo {current}: mensaje vacío")
+        elif ntype == "update_field":
+            field = config.get("field")
+            if isinstance(field, str) and field:
+                variables[field] = config.get("value")
+        elif ntype == "assign_agent":
+            agent_id = config.get("agent_id")
+            if agent_id:
+                assigned_advisor = str(agent_id)
+                variables["asesor_asignado"] = assigned_advisor
+        elif ntype == "advisor_pool":
+            pool = config.get("pool") or config.get("label")
+            if pool:
+                assigned_advisor = str(pool)
+                variables["asesor_asignado"] = assigned_advisor
+        elif ntype in {"create_task", "task", "followup"}:
+            label = config.get("label") or config.get("title") or ntype
+            created_tasks.append(str(label))
+        elif ntype == "end":
+            break
+        elif ntype == "delay":
+            warnings.append(f"Nodo {current}: 'delay' pausaría la ejecución en producción")
+
+        outs = edges_from.get(current, [])
+        if not outs:
+            break
+
+        if ntype == "condition":
+            true_branch = next((tgt for lbl, tgt in outs if lbl == "true"), None)
+            false_branch = next((tgt for lbl, tgt in outs if lbl == "false"), None)
+            picked = true_branch or false_branch or outs[0][1]
+            if true_branch and false_branch:
+                warnings.append(f"Condición {current}: dry-run asume rama 'sí'")
+            current = picked
+        else:
+            current = outs[0][1]
+
+    return {
+        "activated_nodes": activated,
+        "generated_response": generated_response,
+        "variables_saved": variables,
+        "assigned_advisor": assigned_advisor,
+        "created_tasks": created_tasks,
+        "warnings": warnings,
+    }
+
+
 @router.post("/{workflow_id}/simulate", response_model=SimulationResult)
 async def simulate_workflow(
     workflow_id: UUID,
@@ -1277,36 +1402,29 @@ async def simulate_workflow(
     session: AsyncSession = Depends(get_db_session),
 ) -> SimulationResult:
     row = await _get_workflow_or_404(session, workflow_id, tenant_id)
-    message = body.incoming_message.lower()
-    nodes = [node for node in (row.definition or {}).get("nodes", []) if isinstance(node, dict)]
-    activated = [str(node.get("id")) for node in nodes[:6]]
-    variables = {
-        "nombre": "Juan Pérez",
-        "telefono": "5512345678",
-        "tipo_credito": "nómina" if "nómina" in message or "nomina" in message else "tradicional",
-    }
-    warnings = []
-    errors = []
-    if "precio" in message:
-        warnings.append("Advertencia: falta ruta si el cliente pide precio")
-    if "plan" not in message:
-        warnings.append("plan_credito faltante")
+    definition = row.definition or {"nodes": [], "edges": []}
+    nodes_count = sum(1 for n in definition.get("nodes", []) if isinstance(n, dict))
+
+    dry = _dry_run_workflow(definition, body.incoming_message)
+
     validation = _operational_validate(row)
+    errors: list[str] = []
     if validation.critical_count and body.version == "draft":
-        errors.extend(issue.message for issue in validation.issues if issue.severity == "critical")
+        errors = [issue.message for issue in validation.issues if issue.severity == "critical"]
+
     return SimulationResult(
-        activated_nodes=activated,
-        generated_response="¡Hola Juan! Te ayudo a estrenar tu moto. Para continuar, ¿qué modelo te interesa y cuál es tu plan de crédito preferido?",
-        variables_saved=variables,
-        assigned_advisor=None if validation.critical_count else "Ana Díaz",
-        created_tasks=["follow_up_2345"] if not validation.critical_count else [],
-        warnings=warnings,
+        activated_nodes=dry["activated_nodes"],
+        generated_response=dry["generated_response"],
+        variables_saved=dry["variables_saved"],
+        assigned_advisor=dry["assigned_advisor"],
+        created_tasks=dry["created_tasks"],
+        warnings=dry["warnings"][:8],
         errors=errors[:4],
         comparison={
             "version": body.version,
-            "draft_nodes": len(nodes),
-            "published_nodes": max(0, len(nodes) - 1),
-            "changed_nodes": ["n1", "n6"] if body.version == "draft" else [],
+            "draft_nodes": nodes_count,
+            "published_nodes": nodes_count,
+            "changed_nodes": [],
         },
     )
 
