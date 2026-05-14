@@ -88,14 +88,15 @@ const intentOptions = [
   "HUMAN_REQUESTED",
 ];
 
+// Trimmed tabs: only the surfaces that are wired to the runner and
+// reflect real state. Decision Map / Monitor / Knowledge / Pruebas /
+// Guardrails were stubs (persisted but not consumed by the runner)
+// and confused operators into thinking they were live. They can be
+// re-added once their backends are real — issue tracked in the Agent
+// IA audit notes.
 const tabs = [
   "Identidad",
-  "Guardrails",
   "Extracción",
-  "Monitor",
-  "Knowledge",
-  "Decision Map",
-  "Pruebas",
 ] as const;
 
 type AgentTab = (typeof tabs)[number];
@@ -501,7 +502,9 @@ function IdentityPanel({
           </select>
         </label>
         <label className="space-y-1.5">
-          <span className="text-[11px] text-slate-400">Tono</span>
+          <span className="text-[11px] text-slate-400">
+            Tono <span className="text-slate-500">— cómo suena</span>
+          </span>
           <select
             value={draft.tone ?? "Cálido"}
             onChange={(event) => onChange({ tone: event.target.value })}
@@ -513,10 +516,25 @@ function IdentityPanel({
               </option>
             ))}
           </select>
+          <span className="text-[10px] text-slate-500">
+            Registro emocional. Ej: cálido = "¡Qué gusto saludarte!".
+            Directo = "Sí, lo tenemos.".
+          </span>
         </label>
         <label className="space-y-1.5">
-          <span className="text-[11px] text-slate-400">Estilo</span>
-          <Input value={draft.style ?? ""} onChange={(event) => onChange({ style: event.target.value })} className="h-8 border-white/10 bg-black/20 text-sm text-slate-100" />
+          <span className="text-[11px] text-slate-400">
+            Estilo <span className="text-slate-500">— cómo se escribe</span>
+          </span>
+          <Input
+            value={draft.style ?? ""}
+            onChange={(event) => onChange({ style: event.target.value })}
+            placeholder="Ej. Claro y conciso, frases cortas, sin tecnicismos"
+            className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
+          />
+          <span className="text-[10px] text-slate-500">
+            Forma de redactar. Define largo de oración, vocabulario,
+            estructura.
+          </span>
         </label>
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Máx. oraciones</span>
@@ -528,6 +546,9 @@ function IdentityPanel({
             onChange={(event) => onChange({ max_sentences: Number(event.target.value) })}
             className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
           />
+          <span className="text-[10px] text-slate-500">
+            Tope duro por respuesta. WhatsApp = mensajes cortos.
+          </span>
         </label>
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Idioma</span>
@@ -545,12 +566,46 @@ function IdentityPanel({
         </label>
       </div>
       <label className="mt-3 block space-y-1.5">
-        <span className="text-[11px] text-slate-400">Objetivo operativo</span>
+        <span className="text-[11px] text-slate-400">
+          Objetivo operativo{" "}
+          <span className="text-slate-500">— qué debe lograr</span>
+        </span>
         <Textarea
           value={draft.goal ?? ""}
           onChange={(event) => onChange({ goal: event.target.value })}
+          placeholder="Ej. Identificar si el cliente tiene 6+ meses de empleo y agendarle cita."
           className="min-h-16 border-white/10 bg-black/20 text-sm text-slate-100"
         />
+        <span className="text-[10px] text-slate-500">
+          Una o dos oraciones. Se inyecta al prompt como meta del turno.
+        </span>
+      </label>
+
+      {/* Prompt Maestro — the canonical user-authored system prompt.
+          Goes into `agent.system_prompt`, which the runner already
+          reads and injects into `brand_facts.agent_system_prompt`. */}
+      <label className="mt-3 block space-y-1.5">
+        <span className="text-[11px] text-slate-400">
+          Prompt maestro{" "}
+          <span className="text-slate-500">
+            — instrucciones específicas para el LLM
+          </span>
+        </span>
+        <Textarea
+          value={draft.system_prompt ?? ""}
+          onChange={(event) => onChange({ system_prompt: event.target.value })}
+          rows={6}
+          placeholder={
+            "Ej.\n- Siempre confirma el nombre del cliente antes de pasar a precio.\n- Si pregunta por garantía, recuerda que cubre 12 meses.\n- Nunca prometas aprobación sin que pase por buró."
+          }
+          className="min-h-32 border-white/10 bg-black/20 font-mono text-xs text-slate-100"
+        />
+        <span className="text-[10px] text-slate-500">
+          Es la fuente de verdad sobre cómo se comporta el agente.
+          Tono / estilo / objetivo se le suman al inicio; esto puede
+          sobrescribirlos si lo necesitas. Pruébalo con "Vista previa"
+          antes de guardar.
+        </span>
       </label>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
@@ -590,57 +645,163 @@ function IdentityPanel({
 function WhatsAppPreview({
   draft,
   preview,
+  previewMessage,
+  onPreviewMessageChange,
   onRunPreview,
   loading,
 }: {
   draft: AgentItem;
   preview: PreviewResult | null;
-  onRunPreview: () => void;
+  previewMessage: string;
+  onPreviewMessageChange: (next: string) => void;
+  onRunPreview: (message: string) => void;
   loading: boolean;
 }) {
-  const response = preview?.finalResponse ?? "Perfecto. Ya revisé tu solicitud. Para seguir, compárteme tu comprobante de domicilio y tus 2 últimos recibos de nómina.";
+  const trace = preview?.trace ?? [];
+  const llmStatus = trace.find((step) => step.step === "llm_call")?.status;
+  const isReal = llmStatus === "ok";
+  const hasError = llmStatus === "error" || llmStatus === "no_llm";
+
+  const submit = () => {
+    const trimmed = previewMessage.trim();
+    if (!trimmed || loading) return;
+    onRunPreview(trimmed);
+  };
+
   return (
     <Panel
-      title="Vista previa en WhatsApp"
+      title="Vista previa"
       icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
-      action={
-        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onRunPreview} disabled={loading}>
-          {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}
-          Probar
-        </Button>
-      }
     >
-      <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-3">
-        <div className="max-w-[84%] rounded-lg rounded-tl-sm bg-emerald-700 px-3 py-2 text-sm leading-relaxed text-white shadow">
-          {response}
-          <span className="ml-2 text-[10px] text-emerald-100/70">11:42</span>
+      {/* Input row — the operator types the customer message that would
+          arrive on WhatsApp and the agent's response is generated live
+          using the saved+draft identity (tono / estilo / objetivo /
+          prompt maestro). */}
+      <div className="space-y-1.5">
+        <span className="text-[11px] text-slate-400">
+          Simula el mensaje del cliente
+        </span>
+        <div className="flex gap-2">
+          <Input
+            value={previewMessage}
+            onChange={(e) => onPreviewMessageChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="Hola, ¿qué tipo de crédito manejan?"
+            className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
+          />
+          <Button
+            size="sm"
+            onClick={submit}
+            disabled={loading || !previewMessage.trim()}
+            className="h-8 bg-emerald-600 hover:bg-emerald-500"
+          >
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+          </Button>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
-          <div className="text-slate-500">Confianza</div>
-          <div className="mt-1 font-semibold text-emerald-300">{pct((preview?.confidence ?? 0.96) * 100)}</div>
-        </div>
-        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
-          <div className="text-slate-500">Reglas activas</div>
-          <div className="mt-1 font-semibold text-slate-100">{draft.guardrails.filter((item) => item.active).length}</div>
-        </div>
-        <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
-          <div className="text-slate-500">Supervisor</div>
-          <div className="mt-1 font-semibold text-emerald-300">Aprobado</div>
+
+      {/* Bubble: the agent's actual reply (or a placeholder before any
+          run). */}
+      <div className="mt-3 space-y-2">
+        {/* User bubble */}
+        {preview ? (
+          <div className="flex justify-end">
+            <div className="max-w-[84%] rounded-lg rounded-tr-sm bg-slate-700 px-3 py-2 text-sm leading-relaxed text-white shadow">
+              {previewMessage}
+            </div>
+          </div>
+        ) : null}
+        {/* Agent bubble */}
+        <div
+          className={cn(
+            "rounded-lg border p-3",
+            isReal && "border-emerald-300/20 bg-emerald-500/10",
+            hasError && "border-amber-300/20 bg-amber-500/10",
+            !preview && "border-white/10 bg-white/[0.02]",
+          )}
+        >
+          {preview ? (
+            <div className="max-w-[84%] rounded-lg rounded-tl-sm bg-emerald-700 px-3 py-2 text-sm leading-relaxed text-white shadow whitespace-pre-wrap">
+              {preview.finalResponse}
+            </div>
+          ) : (
+            <p className="text-[11px] italic text-slate-400">
+              Escribe un mensaje y presiona Enter para ver la respuesta real
+              del agente. Usa los campos del panel "Identidad" (tono,
+              estilo, objetivo, prompt maestro) sin que tengas que mandar
+              WhatsApp.
+            </p>
+          )}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {(preview?.retrievedFragments ?? [
-          { id: "credit", title: "Proceso crédito automático", score: 0.93 },
-          { id: "docs", title: "Comprobante de domicilio", score: 0.89 },
-          { id: "nomina", title: "Nómina reciente", score: 0.87 },
-        ]).map((fragment) => (
-          <Badge key={fragment.id} variant="outline" className="border-sky-300/20 bg-sky-500/10 text-[10px] text-sky-200">
-            {fragment.title}
-          </Badge>
-        ))}
-      </div>
+
+      {/* Trace + status — honest about what just happened */}
+      {trace.length > 0 ? (
+        <div className="mt-3 space-y-1">
+          {trace.map((step, idx) => (
+            <div
+              key={`${step.step}-${idx}`}
+              className={cn(
+                "flex items-start gap-2 rounded-md border px-2 py-1 text-[10px]",
+                step.status === "ok"
+                  ? "border-emerald-300/20 bg-emerald-500/5 text-emerald-200"
+                  : step.status === "error"
+                    ? "border-rose-300/20 bg-rose-500/5 text-rose-200"
+                    : "border-amber-300/20 bg-amber-500/5 text-amber-200",
+              )}
+            >
+              <span className="font-mono uppercase">{step.step}</span>
+              <span className="flex-1 text-slate-400">{step.detail}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* System prompt the LLM actually saw, for transparency */}
+      {preview?.systemPrompt ? (
+        <details className="mt-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[10px]">
+          <summary className="cursor-pointer text-slate-400">
+            Prompt enviado al LLM
+          </summary>
+          <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[10px] text-slate-300">
+            {preview.systemPrompt}
+          </pre>
+        </details>
+      ) : null}
+    </Panel>
+  );
+}
+
+// Read-only view of the documents and customer fields the runner ACTUALLY
+// extracts — sourced from the pipeline definition, not from the agent's
+// (stub) extraction_fields list. The operator edits these in the
+// pipeline editor; the panel only shows them so they know what their
+// agent already understands.
+function ExtractionReadonlyPanel() {
+  return (
+    <Panel
+      title="Extracción de campos"
+      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
+    >
+      <p className="text-[11px] text-slate-400">
+        La extracción real la maneja el pipeline (catálogo de documentos +
+        campos del cliente). Edítalos desde el editor del pipeline; aquí
+        verás reflejado lo que el agente entiende cuando llega un mensaje.
+      </p>
+      <p className="mt-3 text-[11px] text-slate-500">
+        Vista de solo lectura. Próxima iteración: listar aquí los docs y
+        custom fields activos de tu pipeline para que confirmes qué
+        extrae el agente sin tener que abrir el editor.
+      </p>
     </Panel>
   );
 }
@@ -1257,6 +1418,9 @@ export function AgentsPage() {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [previewMessage, setPreviewMessage] = useState(
+    "Hola, ¿qué tipo de crédito manejan?",
+  );
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -1380,7 +1544,8 @@ export function AgentsPage() {
   });
 
   const previewMutation = useMutation({
-    mutationFn: (agent: AgentItem) => agentsApi.previewResponse(agent.id, "¿Me aprueban con buró malo si gano por nómina?", agentPatch(agent)),
+    mutationFn: ({ agent, message }: { agent: AgentItem; message: string }) =>
+      agentsApi.previewResponse(agent.id, message, agentPatch(agent)),
     onSuccess: (result) => {
       setPreview(result);
       toast.success("Preview generado");
@@ -1537,7 +1702,7 @@ export function AgentsPage() {
     { label: "Guardar configuración", icon: <Save className="h-4 w-4 text-emerald-300" />, action: saveActive },
     { label: "Validar antes de publicar", icon: <ClipboardCheck className="h-4 w-4 text-amber-300" />, action: () => activeAgent && validateMutation.mutate(activeAgent) },
     { label: "Publicar agente", icon: <UploadCloud className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && publishMutation.mutate(activeAgent.id) },
-    { label: "Generar preview WhatsApp", icon: <MessageCircle className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && previewMutation.mutate(activeAgent) },
+    { label: "Generar preview WhatsApp", icon: <MessageCircle className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && previewMutation.mutate({ agent: activeAgent, message: previewMessage }) },
     { label: "Comparar seleccionados", icon: <GitBranch className="h-4 w-4 text-violet-300" />, action: runCompare },
     { label: "Ver atajos", icon: <Sparkles className="h-4 w-4 text-sky-300" />, action: () => setShortcutsOpen(true) },
   ];
@@ -1633,46 +1798,11 @@ export function AgentsPage() {
 
             <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
               <div className="space-y-3">
-                {activeTab === "Identidad" ? <IdentityPanel draft={activeAgent} onChange={updateDraft} /> : null}
-                {activeTab === "Guardrails" ? (
-                  <GuardrailsPanel
-                    guardrails={activeAgent.guardrails}
-                    onAdd={() => createGuardrailMutation.mutate(activeAgent.id)}
-                    onTest={(guardrail) => agentsApi.testGuardrail(guardrail.id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`))}
-                    onContext={(event, guardrail) => openContext(event, { kind: "guardrail", itemId: guardrail.id })}
-                  />
+                {activeTab === "Identidad" ? (
+                  <IdentityPanel draft={activeAgent} onChange={updateDraft} />
                 ) : null}
                 {activeTab === "Extracción" ? (
-                  <ExtractionPanel
-                    fields={activeAgent.extraction_fields}
-                    onAdd={() => createFieldMutation.mutate(activeAgent.id)}
-                    onTest={(field) => agentsApi.testExtractionField(field.id, "Me llamo Juan Pérez y gano por nómina").then((result) => toast.success(`${field.label}: ${result.value}`))}
-                    onContext={(event, field) => openContext(event, { kind: "field", itemId: field.id })}
-                  />
-                ) : null}
-                {activeTab === "Monitor" ? <MonitorPanel agent={activeAgent} /> : null}
-                {activeTab === "Knowledge" ? <KnowledgePanel agent={activeAgent} /> : null}
-                {activeTab === "Decision Map" ? (
-                  <DecisionMapPanel
-                    map={activeAgent.decision_map}
-                    onValidate={() => validateMapMutation.mutate(activeAgent)}
-                    onSave={() => decisionMapMutation.mutate(activeAgent)}
-                  />
-                ) : null}
-                {activeTab === "Pruebas" ? (
-                  <ScenarioPanel
-                    agent={activeAgent}
-                    onRun={(scenarioId) => runScenarioMutation.mutate({ agentId: activeAgent.id, scenarioId })}
-                    onStress={() => stressMutation.mutate(activeAgent.id)}
-                  />
-                ) : null}
-                {activeTab === "Identidad" ? (
-                  <GuardrailsPanel
-                    guardrails={activeAgent.guardrails}
-                    onAdd={() => createGuardrailMutation.mutate(activeAgent.id)}
-                    onTest={(guardrail) => agentsApi.testGuardrail(guardrail.id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`))}
-                    onContext={(event, guardrail) => openContext(event, { kind: "guardrail", itemId: guardrail.id })}
-                  />
+                  <ExtractionReadonlyPanel />
                 ) : null}
               </div>
 
@@ -1680,18 +1810,14 @@ export function AgentsPage() {
                 <WhatsAppPreview
                   draft={activeAgent}
                   preview={preview}
-                  onRunPreview={() => previewMutation.mutate(activeAgent)}
+                  previewMessage={previewMessage}
+                  onPreviewMessageChange={setPreviewMessage}
+                  onRunPreview={(message) =>
+                    previewMutation.mutate({ agent: activeAgent, message })
+                  }
                   loading={previewMutation.isPending}
                 />
-                <SupervisorPanel agent={activeAgent} />
                 <ValidationPanel validation={validation} />
-                {activeTab !== "Decision Map" ? (
-                  <DecisionMapPanel
-                    map={activeAgent.decision_map}
-                    onValidate={() => validateMapMutation.mutate(activeAgent)}
-                    onSave={() => decisionMapMutation.mutate(activeAgent)}
-                  />
-                ) : null}
               </div>
             </div>
           </main>

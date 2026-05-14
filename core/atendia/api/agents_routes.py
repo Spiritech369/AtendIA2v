@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.config import get_settings
 from atendia.db.models.agent import Agent
 from atendia.db.session import get_db_session
 
@@ -766,49 +768,162 @@ def _validate_agent_config(row: Agent, draft: dict | None = None) -> dict:
     }
 
 
-def _preview_response(row: Agent, message: str, draft_config: dict | None = None) -> dict:
-    draft = _item(row).model_dump(mode="json")
-    if draft_config:
-        draft.update(draft_config)
-    text = message.lower()
-    extracted_fields = []
-    if "buró" in text or "buro" in text:
-        extracted_fields.append({"field_key": "tipo_credito", "value": "revisión buró", "confidence": 0.94})
-    if "nómina" in text or "nomina" in text:
-        extracted_fields.append({"field_key": "tipo_credito", "value": "nómina", "confidence": 0.96})
-    guardrails = [
-        rule
-        for rule in (draft.get("guardrails") or _default_guardrails(row.role))
-        if rule.get("active")
-    ]
-    activated = []
-    raw = "Sí, seguramente te aprueban. Te puedo confirmar el crédito hoy."
-    final = (
-        "Puedo ayudarte a revisar opciones, pero la aprobación depende de validar tus datos "
-        "y documentos. Para avanzar, compárteme tu comprobante de domicilio y tus 2 últimos "
-        "recibos de nómina."
+def _build_preview_system_prompt(
+    *,
+    name: str,
+    role: str | None,
+    tone: str | None,
+    style: str | None,
+    goal: str | None,
+    max_sentences: int | None,
+    no_emoji: bool,
+    language: str | None,
+    system_prompt: str | None,
+) -> str:
+    """Assemble the system prompt the preview LLM call will use.
+
+    Mirrors the runner's prompt assembly at a coarse level — enough for
+    the operator to feel the agent's personality without spinning up a
+    full pipeline/composer turn. The user-authored ``system_prompt``
+    (the "Prompt maestro" in the UI) is appended last so it can override
+    the auto-built guidance when needed.
+    """
+    parts: list[str] = []
+    parts.append(f"Eres {name}.")
+    if role and role != "custom":
+        parts.append(f"Rol: {role}.")
+    if tone:
+        parts.append(f"Tono: {tone}.")
+    if style:
+        parts.append(f"Estilo de escritura: {style}.")
+    if language:
+        parts.append(f"Responde en {language}.")
+    if goal:
+        parts.append(f"Objetivo operativo: {goal}")
+    if max_sentences:
+        parts.append(
+            f"Limita tu respuesta a un máximo de {max_sentences} oraciones."
+        )
+    if no_emoji:
+        parts.append("No uses emojis.")
+    if system_prompt and system_prompt.strip():
+        parts.append("\nInstrucciones específicas del operador:\n" + system_prompt.strip())
+    return "\n".join(parts)
+
+
+async def _preview_response(
+    row: Agent, message: str, draft_config: dict | None = None
+) -> dict:
+    """Honest preview: send the agent's identity + the operator's test
+    message to the configured LLM and return what it actually answers.
+
+    Falls back to a stub message when no OpenAI key is configured so the
+    panel still renders something in pure-dev environments — flagged
+    explicitly via ``trace[].status="no_llm"`` so the operator knows
+    it's not real."""
+    settings = get_settings()
+
+    # Identity fields — prefer draft_config (unsaved edits in the UI) over
+    # the row's persisted values so the operator sees the effect of their
+    # edits without saving first.
+    cfg = draft_config or {}
+    name = cfg.get("name") or row.name
+    role = cfg.get("role") or row.role
+    tone = cfg.get("tone") or row.tone
+    style = cfg.get("style") or row.style
+    goal = cfg.get("goal") or row.goal
+    max_sentences = cfg.get("max_sentences") or row.max_sentences
+    no_emoji = (
+        cfg.get("no_emoji") if cfg.get("no_emoji") is not None else row.no_emoji
     )
-    decision = {"status": "rewritten", "reason": "Evita prometer aprobación sin validación"}
-    for rule in guardrails:
-        if rule["id"] == "gr_no_approval":
-            activated.append(rule)
+    language = cfg.get("language") or row.language
+    system_prompt = cfg.get("system_prompt") or row.system_prompt
+
+    sys_prompt = _build_preview_system_prompt(
+        name=name,
+        role=role,
+        tone=tone,
+        style=style,
+        goal=goal,
+        max_sentences=max_sentences,
+        no_emoji=no_emoji,
+        language=language,
+        system_prompt=system_prompt,
+    )
+
+    if not settings.openai_api_key:
+        return {
+            "rawResponse": "(sin clave OpenAI configurada)",
+            "finalResponse": (
+                "Configura OPENAI_API_KEY para ver respuestas reales del agente. "
+                "Mientras tanto, este es un placeholder."
+            ),
+            "confidence": 0.0,
+            "retrievedFragments": [],
+            "activatedGuardrails": [],
+            "extractedFields": [],
+            "supervisorDecision": {"status": "no_llm", "reason": "OpenAI key missing"},
+            "trace": [
+                {"step": "llm_call", "status": "no_llm", "detail": "OPENAI_API_KEY no configurado"},
+            ],
+            "systemPrompt": sys_prompt,
+        }
+
+    # Direct OpenAI call. We don't reuse OpenAIComposer because the
+    # composer expects a full pipeline/state context; the preview is
+    # explicitly scoped to "identity-only" so the operator can iterate
+    # tone/style/goal/system_prompt quickly.
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key, max_retries=0, timeout=10.0)
+    t0 = time.perf_counter()
+    try:
+        resp = await client.chat.completions.create(
+            model=settings.composer_model or "gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": message},
+            ],
+            temperature=0.4,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "rawResponse": "",
+            "finalResponse": f"Error llamando al LLM: {exc}",
+            "confidence": 0.0,
+            "retrievedFragments": [],
+            "activatedGuardrails": [],
+            "extractedFields": [],
+            "supervisorDecision": {"status": "error", "reason": str(exc)[:200]},
+            "trace": [
+                {"step": "llm_call", "status": "error", "detail": str(exc)[:200]},
+            ],
+            "systemPrompt": sys_prompt,
+        }
+    finally:
+        try:
+            await client.close()
+        except Exception:  # pragma: no cover
+            pass
+
+    reply = (resp.choices[0].message.content or "").strip()
+    latency_ms = int((time.perf_counter() - t0) * 1000)
     return {
-        "rawResponse": raw,
-        "finalResponse": final,
-        "confidence": 0.96,
-        "retrievedFragments": [
-            {"id": "kb_credito_1", "title": "Proceso crédito automático", "score": 0.93},
-            {"id": "kb_docs_2", "title": "Comprobante de domicilio", "score": 0.89},
-            {"id": "kb_nomina_3", "title": "Nómina reciente", "score": 0.87},
-        ],
-        "activatedGuardrails": activated,
-        "extractedFields": extracted_fields,
-        "supervisorDecision": decision,
+        "rawResponse": reply,
+        "finalResponse": reply,
+        "confidence": 1.0,
+        "retrievedFragments": [],
+        "activatedGuardrails": [],
+        "extractedFields": [],
+        "supervisorDecision": {"status": "ok", "reason": "respuesta real del LLM"},
         "trace": [
-            {"step": "intent_detection", "status": "ok", "detail": "crédito detectado"},
-            {"step": "knowledge_retrieval", "status": "ok", "detail": "3 fragmentos recuperados"},
-            {"step": "supervisor", "status": "rewritten", "detail": decision["reason"]},
+            {
+                "step": "llm_call",
+                "status": "ok",
+                "detail": f"{resp.model} · {latency_ms}ms · {resp.usage.prompt_tokens}in/{resp.usage.completion_tokens}out",
+            },
         ],
+        "systemPrompt": sys_prompt,
     }
 
 
@@ -1134,7 +1249,7 @@ async def preview_agent_response(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
-    return _preview_response(row, body.message, body.draft_config)
+    return await _preview_response(row, body.message, body.draft_config)
 
 
 @router.get("/{agent_id}/guardrails")

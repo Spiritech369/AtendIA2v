@@ -196,6 +196,10 @@ export interface PreviewResult {
   extractedFields: Array<{ field_key: string; value: string; confidence: number }>;
   supervisorDecision: Record<string, unknown>;
   trace: Array<{ step: string; status: string; detail: string }>;
+  // The assembled system prompt the LLM actually saw. Surfaced in the
+  // preview panel as a collapsible so the operator can verify what
+  // their tono/estilo/objetivo/prompt_maestro combined into.
+  systemPrompt?: string;
 }
 
 export const agentsApi = {
