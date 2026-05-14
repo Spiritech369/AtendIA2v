@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -269,10 +270,40 @@ async def _customer_notes(
     return [CustomerNoteInfo(**row._mapping) for row in rows]
 
 
+_DOC_STATUS_RE = re.compile(r"^(DOCS_[A-Z_]+)\.status$")
+
+
 async def _required_docs(
-    session: AsyncSession, tenant_id: UUID, extracted_data: dict
+    session: AsyncSession,
+    tenant_id: UUID,
+    extracted_data: dict,
+    customer_attrs: dict | None = None,
 ) -> list[RequiredDocInfo]:
+    """Required-docs checklist surfaced on the contact panel.
+
+    Source of truth (in priority order):
+
+    1. **Pipeline `auto_enter_rules.conditions`** — every stage whose
+       rules require ``DOCS_<KEY>.status equals "ok"`` declares
+       ``<KEY>`` as a required document. This is exactly what the
+       Pipeline editor's "Documentos requeridos" checklist writes
+       (`DocumentRuleBuilder.tsx`), so what the operator checks there
+       lights up automatically here. Aggregated across *all* stages so
+       a contact can see the full set of docs they'll eventually need,
+       not just the docs for their current stage.
+
+    2. **Legacy `docs_per_plan`** — older tenants populated a
+       plan-keyed dict directly in the pipeline JSON. Honored as a
+       fallback when no auto-enter rule mentions documents, so we
+       don't regress those tenants.
+
+    Presence (`present=True`) is resolved against the customer's
+    `attrs` first (where uploaded-doc statuses live) and falls back to
+    the conversation's `extracted_data` for plan-keyed legacy values.
+    """
+    from atendia.contracts.documents_catalog import humanize_doc_key
     from atendia.db.models.tenant_config import TenantPipeline
+    from atendia.state_machine.pipeline_evaluator import resolve_field_path
 
     definition = (
         await session.execute(
@@ -284,6 +315,45 @@ async def _required_docs(
     ).scalar_one_or_none()
     if not isinstance(definition, dict):
         return []
+
+    # ── 1. Aggregate DOCS_*.status from every stage's rules ─────────
+    seen: dict[str, str] = {}  # field_path -> friendly label
+    for stage in definition.get("stages", []) or []:
+        if not isinstance(stage, dict):
+            continue
+        rules = stage.get("auto_enter_rules")
+        if not isinstance(rules, dict):
+            continue
+        for cond in rules.get("conditions") or []:
+            if not isinstance(cond, dict):
+                continue
+            field = cond.get("field")
+            if not isinstance(field, str):
+                continue
+            m = _DOC_STATUS_RE.match(field)
+            if not m:
+                continue
+            seen.setdefault(field, humanize_doc_key(m.group(1)))
+
+    if seen:
+        items: list[RequiredDocInfo] = []
+        for field_path, label in seen.items():
+            # Resolve against customer.attrs first (canonical for
+            # uploaded-doc statuses), then conversation extracted_data.
+            value = None
+            if customer_attrs:
+                value = resolve_field_path(customer_attrs, field_path)
+            if value is None:
+                value = resolve_field_path(extracted_data, field_path)
+            # "Present" = the resolved status is "ok"; any other value
+            # (None, "missing", "pending") still counts as not-yet-done.
+            present = isinstance(value, str) and value.lower() == "ok"
+            items.append(
+                RequiredDocInfo(field_name=field_path, label=label, present=present)
+            )
+        return items
+
+    # ── 2. Legacy fallback: docs_per_plan ──────────────────────────
     docs_per_plan = definition.get("docs_per_plan")
     if not isinstance(docs_per_plan, dict):
         return []
@@ -292,7 +362,7 @@ async def _required_docs(
     required = docs_per_plan.get(str(plan)) or docs_per_plan.get("default") or []
     if not isinstance(required, list):
         return []
-    items: list[RequiredDocInfo] = []
+    items = []
     for item in required:
         if isinstance(item, str):
             field_name = item
@@ -525,6 +595,14 @@ async def get_conversation(
     row = (await session.execute(stmt)).first()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    # Pull the customer's `attrs` so `_required_docs` can resolve doc
+    # statuses written by the upload/extraction sprint
+    # (e.g. customer.attrs["DOCS_INE"]["status"] = "ok").
+    customer_attrs = (
+        await session.execute(
+            select(Customer.attrs).where(Customer.id == row.customer_id)
+        )
+    ).scalar_one_or_none() or {}
     return ConversationDetail(
         id=row.id,
         tenant_id=row.tenant_id,
@@ -548,7 +626,12 @@ async def get_conversation(
         tags=row.tags or [],
         customer_fields=await _customer_fields(session, tenant_id, row.customer_id),
         customer_notes=await _customer_notes(session, tenant_id, row.customer_id),
-        required_docs=await _required_docs(session, tenant_id, row.extracted_data or {}),
+        required_docs=await _required_docs(
+            session,
+            tenant_id,
+            row.extracted_data or {},
+            customer_attrs=customer_attrs if isinstance(customer_attrs, dict) else {},
+        ),
     )
 
 
