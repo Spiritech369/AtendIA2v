@@ -781,14 +781,14 @@ DEFAULT_INBOX_CONFIG: dict = {
         {"id": "awaiting_customer", "label": "En espera de cliente", "color": "#4fa8f5", "query": "stage = 'waiting_customer'",                  "live_count": True,  "visible": True, "order": 3},
         {"id": "stale",             "label": "Inactivas >24h",       "color": "#f25252", "query": "last_message_at < now() - interval '24h'",   "live_count": True,  "visible": True, "order": 4},
     ],
-    "stage_rings": [
-        {"stage_id": "nuevo",      "emoji": "🆕", "color": "#6b7cf5", "sla_hours": 24},
-        {"stage_id": "en_curso",   "emoji": "🔄", "color": "#10c98f", "sla_hours": 4},
-        {"stage_id": "en_espera",  "emoji": "⏳", "color": "#f5a623", "sla_hours": 48},
-        {"stage_id": "cotizacion", "emoji": "💰", "color": "#9b72f5", "sla_hours": 12},
-        {"stage_id": "documentos", "emoji": "📄", "color": "#4fa8f5", "sla_hours": 24},
-        {"stage_id": "cierre",     "emoji": "🏁", "color": "#10c98f", "sla_hours": None},
-    ],
+    # stage_rings start empty. The StageRingsSection UI reads the
+    # tenant's live pipeline stages and lets the operator author rings
+    # against THOSE ids. Shipping a default list keyed to credit/sales
+    # stages (en_curso / cotizacion / documentos / cierre) leaked
+    # vertical vocabulary to fresh tenants whose pipeline uses the
+    # neutral default_pipeline (nuevo / contactado / en_proceso /
+    # ganado / perdido) — emojis showed up unmoored from real stages.
+    "stage_rings": [],
     "handoff_rules": [
         {"id": "ask_price", "intent": "ASK_PRICE",       "confidence": 82,  "action": "suggest_template",        "template": "precio_hr_v_2025",  "enabled": True,  "order": 0},
         {"id": "docs_miss", "intent": "DOCS_MISSING",    "confidence": 75,  "action": "send_checklist",          "template": "docs_checklist_v2", "enabled": True,  "order": 1},

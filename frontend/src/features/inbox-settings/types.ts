@@ -95,14 +95,12 @@ export const DEFAULT_INBOX_CONFIG: InboxConfig = {
       order: 4,
     },
   ],
-  stage_rings: [
-    { stage_id: "nuevo", emoji: "🆕", color: "#6b7cf5", sla_hours: 24 },
-    { stage_id: "en_curso", emoji: "🔄", color: "#10c98f", sla_hours: 4 },
-    { stage_id: "en_espera", emoji: "⏳", color: "#f5a623", sla_hours: 48 },
-    { stage_id: "cotizacion", emoji: "💰", color: "#9b72f5", sla_hours: 12 },
-    { stage_id: "documentos", emoji: "📄", color: "#4fa8f5", sla_hours: 24 },
-    { stage_id: "cierre", emoji: "🏁", color: "#10c98f", sla_hours: null },
-  ],
+  // stage_rings start empty by default. StageRingsSection reads the
+  // tenant's live pipeline stages and lets the operator author rings
+  // against THOSE ids. Keeping a sales-flavoured default list (cotizacion,
+  // documentos, cierre…) leaked vertical vocabulary to fresh tenants
+  // whose pipeline uses the neutral default_pipeline.
+  stage_rings: [],
   handoff_rules: [
     {
       id: "ask_price",
