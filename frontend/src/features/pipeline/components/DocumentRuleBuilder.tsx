@@ -23,37 +23,20 @@ import type {
 } from "./PipelineEditor";
 
 // ── Document catalog ──────────────────────────────────────────────────
-// Each entry corresponds to a `customer.attrs[DOC_KEY]` dict the AI
-// Field Extraction sprint writes when a document is uploaded. The .status
-// sub-field is the canonical path the evaluator reads.
+// The catalog is now tenant-configurable and lives inside
+// `pipeline.definition.documents_catalog`. The shape of each entry is
+// what the operator authors in the Pipeline editor's "Catálogo de
+// documentos" section, and `<DocumentRuleBuilder>` receives the
+// current draft's catalog as a prop. Checking a document still writes
+// a `DOCS_<KEY>.status equals "ok"` condition into the stage's
+// auto_enter_rules — that contract is unchanged so existing pipelines
+// keep working.
 
-export const DOCUMENT_CATALOG: ReadonlyArray<{
+export interface DocumentCatalogEntry {
   key: string;
   label: string;
   hint?: string;
-}> = [
-  { key: "DOCS_INE", label: "INE", hint: "Identificación oficial" },
-  {
-    key: "DOCS_COMPROBANTE_DOMICILIO",
-    label: "Comprobante de domicilio",
-    hint: "Recibo CFE / agua / teléfono",
-  },
-  {
-    key: "DOCS_ESTADOS_CUENTA",
-    label: "Estados de cuenta",
-    hint: "3 últimos meses",
-  },
-  {
-    key: "DOCS_RECIBOS_NOMINA",
-    label: "Recibos de nómina",
-    hint: "Aplica para crédito nómina",
-  },
-  {
-    key: "DOCS_RESOLUCION_IMSS",
-    label: "Resolución IMSS",
-    hint: "Aplica si trabajador IMSS",
-  },
-];
+}
 
 // We treat a stage's `auto_enter_rules` as "doc-mode-shaped" when every
 // condition is `DOCS_<KEY>.status equals "ok"` AND there are no other
@@ -87,11 +70,13 @@ function buildDocConditions(selectedKeys: Iterable<string>): ConditionDraft[] {
 export function DocumentRuleBuilder({
   stageLabel,
   rules,
+  catalog,
   onChange,
   disabled,
 }: {
   stageLabel: string;
   rules: AutoEnterRulesDraft | undefined;
+  catalog: ReadonlyArray<DocumentCatalogEntry>;
   onChange: (next: AutoEnterRulesDraft | undefined) => void;
   disabled?: boolean;
 }) {
@@ -147,8 +132,14 @@ export function DocumentRuleBuilder({
           </p>
         </div>
       </div>
+      {catalog.length === 0 && (
+        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
+          No hay documentos en el catálogo. Defínelos arriba en "Catálogo
+          de documentos" para que aparezcan aquí.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {DOCUMENT_CATALOG.map((doc) => {
+        {catalog.map((doc) => {
           const isChecked = selected?.has(doc.key) ?? false;
           return (
             <button

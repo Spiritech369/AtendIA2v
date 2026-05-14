@@ -206,6 +206,37 @@ class StageDefinition(BaseModel):
         return self
 
 
+_DOC_KEY_RE = re.compile(r"^DOCS_[A-Z][A-Z0-9_]*$")
+
+
+class DocumentSpec(BaseModel):
+    """One operator-defined document the tenant collects.
+
+    Lives inside ``PipelineDefinition.documents_catalog`` so the catalog
+    is tenant-configurable and persists alongside the pipeline. The
+    ``key`` is the prefix used in auto_enter_rules conditions
+    (``DOCS_<KEY>.status equals "ok"``); ``label`` / ``hint`` are the
+    operator-friendly strings rendered in the editor checklist and the
+    contact panel.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(min_length=6, max_length=80)
+    label: str = Field(min_length=1, max_length=80)
+    hint: str = Field(default="", max_length=200)
+
+    @field_validator("key")
+    @classmethod
+    def _validate_key_shape(cls, v: str) -> str:
+        if not _DOC_KEY_RE.fullmatch(v):
+            raise ValueError(
+                f"document key {v!r} must match {_DOC_KEY_RE.pattern} "
+                "(uppercase, starts with DOCS_)"
+            )
+        return v
+
+
 class PipelineDefinition(BaseModel):
     version: int = Field(ge=1)
     nlu: NLUConfig = Field(default_factory=NLUConfig)
@@ -218,6 +249,11 @@ class PipelineDefinition(BaseModel):
         default_factory=_default_flow_mode_rules,
     )
     docs_per_plan: dict[str, list[str]] = Field(default_factory=dict)
+    # Tenant-configurable document catalog. The Pipeline editor renders
+    # this as the "Documentos requeridos" checklist; checking a doc
+    # writes a `DOCS_<KEY>.status equals "ok"` condition into the
+    # stage's auto_enter_rules. Order matters (display order in the UI).
+    documents_catalog: list[DocumentSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_stage_ids_unique(self) -> "PipelineDefinition":
@@ -233,4 +269,11 @@ class PipelineDefinition(BaseModel):
             for t in stage.transitions:
                 if t.to not in ids:
                     raise ValueError(f"transition target '{t.to}' is not a known stage")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_doc_keys_unique(self) -> "PipelineDefinition":
+        keys = [d.key for d in self.documents_catalog]
+        if len(keys) != len(set(keys)):
+            raise ValueError("documents_catalog entries must have unique keys")
         return self

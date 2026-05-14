@@ -316,6 +316,19 @@ async def _required_docs(
     if not isinstance(definition, dict):
         return []
 
+    # Tenant-configured catalog wins for label resolution. The hardcoded
+    # `humanize_doc_key` only fires as a last-resort fallback when a
+    # rule references a DOCS_* key that the operator removed from the
+    # catalog (orphan), so the contact panel still shows something
+    # readable instead of the raw identifier.
+    tenant_catalog: dict[str, str] = {}
+    for d in definition.get("documents_catalog") or []:
+        if isinstance(d, dict):
+            k = d.get("key")
+            lbl = d.get("label")
+            if isinstance(k, str) and isinstance(lbl, str) and lbl:
+                tenant_catalog[k] = lbl
+
     # ── 1. Aggregate DOCS_*.status from every stage's rules ─────────
     seen: dict[str, str] = {}  # field_path -> friendly label
     for stage in definition.get("stages", []) or []:
@@ -333,7 +346,9 @@ async def _required_docs(
             m = _DOC_STATUS_RE.match(field)
             if not m:
                 continue
-            seen.setdefault(field, humanize_doc_key(m.group(1)))
+            doc_key = m.group(1)
+            label = tenant_catalog.get(doc_key) or humanize_doc_key(doc_key)
+            seen.setdefault(field, label)
 
     if seen:
         items: list[RequiredDocInfo] = []

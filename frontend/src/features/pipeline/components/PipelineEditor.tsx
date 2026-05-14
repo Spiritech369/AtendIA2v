@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Code2,
+  FileText,
   GripVertical,
   MoreHorizontal,
   Plus,
@@ -98,12 +99,23 @@ interface StageDraft {
   allow_auto_backward?: boolean;
 }
 
+export interface DocumentSpecDraft {
+  key: string;
+  label: string;
+  hint: string;
+}
+
 interface PipelineDraft {
   stages: StageDraft[];
   docs_per_plan: Record<string, string[]>;
+  documents_catalog: DocumentSpecDraft[];
   fallback?: string;
   extra: Record<string, unknown>;
 }
+
+// Mirrors the backend regex in pipeline_definition.py — uppercase, must
+// start with DOCS_, identifier-shaped suffix.
+const DOC_KEY_RE = /^DOCS_[A-Z][A-Z0-9_]*$/;
 
 const STAGE_ID_RE = /^[a-z][a-z0-9_]{2,29}$/;
 const STAGE_COLORS = [
@@ -188,12 +200,27 @@ function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft 
     typeof def.docs_per_plan === "object" && def.docs_per_plan !== null
       ? (def.docs_per_plan as Record<string, string[]>)
       : {};
+  const documents_catalog: DocumentSpecDraft[] = Array.isArray(def.documents_catalog)
+    ? def.documents_catalog.flatMap((d: unknown) => {
+        if (typeof d !== "object" || d === null) return [];
+        const obj = d as Record<string, unknown>;
+        if (typeof obj.key !== "string" || typeof obj.label !== "string") return [];
+        return [
+          {
+            key: obj.key,
+            label: obj.label,
+            hint: typeof obj.hint === "string" ? obj.hint : "",
+          },
+        ];
+      })
+    : [];
   const fallback = typeof def.fallback === "string" ? def.fallback : undefined;
   const extra: Record<string, unknown> = { ...def };
   delete extra.stages;
   delete extra.docs_per_plan;
+  delete extra.documents_catalog;
   delete extra.fallback;
-  return { stages, docs_per_plan: docs, fallback, extra };
+  return { stages, docs_per_plan: docs, documents_catalog, fallback, extra };
 }
 
 function serialise(draft: PipelineDraft): Record<string, unknown> {
@@ -212,6 +239,11 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
       };
     }),
     docs_per_plan: draft.docs_per_plan,
+    documents_catalog: draft.documents_catalog.map((d) => ({
+      key: d.key,
+      label: d.label,
+      ...(d.hint ? { hint: d.hint } : {}),
+    })),
     ...(draft.fallback ? { fallback: draft.fallback } : {}),
   };
 }
@@ -222,6 +254,19 @@ const RULE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 
 function validate(draft: PipelineDraft): string | null {
   if (draft.stages.length === 0) return "El pipeline debe tener al menos una etapa.";
+  const docKeys = new Set<string>();
+  for (const d of draft.documents_catalog) {
+    if (!DOC_KEY_RE.test(d.key)) {
+      return `Documento "${d.key || "(vacío)"}": el ID debe iniciar con DOCS_ y usar solo letras mayúsculas, números y guion bajo.`;
+    }
+    if (docKeys.has(d.key)) {
+      return `Documento duplicado: ${d.key}`;
+    }
+    docKeys.add(d.key);
+    if (!d.label.trim()) {
+      return `Documento "${d.key}": la etiqueta no puede estar vacía.`;
+    }
+  }
   const ids = new Set<string>();
   for (const s of draft.stages) {
     if (!STAGE_ID_RE.test(s.id)) {
@@ -297,7 +342,11 @@ export function PipelineEditor({ onClose }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [showDocsJson, setShowDocsJson] = useState(false);
+  const [showDocsCatalog, setShowDocsCatalog] = useState(true);
   const [docsRaw, setDocsRaw] = useState("");
+  const [newDocKey, setNewDocKey] = useState("");
+  const [newDocLabel, setNewDocLabel] = useState("");
+  const [newDocHint, setNewDocHint] = useState("");
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
 
@@ -315,6 +364,7 @@ export function PipelineEditor({ onClose }: Props) {
           { id: "propuesta", label: "Propuesta", timeout_hours: 48, is_terminal: false, color: "#f59e0b" },
         ],
         docs_per_plan: { default: [] },
+        documents_catalog: [],
         fallback: "escalate_to_human",
         extra: {},
       };
@@ -411,6 +461,61 @@ export function PipelineEditor({ onClose }: Props) {
     setDraft((prev) => {
       if (!prev) return prev;
       return { ...prev, stages: prev.stages.map((s, i) => (i === idx ? { ...s, ...patch } : s)) };
+    });
+  };
+
+  // Document catalog CRUD. Keys are stored normalized as `DOCS_<UPPER>`
+  // so the operator can type "ine" and we still get a valid identifier
+  // for the auto_enter_rules conditions.
+  const normalizeDocKey = (raw: string): string => {
+    const clean = raw
+      .trim()
+      .toUpperCase()
+      .replace(/^DOCS[_\s]?/i, "")
+      .replace(/[^A-Z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return clean ? `DOCS_${clean}` : "";
+  };
+
+  const addDoc = () => {
+    const key = normalizeDocKey(newDocKey);
+    const label = newDocLabel.trim();
+    if (!key || !label) return;
+    setDraft((prev) => {
+      if (!prev) return prev;
+      if (prev.documents_catalog.some((d) => d.key === key)) return prev;
+      return {
+        ...prev,
+        documents_catalog: [
+          ...prev.documents_catalog,
+          { key, label, hint: newDocHint.trim() },
+        ],
+      };
+    });
+    setNewDocKey("");
+    setNewDocLabel("");
+    setNewDocHint("");
+  };
+
+  const updateDoc = (idx: number, patch: Partial<DocumentSpecDraft>) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        documents_catalog: prev.documents_catalog.map((d, i) =>
+          i === idx ? { ...d, ...patch } : d,
+        ),
+      };
+    });
+  };
+
+  const removeDoc = (idx: number) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        documents_catalog: prev.documents_catalog.filter((_, i) => i !== idx),
+      };
     });
   };
 
@@ -962,6 +1067,7 @@ export function PipelineEditor({ onClose }: Props) {
               <DocumentRuleBuilder
                 stageLabel={selected.label || selected.id}
                 rules={selected.auto_enter_rules}
+                catalog={draft.documents_catalog}
                 onChange={(next) =>
                   updateStage(selectedIdx, { auto_enter_rules: next })
                 }
@@ -999,6 +1105,111 @@ export function PipelineEditor({ onClose }: Props) {
                 }}
                 disabled={!canEdit}
               />
+            </div>
+          )}
+        </div>
+
+        {/* Document catalog — tenant-configurable list of `DOCS_*` keys
+            the operator can reference from any stage's auto_enter_rules
+            via the DocumentRuleBuilder checklist. */}
+        <div className="border-t">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setShowDocsCatalog((v) => !v)}
+          >
+            {showDocsCatalog ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            <FileText className="size-3.5" />
+            Catálogo de documentos ({draft.documents_catalog.length})
+          </button>
+          {showDocsCatalog && (
+            <div className="space-y-2 px-4 pb-4">
+              <p className="text-[11px] text-muted-foreground">
+                Define los documentos que tus clientes deben subir. Cada
+                entrada se vuelve un checkbox en la sección "Documentos
+                requeridos" de cada etapa, y aparece en el panel
+                "Documentos" del contacto.
+              </p>
+
+              <div className="space-y-1.5">
+                {draft.documents_catalog.map((doc, idx) => (
+                  <div
+                    key={doc.key}
+                    className="grid grid-cols-[1fr_2fr_2fr_auto] items-center gap-2 rounded-md border bg-card px-2 py-1.5"
+                  >
+                    <code className="truncate font-mono text-[10px] text-muted-foreground">
+                      {doc.key}
+                    </code>
+                    <Input
+                      value={doc.label}
+                      onChange={(e) => updateDoc(idx, { label: e.target.value })}
+                      placeholder="Etiqueta visible"
+                      className="h-7 text-xs"
+                      disabled={!canEdit}
+                    />
+                    <Input
+                      value={doc.hint}
+                      onChange={(e) => updateDoc(idx, { hint: e.target.value })}
+                      placeholder="Pista opcional"
+                      className="h-7 text-xs"
+                      disabled={!canEdit}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-destructive hover:bg-destructive/10"
+                      onClick={() => removeDoc(idx)}
+                      disabled={!canEdit}
+                      aria-label={`Eliminar ${doc.label}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {canEdit && (
+                <div className="grid grid-cols-[1fr_2fr_2fr_auto] items-center gap-2 rounded-md border border-dashed bg-muted/20 px-2 py-1.5">
+                  <Input
+                    value={newDocKey}
+                    onChange={(e) => setNewDocKey(e.target.value)}
+                    placeholder="curp o DOCS_CURP"
+                    className="h-7 font-mono text-[11px]"
+                  />
+                  <Input
+                    value={newDocLabel}
+                    onChange={(e) => setNewDocLabel(e.target.value)}
+                    placeholder="CURP"
+                    className="h-7 text-xs"
+                  />
+                  <Input
+                    value={newDocHint}
+                    onChange={(e) => setNewDocHint(e.target.value)}
+                    placeholder="Pista (opcional)"
+                    className="h-7 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={addDoc}
+                    disabled={!newDocKey.trim() || !newDocLabel.trim()}
+                    aria-label="Agregar documento"
+                  >
+                    <Plus className="size-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              {draft.documents_catalog.length === 0 && (
+                <p className="text-[11px] italic text-muted-foreground">
+                  Vacío. Agrega tu primer documento arriba o usa la plantilla
+                  por defecto (INE, comprobante de domicilio, etc.) creando
+                  un tenant nuevo.
+                </p>
+              )}
             </div>
           )}
         </div>

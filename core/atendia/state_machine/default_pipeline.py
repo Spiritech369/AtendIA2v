@@ -85,6 +85,34 @@ DEFAULT_PIPELINE_DEFINITION: dict = {
     "composer": {"history_turns": 2},
     "flow_mode_rules": [],
     "docs_per_plan": {},
+    # Starter catalog so the editor's "Documentos requeridos" section
+    # isn't empty on day one. Operator can rename / delete / extend
+    # through the editor. The keys mirror the historical hardcoded
+    # frontend catalog for backward compatibility — tenants who
+    # already have rules referencing `DOCS_INE.status` keep working.
+    "documents_catalog": [
+        {"key": "DOCS_INE", "label": "INE", "hint": "Identificación oficial"},
+        {
+            "key": "DOCS_COMPROBANTE_DOMICILIO",
+            "label": "Comprobante de domicilio",
+            "hint": "Recibo CFE / agua / teléfono",
+        },
+        {
+            "key": "DOCS_ESTADOS_CUENTA",
+            "label": "Estados de cuenta",
+            "hint": "3 últimos meses",
+        },
+        {
+            "key": "DOCS_RECIBOS_NOMINA",
+            "label": "Recibos de nómina",
+            "hint": "Aplica para crédito nómina",
+        },
+        {
+            "key": "DOCS_RESOLUCION_IMSS",
+            "label": "Resolución IMSS",
+            "hint": "Aplica si trabajador IMSS",
+        },
+    ],
 }
 
 
