@@ -16,8 +16,17 @@ async def test_load_active_pipeline_returns_validated_definition(db_session):
     definition = {
         "version": 1,
         "stages": [
-            {"id": "greeting", "actions_allowed": ["greet"], "transitions": [{"to": "qualify", "when": "true"}]},
-            {"id": "qualify", "required_fields": ["nombre"], "actions_allowed": ["ask_field"], "transitions": []},
+            {
+                "id": "greeting",
+                "actions_allowed": ["greet"],
+                "transitions": [{"to": "qualify", "when": "true"}],
+            },
+            {
+                "id": "qualify",
+                "required_fields": ["nombre"],
+                "actions_allowed": ["ask_field"],
+                "transitions": [],
+            },
         ],
         "tone": {"register": "informal_mexicano"},
         "fallback": "escalate_to_human",
@@ -67,7 +76,11 @@ async def test_load_active_pipeline_picks_up_new_version_without_restart(db_sess
     )
     tenant_id = res.scalar()
 
-    v1 = {"version": 1, "stages": [{"id": "lead", "actions_allowed": [], "transitions": []}]}
+    v1 = {
+        "version": 1,
+        "stages": [{"id": "lead", "actions_allowed": [], "transitions": []}],
+        "fallback": "escalate_to_human",
+    }
     await db_session.execute(
         text("""
             INSERT INTO tenant_pipelines (tenant_id, version, definition, active)
@@ -82,7 +95,11 @@ async def test_load_active_pipeline_picks_up_new_version_without_restart(db_sess
 
     # Operator publishes a new pipeline version mid-flight: deactivate old,
     # insert + activate new.
-    v2 = {"version": 2, "stages": [{"id": "qualified", "actions_allowed": [], "transitions": []}]}
+    v2 = {
+        "version": 2,
+        "stages": [{"id": "qualified", "actions_allowed": [], "transitions": []}],
+        "fallback": "escalate_to_human",
+    }
     await db_session.execute(
         text("UPDATE tenant_pipelines SET active = false WHERE tenant_id = :tid"),
         {"tid": tenant_id},

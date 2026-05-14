@@ -2,6 +2,7 @@
 
 Sidecar HTTP calls are mocked via monkeypatching baileys_client module.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -176,3 +177,54 @@ def test_internal_inbound_deduplicates(client_tenant_admin):
     assert r1.status_code == 200
     assert r2.status_code == 200
     assert r2.json()["status"] == "duplicate"
+
+
+def test_internal_inbound_runs_conversation_runner(client_tenant_admin):
+    """Sprint A.3 regression-guard.
+
+    Earlier in the project the Baileys inbound webhook persisted the message
+    but never invoked the conversation runner — the operator saw the chat
+    but the bot stayed silent. Commit 7658b14 wired the runner in. This
+    test pins that wiring by asserting a `turn_traces` row exists after
+    posting a Baileys inbound: the runner is the only thing that writes
+    that table, so a row implies the pipeline ran end-to-end.
+
+    If a future refactor short-circuits the runner (e.g. moves it to an
+    async task that doesn't await within the request), this test will
+    catch it — the bot would otherwise look "fine" until a real customer
+    hit silence after one day.
+    """
+    settings = get_settings()
+    body = {
+        "tenant_id": client_tenant_admin.tenant_id,
+        "from_phone": "5215559876543",
+        "text": "hola, quiero info",
+        "ts": 1700000000000,
+        "message_id": f"wa-runner-{uuid4().hex[:8]}",
+    }
+    resp = client_tenant_admin.post(
+        "/api/v1/internal/baileys/inbound",
+        json=body,
+        headers={"X-Internal-Token": settings.baileys_internal_token},
+    )
+    assert resp.status_code == 200, resp.text
+    conv_id = resp.json()["conversation_id"]
+
+    async def _count_turn_traces() -> int:
+        engine = create_async_engine(settings.database_url)
+        try:
+            async with engine.begin() as conn:
+                return (
+                    await conn.execute(
+                        text("SELECT COUNT(*) FROM turn_traces WHERE conversation_id = :c"),
+                        {"c": conv_id},
+                    )
+                ).scalar()
+        finally:
+            await engine.dispose()
+
+    count = asyncio.run(_count_turn_traces())
+    assert count >= 1, (
+        f"expected at least 1 turn_trace row for conv {conv_id} after Baileys "
+        f"inbound (proves the conversation_runner executed), got {count}"
+    )

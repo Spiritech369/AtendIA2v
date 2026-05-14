@@ -11,6 +11,7 @@ secret and short-circuits FastAPI's normal auth deps.
 
 Design: `docs/plans/2026-05-13-baileys-integration-design.md`.
 """
+
 from __future__ import annotations
 
 import json as _json
@@ -82,11 +83,15 @@ async def _upsert_config(
     await session.execute(stmt)
     await session.commit()
     row = (
-        await session.execute(
-            text("SELECT * FROM tenant_baileys_config WHERE tenant_id = :t"),
-            {"t": tenant_id},
+        (
+            await session.execute(
+                text("SELECT * FROM tenant_baileys_config WHERE tenant_id = :t"),
+                {"t": tenant_id},
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
     return row  # type: ignore[return-value]
 
 
@@ -100,9 +105,7 @@ async def get_baileys_status(
         live = await baileys_client.get_status(tenant_id)
     except baileys_client.BaileysBridgeUnavailable as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"sidecar: {exc}") from exc
-    row = await _upsert_config(
-        session, tenant_id, status_val=live.status, phone=live.phone
-    )
+    row = await _upsert_config(session, tenant_id, status_val=live.status, phone=live.phone)
     return BaileysStatusResponse(
         status=live.status,
         phone=live.phone,
@@ -185,7 +188,9 @@ async def update_baileys_preference(
     )
     await session.commit()
     return await get_baileys_status(  # type: ignore[return-value]
-        tenant_id=tenant_id, user=None, session=session  # noqa
+        tenant_id=tenant_id,
+        user=None,
+        session=session,  # noqa
     )
 
 
@@ -347,13 +352,9 @@ async def baileys_inbound(
         from atendia.workflows.engine import enqueue_executions_to_workflows_queue
 
         try:
-            arq_pool = await create_pool(
-                RedisSettings.from_dsn(get_settings().redis_url)
-            )
+            arq_pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
             try:
-                await enqueue_executions_to_workflows_queue(
-                    arq_pool, started_executions
-                )
+                await enqueue_executions_to_workflows_queue(arq_pool, started_executions)
             finally:
                 await arq_pool.aclose()
         except Exception:  # pragma: no cover
@@ -480,8 +481,14 @@ async def _run_inbound_pipeline(
                 arq_pool=arq_pool,
                 to_phone_e164=from_phone_e164,
             )
-        except Exception:
+        except Exception as exc:
             # Never crash the webhook — log via event and let Baileys retry-free.
+            # Surface the exception type + message in the payload so an operator
+            # can diagnose runner failures from the audit log (previously the
+            # event said only "run_turn failed" which made silent regressions
+            # invisible — Sprint A.3 fix).
+            import traceback as _tb
+
             await emitter.emit(
                 conversation_id=conversation_id,
                 tenant_id=tenant_id,
@@ -489,6 +496,9 @@ async def _run_inbound_pipeline(
                 payload={
                     "where": "baileys_inbound_runner",
                     "message": "run_turn failed",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc)[:500],
+                    "traceback_tail": _tb.format_exc().splitlines()[-5:],
                 },
             )
     finally:
@@ -498,9 +508,7 @@ async def _run_inbound_pipeline(
     return started_executions
 
 
-@internal_router.post(
-    "/outbound-echo", dependencies=[Depends(_validate_internal_token)]
-)
+@internal_router.post("/outbound-echo", dependencies=[Depends(_validate_internal_token)])
 async def baileys_outbound_echo(
     body: BaileysOutboundEchoBody,
     session: AsyncSession = Depends(get_db_session),
@@ -565,10 +573,7 @@ async def baileys_outbound_echo(
     # The operator just took control from their phone — pause the bot so
     # the runner doesn't reply on top of them.
     await session.execute(
-        text(
-            "UPDATE conversation_state SET bot_paused = TRUE "
-            "WHERE conversation_id = :c"
-        ),
+        text("UPDATE conversation_state SET bot_paused = TRUE WHERE conversation_id = :c"),
         {"c": conv_id},
     )
 
@@ -591,9 +596,7 @@ async def baileys_outbound_echo(
                 "txt": body.text,
                 "cmid": body.message_id,
                 "ts": sent_at,
-                "meta": _json.dumps(
-                    {"channel": "baileys", "source": "operator_device"}
-                ),
+                "meta": _json.dumps({"channel": "baileys", "source": "operator_device"}),
             },
         )
     ).scalar_one_or_none()
@@ -603,9 +606,7 @@ async def baileys_outbound_echo(
         return {"status": "duplicate"}
 
     await session.execute(
-        text(
-            "UPDATE conversations SET last_activity_at = :ts WHERE id = :c"
-        ),
+        text("UPDATE conversations SET last_activity_at = :ts WHERE id = :c"),
         {"ts": sent_at, "c": conv_id},
     )
     await session.commit()

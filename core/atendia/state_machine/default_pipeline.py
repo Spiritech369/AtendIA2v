@@ -32,6 +32,7 @@ Design choices:
   DO NOTHING`` on ``(tenant_id, version)`` rather than racing each
   other into duplicate rows.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -46,6 +47,25 @@ from atendia.db.models.tenant_config import TenantPipeline
 # shape stored in `tenant_pipelines.definition` directly — no Pydantic
 # round-trip needed on the hot path. The shape is validated against
 # `PipelineDefinition` in the unit tests.
+# Vertical-neutral defaults so a brand-new tenant's runner doesn't crash on
+# `NoActionAvailableError` the first time a customer messages them. The
+# action_resolver maps NLU intents (GREETING, ASK_INFO, ASK_PRICE, BUY,
+# SCHEDULE, COMPLAIN, OFF_TOPIC, UNCLEAR) to preferred actions; if none
+# of those actions are in `actions_allowed` for the current stage, the
+# resolver raises and the bot stays silent. The list below is the
+# minimal union that covers every intent with at least one fallback.
+_DEFAULT_ACTIONS_ALLOWED: list[str] = [
+    "greet",
+    "ask_field",
+    "ask_clarification",
+    "lookup_faq",
+    "search_catalog",
+    "quote",
+    "book_appointment",
+    "close",
+    "escalate_to_human",
+]
+
 DEFAULT_PIPELINE_DEFINITION: dict = {
     "version": 1,
     "stages": [
@@ -54,36 +74,53 @@ DEFAULT_PIPELINE_DEFINITION: dict = {
             "label": "Nuevo",
             "color": "#6366f1",
             "timeout_hours": 24,
+            "actions_allowed": _DEFAULT_ACTIONS_ALLOWED,
         },
         {
             "id": "contactado",
             "label": "Contactado",
             "color": "#3b82f6",
             "timeout_hours": 48,
+            "actions_allowed": _DEFAULT_ACTIONS_ALLOWED,
         },
         {
             "id": "en_proceso",
             "label": "En proceso",
             "color": "#f59e0b",
             "timeout_hours": 72,
+            "actions_allowed": _DEFAULT_ACTIONS_ALLOWED,
         },
         {
             "id": "ganado",
             "label": "Ganado",
             "color": "#10b981",
             "is_terminal": True,
+            "actions_allowed": ["escalate_to_human"],
         },
         {
             "id": "perdido",
             "label": "Perdido",
             "color": "#ef4444",
             "is_terminal": True,
+            "actions_allowed": ["escalate_to_human"],
         },
     ],
     "fallback": "ask_clarification",
     "nlu": {"history_turns": 2},
     "composer": {"history_turns": 2},
-    "flow_mode_rules": [],
+    # The flow router requires the rules list to END with an `always`
+    # fallback or it raises at turn time. We can't just leave this empty
+    # because the JSONB column doesn't trigger Pydantic's default_factory
+    # — an explicit empty list defeats the default. Route everything to
+    # SUPPORT until the tenant authors explicit rules; SUPPORT keeps
+    # legacy 3a/3b composer behavior so the bot still answers.
+    "flow_mode_rules": [
+        {
+            "id": "default_always_support",
+            "trigger": {"type": "always"},
+            "mode": "SUPPORT",
+        }
+    ],
     "docs_per_plan": {},
     # Document catalog is intentionally empty — each tenant authors
     # their own list through the editor ("Catálogo de documentos"
