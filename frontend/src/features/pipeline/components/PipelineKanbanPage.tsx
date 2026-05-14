@@ -135,6 +135,25 @@ function stageColor(stageId: string, definitionColor?: string): string {
   return STAGE_COLORS[stageId] ?? "#6b7280";
 }
 
+// Stage health is a 0-100 score combining conversion velocity, SLA breach
+// rate, docs-blocked density and unassigned count. Coloring matches the
+// risk_level palette so the kanban reads consistently at a glance.
+function healthTone(score: number): { dot: string; text: string; bg: string; label: string } {
+  if (score >= 80) return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/10", label: "Saludable" };
+  if (score >= 50) return { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300", bg: "bg-amber-500/10", label: "En riesgo" };
+  return { dot: "bg-red-500", text: "text-red-700 dark:text-red-300", bg: "bg-red-500/10", label: "Crítico" };
+}
+
+// % of the stage SLA window already consumed by this card. Returns null when
+// we can't compute it (orphan stages, no entry timestamp, no timeout config).
+function slaProgress(enteredAt: string | null, timeoutHours: number | null): number | null {
+  if (!enteredAt || !timeoutHours || timeoutHours <= 0) return null;
+  const elapsedMs = Date.now() - new Date(enteredAt).getTime();
+  if (elapsedMs <= 0) return 0;
+  const pct = elapsedMs / (timeoutHours * 3600_000);
+  return pct;
+}
+
 // ── KPI Tile ─────────────────────────────────────────────────────────────────
 
 interface KpiTileProps {
@@ -289,9 +308,25 @@ function StageColumn({
         >
           {stage.total_count}
         </Badge>
+        {!stage.is_orphan && (() => {
+          const tone = healthTone(stage.health_score);
+          return (
+            <span
+              className={cn(
+                "flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium tabular-nums",
+                tone.bg,
+                tone.text,
+              )}
+              title={`Salud de etapa: ${tone.label} (${stage.health_score}/100)`}
+            >
+              <span className={cn("size-1.5 rounded-full", tone.dot)} />
+              {stage.health_score}
+            </span>
+          );
+        })()}
         {!stage.is_orphan && (
           <span
-            className="h-6 shrink-0 px-1.5 text-[10px] tabular-nums text-muted-foreground"
+            className="h-6 shrink-0 text-[10px] tabular-nums text-muted-foreground"
             title="Valor estimado de la etapa"
           >
             {formatCurrency(stage.total_value_mxn)}
@@ -341,6 +376,7 @@ function StageColumn({
               key={card.id}
               card={card}
               isOrphan={stage.is_orphan ?? false}
+              stageTimeoutHours={stage.timeout_hours}
               allRealStages={allRealStages}
               onMove={onMove}
               onArchive={onArchive}
@@ -401,6 +437,7 @@ function StageColumn({
 function KanbanCard({
   card,
   isOrphan,
+  stageTimeoutHours,
   allRealStages,
   onMove,
   onArchive,
@@ -410,6 +447,7 @@ function KanbanCard({
 }: {
   card: PipelineConversationCard;
   isOrphan: boolean;
+  stageTimeoutHours: number | null;
   allRealStages: StageGroup[];
   onMove: (id: string, toStage: string) => void;
   onArchive: (id: string) => void;
@@ -418,6 +456,16 @@ function KanbanCard({
   onOpenContextMenu: (e: React.MouseEvent, card: PipelineConversationCard) => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
+  const sla = slaProgress(card.stage_entered_at, stageTimeoutHours);
+  // SLA accent only kicks in when risk_level is still normal — for medio/alto
+  // the existing risk coloring already communicates urgency and doubling up
+  // would saturate the visual hierarchy.
+  const slaAccent =
+    card.risk_level === "normal" && sla !== null && sla >= 0.8
+      ? sla >= 1
+        ? "border-l-4 border-l-red-500"
+        : "border-l-4 border-l-amber-500"
+      : "";
   const riskClass =
     card.risk_level === "alto"
       ? "border-destructive/50 bg-destructive/5"
@@ -449,10 +497,18 @@ function KanbanCard({
         "group relative rounded-lg border p-3 text-left shadow-sm outline-none transition-all",
         "hover:border-foreground/20 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring",
         riskClass,
+        slaAccent,
         isOrphan && "border-destructive/50",
         isDragging && "opacity-40 shadow-lg",
         !isOrphan && "cursor-grab active:cursor-grabbing",
       )}
+      title={
+        sla !== null && sla >= 0.8
+          ? sla >= 1
+            ? `SLA vencido — lleva ${Math.round(sla * 100)}% del timeout de la etapa`
+            : `SLA al límite — ${Math.round(sla * 100)}% del timeout consumido`
+          : undefined
+      }
     >
       {/* Drag handle + overflow menu */}
       <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
