@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  Bell,
   Bot,
   BrainCircuit,
   Check,
   CheckCircle2,
+  ChevronRight,
   ClipboardCheck,
   Copy,
   Download,
@@ -16,6 +18,7 @@ import {
   GitBranch,
   Globe2,
   History,
+  ListChecks,
   Loader2,
   MessageCircle,
   MoreVertical,
@@ -90,10 +93,21 @@ const intentOptions = [
   "HUMAN_REQUESTED",
 ];
 
-// Wired tabs: each one reads or writes data the runner actually uses
-// on every inbound turn. Decision Map / Pruebas remain hidden until
-// their backends are real.
-const tabs = ["Identidad", "Guardrails", "Knowledge", "Monitor", "Extracción"] as const;
+// Resumen is the landing — aggregates pending changes, validation,
+// risk radar, scenarios, knowledge coverage and extraction status using
+// data the runner actually exposes. Decision Map / Pruebas / Historial
+// are wired to existing backend endpoints (some return seeded data —
+// flagged in each panel) so the operator can author, run and audit.
+const tabs = [
+  "Resumen",
+  "Identidad",
+  "Guardrails",
+  "Knowledge",
+  "Extracción",
+  "Decision Map",
+  "Pruebas",
+  "Historial",
+] as const;
 
 type AgentTab = (typeof tabs)[number];
 type ComparisonResult = Awaited<ReturnType<typeof agentsApi.compare>>;
@@ -2010,6 +2024,1096 @@ function Sidebar({
   );
 }
 
+// ----------------------------------------------------------------------
+// Resumen / Decision Map / Pruebas / Historial / Operational sidebar
+// ----------------------------------------------------------------------
+//
+// These panels are pure presentation over the existing agents API + the
+// monitor / audit / notifications endpoints. No new backend surface.
+//
+// Notes per tab:
+//  - Resumen: derives Risk Radar items from agent.metrics + monitor
+//    (no risk_events table yet). Validation card mirrors the
+//    /validate-config response shape (issues + checks).
+//  - Decision Map: edits the routing rules JSON inside
+//    ops_config.decision_map via PUT /agents/{id}/decision-map. Backend
+//    accepts arbitrary rules[] alongside nodes/edges, so we treat
+//    `rules` as the operator-authored slice and leave `nodes`/`edges`
+//    untouched (the legacy flow graph keeps working).
+//  - Pruebas: lists agent.scenarios (seeded by role today) and lets the
+//    operator trigger /scenarios/run or /scenarios/stress-test. Both
+//    endpoints currently return seeded pass/fail until real
+//    simulator lands — flagged with a DemoBadge.
+//  - Historial: combines agent.versions (real snapshots) with
+//    /audit-logs (real ops_config.audit_logs).
+
+function summarizePatch(before: AgentItem | null, after: AgentItem | null): string[] {
+  if (!before || !after) return [];
+  const out: string[] = [];
+  const fields: Array<[keyof AgentItem, string]> = [
+    ["name", "Nombre"],
+    ["role", "Rol"],
+    ["behavior_mode", "Modo de comportamiento"],
+    ["tone", "Tono"],
+    ["style", "Estilo"],
+    ["goal", "Objetivo"],
+    ["language", "Idioma"],
+    ["max_sentences", "Máximo de frases"],
+    ["no_emoji", "Emojis"],
+    ["return_to_flow", "Volver al flujo"],
+    ["system_prompt", "Prompt maestro"],
+  ];
+  for (const [key, label] of fields) {
+    if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+      out.push(label);
+    }
+  }
+  if (JSON.stringify(before.active_intents) !== JSON.stringify(after.active_intents)) {
+    out.push("Intents activos");
+  }
+  if (JSON.stringify(before.knowledge_config) !== JSON.stringify(after.knowledge_config)) {
+    out.push("Knowledge scope");
+  }
+  if (JSON.stringify(before.flow_mode_rules) !== JSON.stringify(after.flow_mode_rules)) {
+    out.push("Reglas de modo");
+  }
+  return out;
+}
+
+interface RiskItem {
+  id: string;
+  title: string;
+  severity: "alto" | "medio" | "bajo";
+  detail: string;
+}
+
+function deriveRiskRadar(
+  agent: AgentItem,
+  monitor: ReturnType<typeof agentsApi.monitor> extends Promise<infer T> ? T | undefined : never,
+): RiskItem[] {
+  const items: RiskItem[] = [];
+  const promiseGuard = agent.guardrails.find((g) =>
+    /aprobaci[oó]n|promete/i.test(`${g.name} ${g.rule_text}`),
+  );
+  if (!promiseGuard || !promiseGuard.active) {
+    items.push({
+      id: "promise-approval",
+      title: "Promete aprobación",
+      severity: "alto",
+      detail: "Falta o está inactivo el guardrail que evita prometer aprobación.",
+    });
+  }
+  const hasPlanField = agent.extraction_fields.some((f) => f.field_key.includes("plan"));
+  if (!hasPlanField) {
+    items.push({
+      id: "price-without-plan",
+      title: "Responde precios sin plan",
+      severity: "alto",
+      detail: "Sin campo de plan_credito el agente puede cotizar sin calificación.",
+    });
+  }
+  if (agent.metrics.failed_kb_searches >= 3) {
+    items.push({
+      id: "fallback-high",
+      title: "Fallback elevado",
+      severity: "medio",
+      detail: `${agent.metrics.failed_kb_searches} búsquedas en knowledge fallidas recientes.`,
+    });
+  }
+  if (agent.knowledge_coverage.coverage < 80) {
+    items.push({
+      id: "knowledge-gap",
+      title: "Knowledge no asignado",
+      severity: "medio",
+      detail: `Cobertura ${Math.round(agent.knowledge_coverage.coverage)}%. Temas débiles: ${
+        agent.knowledge_coverage.weak_topics.slice(0, 2).join(", ") || "—"
+      }.`,
+    });
+  }
+  if (agent.live_monitor.leads_at_risk > 0) {
+    items.push({
+      id: "leads-at-risk",
+      title: "Leads en riesgo",
+      severity: agent.live_monitor.leads_at_risk >= 3 ? "alto" : "medio",
+      detail: `${agent.live_monitor.leads_at_risk} conversaciones marcadas en riesgo en vivo.`,
+    });
+  }
+  if (monitor && monitor.cost_usd_24h >= 5) {
+    items.push({
+      id: "cost-spike",
+      title: "Costo elevado 24h",
+      severity: monitor.cost_usd_24h >= 15 ? "alto" : "medio",
+      detail: `Acumulado $${monitor.cost_usd_24h.toFixed(2)} USD en las últimas 24h.`,
+    });
+  }
+  if (items.length === 0) {
+    items.push({
+      id: "all-clear",
+      title: "Sin riesgos detectados",
+      severity: "bajo",
+      detail: "Configuración estable. Continúa monitoreando.",
+    });
+  }
+  return items;
+}
+
+interface NextBestActionItem {
+  id: string;
+  title: string;
+  reason: string;
+  cta: string;
+  onClick?: () => void;
+}
+
+function deriveNextBestAction(args: {
+  agent: AgentItem;
+  validation: ValidationResult | null;
+  dirty: boolean;
+  onValidate: () => void;
+  onPublish: () => void;
+  onSave: () => void;
+}): NextBestActionItem {
+  const { agent, validation, dirty, onValidate, onPublish, onSave } = args;
+  if (validation && validation.status !== "ok") {
+    const blocking = validation.issues.find((i) => i.severity === "critical" || i.severity === "error");
+    if (blocking) {
+      return {
+        id: "fix-validation",
+        title: `Resolver: ${blocking.message}`,
+        reason: "Validación previa publica un bloqueante crítico.",
+        cta: "Validar de nuevo",
+        onClick: onValidate,
+      };
+    }
+  }
+  if (dirty) {
+    return {
+      id: "save-draft",
+      title: "Guardar borrador",
+      reason: "Tienes cambios sin guardar en este agente.",
+      cta: "Guardar",
+      onClick: onSave,
+    };
+  }
+  if (agent.knowledge_coverage.coverage < 80 && agent.knowledge_coverage.weak_topics[0]) {
+    return {
+      id: "cover-topic",
+      title: `Cubrir tema "${agent.knowledge_coverage.weak_topics[0]}"`,
+      reason: `Cobertura ${Math.round(agent.knowledge_coverage.coverage)}% — esta sección causa fallback.`,
+      cta: "Ir a Knowledge",
+    };
+  }
+  if (agent.metrics.leads_waiting_human > 0) {
+    return {
+      id: "handle-handoff",
+      title: `${agent.metrics.leads_waiting_human} leads esperando humano`,
+      reason: "Bandeja de handoff con conversaciones pendientes.",
+      cta: "Abrir bandeja",
+    };
+  }
+  if (agent.status !== "production") {
+    return {
+      id: "publish",
+      title: "Publicar a producción",
+      reason: "Este agente está validado pero aún no se publica.",
+      cta: "Publicar",
+      onClick: onPublish,
+    };
+  }
+  return {
+    id: "monitor",
+    title: "Continuar monitoreando",
+    reason: "No hay acciones críticas. Revisa Riesgo Radar y Knowledge.",
+    cta: "Ver historial",
+  };
+}
+
+function severityTone(severity: "alto" | "medio" | "bajo"): string {
+  if (severity === "alto") return "text-red-300";
+  if (severity === "medio") return "text-amber-300";
+  return "text-emerald-300";
+}
+
+function PendingChangesCard({
+  baseline,
+  draft,
+  dirty,
+  publishedVersion,
+}: {
+  baseline: AgentItem | null;
+  draft: AgentItem | null;
+  dirty: boolean;
+  publishedVersion?: string;
+}) {
+  const fields = summarizePatch(baseline, draft);
+  return (
+    <Panel
+      title="Cambios pendientes"
+      icon={<UploadCloud className="h-4 w-4 text-amber-300" />}
+      action={
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-5 border text-[10px]",
+            dirty
+              ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+              : "border-emerald-300/30 bg-emerald-500/10 text-emerald-200",
+          )}
+        >
+          {dirty ? "Sin publicar" : "Sincronizado"}
+        </Badge>
+      }
+    >
+      {!dirty ? (
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+          El borrador coincide con producción {publishedVersion ? `(${publishedVersion})` : ""}.
+        </div>
+      ) : fields.length === 0 ? (
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-300">
+          Cambios menores no resumibles. Compara versiones para más detalle.
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {fields.map((field) => (
+            <li
+              key={field}
+              className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-slate-200"
+            >
+              <span>{field}</span>
+              <span className="text-[10px] text-amber-300">modificado</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function RiskRadarCard({ items }: { items: RiskItem[] }) {
+  return (
+    <Panel title="Risk Radar" icon={<AlertTriangle className="h-4 w-4 text-red-300" />}>
+      <ul className="space-y-1.5">
+        {items.slice(0, 5).map((item) => (
+          <li
+            key={item.id}
+            className="flex items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+          >
+            <div className="min-w-0">
+              <div className="font-medium text-slate-100">{item.title}</div>
+              <div className="mt-0.5 truncate text-[11px] text-slate-400">{item.detail}</div>
+            </div>
+            <span className={cn("text-[11px] font-semibold uppercase", severityTone(item.severity))}>
+              {item.severity}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function ValidationBeforePublishCard({
+  validation,
+  onValidate,
+  loading,
+}: {
+  validation: ValidationResult | null;
+  onValidate: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Panel
+      title="Validación antes de publicar"
+      icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={onValidate}
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Validar ahora"}
+        </Button>
+      }
+    >
+      {!validation ? (
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+          Aún no ejecutaste una validación para este borrador.
+        </div>
+      ) : (
+        <>
+          <div
+            className={cn(
+              "rounded-md border p-2.5 text-xs",
+              validation.status === "ok"
+                ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100"
+                : validation.status === "warning"
+                  ? "border-amber-300/30 bg-amber-500/10 text-amber-100"
+                  : "border-red-300/30 bg-red-500/10 text-red-100",
+            )}
+          >
+            {validation.summary}
+          </div>
+          <ul className="mt-2 space-y-1">
+            {validation.checks.map((check) => (
+              <li
+                key={check.label}
+                className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
+              >
+                <span className="text-slate-300">{check.label}</span>
+                <span
+                  className={
+                    check.status === "ok"
+                      ? "text-emerald-300"
+                      : check.status === "warning"
+                        ? "text-amber-300"
+                        : "text-red-300"
+                  }
+                >
+                  {check.status === "ok" ? "Pasa" : check.status === "warning" ? "Advertencia" : "Bloquea"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function ScenarioSimulatorSummaryCard({
+  agent,
+  onStressTest,
+  loading,
+}: {
+  agent: AgentItem;
+  onStressTest: () => void;
+  loading: boolean;
+}) {
+  const passed = agent.scenarios.filter((s) => s.status === "passed").length;
+  const failed = agent.scenarios.filter((s) => s.status === "failed").length;
+  const warning = agent.scenarios.filter((s) => s.status === "warning" || s.status === "risky").length;
+  return (
+    <Panel
+      title="Simulador de escenarios"
+      icon={<FlaskConical className="h-4 w-4 text-violet-300" />}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={onStressTest}
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ejecutar todos"}
+        </Button>
+      }
+    >
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="rounded-md border border-emerald-300/20 bg-emerald-500/5 p-2">
+          <div className="text-[10px] text-emerald-300/80">Pasa</div>
+          <div className="text-base font-semibold text-emerald-200">{passed}</div>
+        </div>
+        <div className="rounded-md border border-amber-300/20 bg-amber-500/5 p-2">
+          <div className="text-[10px] text-amber-300/80">Advertencia</div>
+          <div className="text-base font-semibold text-amber-200">{warning}</div>
+        </div>
+        <div className="rounded-md border border-red-300/20 bg-red-500/5 p-2">
+          <div className="text-[10px] text-red-300/80">Falla</div>
+          <div className="text-base font-semibold text-red-200">{failed}</div>
+        </div>
+      </div>
+      <ul className="mt-2 space-y-1">
+        {agent.scenarios.slice(0, 4).map((scenario) => (
+          <li
+            key={scenario.id}
+            className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
+          >
+            <span className="truncate text-slate-200">{scenario.name}</span>
+            <span
+              className={cn(
+                "text-[10px] font-semibold uppercase",
+                scenario.status === "failed"
+                  ? "text-red-300"
+                  : scenario.status === "warning" || scenario.status === "risky"
+                    ? "text-amber-300"
+                    : "text-emerald-300",
+              )}
+            >
+              {scenario.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function KnowledgeCoverageCard({ agent }: { agent: AgentItem }) {
+  const coverage = Math.round(agent.knowledge_coverage.coverage);
+  return (
+    <Panel title="Knowledge Coverage" icon={<BrainCircuit className="h-4 w-4 text-sky-300" />}>
+      <div className="grid grid-cols-[110px_1fr] gap-3">
+        <div className="grid place-items-center">
+          <div className="relative grid h-24 w-24 place-items-center rounded-full border-[6px] border-sky-400/70">
+            <span className="text-2xl font-semibold text-slate-100">{coverage}%</span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500">Cobertura</div>
+        </div>
+        <div className="space-y-1">
+          <div className="text-[11px] uppercase text-slate-500">Temas débiles</div>
+          {agent.knowledge_coverage.weak_topics.length === 0 ? (
+            <div className="rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs text-slate-300">
+              Sin huecos detectados.
+            </div>
+          ) : (
+            agent.knowledge_coverage.weak_topics.slice(0, 4).map((topic) => (
+              <div
+                key={topic}
+                className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs"
+              >
+                <span className="truncate text-slate-200">{topic}</span>
+                <span className="text-[10px] text-amber-300">débil</span>
+              </div>
+            ))
+          )}
+          <div className="pt-1 text-[10px] text-slate-500">
+            {agent.knowledge_coverage.unanswered_queries} consultas sin respuesta ·{" "}
+            {agent.knowledge_coverage.missing_documents} documentos faltantes
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function ExtractionStatusCard({ agent }: { agent: AgentItem }) {
+  const fields = agent.extraction_fields.slice(0, 5);
+  return (
+    <Panel
+      title="Extracción de campos (24h)"
+      icon={<ListChecks className="h-4 w-4 text-emerald-300" />}
+    >
+      {fields.length === 0 ? (
+        <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+          Este agente no define campos de extracción.
+        </div>
+      ) : (
+        <ul className="space-y-1">
+          {fields.map((field) => (
+            <li
+              key={field.id}
+              className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-slate-200">{field.label}</div>
+                <div className="text-[10px] text-slate-500">{field.field_key}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] font-semibold text-emerald-300">
+                  {Math.round((field.confidence ?? field.confidence_threshold) * 100)}%
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  {field.status ?? (field.required ? "requerido" : "opcional")}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function NextBestActionCard({ action }: { action: NextBestActionItem }) {
+  return (
+    <Panel title="Siguiente mejor acción" icon={<Sparkles className="h-4 w-4 text-violet-300" />}>
+      <div className="rounded-md border border-violet-300/20 bg-violet-500/5 p-3">
+        <div className="text-sm font-semibold text-slate-100">{action.title}</div>
+        <div className="mt-1 text-[11px] text-slate-400">{action.reason}</div>
+        <div className="mt-2 flex justify-end">
+          <Button
+            size="sm"
+            className="h-7 bg-violet-600 text-xs hover:bg-violet-500"
+            onClick={action.onClick}
+            disabled={!action.onClick}
+          >
+            {action.cta}
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function ResumenTab({
+  agent,
+  baseline,
+  draft,
+  dirty,
+  validation,
+  monitor,
+  preview,
+  previewMessage,
+  onPreviewMessageChange,
+  onRunPreview,
+  previewLoading,
+  onValidate,
+  validateLoading,
+  onStressTest,
+  stressTestLoading,
+  onSave,
+  onPublish,
+}: {
+  agent: AgentItem;
+  baseline: AgentItem | null;
+  draft: AgentItem | null;
+  dirty: boolean;
+  validation: ValidationResult | null;
+  monitor: Awaited<ReturnType<typeof agentsApi.monitor>> | undefined;
+  preview: PreviewResult | null;
+  previewMessage: string;
+  onPreviewMessageChange: (value: string) => void;
+  onRunPreview: (message: string) => void;
+  previewLoading: boolean;
+  onValidate: () => void;
+  validateLoading: boolean;
+  onStressTest: () => void;
+  stressTestLoading: boolean;
+  onSave: () => void;
+  onPublish: () => void;
+}) {
+  const risks = useMemo(() => deriveRiskRadar(agent, monitor), [agent, monitor]);
+  const nba = useMemo(
+    () =>
+      deriveNextBestAction({
+        agent,
+        validation,
+        dirty,
+        onValidate,
+        onPublish,
+        onSave,
+      }),
+    [agent, validation, dirty, onValidate, onPublish, onSave],
+  );
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <PendingChangesCard
+          baseline={baseline}
+          draft={draft}
+          dirty={dirty}
+          publishedVersion={agent.version}
+        />
+        <RiskRadarCard items={risks} />
+        <ValidationBeforePublishCard
+          validation={validation}
+          onValidate={onValidate}
+          loading={validateLoading}
+        />
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <ScenarioSimulatorSummaryCard
+          agent={agent}
+          onStressTest={onStressTest}
+          loading={stressTestLoading}
+        />
+        <KnowledgeCoverageCard agent={agent} />
+        <ExtractionStatusCard agent={agent} />
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+        <WhatsAppPreview
+          draft={agent}
+          preview={preview}
+          previewMessage={previewMessage}
+          onPreviewMessageChange={onPreviewMessageChange}
+          onRunPreview={onRunPreview}
+          loading={previewLoading}
+        />
+        <NextBestActionCard action={nba} />
+      </div>
+    </div>
+  );
+}
+
+// ---------- Decision Map (editable routing table) -----------------------
+interface DecisionRule {
+  id: string;
+  name: string;
+  intent: string;
+  required_fields: string[];
+  action: string;
+  target?: string;
+  priority: number;
+  active: boolean;
+}
+
+const DEFAULT_RULES: DecisionRule[] = [
+  {
+    id: "rule_ask_price_with_plan",
+    name: "Cotizar cuando hay plan",
+    intent: "ASK_PRICE",
+    required_fields: ["plan_credito"],
+    action: "assign_agent",
+    target: "sales_agent",
+    priority: 10,
+    active: true,
+  },
+  {
+    id: "rule_ask_price_no_plan",
+    name: "Pedir plan antes de cotizar",
+    intent: "ASK_PRICE",
+    required_fields: [],
+    action: "ask_field",
+    target: "plan_credito",
+    priority: 20,
+    active: true,
+  },
+  {
+    id: "rule_human_requested",
+    name: "Asignar humano",
+    intent: "HUMAN_REQUESTED",
+    required_fields: [],
+    action: "handoff_human",
+    priority: 5,
+    active: true,
+  },
+];
+
+function DecisionMapTab({
+  agent,
+  onChange,
+  onSave,
+  onValidate,
+  saving,
+  validating,
+}: {
+  agent: AgentItem;
+  onChange: (rules: DecisionRule[]) => void;
+  onSave: () => void;
+  onValidate: () => void;
+  saving: boolean;
+  validating: boolean;
+}) {
+  const dmRules = (agent.decision_map as unknown as { rules?: DecisionRule[] }).rules;
+  const rules: DecisionRule[] = useMemo(
+    () => (Array.isArray(dmRules) && dmRules.length > 0 ? dmRules : DEFAULT_RULES),
+    [dmRules],
+  );
+
+  const updateRule = (id: string, patch: Partial<DecisionRule>) => {
+    onChange(rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+  const deleteRule = (id: string) => onChange(rules.filter((r) => r.id !== id));
+  const addRule = () =>
+    onChange([
+      ...rules,
+      {
+        id: `rule_${Date.now()}`,
+        name: "Nueva regla",
+        intent: "ASK_INFO",
+        required_fields: [],
+        action: "assign_agent",
+        priority: 100,
+        active: true,
+      },
+    ]);
+
+  return (
+    <Panel
+      title="Decision Map"
+      icon={<GitBranch className="h-4 w-4 text-violet-300" />}
+      action={
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+            onClick={onValidate}
+            disabled={validating}
+          >
+            {validating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Validar"}
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 bg-sky-600 text-xs hover:bg-sky-500"
+            onClick={onSave}
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+            onClick={addRule}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Regla
+          </Button>
+        </div>
+      }
+    >
+      <p className="mb-2 text-[11px] text-slate-500">
+        Tabla de ruteo: cada regla cruza un intent + campos requeridos contra una acción. Se evalúan
+        de menor a mayor prioridad (los números bajos ganan).
+      </p>
+      <div className="overflow-x-auto rounded-md border border-white/10">
+        <table className="w-full text-xs">
+          <thead className="bg-white/[0.035] text-[10px] uppercase text-slate-500">
+            <tr>
+              <th className="px-2 py-1.5 text-left">Prio</th>
+              <th className="px-2 py-1.5 text-left">Nombre</th>
+              <th className="px-2 py-1.5 text-left">Intent</th>
+              <th className="px-2 py-1.5 text-left">Campos requeridos</th>
+              <th className="px-2 py-1.5 text-left">Acción</th>
+              <th className="px-2 py-1.5 text-left">Target</th>
+              <th className="px-2 py-1.5 text-center">Activa</th>
+              <th className="w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {rules
+              .slice()
+              .sort((a, b) => a.priority - b.priority)
+              .map((rule) => (
+                <tr key={rule.id} className="border-t border-white/5">
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={String(rule.priority)}
+                      onChange={(e) =>
+                        updateRule(rule.id, { priority: Number(e.target.value) || 0 })
+                      }
+                      className="h-7 w-14 border-white/10 bg-black/20 text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={rule.name}
+                      onChange={(e) => updateRule(rule.id, { name: e.target.value })}
+                      className="h-7 border-white/10 bg-black/20 text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={rule.intent}
+                      onChange={(e) => updateRule(rule.id, { intent: e.target.value })}
+                      className="h-7 w-32 border-white/10 bg-black/20 text-xs font-mono"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={rule.required_fields.join(", ")}
+                      onChange={(e) =>
+                        updateRule(rule.id, {
+                          required_fields: e.target.value
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="plan_credito, antiguedad_laboral"
+                      className="h-7 border-white/10 bg-black/20 text-xs font-mono"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <select
+                      value={rule.action}
+                      onChange={(e) => updateRule(rule.id, { action: e.target.value })}
+                      className="h-7 rounded-md border border-white/10 bg-black/20 px-2 text-xs text-slate-100"
+                    >
+                      <option value="assign_agent">assign_agent</option>
+                      <option value="ask_field">ask_field</option>
+                      <option value="handoff_human">handoff_human</option>
+                      <option value="update_lifecycle">update_lifecycle</option>
+                      <option value="answer_faq">answer_faq</option>
+                    </select>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Input
+                      value={rule.target ?? ""}
+                      onChange={(e) => updateRule(rule.id, { target: e.target.value })}
+                      className="h-7 border-white/10 bg-black/20 text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Toggle
+                      checked={rule.active}
+                      onChange={(value) => updateRule(rule.id, { active: value })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      type="button"
+                      onClick={() => deleteRule(rule.id)}
+                      className="text-slate-500 hover:text-red-300"
+                      title="Eliminar regla"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+// ---------- Pruebas tab ------------------------------------------------
+function PruebasTab({
+  agent,
+  onRunOne,
+  onStressTest,
+  stressLoading,
+}: {
+  agent: AgentItem;
+  onRunOne: (scenarioId: string) => void;
+  onStressTest: () => void;
+  stressLoading: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <Panel
+        title="Escenarios"
+        icon={<FlaskConical className="h-4 w-4 text-emerald-300" />}
+        action={
+          <div className="flex items-center gap-2">
+            <DemoBadge />
+            <Button
+              size="sm"
+              className="h-7 bg-emerald-600 text-xs hover:bg-emerald-500"
+              onClick={onStressTest}
+              disabled={stressLoading}
+            >
+              {stressLoading ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="mr-1 h-3.5 w-3.5" />
+              )}
+              Ejecutar todos
+            </Button>
+          </div>
+        }
+      >
+        <p className="mb-2 text-[11px] text-slate-500">
+          Los escenarios usan plantillas según el rol del agente. El simulador real (con trace, costo
+          y latencia por turno) aterriza en V1 — hoy el endpoint devuelve un veredicto determinístico
+          por escenario.
+        </p>
+        <ul className="space-y-1.5">
+          {agent.scenarios.map((scenario) => (
+            <li
+              key={scenario.id}
+              className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+            >
+              <div className="min-w-0">
+                <div className="font-medium text-slate-100">{scenario.name}</div>
+                <div className="text-[10px] text-slate-500">
+                  Último: {scenario.last_run ?? "sin correr"} · Score {scenario.score ?? "—"}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-5 text-[10px]",
+                    scenario.status === "failed"
+                      ? "border-red-300/30 text-red-200"
+                      : scenario.status === "warning" || scenario.status === "risky"
+                        ? "border-amber-300/30 text-amber-200"
+                        : "border-emerald-300/30 text-emerald-200",
+                  )}
+                >
+                  {scenario.status}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-white/10 bg-white/[0.035] text-[11px] text-slate-200"
+                  onClick={() => onRunOne(scenario.id)}
+                >
+                  Correr
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    </div>
+  );
+}
+
+// ---------- Historial tab ----------------------------------------------
+function HistorialTab({
+  agent,
+  auditLogs,
+}: {
+  agent: AgentItem;
+  auditLogs: Array<Record<string, unknown>>;
+}) {
+  return (
+    <div className="space-y-3">
+      <Panel title="Versiones" icon={<History className="h-4 w-4 text-sky-300" />}>
+        {agent.versions.length === 0 ? (
+          <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+            Aún no hay versiones registradas.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {agent.versions.slice(0, 12).map((version) => (
+              <li
+                key={version.id}
+                className="flex items-start justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-slate-100">
+                    <span className="font-semibold">{version.version}</span>
+                    <Badge variant="outline" className={cn("h-5 text-[10px]", statusClass(version.status))}>
+                      {statusLabel(version.status)}
+                    </Badge>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-slate-500">
+                    {version.author} · {new Date(version.created_at).toLocaleString()}
+                  </div>
+                  {version.reason ? (
+                    <div className="mt-1 text-[11px] text-slate-300">{version.reason}</div>
+                  ) : null}
+                </div>
+                <div className="text-right text-[10px] text-slate-500">
+                  {version.performance_impact ?? ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+      <Panel title="Audit log" icon={<Activity className="h-4 w-4 text-violet-300" />}>
+        {auditLogs.length === 0 ? (
+          <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+            Sin eventos registrados en ops_config.audit_logs.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {auditLogs.slice(0, 30).map((entry, index) => {
+              const action = String(entry.action ?? entry.event ?? "evento");
+              const actor = String(entry.actor ?? entry.author ?? entry.user ?? "sistema");
+              const at = String(entry.created_at ?? entry.timestamp ?? "");
+              return (
+                <li
+                  key={`${action}-${index}`}
+                  className="flex items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-slate-100">{action}</div>
+                    <div className="text-[10px] text-slate-500">{actor}</div>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {at ? new Date(at).toLocaleString() : ""}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+// ---------- Right rail (Alertas + Actividad reciente) -----------------
+function OperationalSidebar({
+  agent,
+  notifications,
+  auditLogs,
+}: {
+  agent: AgentItem;
+  notifications:
+    | { items: Array<{ id: string; title: string; body: string | null; read: boolean; created_at: string }>; unread_count: number }
+    | undefined;
+  auditLogs: Array<Record<string, unknown>>;
+}) {
+  const unread = notifications?.items.filter((n) => !n.read).slice(0, 6) ?? [];
+  return (
+    <div className="space-y-3">
+      <Panel
+        title="Alertas activas"
+        icon={<Bell className="h-4 w-4 text-amber-300" />}
+        action={
+          <Badge variant="outline" className="h-5 border-amber-400/30 bg-amber-500/10 text-[10px] text-amber-200">
+            {notifications?.unread_count ?? 0}
+          </Badge>
+        }
+      >
+        {unread.length === 0 ? (
+          <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+            Sin alertas activas para tu usuario.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {unread.map((alert) => (
+              <li
+                key={alert.id}
+                className="rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-2 text-xs"
+              >
+                <div className="font-medium text-slate-100">{alert.title}</div>
+                {alert.body ? (
+                  <div className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">{alert.body}</div>
+                ) : null}
+                <div className="mt-1 text-[10px] text-slate-500">
+                  {new Date(alert.created_at).toLocaleString()}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+      <Panel title="Actividad reciente" icon={<Activity className="h-4 w-4 text-sky-300" />}>
+        {auditLogs.length === 0 && agent.versions.length === 0 ? (
+          <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-xs text-slate-400">
+            Sin actividad registrada todavía.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {auditLogs.slice(0, 5).map((entry, index) => {
+              const action = String(entry.action ?? entry.event ?? "evento");
+              const at = String(entry.created_at ?? entry.timestamp ?? "");
+              return (
+                <li
+                  key={`audit-${index}`}
+                  className="rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
+                >
+                  <div className="truncate text-slate-200">{action}</div>
+                  <div className="text-[10px] text-slate-500">
+                    {at ? new Date(at).toLocaleString() : ""}
+                  </div>
+                </li>
+              );
+            })}
+            {auditLogs.length === 0
+              ? agent.versions.slice(0, 5).map((version) => (
+                  <li
+                    key={`v-${version.id}`}
+                    className="rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
+                  >
+                    <div className="text-slate-200">
+                      Versión {version.version} publicada
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {new Date(version.created_at).toLocaleString()}
+                    </div>
+                  </li>
+                ))
+              : null}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {}) {
   const queryClient = useQueryClient();
   const agentsQuery = useQuery({
@@ -2021,7 +3125,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
   // row without an extra click.
   const [selectedId, setSelectedId] = useState<string | null>(initialAgentId ?? null);
   const [draft, setDraft] = useState<AgentItem | null>(null);
-  const [activeTab, setActiveTab] = useState<AgentTab>("Identidad");
+  const [activeTab, setActiveTab] = useState<AgentTab>("Resumen");
   const [search, setSearch] = useState("");
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
@@ -2045,6 +3149,48 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
     [agents, selectedId],
   );
   const dirty = Boolean(selected && draft && compactPatchKey(selected) !== compactPatchKey(draft));
+
+  // Page-level monitor query feeds the 5-card KPI row (Conv 24h, Costo
+  // 24h). 30s refresh matches MonitorRealPanel so both share the cache.
+  const monitorQuery = useQuery({
+    queryKey: ["agents", selected?.id, "monitor"],
+    queryFn: () => agentsApi.monitor(selected?.id ?? ""),
+    enabled: !!selected,
+    refetchInterval: 30_000,
+  });
+  // Audit logs power Historial tab + the right-rail "Actividad reciente"
+  // when Resumen is active. Cheap; reuses ops_config.audit_logs.
+  const auditQuery = useQuery({
+    queryKey: ["agents", selected?.id, "audit-logs"],
+    queryFn: async () => {
+      if (!selected) return [] as Array<Record<string, unknown>>;
+      const { data } = await api.get<Array<Record<string, unknown>>>(
+        `/agents/${selected.id}/audit-logs`,
+      );
+      return data;
+    },
+    enabled: !!selected,
+  });
+  // Notifications back the "Alertas activas" rail. List is user-scoped,
+  // not agent-scoped — but for the operator that's the natural read.
+  const notificationsQuery = useQuery({
+    queryKey: ["notifications", "agents-rail"],
+    queryFn: async () => {
+      const { data } = await api.get<{
+        items: Array<{
+          id: string;
+          title: string;
+          body: string | null;
+          read: boolean;
+          source_type: string | null;
+          created_at: string;
+        }>;
+        unread_count: number;
+      }>("/notifications");
+      return data;
+    },
+    refetchInterval: 60_000,
+  });
 
   const invalidateAgents = () =>
     queryClient.invalidateQueries({ queryKey: ["agents", "operations-center"] });
@@ -2419,21 +3565,58 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
                     {roleLabel(activeAgent.role)} · {roleDetail(activeAgent.role)}
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
                   <MetricTile
-                    label="Salud"
+                    label="AI Health Score"
                     value={`${activeAgent.health.score}/100`}
+                    detail={`trend ${activeAgent.health.trend >= 0 ? "+" : ""}${activeAgent.health.trend}% vs 7d`}
                     tone={activeAgent.health.score >= 88 ? "good" : "warn"}
                   />
                   <MetricTile
                     label="Precisión"
                     value={pct(activeAgent.metrics.response_accuracy)}
+                    detail="extracción + tono"
                     tone="good"
                   />
                   <MetricTile
                     label="Riesgo"
-                    value={String(activeAgent.metrics.risk_score)}
-                    tone={activeAgent.metrics.risk_score > 65 ? "bad" : "warn"}
+                    value={
+                      activeAgent.metrics.risk_score >= 70
+                        ? "Alto"
+                        : activeAgent.metrics.risk_score >= 45
+                          ? "Medio"
+                          : "Bajo"
+                    }
+                    detail={`score ${activeAgent.metrics.risk_score}`}
+                    tone={
+                      activeAgent.metrics.risk_score >= 70
+                        ? "bad"
+                        : activeAgent.metrics.risk_score >= 45
+                          ? "warn"
+                          : "good"
+                    }
+                  />
+                  <MetricTile
+                    label="Conversaciones 24h"
+                    value={
+                      monitorQuery.data
+                        ? String(monitorQuery.data.active_conversations_24h)
+                        : String(activeAgent.metrics.active_conversations)
+                    }
+                    detail={
+                      monitorQuery.data
+                        ? `${monitorQuery.data.turns_24h} turnos`
+                        : "datos en vivo"
+                    }
+                  />
+                  <MetricTile
+                    label="Costo 24h"
+                    value={
+                      monitorQuery.data ? `$${monitorQuery.data.cost_usd_24h.toFixed(2)}` : "—"
+                    }
+                    detail={
+                      monitorQuery.data ? `${monitorQuery.data.avg_latency_ms} ms latencia` : ""
+                    }
                   />
                 </div>
               </div>
@@ -2504,35 +3687,95 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
               </div>
             </div>
 
-            <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-              <div className="space-y-3">
-                {activeTab === "Identidad" ? (
-                  <IdentityPanel draft={activeAgent} onChange={updateDraft} />
-                ) : null}
-                {activeTab === "Guardrails" ? (
-                  <GuardrailsRealPanel draft={activeAgent} onChange={updateDraft} />
-                ) : null}
-                {activeTab === "Knowledge" ? (
-                  <KnowledgeRealPanel draft={activeAgent} onChange={updateDraft} />
-                ) : null}
-                {activeTab === "Monitor" ? <MonitorRealPanel agentId={activeAgent.id} /> : null}
-                {activeTab === "Extracción" ? <ExtractionReadonlyPanel /> : null}
-              </div>
-
-              <div className="space-y-3">
-                <WhatsAppPreview
-                  draft={activeAgent}
+            {activeTab === "Resumen" ? (
+              <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+                <ResumenTab
+                  agent={activeAgent}
+                  baseline={selected}
+                  draft={draft}
+                  dirty={dirty}
+                  validation={validation}
+                  monitor={monitorQuery.data}
                   preview={preview}
                   previewMessage={previewMessage}
                   onPreviewMessageChange={setPreviewMessage}
                   onRunPreview={(message) =>
                     previewMutation.mutate({ agent: activeAgent, message })
                   }
-                  loading={previewMutation.isPending}
+                  previewLoading={previewMutation.isPending}
+                  onValidate={() => validateMutation.mutate(activeAgent)}
+                  validateLoading={validateMutation.isPending}
+                  onStressTest={() => stressMutation.mutate(activeAgent.id)}
+                  stressTestLoading={stressMutation.isPending}
+                  onSave={saveActive}
+                  onPublish={() => publishMutation.mutate(activeAgent.id)}
                 />
-                <ValidationPanel validation={validation} />
+                <OperationalSidebar
+                  agent={activeAgent}
+                  notifications={notificationsQuery.data}
+                  auditLogs={auditQuery.data ?? []}
+                />
               </div>
-            </div>
+            ) : (
+              <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+                <div className="space-y-3">
+                  {activeTab === "Identidad" ? (
+                    <IdentityPanel draft={activeAgent} onChange={updateDraft} />
+                  ) : null}
+                  {activeTab === "Guardrails" ? (
+                    <GuardrailsRealPanel draft={activeAgent} onChange={updateDraft} />
+                  ) : null}
+                  {activeTab === "Knowledge" ? (
+                    <KnowledgeRealPanel draft={activeAgent} onChange={updateDraft} />
+                  ) : null}
+                  {activeTab === "Extracción" ? <ExtractionReadonlyPanel /> : null}
+                  {activeTab === "Decision Map" ? (
+                    <DecisionMapTab
+                      agent={activeAgent}
+                      onChange={(rules) =>
+                        updateDraft({
+                          decision_map: {
+                            ...activeAgent.decision_map,
+                            rules,
+                          },
+                        })
+                      }
+                      onSave={() => decisionMapMutation.mutate(activeAgent)}
+                      onValidate={() => validateMapMutation.mutate(activeAgent)}
+                      saving={decisionMapMutation.isPending}
+                      validating={validateMapMutation.isPending}
+                    />
+                  ) : null}
+                  {activeTab === "Pruebas" ? (
+                    <PruebasTab
+                      agent={activeAgent}
+                      onRunOne={(scenarioId) =>
+                        runScenarioMutation.mutate({ agentId: activeAgent.id, scenarioId })
+                      }
+                      onStressTest={() => stressMutation.mutate(activeAgent.id)}
+                      stressLoading={stressMutation.isPending}
+                    />
+                  ) : null}
+                  {activeTab === "Historial" ? (
+                    <HistorialTab agent={activeAgent} auditLogs={auditQuery.data ?? []} />
+                  ) : null}
+                </div>
+
+                <div className="space-y-3">
+                  <WhatsAppPreview
+                    draft={activeAgent}
+                    preview={preview}
+                    previewMessage={previewMessage}
+                    onPreviewMessageChange={setPreviewMessage}
+                    onRunPreview={(message) =>
+                      previewMutation.mutate({ agent: activeAgent, message })
+                    }
+                    loading={previewMutation.isPending}
+                  />
+                  <ValidationPanel validation={validation} />
+                </div>
+              </div>
+            )}
           </main>
         ) : (
           <main className="grid flex-1 place-items-center">

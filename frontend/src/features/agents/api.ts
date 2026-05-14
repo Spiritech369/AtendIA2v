@@ -101,9 +101,21 @@ export interface KnowledgeCoverage {
   weak_topics: string[];
 }
 
+export interface DecisionRule {
+  id: string;
+  name: string;
+  intent: string;
+  required_fields: string[];
+  action: string;
+  target?: string;
+  priority: number;
+  active: boolean;
+}
+
 export interface DecisionMap {
   nodes: Array<Record<string, unknown>>;
   edges: Array<Record<string, unknown>>;
+  rules?: DecisionRule[];
 }
 
 export interface AgentVersionSnapshot {

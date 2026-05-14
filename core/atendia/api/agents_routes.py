@@ -274,8 +274,16 @@ class CompareBody(BaseModel):
 
 
 class DecisionMapBody(BaseModel):
-    nodes: list[dict] = Field(default_factory=list)
-    edges: list[dict] = Field(default_factory=list)
+    # All optional + exclude_unset on the handler so partial updates (e.g.
+    # the Decision Map tab editing only `rules`) don't wipe the legacy
+    # nodes/edges graph.
+    nodes: list[dict] | None = None
+    edges: list[dict] | None = None
+    # Operator-authored routing rules surfaced in the Decision Map tab as
+    # a sortable table (priority, intent, required fields, action,
+    # target). Independent of nodes/edges so the legacy flow graph and
+    # the table coexist.
+    rules: list[dict] | None = None
 
 
 class ScenarioRunBody(BaseModel):
@@ -1510,7 +1518,10 @@ async def put_decision_map(
 ) -> AgentItem:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
     ops = _merged_ops(row)
-    ops["decision_map"] = body.model_dump()
+    current = ops.get("decision_map") or _default_decision_map()
+    patch = body.model_dump(exclude_unset=True)
+    current.update(patch)
+    ops["decision_map"] = current
     row.ops_config = ops
     row.updated_at = datetime.now(UTC)
     await emit_admin_event(
@@ -1518,7 +1529,11 @@ async def put_decision_map(
         tenant_id=tenant_id,
         actor_user_id=user.user_id,
         action="agent.decision_map.updated",
-        payload={"agent_id": str(row.id), "nodes": len(body.nodes)},
+        payload={
+            "agent_id": str(row.id),
+            "nodes": len(current.get("nodes") or []),
+            "rules": len(current.get("rules") or []),
+        },
     )
     await session.commit()
     await session.refresh(row)
