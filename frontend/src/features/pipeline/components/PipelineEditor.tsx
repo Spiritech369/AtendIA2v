@@ -344,7 +344,6 @@ export function PipelineEditor({ onClose }: Props) {
   const [showDocsJson, setShowDocsJson] = useState(false);
   const [showDocsCatalog, setShowDocsCatalog] = useState(true);
   const [docsRaw, setDocsRaw] = useState("");
-  const [newDocKey, setNewDocKey] = useState("");
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocHint, setNewDocHint] = useState("");
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -464,22 +463,33 @@ export function PipelineEditor({ onClose }: Props) {
     });
   };
 
-  // Document catalog CRUD. Keys are stored normalized as `DOCS_<UPPER>`
-  // so the operator can type "ine" and we still get a valid identifier
-  // for the auto_enter_rules conditions.
-  const normalizeDocKey = (raw: string): string => {
-    const clean = raw
+  // Document catalog CRUD. Operator types only the human name; we
+  // derive the stable `DOCS_<UPPER>` identifier the auto_enter_rules
+  // conditions reference. The derived key is fixed at create-time:
+  // renaming the label later doesn't break existing rules.
+  const deriveDocKey = (label: string): string => {
+    const clean = label
       .trim()
       .toUpperCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "") // strip accents (CURP, NÓMINA, etc.)
       .replace(/^DOCS[_\s]?/i, "")
       .replace(/[^A-Z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+      .replace(/^_+|_+$/g, "")
+      .replace(/_+/g, "_");
     return clean ? `DOCS_${clean}` : "";
   };
 
+  // Live preview of the key the operator would get, so they can see
+  // collisions before they hit Add.
+  const previewKey = deriveDocKey(newDocLabel);
+  const previewCollides = previewKey
+    ? draft.documents_catalog.some((d) => d.key === previewKey)
+    : false;
+
   const addDoc = () => {
-    const key = normalizeDocKey(newDocKey);
     const label = newDocLabel.trim();
+    const key = deriveDocKey(label);
     if (!key || !label) return;
     setDraft((prev) => {
       if (!prev) return prev;
@@ -492,7 +502,6 @@ export function PipelineEditor({ onClose }: Props) {
         ],
       };
     });
-    setNewDocKey("");
     setNewDocLabel("");
     setNewDocHint("");
   };
@@ -1186,7 +1195,8 @@ export function PipelineEditor({ onClose }: Props) {
                 </div>
               )}
 
-              {/* Add-row */}
+              {/* Add-row — single primary field + optional hint. The
+                  internal DOCS_* key is auto-derived from the name. */}
               {canEdit && (
                 <div className="rounded-md border border-dashed bg-muted/20 p-2">
                   <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -1195,31 +1205,38 @@ export function PipelineEditor({ onClose }: Props) {
                   <div className="space-y-1.5">
                     <div>
                       <Label className="text-[10px] text-muted-foreground">
-                        ID interno
-                      </Label>
-                      <Input
-                        value={newDocKey}
-                        onChange={(e) => setNewDocKey(e.target.value)}
-                        placeholder="Ej. curp (se guarda como DOCS_CURP)"
-                        className="h-7 font-mono text-[11px]"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">
-                        Nombre visible
+                        Nombre del documento
                       </Label>
                       <Input
                         value={newDocLabel}
                         onChange={(e) => setNewDocLabel(e.target.value)}
-                        placeholder="Ej. CURP"
+                        placeholder="Ej. CURP, Comprobante de ingresos"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && newDocKey.trim() && newDocLabel.trim()) {
+                          if (
+                            e.key === "Enter" &&
+                            newDocLabel.trim() &&
+                            !previewCollides
+                          ) {
                             e.preventDefault();
                             addDoc();
                           }
                         }}
                       />
+                      {previewKey && (
+                        <p
+                          className={cn(
+                            "mt-1 text-[10px]",
+                            previewCollides
+                              ? "text-destructive"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {previewCollides
+                            ? `Ya existe un documento con el ID ${previewKey}. Renómbralo.`
+                            : <>ID interno: <code className="font-mono">{previewKey}</code></>}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-[10px] text-muted-foreground">
@@ -1231,7 +1248,11 @@ export function PipelineEditor({ onClose }: Props) {
                         placeholder="Ej. 18 caracteres alfanuméricos"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && newDocKey.trim() && newDocLabel.trim()) {
+                          if (
+                            e.key === "Enter" &&
+                            newDocLabel.trim() &&
+                            !previewCollides
+                          ) {
                             e.preventDefault();
                             addDoc();
                           }
@@ -1244,7 +1265,7 @@ export function PipelineEditor({ onClose }: Props) {
                       size="sm"
                       className="h-7 w-full"
                       onClick={addDoc}
-                      disabled={!newDocKey.trim() || !newDocLabel.trim()}
+                      disabled={!newDocLabel.trim() || previewCollides}
                     >
                       <Plus className="mr-1 size-3.5" />
                       Agregar al catálogo
