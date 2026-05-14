@@ -55,6 +55,7 @@ import {
 } from "@/features/workflows/api";
 import { Bookmark, FolderOpen, PauseCircle, Save, ZapOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NextBestFixPanel } from "./NextBestFixPanel";
 import { WorkflowEditor } from "./WorkflowEditor";
 
 type ContextAction = { label: string; action: () => void; danger?: boolean };
@@ -628,6 +629,7 @@ export function WorkflowsPage() {
   const [menu, setMenu] = useState<ContextState>(null);
   const [simOpen, setSimOpen] = useState(false);
   const [executionNodeFilter, setExecutionNodeFilter] = useState<string | null>(null);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
 
   const workflowsQuery = useQuery({
     queryKey: ["workflows"],
@@ -1072,6 +1074,7 @@ export function WorkflowsPage() {
           {selected ? (
             <WorkflowEditor
               workflow={selected}
+              focusNodeId={focusNodeId}
               onRunSimulation={() => setSimOpen(true)}
               onContextMenu={openContextMenu}
               onShowExecutions={(nodeId) => {
@@ -1101,7 +1104,15 @@ export function WorkflowsPage() {
             nodeFilter={executionNodeFilter}
             onClearNodeFilter={() => setExecutionNodeFilter(null)}
           />
-          <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2">
+          <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-2">
+            <NextBestFixPanel
+              workflow={selected}
+              onOpenNode={(nodeId) => {
+                setFocusNodeId(nodeId);
+                // Clear after a tick so the same nodeId can be re-focused later.
+                setTimeout(() => setFocusNodeId(null), 100);
+              }}
+            />
             <ValidationPanel workflow={selected} />
             <SafetyPanel
               workflow={selected}

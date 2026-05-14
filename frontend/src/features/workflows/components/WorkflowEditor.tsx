@@ -38,6 +38,8 @@ import { agentsApi } from "@/features/agents/api";
 import { pipelineStagesApi, workflowsApi, type WorkflowItem, type WorkflowNode } from "@/features/workflows/api";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkflowCanvas } from "./WorkflowCanvas";
+import { PublishDialog } from "./PublishDialog";
+import { VersionCompareDialog } from "./VersionCompareDialog";
 import { cn } from "@/lib/utils";
 
 type ContextAction = { label: string; action: () => void; danger?: boolean };
@@ -49,6 +51,7 @@ interface WorkflowEditorProps {
   onRunSimulation: () => void;
   onContextMenu?: (event: MouseEvent, actions: ContextAction[]) => void;
   onShowExecutions?: (nodeId: string) => void;
+  focusNodeId?: string | null;
 }
 
 const DEFAULT_NODE_META = { label: "Acción", icon: Zap, color: "text-slate-300", bg: "bg-white/10" };
@@ -505,7 +508,7 @@ function pct(value: unknown, fallback = 0) {
   return typeof value === "number" ? `${value}%` : `${fallback}%`;
 }
 
-export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onShowExecutions }: WorkflowEditorProps) {
+export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onShowExecutions, focusNodeId }: WorkflowEditorProps) {
   const qc = useQueryClient();
   const nodes = workflow.definition.nodes;
   const [selectedNodeId, setSelectedNodeId] = useState(nodes[0]?.id ?? "");
@@ -518,6 +521,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
   const [nameDraft, setNameDraft] = useState(workflow.name);
   const [renaming, setRenaming] = useState(false);
   const [mode, setMode] = useState<EditorMode>("design");
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   useEffect(() => {
     setNameDraft(workflow.name);
@@ -532,6 +537,18 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
     setTitleDraft(selectedNode.title ?? "");
     setConfigDraft(JSON.stringify(selectedNode.config ?? {}, null, 2));
   }, [selectedNode?.id]);
+
+  useEffect(() => {
+    if (focusNodeId && nodes.some((n) => n.id === focusNodeId)) {
+      setSelectedNodeId(focusNodeId);
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-node-row="${focusNodeId}"]`);
+        if (el && "scrollIntoView" in el) {
+          (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+  }, [focusNodeId, nodes]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["workflows"] });
 
@@ -631,28 +648,11 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
     },
   });
 
-  const publish = useMutation({
-    mutationFn: () => workflowsApi.publish(workflow.id),
-    onSuccess: () => {
-      void invalidate();
-      toast.success("Cambios publicados");
-    },
-    onError: (error) => toast.error("Publicación bloqueada", { description: error.message }),
-  });
-
   const saveDraft = useMutation({
     mutationFn: () => workflowsApi.saveDraft(workflow.id),
     onSuccess: () => {
       void invalidate();
       toast.success("Borrador guardado");
-    },
-  });
-
-  const compare = useMutation({
-    mutationFn: () => workflowsApi.compare(workflow.id),
-    onSuccess: (data) => {
-      const changed = Array.isArray(data.changed) ? data.changed.length : 0;
-      toast.success("Comparación lista", { description: `${changed} cambios detectados` });
     },
   });
 
@@ -775,7 +775,7 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={() => compare.mutate()}>
+          <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={() => setCompareOpen(true)}>
             <GitBranch className="mr-1 h-3 w-3" /> Comparar
           </Button>
           <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={() => restore.mutate()}>
@@ -787,7 +787,7 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
           <Button size="sm" className="h-7 text-[11px]" onClick={() => saveDraft.mutate()}>
             <Save className="mr-1 h-3 w-3" /> Guardar draft
           </Button>
-          <Button size="sm" className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500" onClick={() => publish.mutate()}>
+          <Button size="sm" className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500" onClick={() => setPublishOpen(true)}>
             Publicar cambios
           </Button>
         </div>
@@ -1221,6 +1221,14 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
           )}
         </div>
       </div>
+
+      <PublishDialog
+        workflow={workflow}
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        onPublished={() => qc.invalidateQueries({ queryKey: ["workflows"] })}
+      />
+      <VersionCompareDialog workflow={workflow} open={compareOpen} onOpenChange={setCompareOpen} />
     </section>
   );
 }
