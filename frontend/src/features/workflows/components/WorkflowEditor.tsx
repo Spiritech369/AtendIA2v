@@ -9,7 +9,6 @@ import {
   FileCheck2,
   GitBranch,
   MessageSquare,
-  MoreVertical,
   Play,
   Plus,
   RotateCcw,
@@ -30,18 +29,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { agentsApi } from "@/features/agents/api";
 import { pipelineStagesApi, workflowsApi, type WorkflowItem, type WorkflowNode } from "@/features/workflows/api";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorkflowCanvas } from "./WorkflowCanvas";
 import { cn } from "@/lib/utils";
 
 type ContextAction = { label: string; action: () => void; danger?: boolean };
+
+type EditorMode = "design" | "simulation" | "production";
 
 interface WorkflowEditorProps {
   workflow: WorkflowItem;
@@ -516,6 +517,7 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
   const [configDraft, setConfigDraft] = useState("{}");
   const [nameDraft, setNameDraft] = useState(workflow.name);
   const [renaming, setRenaming] = useState(false);
+  const [mode, setMode] = useState<EditorMode>("design");
 
   useEffect(() => {
     setNameDraft(workflow.name);
@@ -791,89 +793,59 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
         </div>
       </div>
 
+      <div className="border-b border-white/10 px-3">
+        <Tabs
+          value={mode}
+          onValueChange={(value) => {
+            const next = value as EditorMode;
+            setMode(next);
+            if (next === "simulation") onRunSimulation();
+          }}
+        >
+          <TabsList className="h-8 bg-transparent p-0">
+            <TabsTrigger value="design" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+              Diseño
+            </TabsTrigger>
+            <TabsTrigger value="simulation" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+              Simulación
+            </TabsTrigger>
+            <TabsTrigger value="production" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+              Producción
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(430px,1fr)_300px]">
-        <ScrollArea className="min-h-0 border-r border-white/10">
-          <div className="p-3">
-            {nodes.map((node, index) => {
-              const meta = NODE_META[node.type] ?? DEFAULT_NODE_META;
-              const Icon = meta.icon;
-              const metrics = nodeMetrics(workflow, node.id);
-              const selected = selectedNode?.id === node.id;
-              const issue = workflow.validation.issues.find((item) => item.node_id === node.id);
-              return (
-                <div key={node.id} className="flex gap-2">
-                  <div className="flex w-7 flex-col items-center pt-3">
-                    <button
-                      type="button"
-                      className={cn(
-                        "grid h-6 w-6 place-items-center rounded-full border text-[10px]",
-                        selected ? "border-blue-400 bg-blue-500/20 text-blue-100" : "border-white/15 bg-white/5 text-slate-400",
-                      )}
-                      onClick={() => setSelectedNodeId(node.id)}
-                      aria-label={`Seleccionar nodo ${index + 1}`}
-                    >
-                      {index + 1}
-                    </button>
-                    {index < nodes.length - 1 && <div className="h-8 w-px bg-white/15" />}
-                  </div>
-                  <button
-                    type="button"
-                    data-node-row={node.id}
-                    onClick={() => setSelectedNodeId(node.id)}
-                    onContextMenu={(event) => onContextMenu?.(event, nodeActions(node))}
-                    className={cn(
-                      "mb-2 grid min-h-14 flex-1 grid-cols-[1fr_54px_54px_54px_52px_1fr] items-center gap-2 rounded-md border px-2 py-2 text-left text-[11px]",
-                      selected ? "border-blue-400/60 bg-blue-500/10" : "border-white/10 bg-[#101f2c] hover:bg-[#142637]",
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md", meta.bg)}>
-                        <Icon className={cn("h-3.5 w-3.5", meta.color)} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-100">{meta.label}: {titleFor(node)}</span>
-                        <span className="block truncate text-[10px] text-slate-400">{summaryFor(node, agentNameById, workflow.trigger_type)}</span>
-                      </span>
-                    </span>
-                    <span className="text-slate-200">{pct(metrics.conversion_rate, 100)}</span>
-                    <span className="text-slate-300">{String(metrics.entered ?? "0")}</span>
-                    <span className="text-slate-300">{String(metrics.completed ?? "0")}</span>
-                    <span className={Number(metrics.dropoff ?? 0) > 20 ? "text-red-300" : "text-slate-400"}>
-                      {pct(metrics.dropoff)}
-                    </span>
-                    <span className="truncate text-right text-[10px] text-red-300">
-                      {issue?.message ?? String(metrics.last_error ?? "—")}
-                    </span>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="mt-3 h-7 w-7 text-slate-300">
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {nodeActions(node).map((action) => (
-                        <DropdownMenuItem
-                          key={action.label}
-                          className={action.danger ? "text-destructive focus:text-destructive" : undefined}
-                          onClick={action.action}
-                        >
-                          {action.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              );
-            })}
+        <WorkflowCanvas
+          nodes={nodes}
+          edges={workflow.definition.edges ?? []}
+          selectedNodeId={selectedNode?.id ?? ""}
+          onSelect={setSelectedNodeId}
+          onContextMenu={(event, nodeId) => {
+            const node = nodes.find((n) => n.id === nodeId);
+            if (node) onContextMenu?.(event, nodeActions(node));
+          }}
+          nodeMeta={(type) => NODE_META[type] ?? DEFAULT_NODE_META}
+          titleFor={titleFor}
+          summaryFor={(node) => summaryFor(node, agentNameById, workflow.trigger_type)}
+          nodeMetrics={(nodeId) => nodeMetrics(workflow, nodeId)}
+          issueForNode={(nodeId) => {
+            const issue = workflow.validation.issues.find((item) => item.node_id === nodeId);
+            return issue ? { message: issue.message } : undefined;
+          }}
+          readOnly={readOnly}
+          addNodeMenu={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
-                  className="ml-9 mt-1 h-8 w-[calc(100%-2.25rem)] border-dashed border-white/15 bg-white/5 text-xs text-slate-300"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-md text-slate-300 hover:bg-white/5"
                   disabled={readOnly}
+                  title="Agregar nodo"
                 >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Agregar nodo aquí
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
@@ -889,8 +861,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </ScrollArea>
+          }
+        />
 
         <div className="flex min-h-0 flex-col">
           <div className="border-b border-white/10 p-3">
