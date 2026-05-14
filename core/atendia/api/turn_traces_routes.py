@@ -82,6 +82,12 @@ class TurnTraceDetail(TurnTraceListItem):
     outbound_messages: list | None
     errors: list | None
     tool_calls: list[ToolCallOut]
+    # Migration 045 — DebugPanel observability. NULL on legacy rows.
+    router_trigger: str | None
+    raw_llm_response: str | None
+    agent_id: UUID | None
+    kb_evidence: dict | None
+    rules_evaluated: list | None
 
 
 @router.get("", response_model=TurnTraceListResponse)
@@ -188,6 +194,11 @@ async def get_turn_trace(
         stage_transition=row.stage_transition,
         outbound_messages=row.outbound_messages,
         errors=row.errors,
+        router_trigger=row.router_trigger,
+        raw_llm_response=row.raw_llm_response,
+        agent_id=row.agent_id,
+        kb_evidence=row.kb_evidence,
+        rules_evaluated=row.rules_evaluated,
         tool_calls=[
             ToolCallOut(
                 id=tc.id,

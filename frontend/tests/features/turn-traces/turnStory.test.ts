@@ -8,7 +8,7 @@ const baseTrace: TurnTraceDetail = {
   conversation_id: "c1",
   turn_number: 1,
   inbound_message_id: "m1",
-  inbound_preview: "¿Cuánto cuesta el Civic?",
+  inbound_preview: "¿Cuánto cuesta?",
   flow_mode: "SALES",
   nlu_model: "gpt-4o-mini",
   composer_model: "gpt-4o",
@@ -16,7 +16,7 @@ const baseTrace: TurnTraceDetail = {
   total_latency_ms: 1200,
   bot_paused: false,
   created_at: "2026-05-12T00:00:00Z",
-  inbound_text: "¿Cuánto cuesta el Civic?",
+  inbound_text: "¿Cuánto cuesta?",
   nlu_input: null,
   nlu_output: {
     intent: "ask_price",
@@ -32,14 +32,14 @@ const baseTrace: TurnTraceDetail = {
   nlu_tokens_out: null,
   nlu_cost_usd: null,
   nlu_latency_ms: 300,
-  composer_input: null,
+  composer_input: { action: "quote", action_payload: {} },
   composer_output: {
-    messages: ["Hola, el Civic cuesta $325,000"],
+    messages: ["Hola, el modelo cuesta $325,000"],
     pending_confirmation_set: null,
   },
   composer_tokens_in: null,
   composer_tokens_out: null,
-  composer_cost_usd: null,
+  composer_cost_usd: "0.0008",
   composer_latency_ms: 800,
   vision_cost_usd: null,
   vision_latency_ms: null,
@@ -47,9 +47,14 @@ const baseTrace: TurnTraceDetail = {
   state_before: { current_stage: "lead_warm" },
   state_after: { current_stage: "quote_sent" },
   stage_transition: "lead_warm → quote_sent",
-  outbound_messages: [{ text: "Hola, el Civic cuesta $325,000" }],
+  outbound_messages: [{ text: "Hola, el modelo cuesta $325,000" }],
   errors: null,
   tool_calls: [],
+  router_trigger: null,
+  raw_llm_response: null,
+  agent_id: null,
+  kb_evidence: null,
+  rules_evaluated: null,
 };
 
 describe("buildTurnStory", () => {
@@ -57,35 +62,39 @@ describe("buildTurnStory", () => {
     const steps = buildTurnStory(baseTrace);
     expect(steps[0]).toMatchObject({
       kind: "inbound",
-      text: "¿Cuánto cuesta el Civic?",
+      text: "¿Cuánto cuesta?",
     });
   });
 
-  it("emits nlu step with intent + extracted entities", () => {
+  it("emits nlu step with intent + confidence + entity count", () => {
     const steps = buildTurnStory(baseTrace);
     const nlu = steps.find((s) => s.kind === "nlu");
     expect(nlu).toMatchObject({
       kind: "nlu",
       intent: "ask_price",
-      extracted: { brand: "Honda", model: "Civic" },
+      confidence: 0.92,
+      entityCount: 2,
     });
   });
 
-  it("emits mode step from flow_mode", () => {
+  it("emits mode step from flow_mode with a derived rationale", () => {
     const steps = buildTurnStory(baseTrace);
-    expect(steps.find((s) => s.kind === "mode")).toMatchObject({
-      kind: "mode",
-      mode: "SALES",
-    });
+    const mode = steps.find((s) => s.kind === "mode");
+    expect(mode).toMatchObject({ kind: "mode", mode: "SALES" });
+    // rationale is best-effort; when an action exists we surface it.
+    expect((mode as { rationale: string | null }).rationale).toContain("quote");
   });
 
-  it("emits outbound step with previews", () => {
+  it("emits composer step with messages and latency/cost metadata", () => {
     const steps = buildTurnStory(baseTrace);
-    expect(steps.find((s) => s.kind === "outbound")).toMatchObject({
-      kind: "outbound",
-      count: 1,
-      previews: ["Hola, el Civic cuesta $325,000"],
+    const composer = steps.find((s) => s.kind === "composer");
+    expect(composer).toMatchObject({
+      kind: "composer",
+      model: "gpt-4o",
+      latencyMs: 800,
+      messages: ["Hola, el modelo cuesta $325,000"],
     });
+    expect((composer as { costUsd: number | null }).costUsd).toBeCloseTo(0.0008, 6);
   });
 
   it("emits transition step when stage changed", () => {
@@ -97,27 +106,36 @@ describe("buildTurnStory", () => {
     });
   });
 
-  it("emits tool step per tool call with summary", () => {
+  it("emits knowledge step from composer_input.action_payload (FAQ matches)", () => {
     const trace: TurnTraceDetail = {
       ...baseTrace,
-      tool_calls: [
-        {
-          id: "tc1",
-          tool_name: "search_catalog",
-          input_payload: { query: "Civic" },
-          output_payload: {
-            results: [{ name: "Honda Civic 2024", price: 325000 }],
-          },
-          latency_ms: 50,
-          error: null,
-          called_at: "2026-05-12T00:00:01Z",
+      composer_input: {
+        action: "lookup_faq",
+        action_payload: {
+          matches: [
+            { pregunta: "¿Aceptan transferencia?", respuesta: "Sí, también.", score: 0.84 },
+            { pregunta: "¿Cuál es el horario?", respuesta: "9 a 18.", score: 0.71 },
+          ],
         },
-      ],
+      },
     };
-    const steps = buildTurnStory(trace);
-    const tool = steps.find((s) => s.kind === "tool");
-    expect(tool).toMatchObject({ kind: "tool", toolName: "search_catalog" });
-    expect((tool as { kind: "tool"; summary: string }).summary).toContain("Civic");
+    const kb = buildTurnStory(trace).find((s) => s.kind === "knowledge");
+    expect(kb).toMatchObject({ kind: "knowledge", action: "lookup_faq" });
+    expect((kb as { hits: { title: string; score: number }[] }).hits).toHaveLength(2);
+    expect((kb as { hits: { title: string }[] }).hits[0]?.title).toContain("transferencia");
+  });
+
+  it("emits knowledge step with emptyHint when the tool returned no data", () => {
+    const trace: TurnTraceDetail = {
+      ...baseTrace,
+      composer_input: {
+        action: "lookup_faq",
+        action_payload: { hint: "no FAQ above similarity threshold 0.5" },
+      },
+    };
+    const kb = buildTurnStory(trace).find((s) => s.kind === "knowledge");
+    expect(kb).toMatchObject({ kind: "knowledge", action: "lookup_faq" });
+    expect((kb as { emptyHint?: string }).emptyHint).toContain("similarity");
   });
 
   it("flags hasMedia when inbound_text is null but a message id exists", () => {
@@ -130,8 +148,8 @@ describe("buildTurnStory", () => {
     });
   });
 
-  it("skips nlu step when nlu_output is null", () => {
-    const trace = { ...baseTrace, nlu_output: null };
+  it("skips nlu step when nlu_output is null and there is no nlu_model", () => {
+    const trace = { ...baseTrace, nlu_output: null, nlu_model: null };
     const steps = buildTurnStory(trace);
     expect(steps.find((s) => s.kind === "nlu")).toBeUndefined();
   });
@@ -142,22 +160,47 @@ describe("buildTurnStory", () => {
     expect(steps.find((s) => s.kind === "transition")).toBeUndefined();
   });
 
-  it("handles tool errors by populating the error field", () => {
+  it("uses migration-045 router_trigger over the heuristic rationale", () => {
     const trace: TurnTraceDetail = {
       ...baseTrace,
-      tool_calls: [
-        {
-          id: "tc",
-          tool_name: "quote",
-          input_payload: {},
-          output_payload: null,
-          latency_ms: 10,
-          error: "missing SKU",
-          called_at: "2026-05-12T00:00:01Z",
-        },
-      ],
+      router_trigger: "doc_attachment:has_attachment",
     };
-    const tool = buildTurnStory(trace).find((s) => s.kind === "tool");
-    expect(tool).toMatchObject({ kind: "tool", error: "missing SKU" });
+    const mode = buildTurnStory(trace).find((s) => s.kind === "mode");
+    expect((mode as { rationale: string | null }).rationale).toContain("doc_attachment");
+    expect((mode as { rationale: string | null }).rationale).toContain("has_attachment");
+  });
+
+  it("reads knowledge from migration-045 kb_evidence column when present", () => {
+    const trace: TurnTraceDetail = {
+      ...baseTrace,
+      kb_evidence: {
+        action: "lookup_faq",
+        hits: [
+          {
+            source_type: "faq",
+            source_id: "00000000-0000-0000-0000-0000000000aa",
+            collection_id: "00000000-0000-0000-0000-0000000000bb",
+            title: "¿Cuál es el horario?",
+            preview: "Lunes a sábado 9 a 18.",
+            score: 0.81,
+          },
+        ],
+      },
+    };
+    const kb = buildTurnStory(trace).find((s) => s.kind === "knowledge");
+    expect(kb).toMatchObject({ kind: "knowledge", action: "lookup_faq" });
+    const hits = (kb as { hits: { title: string; externalId?: string }[] }).hits;
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.title).toContain("horario");
+    expect(hits[0]?.externalId).toBe("00000000-0000-0000-0000-0000000000aa");
+  });
+
+  it("exposes raw_llm_response on the composer step when set", () => {
+    const trace: TurnTraceDetail = {
+      ...baseTrace,
+      raw_llm_response: '{"messages":["Hola, el modelo cuesta $325,000"]}',
+    };
+    const composer = buildTurnStory(trace).find((s) => s.kind === "composer");
+    expect((composer as { rawLlmResponse: string | null }).rawLlmResponse).toContain("$325,000");
   });
 });

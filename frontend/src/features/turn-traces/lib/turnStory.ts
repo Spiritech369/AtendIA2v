@@ -1,65 +1,50 @@
 import type { TurnTraceDetail } from "@/features/turn-traces/api";
+import {
+  extractKnowledge,
+  type KnowledgeBlock,
+  outboundPreviews,
+  readIntent,
+} from "@/features/turn-traces/lib/turnAnalysis";
+
+// Story steps are the narrative the operator reads top-down. We build
+// one per logical stage of the turn so the panel can render a
+// vertical timeline instead of a flat key-value dump.
+//
+// Vertical-agnostic: no step type knows about credit, motorcycles,
+// clinics, etc. Labels in the UI come from `intent`, `mode`, `action`
+// and from the tenant's own state keys.
 
 export type StoryStep =
   | { kind: "inbound"; text: string | null; hasMedia: boolean }
   | {
       kind: "nlu";
       intent: string | null;
-      extracted: Record<string, unknown>;
+      confidence: number | null;
+      entityCount: number;
     }
-  | { kind: "mode"; mode: string | null }
+  | { kind: "mode"; mode: string | null; rationale: string | null }
   | {
-      kind: "tool";
-      toolName: string;
-      summary: string;
-      error: string | null;
+      kind: "knowledge";
+      action: string | null;
+      hits: KnowledgeBlock["hits"];
+      emptyHint?: string;
     }
-  | { kind: "composer"; messages: string[] }
-  | { kind: "outbound"; count: number; previews: string[] }
-  | { kind: "transition"; from: string; to: string };
-
-function extractEntities(nluOutput: unknown): Record<string, unknown> {
-  if (!nluOutput || typeof nluOutput !== "object") return {};
-  const entities = (nluOutput as { entities?: unknown }).entities;
-  if (!entities || typeof entities !== "object") return {};
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(entities as Record<string, unknown>)) {
-    if (v && typeof v === "object" && "value" in (v as object)) {
-      out[k] = (v as { value: unknown }).value;
-    } else {
-      out[k] = v;
+  | {
+      kind: "composer";
+      model: string | null;
+      latencyMs: number | null;
+      costUsd: number | null;
+      messages: string[];
+      pendingConfirmation: string | null;
+      // Migration 045 — raw OpenAI text. When present and different from
+      // the parsed messages, the composer step renders a diff toggle.
+      rawLlmResponse: string | null;
     }
-  }
-  return out;
-}
-
-function summarizeTool(name: string, input: unknown, output: unknown): string {
-  if (name === "search_catalog" && output && typeof output === "object") {
-    const results = (output as { results?: unknown }).results;
-    if (Array.isArray(results) && results.length > 0) {
-      const first = results[0] as Record<string, unknown>;
-      const label = String(first.name ?? first.sku ?? "resultado");
-      const price = first.price != null ? ` — $${first.price}` : "";
-      return `${results.length} resultado${results.length > 1 ? "s" : ""}: ${label}${price}`;
-    }
-    if (Array.isArray(results)) return "0 resultados";
-  }
-  if (name === "lookup_faq" && output && typeof output === "object") {
-    const answer = (output as { answer?: unknown }).answer;
-    if (typeof answer === "string") {
-      return `respuesta: ${answer.slice(0, 60)}${answer.length > 60 ? "…" : ""}`;
-    }
-  }
-  if (name === "quote" && output && typeof output === "object") {
-    const total = (output as { total?: unknown }).total;
-    if (total != null) return `cotización: $${total}`;
-  }
-  if (input && typeof input === "object") {
-    const entries = Object.entries(input).slice(0, 2);
-    return entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ") || "(sin datos)";
-  }
-  return "(sin datos)";
-}
+  | {
+      kind: "transition";
+      from: string;
+      to: string;
+    };
 
 function parseTransition(t: string | null): { from: string; to: string } | null {
   if (!t) return null;
@@ -68,17 +53,50 @@ function parseTransition(t: string | null): { from: string; to: string } | null 
   return null;
 }
 
-function outboundPreviews(messages: unknown): string[] {
-  if (!Array.isArray(messages)) return [];
-  return messages
-    .map((m) => {
-      if (typeof m === "string") return m;
-      if (m && typeof m === "object" && "text" in m) {
-        return String((m as { text: unknown }).text ?? "");
-      }
-      return "";
-    })
-    .filter((t) => t.length > 0);
+// Migration 045 persists `router_trigger` as `"<rule_id>:<trigger_type>"`.
+// When present, parse it into a human-readable line. Returns null for
+// legacy rows so the heuristic fallback below kicks in.
+function readRouterTrigger(trace: TurnTraceDetail): string | null {
+  if (!trace.router_trigger) return null;
+  const sep = trace.router_trigger.indexOf(":");
+  if (sep < 0) return trace.router_trigger;
+  const ruleId = trace.router_trigger.slice(0, sep);
+  const triggerType = trace.router_trigger.slice(sep + 1);
+  return `regla "${ruleId}" (${triggerType})`;
+}
+
+// Best-effort rationale derived from observable signals — used as a
+// fallback when router_trigger isn't populated (pre-045 rows).
+function deriveModeRationale(trace: TurnTraceDetail): string | null {
+  const ci =
+    trace.composer_input && typeof trace.composer_input === "object"
+      ? (trace.composer_input as Record<string, unknown>)
+      : null;
+  if (!ci) return null;
+
+  const action = typeof ci.action === "string" ? ci.action : null;
+  const visionResult = ci.vision_result;
+  const intent = readIntent(trace).intent;
+  const pendingConfirmation =
+    trace.state_before &&
+    typeof trace.state_before === "object" &&
+    typeof (trace.state_before as Record<string, unknown>).pending_confirmation === "string"
+      ? ((trace.state_before as Record<string, unknown>).pending_confirmation as string)
+      : null;
+
+  if (pendingConfirmation) {
+    return `confirmación pendiente: "${pendingConfirmation}"`;
+  }
+  if (visionResult && typeof visionResult === "object") {
+    return "el cliente envió un adjunto";
+  }
+  if (action) {
+    return `acción decidida: ${action}`;
+  }
+  if (intent) {
+    return `intent detectado: ${intent}`;
+  }
+  return null;
 }
 
 export function buildTurnStory(trace: TurnTraceDetail): StoryStep[] {
@@ -90,37 +108,58 @@ export function buildTurnStory(trace: TurnTraceDetail): StoryStep[] {
     hasMedia: !trace.inbound_text && !!trace.inbound_message_id,
   });
 
-  if (trace.nlu_output) {
-    const out = trace.nlu_output as Record<string, unknown>;
+  const { intent, confidence } = readIntent(trace);
+  const nluEntities =
+    trace.nlu_output &&
+    typeof trace.nlu_output === "object" &&
+    (trace.nlu_output as { entities?: unknown }).entities &&
+    typeof (trace.nlu_output as { entities?: unknown }).entities === "object"
+      ? Object.keys((trace.nlu_output as { entities: Record<string, unknown> }).entities)
+      : [];
+
+  if (intent || trace.nlu_model) {
     steps.push({
       kind: "nlu",
-      intent: typeof out.intent === "string" ? out.intent : null,
-      extracted: extractEntities(trace.nlu_output),
+      intent,
+      confidence,
+      entityCount: nluEntities.length,
     });
   }
 
   if (trace.flow_mode) {
-    steps.push({ kind: "mode", mode: trace.flow_mode });
-  }
-
-  for (const tc of trace.tool_calls ?? []) {
     steps.push({
-      kind: "tool",
-      toolName: tc.tool_name,
-      summary: summarizeTool(tc.tool_name, tc.input_payload, tc.output_payload),
-      error: tc.error,
+      kind: "mode",
+      mode: trace.flow_mode,
+      rationale: readRouterTrigger(trace) ?? deriveModeRationale(trace),
     });
   }
 
-  if (trace.composer_output) {
-    const out = trace.composer_output as Record<string, unknown>;
-    const messages = Array.isArray(out.messages) ? out.messages.map((m) => String(m)) : [];
-    if (messages.length > 0) steps.push({ kind: "composer", messages });
+  const kb = extractKnowledge(trace);
+  if (kb.action || kb.hits.length > 0 || kb.emptyHint) {
+    steps.push({
+      kind: "knowledge",
+      action: kb.action,
+      hits: kb.hits,
+      emptyHint: kb.emptyHint,
+    });
   }
 
-  const previews = outboundPreviews(trace.outbound_messages);
-  if (previews.length > 0) {
-    steps.push({ kind: "outbound", count: previews.length, previews });
+  if (trace.composer_output || trace.composer_model) {
+    steps.push({
+      kind: "composer",
+      model: trace.composer_model,
+      latencyMs: trace.composer_latency_ms,
+      costUsd: trace.composer_cost_usd != null ? Number(trace.composer_cost_usd) : null,
+      messages: outboundPreviews(trace),
+      pendingConfirmation:
+        trace.composer_output &&
+        typeof trace.composer_output === "object" &&
+        typeof (trace.composer_output as { pending_confirmation_set?: unknown })
+          .pending_confirmation_set === "string"
+          ? ((trace.composer_output as Record<string, unknown>).pending_confirmation_set as string)
+          : null,
+      rawLlmResponse: trace.raw_llm_response,
+    });
   }
 
   const t = parseTransition(trace.stage_transition);

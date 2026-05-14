@@ -60,6 +60,15 @@ class TurnTrace(Base):
     # Phase 4 T24 — true when the runner short-circuited because an
     # operator was driving the conversation (conversation_state.bot_paused).
     bot_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Migration 045 — DebugPanel observability. All nullable; legacy rows
+    # stay NULL and the runner populates them going forward.
+    router_trigger: Mapped[str | None] = mapped_column(String(80))
+    raw_llm_response: Mapped[str | None] = mapped_column(Text)
+    agent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"), index=True
+    )
+    kb_evidence: Mapped[dict | None] = mapped_column(JSONB)
+    rules_evaluated: Mapped[list | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tool_calls: Mapped[list["ToolCallRow"]] = relationship(back_populates="turn_trace")

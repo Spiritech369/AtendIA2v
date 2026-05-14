@@ -1,16 +1,29 @@
+// The story is the top section of the DebugPanel: a vertical timeline
+// of what happened in the turn, top-down. Each step is a card with an
+// icon, primary line, and optional secondary content (intent bar, KB
+// hits, outbound messages, etc.).
+//
+// Vertical-agnostic: no step looks at field names or hardcoded
+// vocabulary. The trace itself supplies labels.
 import {
   ArrowRight,
+  BookOpen,
   Brain,
   MessageSquareText,
+  Paperclip,
   SendHorizonal,
-  Sparkles,
   Target,
-  Wrench,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { StoryStep } from "../lib/turnStory";
 import { FlowModeBadge } from "./FlowModeBadge";
 
+// Human-readable intent labels. Keep `unclear` → "No claro" style. New
+// intents fall back to their key (e.g. `complain` → `complain`), which
+// is fine for now. When migration 021 lands with `agent_id`, this map
+// moves to backend-provided labels.
 const INTENT_LABELS: Record<string, string> = {
   greeting: "Saludo",
   ask_info: "Pidió información",
@@ -22,116 +35,277 @@ const INTENT_LABELS: Record<string, string> = {
   unclear: "No claro",
 };
 
-function StepRow({
-  icon: Icon,
-  children,
-}: {
-  icon: typeof MessageSquareText;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3 py-2">
-      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-      </div>
-      <div className="flex-1 text-sm">{children}</div>
-    </div>
-  );
+function intentLabel(intent: string | null): string {
+  if (!intent) return "—";
+  return INTENT_LABELS[intent] ?? intent.replace(/_/g, " ");
 }
 
 function truncate(s: string, n: number) {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
-function renderStep(step: StoryStep) {
-  switch (step.kind) {
-    case "inbound":
-      return (
-        <StepRow icon={MessageSquareText}>
-          {step.text ? (
-            <>
-              <span className="text-muted-foreground">Cliente:</span>{" "}
-              <span className="italic">«{step.text}»</span>
-            </>
-          ) : step.hasMedia ? (
-            <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>
-          ) : (
-            <span className="text-muted-foreground">Sin mensaje entrante.</span>
-          )}
-        </StepRow>
-      );
-    case "nlu": {
-      const entities = Object.entries(step.extracted ?? {});
-      const intentLabel = step.intent ? (INTENT_LABELS[step.intent] ?? step.intent) : "—";
-      return (
-        <StepRow icon={Brain}>
-          <span className="text-muted-foreground">Bot entendió:</span>{" "}
-          <span className="font-medium">{intentLabel}</span>
-          {entities.length > 0 && (
-            <span className="ml-1 text-muted-foreground">
-              ({entities.map(([k, v]) => `${k}=${String(v)}`).join(", ")})
-            </span>
-          )}
-        </StepRow>
-      );
-    }
-    case "mode":
-      return (
-        <StepRow icon={Target}>
-          <span className="text-muted-foreground">Modo:</span> <FlowModeBadge mode={step.mode} />
-        </StepRow>
-      );
-    case "tool":
-      return (
-        <StepRow icon={Wrench}>
-          <span className="font-mono text-xs">{step.toolName}</span>{" "}
-          <span className="text-muted-foreground">→</span>{" "}
-          {step.error ? (
-            <span className="text-destructive">error: {step.error}</span>
-          ) : (
-            <span>{step.summary}</span>
-          )}
-        </StepRow>
-      );
-    case "composer": {
-      const first = step.messages[0];
-      return (
-        <StepRow icon={Sparkles}>
-          <span className="text-muted-foreground">Bot decidió responder:</span>{" "}
-          <span className="italic">
-            {step.messages.length === 1 && first
-              ? `«${truncate(first, 80)}»`
-              : `${step.messages.length} mensajes`}
-          </span>
-        </StepRow>
-      );
-    }
-    case "outbound":
-      return (
-        <StepRow icon={SendHorizonal}>
+function StepShell({
+  index,
+  icon: Icon,
+  primary,
+  children,
+}: {
+  index: number;
+  icon: React.ElementType;
+  primary: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <li className="relative flex gap-3 py-2.5">
+      <div className="flex flex-col items-center">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-card text-muted-foreground">
+          <Icon className="h-3 w-3" />
+        </div>
+        <div className="mt-1 flex-1 w-px bg-border last:hidden" />
+      </div>
+      <div className="flex-1 space-y-1">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[10px] font-mono text-muted-foreground">{`#${index + 1}`}</span>
+          <div className="flex-1 text-sm">{primary}</div>
+        </div>
+        {children && <div className="space-y-1.5">{children}</div>}
+      </div>
+    </li>
+  );
+}
+
+function IntentBar({ confidence }: { confidence: number }) {
+  const pct = Math.max(0, Math.min(100, Math.round(confidence * 100)));
+  const tone =
+    confidence >= 0.8 ? "bg-emerald-500" : confidence >= 0.6 ? "bg-amber-500" : "bg-rose-500";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative h-1.5 w-24 overflow-hidden rounded bg-muted">
+        <div className={cn("absolute inset-y-0 left-0", tone)} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="font-mono text-[10px] text-muted-foreground">{pct}%</span>
+    </div>
+  );
+}
+
+function StepInbound({
+  index,
+  step,
+}: {
+  index: number;
+  step: Extract<StoryStep, { kind: "inbound" }>;
+}) {
+  return (
+    <StepShell
+      index={index}
+      icon={step.hasMedia ? Paperclip : MessageSquareText}
+      primary={
+        step.text ? (
+          <>
+            <span className="text-muted-foreground">Cliente escribió</span>
+            <div className="mt-1 rounded-md bg-muted px-2 py-1.5 text-sm italic">«{step.text}»</div>
+          </>
+        ) : step.hasMedia ? (
+          <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>
+        ) : (
+          <span className="text-muted-foreground">Sin mensaje entrante.</span>
+        )
+      }
+    />
+  );
+}
+
+function StepNlu({ index, step }: { index: number; step: Extract<StoryStep, { kind: "nlu" }> }) {
+  return (
+    <StepShell
+      index={index}
+      icon={Brain}
+      primary={
+        <span>
+          <span className="text-muted-foreground">El bot entendió</span>{" "}
+          <span className="font-medium">{intentLabel(step.intent)}</span>
+        </span>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
+        {step.confidence != null && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Confianza:</span>
+            <IntentBar confidence={step.confidence} />
+          </div>
+        )}
+        {step.entityCount > 0 && (
           <span className="text-muted-foreground">
-            Envió {step.count} mensaje{step.count > 1 ? "s" : ""}:
+            {step.entityCount} entidad{step.entityCount === 1 ? "" : "es"} extraída
+            {step.entityCount === 1 ? "" : "s"}
           </span>
-          <ul className="mt-1 space-y-0.5">
-            {step.previews.map((p, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: previews are derived from immutable trace JSON, never reordered.
-              <li key={`${i}-${p.slice(0, 12)}`} className="text-xs text-muted-foreground">
-                · {truncate(p, 100)}
-              </li>
-            ))}
-          </ul>
-        </StepRow>
-      );
-    case "transition":
-      return (
-        <StepRow icon={ArrowRight}>
-          <span className="text-muted-foreground">Etapa:</span>{" "}
-          <span className="font-mono text-xs">{step.from}</span>{" "}
-          <ArrowRight className="inline h-3 w-3" />{" "}
-          <span className="font-mono text-xs">{step.to}</span>
-        </StepRow>
-      );
-  }
+        )}
+      </div>
+    </StepShell>
+  );
+}
+
+function StepMode({ index, step }: { index: number; step: Extract<StoryStep, { kind: "mode" }> }) {
+  return (
+    <StepShell
+      index={index}
+      icon={Target}
+      primary={
+        <span className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Router eligió modo</span>
+          <FlowModeBadge mode={step.mode} />
+        </span>
+      }
+    >
+      {step.rationale && (
+        <div className="text-[11px] text-muted-foreground">Porque: {step.rationale}</div>
+      )}
+    </StepShell>
+  );
+}
+
+function StepKnowledge({
+  index,
+  step,
+}: {
+  index: number;
+  step: Extract<StoryStep, { kind: "knowledge" }>;
+}) {
+  const hasHits = step.hits.length > 0;
+  return (
+    <StepShell
+      index={index}
+      icon={BookOpen}
+      primary={
+        <span>
+          <span className="text-muted-foreground">Conocimiento consultado</span>
+          {step.action && (
+            <span className="ml-1.5 font-mono text-[11px] text-foreground/70">({step.action})</span>
+          )}
+        </span>
+      }
+    >
+      {hasHits ? (
+        <div className="space-y-1">
+          {step.hits.slice(0, 3).map((h, i) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: ordered, immutable hits.
+              key={`${i}-${h.title.slice(0, 12)}`}
+              className="flex items-center justify-between gap-2 text-[11px]"
+            >
+              <span className="truncate">
+                <span className="text-muted-foreground/70">·</span> {truncate(h.title, 60)}
+              </span>
+              {h.score != null && (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {h.score.toFixed(2)}
+                </span>
+              )}
+            </div>
+          ))}
+          {step.hits.length > 3 && (
+            <div className="text-[10px] text-muted-foreground">
+              + {step.hits.length - 3} más en el panel de conocimiento
+            </div>
+          )}
+        </div>
+      ) : step.emptyHint ? (
+        <div className="text-[11px] text-muted-foreground italic">{step.emptyHint}</div>
+      ) : (
+        <div className="text-[11px] text-muted-foreground italic">Sin resultados.</div>
+      )}
+    </StepShell>
+  );
+}
+
+function StepComposer({
+  index,
+  step,
+}: {
+  index: number;
+  step: Extract<StoryStep, { kind: "composer" }>;
+}) {
+  const hasMessages = step.messages.length > 0;
+  return (
+    <StepShell
+      index={index}
+      icon={SendHorizonal}
+      primary={
+        <span>
+          <span className="text-muted-foreground">El bot respondió</span>
+          {hasMessages && step.messages.length > 1 && (
+            <span className="ml-1 text-muted-foreground">({step.messages.length} mensajes)</span>
+          )}
+        </span>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+        {step.model && <span className="font-mono">{step.model}</span>}
+        {step.latencyMs != null && <span>· {step.latencyMs}ms</span>}
+        {step.costUsd != null && step.costUsd > 0 && <span>· ${step.costUsd.toFixed(4)}</span>}
+        {step.pendingConfirmation && (
+          <Badge
+            variant="outline"
+            className="border-amber-500/40 bg-amber-500/10 text-amber-700 text-[10px]"
+          >
+            Pregunta sí/no: {step.pendingConfirmation}
+          </Badge>
+        )}
+      </div>
+      {hasMessages && (
+        <div className="space-y-1">
+          {step.messages.map((m, i) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: outbound messages are immutable per trace.
+              key={`${i}-${m.slice(0, 16)}`}
+              className="rounded-md bg-primary/5 px-2 py-1 text-[12px] text-foreground/90"
+            >
+              {truncate(m, 220)}
+            </div>
+          ))}
+        </div>
+      )}
+      {step.rawLlmResponse && step.rawLlmResponse.length > 0 && (
+        // Migration 045 — always surface the raw JSON when present.
+        // The operator decides whether to expand; we don't second-guess
+        // "is there a meaningful diff" because JSON wrapping bytes make
+        // a byte-equal check meaningless.
+        <details className="rounded-md border border-amber-500/40 bg-amber-500/5 text-[11px]">
+          <summary className="cursor-pointer px-2 py-1 text-amber-700 hover:text-amber-900">
+            Ver raw LLM
+          </summary>
+          <pre className="max-h-32 overflow-auto border-t border-amber-500/40 bg-amber-500/5 p-2 text-[10px] text-amber-900">
+            {step.rawLlmResponse}
+          </pre>
+        </details>
+      )}
+    </StepShell>
+  );
+}
+
+function StepTransition({
+  index,
+  step,
+}: {
+  index: number;
+  step: Extract<StoryStep, { kind: "transition" }>;
+}) {
+  return (
+    <StepShell
+      index={index}
+      icon={ArrowRight}
+      primary={
+        <span className="flex items-center gap-1.5 text-sm">
+          <span className="text-muted-foreground">Etapa:</span>
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{step.from}</code>
+          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+          <code className="rounded bg-violet-500/15 px-1.5 py-0.5 font-mono text-[11px] text-violet-700">
+            {step.to}
+          </code>
+        </span>
+      }
+    />
+  );
 }
 
 export function TurnStoryView({ steps }: { steps: StoryStep[] }) {
@@ -143,13 +317,26 @@ export function TurnStoryView({ steps }: { steps: StoryStep[] }) {
     );
   }
   return (
-    <div className="divide-y rounded-md border">
-      {steps.map((step, idx) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: story steps are derived deterministically from the trace and never reordered.
-        <div key={`${idx}-${step.kind}`} className="px-3">
-          {renderStep(step)}
-        </div>
-      ))}
-    </div>
+    <ol className="relative space-y-0">
+      {steps.map((step, idx) => {
+        const key = `${step.kind}-${idx}`;
+        switch (step.kind) {
+          case "inbound":
+            return <StepInbound key={key} index={idx} step={step} />;
+          case "nlu":
+            return <StepNlu key={key} index={idx} step={step} />;
+          case "mode":
+            return <StepMode key={key} index={idx} step={step} />;
+          case "knowledge":
+            return <StepKnowledge key={key} index={idx} step={step} />;
+          case "composer":
+            return <StepComposer key={key} index={idx} step={step} />;
+          case "transition":
+            return <StepTransition key={key} index={idx} step={step} />;
+          default:
+            return null;
+        }
+      })}
+    </ol>
   );
 }

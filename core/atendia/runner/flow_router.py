@@ -75,6 +75,16 @@ class FlowModeRule(BaseModel):
     mode: FlowMode
 
 
+class FlowDecision(BaseModel):
+    """Router output. Carries the chosen mode plus the rule that fired so
+    the DebugPanel can render "Modo X because rule Y matched" without
+    re-deriving the rationale from observable side-effects.
+    """
+    mode: FlowMode
+    rule_id: str
+    trigger_type: str
+
+
 def pick_flow_mode(
     *,
     rules: list[FlowModeRule],
@@ -83,15 +93,19 @@ def pick_flow_mode(
     vision: VisionResult | None,
     inbound_text: str,
     pending_confirmation: str | None,
-) -> FlowMode:
-    """Return the first FlowMode whose rule matches.
+) -> FlowDecision:
+    """Return the first FlowMode whose rule matches, plus the rule id.
 
     rules MUST end with an AlwaysTrigger rule, else this raises.
     """
     normalized = _normalize_for_router(inbound_text)
     for rule in rules:
         if _matches(rule.trigger, extracted, nlu, vision, normalized, pending_confirmation):
-            return rule.mode
+            return FlowDecision(
+                mode=rule.mode,
+                rule_id=rule.id,
+                trigger_type=rule.trigger.type,
+            )
     raise RuntimeError("flow_mode_rules MUST end with an `always` fallback rule")
 
 

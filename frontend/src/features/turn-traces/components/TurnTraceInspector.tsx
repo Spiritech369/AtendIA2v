@@ -1,23 +1,29 @@
+// Modal version of DebugPanel used by the turn-trace admin list. Same
+// content as the side panel but presented as a dialog. Kept in sync
+// with DebugPanel so the operator and admin views never diverge.
 import { useQuery } from "@tanstack/react-query";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { turnTracesApi } from "@/features/turn-traces/api";
 
 import { buildTurnStory } from "../lib/turnStory";
 import { FlowModeBadge } from "./FlowModeBadge";
-import { TurnStoryView } from "./TurnStoryView";
 import {
-  ComposerSection,
-  ErrorsSection,
-  NluSection,
-  OverviewSection,
-  PipelineSection,
-  StateSection,
-  ToolCallsSection,
-} from "./TurnTraceSections";
+  AgentBadge,
+  AnomalyChips,
+  CostBreakdown,
+  EntityPills,
+  ErrorBanner,
+  FactPackCard,
+  KnowledgePanel,
+  LatencyStackedBar,
+  RawJsonFooter,
+  RulesEvaluatedPanel,
+  StateDiff,
+} from "./TurnPanels";
+import { TurnStoryView } from "./TurnStoryView";
 
 export function TurnTraceInspector({
   traceId,
@@ -36,50 +42,38 @@ export function TurnTraceInspector({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Turn {query.data?.turn_number ?? "…"}
+            Turno {query.data?.turn_number ?? "…"}
             {query.data?.flow_mode && <FlowModeBadge mode={query.data.flow_mode} />}
           </DialogTitle>
         </DialogHeader>
         {query.isLoading || !query.data ? (
           <Skeleton className="h-64 w-full" />
         ) : (
-          <Tabs defaultValue="story">
-            <TabsList>
-              <TabsTrigger value="story">Resumen</TabsTrigger>
-              <TabsTrigger value="detail">Detalle técnico</TabsTrigger>
-              <TabsTrigger value="raw">Raw</TabsTrigger>
-            </TabsList>
-            <TabsContent value="story" className="space-y-3">
-              <TurnStoryView steps={buildTurnStory(query.data)} />
-            </TabsContent>
-            <TabsContent value="detail" className="space-y-0">
-              <OverviewSection trace={query.data} />
-              <Separator />
-              <PipelineSection trace={query.data} />
-              <Separator />
-              <NluSection trace={query.data} />
-              <Separator />
-              <ComposerSection trace={query.data} />
-              {query.data.tool_calls.length > 0 && (
-                <>
-                  <Separator />
-                  <ToolCallsSection trace={query.data} />
-                </>
-              )}
-              <Separator />
-              <StateSection trace={query.data} />
-              <Separator />
-              <ErrorsSection trace={query.data} />
-            </TabsContent>
-            <TabsContent value="raw">
-              <pre className="overflow-auto rounded bg-muted p-2 text-xs">
-                {JSON.stringify(query.data, null, 2)}
-              </pre>
-            </TabsContent>
-          </Tabs>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <AgentBadge trace={query.data} />
+              <AnomalyChips trace={query.data} />
+            </div>
+            <ErrorBanner trace={query.data} />
+            <TurnStoryView steps={buildTurnStory(query.data)} />
+            <Separator />
+            <EntityPills trace={query.data} />
+            <Separator />
+            <KnowledgePanel trace={query.data} />
+            <Separator />
+            <StateDiff trace={query.data} />
+            <Separator />
+            <RulesEvaluatedPanel trace={query.data} />
+            <Separator />
+            <LatencyStackedBar trace={query.data} />
+            <CostBreakdown trace={query.data} />
+            <Separator />
+            <FactPackCard trace={query.data} />
+            <RawJsonFooter trace={query.data} />
+          </div>
         )}
       </DialogContent>
     </Dialog>

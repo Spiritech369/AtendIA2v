@@ -43,6 +43,11 @@ class ComposerOutput(BaseModel):
     # any non-disambiguating turn; snapshot tests treat it as an
     # additive optional field so existing fixtures stay byte-equal.
     pending_confirmation_set: str | None = None
+    # Migration 045 — raw text the LLM returned before parsing. Kept on
+    # the output object (rather than UsageMetadata) so canned/fallback
+    # composers can also surface their canned text for the DebugPanel
+    # raw-vs-final comparison. None on legacy paths that don't capture it.
+    raw_llm_response: str | None = None
 
 
 class ComposerProvider(Protocol):

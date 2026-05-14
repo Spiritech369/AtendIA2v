@@ -45,7 +45,7 @@ def test_has_attachment_triggers_doc() -> None:
         nlu=_nlu(), vision=_vision(), inbound_text="aquí va",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.DOC
+    assert mode.mode == FlowMode.DOC
 
 
 def test_no_attachment_skips_doc_rule() -> None:
@@ -58,7 +58,7 @@ def test_no_attachment_skips_doc_rule() -> None:
         nlu=_nlu(), vision=None, inbound_text="hola",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.SUPPORT
+    assert mode.mode == FlowMode.SUPPORT
 
 
 def test_keyword_match_with_accents_stripped() -> None:
@@ -74,7 +74,7 @@ def test_keyword_match_with_accents_stripped() -> None:
         nlu=_nlu(), vision=None, inbound_text="te lo paso manana",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.OBSTACLE
+    assert mode.mode == FlowMode.OBSTACLE
 
 
 def test_keyword_match_case_insensitive() -> None:
@@ -89,7 +89,7 @@ def test_keyword_match_case_insensitive() -> None:
         nlu=_nlu(), vision=None, inbound_text="GRACIAS por la info",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.RETENTION
+    assert mode.mode == FlowMode.RETENTION
 
 
 def test_field_missing_triggers_when_field_is_none() -> None:
@@ -104,7 +104,7 @@ def test_field_missing_triggers_when_field_is_none() -> None:
         nlu=_nlu(), vision=None, inbound_text="",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.PLAN
+    assert mode.mode == FlowMode.PLAN
 
 
 def test_field_missing_skipped_when_field_present() -> None:
@@ -120,7 +120,7 @@ def test_field_missing_skipped_when_field_present() -> None:
         nlu=_nlu(), vision=None, inbound_text="",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.SUPPORT
+    assert mode.mode == FlowMode.SUPPORT
 
 
 def test_field_present_and_intent_combined() -> None:
@@ -140,21 +140,21 @@ def test_field_present_and_intent_combined() -> None:
         nlu=_nlu(intent=Intent.ASK_PRICE), vision=None, inbound_text="",
         pending_confirmation=None,
     )
-    assert mode1 == FlowMode.SALES
+    assert mode1.mode == FlowMode.SALES
     # Caso 2: plan pero intent unrelated → SUPPORT
     mode2 = pick_flow_mode(
         rules=rules, extracted=extracted,
         nlu=_nlu(intent=Intent.GREETING), vision=None, inbound_text="",
         pending_confirmation=None,
     )
-    assert mode2 == FlowMode.SUPPORT
+    assert mode2.mode == FlowMode.SUPPORT
     # Caso 3: sin plan, ask_price → SUPPORT
     mode3 = pick_flow_mode(
         rules=rules, extracted=ExtractedFields(),
         nlu=_nlu(intent=Intent.ASK_PRICE), vision=None, inbound_text="",
         pending_confirmation=None,
     )
-    assert mode3 == FlowMode.SUPPORT
+    assert mode3.mode == FlowMode.SUPPORT
 
 
 def test_pending_confirmation_trigger_for_binary_qa() -> None:
@@ -169,7 +169,7 @@ def test_pending_confirmation_trigger_for_binary_qa() -> None:
         nlu=_nlu(), vision=None, inbound_text="sí",
         pending_confirmation="is_nomina_tarjeta",
     )
-    assert mode == FlowMode.PLAN
+    assert mode.mode == FlowMode.PLAN
 
 
 # ---- Precedence + safety -----------------------------------------------
@@ -188,7 +188,7 @@ def test_first_match_wins_over_later() -> None:
         nlu=_nlu(), vision=_vision(), inbound_text="te lo paso mañana",
         pending_confirmation=None,
     )
-    assert mode == FlowMode.DOC
+    assert mode.mode == FlowMode.DOC
 
 
 def test_missing_always_fallback_raises() -> None:
@@ -202,6 +202,43 @@ def test_missing_always_fallback_raises() -> None:
             nlu=_nlu(), vision=None, inbound_text="hola",
             pending_confirmation=None,
         )
+
+
+# ---- Rule id / trigger type (Migration 045 — DebugPanel) ----------------
+
+def test_decision_carries_matched_rule_id_and_trigger_type() -> None:
+    """DebugPanel needs to know which rule fired and what type. Migration 045
+    exposes both on FlowDecision so the panel can render "Modo X because
+    rule Y matched" without re-deriving rationale."""
+    rules = [
+        FlowModeRule(id="doc_attachment",
+                     trigger=HasAttachmentTrigger(), mode=FlowMode.DOC),
+        FlowModeRule(id="fb", trigger=AlwaysTrigger(), mode=FlowMode.SUPPORT),
+    ]
+    decision = pick_flow_mode(
+        rules=rules, extracted=ExtractedFields(),
+        nlu=_nlu(), vision=_vision(), inbound_text="aquí va",
+        pending_confirmation=None,
+    )
+    assert decision.mode == FlowMode.DOC
+    assert decision.rule_id == "doc_attachment"
+    assert decision.trigger_type == "has_attachment"
+
+
+def test_decision_for_always_fallback_reports_rule_id() -> None:
+    rules = [
+        FlowModeRule(id="r1", trigger=HasAttachmentTrigger(), mode=FlowMode.DOC),
+        FlowModeRule(id="default_support",
+                     trigger=AlwaysTrigger(), mode=FlowMode.SUPPORT),
+    ]
+    decision = pick_flow_mode(
+        rules=rules, extracted=ExtractedFields(),
+        nlu=_nlu(), vision=None, inbound_text="hola",
+        pending_confirmation=None,
+    )
+    assert decision.mode == FlowMode.SUPPORT
+    assert decision.rule_id == "default_support"
+    assert decision.trigger_type == "always"
 
 
 # ---- Normalization helper ----------------------------------------------

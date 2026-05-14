@@ -514,6 +514,10 @@ class ConversationRunner:
         # Wrapped in try/except so a malformed rule never crashes the
         # turn — the conversation just stays where the FSM put it.
         from atendia.state_machine.pipeline_evaluator import evaluate_pipeline_rules
+        # rules_evaluated is captured for migration 045 so the DebugPanel
+        # can render per-rule pass/fail. None when evaluation never ran
+        # (e.g. evaluator raised below).
+        rules_evaluated_payload: list[dict] | None = None
         try:
             rules_result = await evaluate_pipeline_rules(
                 self._session,
@@ -521,6 +525,7 @@ class ConversationRunner:
                 pipeline,
                 trigger_event="field_updated",
             )
+            rules_evaluated_payload = rules_result.rules_evaluated
             if rules_result.moved and rules_result.to_stage:
                 # evaluate_pipeline_rules already persisted current_stage
                 # + stage_entered_at. Sync local vars so subsequent code
@@ -692,7 +697,7 @@ class ConversationRunner:
             # Mismatched legacy data shouldn't crash the runner — fall back to
             # defaults; SUPPORT mode handles unknown contexts gracefully.
             ext_fields = ExtractedFields()
-        flow_mode = pick_flow_mode(
+        flow_decision = pick_flow_mode(
             rules=pipeline.flow_mode_rules,
             extracted=ext_fields,
             nlu=nlu,
@@ -700,6 +705,11 @@ class ConversationRunner:
             inbound_text=inbound.text,
             pending_confirmation=pending_confirmation,
         )
+        flow_mode = flow_decision.mode
+        # Persisted into turn_traces.router_trigger so the DebugPanel can
+        # show the exact rule that fired (e.g. "doc_attachment" instead
+        # of inferring it from observable side-effects).
+        router_trigger = f"{flow_decision.rule_id}:{flow_decision.trigger_type}"
 
         # Fase 6 — stage-level override. When the just-entered stage
         # pins `behavior_mode`, it wins over the router's verdict.
@@ -1011,6 +1021,11 @@ class ConversationRunner:
 
         # Persist turn_trace
         latency_ms = int((time.perf_counter() - started) * 1000)
+        # Migration 045 — build the kb_evidence block from action_payload.
+        # FAQ matches and catalog results already carry faq_id /
+        # catalog_item_id / collection_id since the tool models were
+        # extended; we just project them into a stable UI-friendly shape.
+        kb_evidence = _build_kb_evidence(decision.action, action_payload)
         trace = TurnTrace(
             id=uuid4(),
             conversation_id=conversation_id,
@@ -1055,6 +1070,14 @@ class ConversationRunner:
                 composer_output.messages if composer_output is not None else None
             ),
             total_latency_ms=latency_ms,
+            # ── Migration 045 — DebugPanel observability ────────────────
+            router_trigger=router_trigger,
+            raw_llm_response=(
+                composer_output.raw_llm_response if composer_output is not None else None
+            ),
+            agent_id=(agent_row.id if agent_row is not None else None),
+            kb_evidence=kb_evidence,
+            rules_evaluated=rules_evaluated_payload,
         )
         self._session.add(trace)
         await self._session.flush()
@@ -1464,3 +1487,94 @@ def _agent_tone_to_register(value: str | None) -> str:
         "neutral": "neutral_es",
     }
     return mapping.get((value or "").lower(), "neutral_es")
+
+
+def _build_kb_evidence(action: str, action_payload: dict) -> dict | None:
+    """Migration 045 — normalize FAQ/catalog/quote results into a stable
+    DebugPanel-friendly shape.
+
+    Returns None when there's nothing knowledge-shaped to surface
+    (action is not a KB action, or the tool returned ToolNoDataResult).
+    The DebugPanel renders the KnowledgePanel based on this column —
+    callers don't need to re-derive it from composer_input.action_payload.
+
+    Shape:
+        {
+          "action": "lookup_faq" | "search_catalog" | "quote",
+          "hits": [
+            { "source_type": "faq",
+              "source_id": <uuid|null>,
+              "collection_id": <uuid|null>,
+              "title": <str>,
+              "preview": <str|null>,
+              "score": <float|null> }
+          ]
+        }
+    """
+    if not isinstance(action_payload, dict) or not action_payload:
+        return None
+
+    hits: list[dict] = []
+
+    matches = action_payload.get("matches")
+    if isinstance(matches, list):
+        for m in matches:
+            if not isinstance(m, dict):
+                continue
+            hits.append(
+                {
+                    "source_type": "faq",
+                    "source_id": m.get("faq_id"),
+                    "collection_id": m.get("collection_id"),
+                    "title": m.get("pregunta"),
+                    "preview": m.get("respuesta"),
+                    "score": m.get("score"),
+                },
+            )
+
+    results = action_payload.get("results")
+    if isinstance(results, list):
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+            hits.append(
+                {
+                    "source_type": "catalog",
+                    "source_id": r.get("catalog_item_id"),
+                    "collection_id": r.get("collection_id"),
+                    "title": r.get("name") or r.get("sku"),
+                    "preview": (
+                        f"${r['price_contado_mxn']}" if r.get("price_contado_mxn") else None
+                    ),
+                    "score": r.get("score"),
+                },
+            )
+
+    # Quote payloads carry a single record (sku/name + price + planes).
+    if action == "quote" and action_payload.get("status") == "ok":
+        hits.append(
+            {
+                "source_type": "quote",
+                "source_id": None,
+                "collection_id": None,
+                "title": action_payload.get("name") or action_payload.get("sku"),
+                "preview": (
+                    f"${action_payload['price_contado_mxn']}"
+                    if action_payload.get("price_contado_mxn")
+                    else None
+                ),
+                "score": None,
+            },
+        )
+
+    if not hits and action in ("lookup_faq", "search_catalog", "quote"):
+        # Tool ran but returned nothing — surface the hint so the
+        # operator sees "no FAQ above similarity threshold" instead of
+        # an empty panel.
+        hint = action_payload.get("hint") if isinstance(action_payload, dict) else None
+        return {"action": action, "hits": [], "empty_hint": hint}
+
+    if not hits:
+        return None
+
+    return {"action": action, "hits": hits}

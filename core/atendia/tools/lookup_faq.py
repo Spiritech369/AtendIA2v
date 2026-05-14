@@ -67,7 +67,13 @@ async def lookup_faq(
         stmt = stmt.where(TenantFAQ.collection_id.in_(collection_ids))
     rows = (await session.execute(stmt)).all()
     matches = [
-        FAQMatch(pregunta=faq.question, respuesta=faq.answer, score=float(score))
+        FAQMatch(
+            pregunta=faq.question,
+            respuesta=faq.answer,
+            score=float(score),
+            faq_id=faq.id,
+            collection_id=faq.collection_id,
+        )
         for faq, score in rows
         if float(score) >= score_threshold
     ]

@@ -42,6 +42,8 @@ def _to_result(item: TenantCatalogItem, *, score: float) -> CatalogResult:
         category=item.category or "",
         price_contado_mxn=Decimal(str(attrs.get("precio_contado", "0"))),
         score=score,
+        catalog_item_id=item.id,
+        collection_id=item.collection_id,
     )
 
 

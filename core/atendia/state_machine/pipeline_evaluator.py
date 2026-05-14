@@ -289,6 +289,10 @@ class EvaluationResult:
     from_stage: str | None = None
     to_stage: str | None = None
     matched_stage_ids: list[str] | None = None
+    # Migration 045 — every auto_enter_rule condition we evaluated this turn,
+    # with its pass/fail. Lets the DebugPanel render a per-rule audit so the
+    # operator can see exactly why a stage advanced (or didn't).
+    rules_evaluated: list[dict] | None = None
 
 
 def _merge_fields(
@@ -360,11 +364,26 @@ async def evaluate_pipeline_rules(
     # so we don't re-read the pipeline JSON per condition.
     docs_per_plan = pipeline.docs_per_plan or {}
 
-    # Run each enabled rule group; collect the stages that match.
+    # Run each enabled rule group; collect the stages that match. Along
+    # the way, record per-condition pass/fail into rules_evaluated so the
+    # DebugPanel can show the rule-by-rule outcome (migration 045).
     matching: list[StageDefinition] = []
+    rules_evaluated: list[dict] = []
     for stage in pipeline.stages:
         if not stage.auto_enter_rules:
             continue
+        for idx, cond in enumerate(stage.auto_enter_rules.conditions or []):
+            passed = evaluate_condition(cond, fields, docs_per_plan=docs_per_plan)
+            rules_evaluated.append(
+                {
+                    "stage_id": stage.id,
+                    "condition_index": idx,
+                    "operator": cond.operator,
+                    "field": cond.field,
+                    "value": cond.value,
+                    "passed": passed,
+                },
+            )
         if evaluate_rule_group(
             stage.auto_enter_rules,
             fields,
@@ -389,6 +408,7 @@ async def evaluate_pipeline_rules(
             ),
             from_stage=conv.current_stage,
             matched_stage_ids=matched_ids,
+            rules_evaluated=rules_evaluated,
         )
 
     if target.id == conv.current_stage:
@@ -397,6 +417,7 @@ async def evaluate_pipeline_rules(
             reason="already_in_stage",
             from_stage=conv.current_stage,
             matched_stage_ids=matched_ids,
+            rules_evaluated=rules_evaluated,
         )
 
     # Apply the transition. Both conversation and state are updated in
@@ -422,6 +443,7 @@ async def evaluate_pipeline_rules(
         from_stage=previous,
         to_stage=target.id,
         matched_stage_ids=matched_ids,
+        rules_evaluated=rules_evaluated,
     )
 
 

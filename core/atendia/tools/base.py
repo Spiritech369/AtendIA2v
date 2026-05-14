@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,10 +67,16 @@ class FAQMatch(BaseModel):
     Returned inside `lookup_faq()`'s response list. `score` is in [0, 1]
     (1 = identical embedding); the runner applies the design-doc threshold
     `score >= 0.5` before forwarding to Composer.
+
+    `faq_id` and `collection_id` (migration 045) let the DebugPanel
+    deep-link each hit back to the KB module so the operator can edit the
+    source row in one click. Both nullable to keep legacy callers working.
     """
     pregunta: str
     respuesta: str
     score: float
+    faq_id: UUID | None = None
+    collection_id: UUID | None = None
 
 
 class CatalogResult(BaseModel):
@@ -79,9 +86,14 @@ class CatalogResult(BaseModel):
     `search_catalog` is the browsing entry point ("muéstrame motonetas
     económicas"). Once the user picks one, the runner re-dispatches to
     `quote(sku=…)` for the full payload.
+
+    `catalog_item_id` and `collection_id` (migration 045) enable
+    DebugPanel deep-links the same way as FAQMatch.
     """
     sku: str
     name: str
     category: str
     price_contado_mxn: Decimal
     score: float
+    catalog_item_id: UUID | None = None
+    collection_id: UUID | None = None

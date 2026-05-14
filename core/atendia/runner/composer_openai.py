@@ -73,8 +73,13 @@ class OpenAIComposer:
                     response_format={"type": "json_schema", "json_schema": json_schema},
                     temperature=0,
                 )
-                raw = json.loads(resp.choices[0].message.content)
+                # Capture the raw JSON string before parsing — the
+                # DebugPanel uses this to spot post-processing bugs where
+                # the parsed output diverges from what the model said.
+                raw_text = resp.choices[0].message.content or ""
+                raw = json.loads(raw_text)
                 output = ComposerOutput.model_validate(raw)
+                output = output.model_copy(update={"raw_llm_response": raw_text})
                 usage = UsageMetadata(
                     model=resp.model,
                     tokens_in=resp.usage.prompt_tokens,

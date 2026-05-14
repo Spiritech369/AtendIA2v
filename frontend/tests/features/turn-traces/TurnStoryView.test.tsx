@@ -24,48 +24,88 @@ describe("TurnStoryView", () => {
     expect(screen.getByText(/adjunto/i)).toBeInTheDocument();
   });
 
-  it("renders nlu intent + entities", () => {
+  it("renders nlu intent with a confidence bar and entity count", () => {
     const steps: StoryStep[] = [
-      { kind: "nlu", intent: "ask_price", extracted: { brand: "Honda" } },
+      { kind: "nlu", intent: "ask_price", confidence: 0.87, entityCount: 2 },
     ];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText(/Pidió precio/)).toBeInTheDocument();
-    expect(screen.getByText(/Honda/)).toBeInTheDocument();
+    expect(screen.getByText(/87%/)).toBeInTheDocument();
+    expect(screen.getByText(/2 entidades/)).toBeInTheDocument();
   });
 
-  it("renders mode badge label", () => {
-    const steps: StoryStep[] = [{ kind: "mode", mode: "SALES" }];
+  it("renders mode badge label and rationale", () => {
+    const steps: StoryStep[] = [
+      { kind: "mode", mode: "SALES", rationale: "acción decidida: quote" },
+    ];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText("Ventas")).toBeInTheDocument();
+    expect(screen.getByText(/quote/)).toBeInTheDocument();
   });
 
-  it("renders tool summary and error states", () => {
+  it("renders knowledge hits with score values", () => {
     const steps: StoryStep[] = [
       {
-        kind: "tool",
-        toolName: "search_catalog",
-        summary: "1 resultado: Civic",
-        error: null,
-      },
-      { kind: "tool", toolName: "quote", summary: "", error: "missing SKU" },
-    ];
-    render(<TurnStoryView steps={steps} />);
-    expect(screen.getByText(/Civic/)).toBeInTheDocument();
-    expect(screen.getByText(/missing SKU/)).toBeInTheDocument();
-  });
-
-  it("renders outbound previews", () => {
-    const steps: StoryStep[] = [
-      {
-        kind: "outbound",
-        count: 2,
-        previews: ["Saludo", "¿Apartas?"],
+        kind: "knowledge",
+        action: "lookup_faq",
+        hits: [
+          { source: "faq", title: "¿Aceptan transferencia?", score: 0.84 },
+          { source: "faq", title: "¿Cuál es el horario?", score: 0.71 },
+        ],
       },
     ];
     render(<TurnStoryView steps={steps} />);
-    expect(screen.getByText(/Envió 2 mensajes/)).toBeInTheDocument();
-    expect(screen.getByText(/Saludo/)).toBeInTheDocument();
-    expect(screen.getByText(/¿Apartas\?/)).toBeInTheDocument();
+    expect(screen.getByText(/Conocimiento consultado/)).toBeInTheDocument();
+    expect(screen.getByText(/transferencia/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.84/)).toBeInTheDocument();
+  });
+
+  it("renders knowledge emptyHint when no hits", () => {
+    const steps: StoryStep[] = [
+      {
+        kind: "knowledge",
+        action: "lookup_faq",
+        hits: [],
+        emptyHint: "no FAQ above similarity threshold 0.5",
+      },
+    ];
+    render(<TurnStoryView steps={steps} />);
+    expect(screen.getByText(/similarity threshold/i)).toBeInTheDocument();
+  });
+
+  it("renders composer outbound messages", () => {
+    const steps: StoryStep[] = [
+      {
+        kind: "composer",
+        model: "gpt-4o",
+        latencyMs: 1100,
+        costUsd: 0.0014,
+        messages: ["Saludo", "¿Apartas?"],
+        pendingConfirmation: null,
+        rawLlmResponse: null,
+      },
+    ];
+    render(<TurnStoryView steps={steps} />);
+    expect(screen.getByText("Saludo")).toBeInTheDocument();
+    expect(screen.getByText("¿Apartas?")).toBeInTheDocument();
+    expect(screen.getByText(/gpt-4o/)).toBeInTheDocument();
+  });
+
+  it("surfaces a raw-vs-final toggle when raw_llm_response differs from messages", () => {
+    const steps: StoryStep[] = [
+      {
+        kind: "composer",
+        model: "gpt-4o",
+        latencyMs: 1100,
+        costUsd: 0.0014,
+        messages: ["Saludo"],
+        pendingConfirmation: null,
+        // Raw differs (extra trailing chunk) — diff toggle should render.
+        rawLlmResponse: '{"messages":["Saludo"],"debug":"trailing"}',
+      },
+    ];
+    render(<TurnStoryView steps={steps} />);
+    expect(screen.getByText(/raw LLM/i)).toBeInTheDocument();
   });
 
   it("renders stage transition with from and to", () => {

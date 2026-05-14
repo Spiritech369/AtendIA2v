@@ -26,6 +26,30 @@ export interface ToolCallItem {
   called_at: string;
 }
 
+export interface KbEvidenceHit {
+  source_type: "faq" | "catalog" | "quote";
+  source_id: string | null;
+  collection_id: string | null;
+  title: string | null;
+  preview: string | null;
+  score: number | null;
+}
+
+export interface KbEvidence {
+  action: string;
+  hits: KbEvidenceHit[];
+  empty_hint?: string | null;
+}
+
+export interface RuleEvaluated {
+  stage_id: string;
+  condition_index: number;
+  operator: string;
+  field: string;
+  value: unknown;
+  passed: boolean;
+}
+
 export interface TurnTraceDetail extends TurnTraceListItem {
   inbound_text: string | null;
   nlu_input: Record<string, unknown> | null;
@@ -49,6 +73,13 @@ export interface TurnTraceDetail extends TurnTraceListItem {
   outbound_messages: unknown[] | null;
   errors: unknown[] | null;
   tool_calls: ToolCallItem[];
+  // Migration 045 — DebugPanel observability. Null on legacy rows
+  // recorded before the runner instrumentation landed.
+  router_trigger: string | null;
+  raw_llm_response: string | null;
+  agent_id: string | null;
+  kb_evidence: KbEvidence | null;
+  rules_evaluated: RuleEvaluated[] | null;
 }
 
 export const turnTracesApi = {
