@@ -1297,21 +1297,46 @@ async def reindex_chunk(chunk_id: str, _user: AuthenticatedUser) -> dict[str, st
 async def get_conflicts(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
-    tenant_id=Depends(current_tenant_id),
+    tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ConflictsResponse:
-    if not is_demo:
-        try:
-            total = (
-                await session.execute(
-                    sql_text("SELECT COUNT(*) FROM kb_conflicts WHERE tenant_id = :t"),
-                    {"t": str(tenant_id)},
-                )
-            ).scalar_one()
-        except Exception:
-            total = 0
-        return ConflictsResponse(items=[], total=total or 0)
-    return ConflictsResponse(items=CONFLICTS, total=len(CONFLICTS))
+    if is_demo:
+        return ConflictsResponse(items=CONFLICTS, total=len(CONFLICTS))
+
+    # Real tenants — read kb_conflicts rows in `open` state ordered by
+    # severity then recency. The shape returned to the UI maps several
+    # detection_type values onto the legacy "sources" list and uses the
+    # canonical recommended_resolution if present (Sprint B.3b).
+    rows = (
+        (
+            await session.execute(
+                sql_text(
+                    "SELECT id, title, severity, status, detection_type, "
+                    "entity_a_type, entity_b_type, suggested_priority "
+                    "FROM kb_conflicts WHERE tenant_id = :t "
+                    "ORDER BY CASE severity "
+                    "  WHEN 'critical' THEN 0 WHEN 'high' THEN 1 "
+                    "  WHEN 'medium' THEN 2 ELSE 3 END, "
+                    "created_at DESC LIMIT 100"
+                ),
+                {"t": str(tenant_id)},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    items = [
+        ConflictItem(
+            id=str(r["id"]),
+            title=r["title"],
+            severity=r["severity"],
+            sources=[r["entity_a_type"], r["entity_b_type"]],
+            status=r["status"],
+            recommended_resolution=(r["suggested_priority"] or "Revisar manualmente."),
+        )
+        for r in rows
+    ]
+    return ConflictsResponse(items=items, total=len(items))
 
 
 @router.post("/conflicts/{conflict_id}/resolve")
@@ -1323,7 +1348,60 @@ async def resolve_conflict(conflict_id: str, _user: AuthenticatedUser) -> dict[s
 async def get_audit_logs(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> AuditLogsResponse:
-    if not is_demo:
-        return AuditLogsResponse(items=[])
-    return AuditLogsResponse(items=AUDIT_LOGS)
+    if is_demo:
+        return AuditLogsResponse(items=AUDIT_LOGS)
+
+    # Real tenants — pull admin.kb.* events from the events table and
+    # render them as AuditLogItem rows. The actor lookup left-joins
+    # tenant_users so events without a user (system actions) still
+    # surface with a sensible "Sistema" label. Limit 50 — operators
+    # paginate by reloading the page; surfacing more than ~a screen
+    # of audit clutter doesn't help (Sprint B.3a).
+    rows = (
+        (
+            await session.execute(
+                sql_text(
+                    "SELECT e.id, e.type, e.payload, e.occurred_at, "
+                    "       COALESCE(u.email, '') AS actor_email "
+                    "FROM events e LEFT JOIN tenant_users u "
+                    "  ON u.id = e.actor_user_id "
+                    "WHERE e.tenant_id = :t AND e.type LIKE 'admin.kb.%' "
+                    "ORDER BY e.occurred_at DESC LIMIT 50"
+                ),
+                {"t": str(tenant_id)},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    items: list[AuditLogItem] = []
+    for r in rows:
+        payload = r["payload"] or {}
+        if isinstance(payload, str):
+            try:
+                import json as _json
+
+                payload = _json.loads(payload)
+            except Exception:
+                payload = {}
+        # `type` is "admin.kb.document.uploaded" → action is "kb.document.uploaded"
+        action = r["type"][len("admin.") :] if r["type"].startswith("admin.") else r["type"]
+        target = (
+            payload.get("filename")
+            or payload.get("title")
+            or payload.get("name")
+            or str(payload.get("document_id") or payload.get("id") or "")
+        )
+        items.append(
+            AuditLogItem(
+                id=str(r["id"]),
+                action=action,
+                actor=r["actor_email"] or "Sistema",
+                target=str(target),
+                created_at=r["occurred_at"].isoformat(),
+            )
+        )
+    return AuditLogsResponse(items=items)
