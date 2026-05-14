@@ -37,6 +37,12 @@ class TenantPipeline(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     definition: Mapped[dict] = mapped_column(JSONB, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    # Migration 046 — append-only history of previous definitions, capped
+    # at 10 entries by the route. Powers P1's version rollback UI:
+    # operators can list, diff, and restore prior saves. Each entry:
+    # {"index": int, "captured_at": ISO ts, "stage_count": int,
+    #  "captured_by": uuid-str | null, "definition": <full JSONB>}.
+    history: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

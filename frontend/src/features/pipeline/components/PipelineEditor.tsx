@@ -39,11 +39,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantsApi } from "@/features/config/api";
-import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
 
 import { AuditLogDrawer } from "./AuditLogDrawer";
 import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
+import { PipelineVersionHistoryButton } from "./PipelineVersionHistoryDrawer";
 import { RuleBuilder } from "./RuleBuilder";
 import { StageDeleteDialog } from "./StageDeleteDialog";
 import { UnsavedChangesGuard } from "./UnsavedChangesGuard";
@@ -69,10 +70,7 @@ export const OPERATORS_WITHOUT_VALUE: ReadonlySet<RuleOperator> = new Set([
   "docs_complete_for_plan",
 ]);
 
-export const OPERATORS_NEEDING_LIST: ReadonlySet<RuleOperator> = new Set([
-  "in",
-  "not_in",
-]);
+export const OPERATORS_NEEDING_LIST: ReadonlySet<RuleOperator> = new Set(["in", "not_in"]);
 
 export interface ConditionDraft {
   field: string;
@@ -112,14 +110,7 @@ export interface StageDraft {
 // Mirror of FlowMode in core/atendia/contracts/flow_mode.py. Kept as a
 // readonly tuple so the dropdown options stay in lockstep with both
 // validator branches.
-export const BEHAVIOR_MODES = [
-  "PLAN",
-  "SALES",
-  "DOC",
-  "OBSTACLE",
-  "RETENTION",
-  "SUPPORT",
-] as const;
+export const BEHAVIOR_MODES = ["PLAN", "SALES", "DOC", "OBSTACLE", "RETENTION", "SUPPORT"] as const;
 export type BehaviorMode = (typeof BEHAVIOR_MODES)[number];
 
 // Curated reasons surfaced in the dropdown. Operators can still type a
@@ -183,8 +174,14 @@ const DOC_KEY_RE = /^DOCS_[A-Z][A-Z0-9_]*$/;
 
 const STAGE_ID_RE = /^[a-z][a-z0-9_]{2,29}$/;
 const STAGE_COLORS = [
-  "#6366f1", "#3b82f6", "#10b981", "#f59e0b",
-  "#ef4444", "#8b5cf6", "#06b6d4", "#84cc16",
+  "#6366f1",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
 ];
 
 function defaultColor(idx: number): string {
@@ -211,7 +208,10 @@ function parseAutoEnterRules(raw: unknown): AutoEnterRulesDraft | undefined {
       const list = Array.isArray(co.value)
         ? co.value.map((x) => String(x))
         : typeof co.value === "string"
-          ? co.value.split(",").map((x) => x.trim()).filter(Boolean)
+          ? co.value
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean)
           : [];
       return [{ field: co.field, operator: op, value: list }];
     }
@@ -221,7 +221,9 @@ function parseAutoEnterRules(raw: unknown): AutoEnterRulesDraft | undefined {
   return { enabled, match, conditions };
 }
 
-function serializeAutoEnterRules(rules: AutoEnterRulesDraft | undefined): Record<string, unknown> | undefined {
+function serializeAutoEnterRules(
+  rules: AutoEnterRulesDraft | undefined,
+): Record<string, unknown> | undefined {
   if (!rules) return undefined;
   const conditions = rules.conditions.map((c) => {
     if (OPERATORS_WITHOUT_VALUE.has(c.operator)) {
@@ -232,7 +234,10 @@ function serializeAutoEnterRules(rules: AutoEnterRulesDraft | undefined): Record
       const list = Array.isArray(c.value)
         ? c.value
         : typeof c.value === "string"
-          ? c.value.split(",").map((x) => x.trim()).filter(Boolean)
+          ? c.value
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean)
           : [];
       return { field: c.field, operator: c.operator, value: list };
     }
@@ -352,9 +357,7 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
       label: d.label,
       ...(d.hint ? { hint: d.hint } : {}),
     })),
-    ...(Object.keys(visionMapping).length > 0
-      ? { vision_doc_mapping: visionMapping }
-      : {}),
+    ...(Object.keys(visionMapping).length > 0 ? { vision_doc_mapping: visionMapping } : {}),
     ...(draft.fallback ? { fallback: draft.fallback } : {}),
   };
 }
@@ -398,10 +401,7 @@ function validate(draft: PipelineDraft): string | null {
     }
     // Fase 6 — behavior_mode is open-set on the type but pinned to the
     // 6 known modes; reject typed-in JSON drift before save.
-    if (
-      s.behavior_mode &&
-      !(BEHAVIOR_MODES as readonly string[]).includes(s.behavior_mode)
-    ) {
+    if (s.behavior_mode && !(BEHAVIOR_MODES as readonly string[]).includes(s.behavior_mode)) {
       return `"${s.id}": behavior_mode "${s.behavior_mode}" no es uno de ${BEHAVIOR_MODES.join(", ")}.`;
     }
     // Fase 4 — handoff_reason without pause_bot_on_enter is a config
@@ -423,7 +423,10 @@ function validate(draft: PipelineDraft): string | null {
           const list = Array.isArray(c.value)
             ? c.value
             : typeof c.value === "string"
-              ? c.value.split(",").map((x) => x.trim()).filter(Boolean)
+              ? c.value
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean)
               : [];
           if (list.length === 0) {
             return `"${s.id}": condición #${i + 1} (${c.operator}) requiere una lista de valores.`;
@@ -503,9 +506,27 @@ export function PipelineEditor({ onClose }: Props) {
     } else if (query.isError) {
       const seed: PipelineDraft = {
         stages: [
-          { id: "nuevo", label: "Nuevo lead", timeout_hours: 24, is_terminal: false, color: "#6366f1" },
-          { id: "en_conversacion", label: "En conversación", timeout_hours: 12, is_terminal: false, color: "#3b82f6" },
-          { id: "propuesta", label: "Propuesta", timeout_hours: 48, is_terminal: false, color: "#f59e0b" },
+          {
+            id: "nuevo",
+            label: "Nuevo lead",
+            timeout_hours: 24,
+            is_terminal: false,
+            color: "#6366f1",
+          },
+          {
+            id: "en_conversacion",
+            label: "En conversación",
+            timeout_hours: 12,
+            is_terminal: false,
+            color: "#3b82f6",
+          },
+          {
+            id: "propuesta",
+            label: "Propuesta",
+            timeout_hours: 48,
+            is_terminal: false,
+            color: "#f59e0b",
+          },
         ],
         docs_per_plan: {},
         documents_catalog: [],
@@ -578,8 +599,7 @@ export function PipelineEditor({ onClose }: Props) {
       void qc.invalidateQueries({ queryKey: ["tenants", "pipeline"] });
       void qc.invalidateQueries({ queryKey: ["pipeline"] });
     },
-    onError: (e) =>
-      toast.error("No se pudo eliminar", { description: e.message }),
+    onError: (e) => toast.error("No se pudo eliminar", { description: e.message }),
   });
 
   if (query.isLoading || !draft) {
@@ -633,10 +653,7 @@ export function PipelineEditor({ onClose }: Props) {
       if (prev.documents_catalog.some((d) => d.key === key)) return prev;
       return {
         ...prev,
-        documents_catalog: [
-          ...prev.documents_catalog,
-          { key, label, hint: newDocHint.trim() },
-        ],
+        documents_catalog: [...prev.documents_catalog, { key, label, hint: newDocHint.trim() }],
       };
     });
     setNewDocLabel("");
@@ -669,7 +686,11 @@ export function PipelineEditor({ onClose }: Props) {
   // (they appear in `customer.attrs.plan_credito` exactly as the AI agent
   // extracted them — typically snake_case or short tokens).
   const normalizePlanName = (raw: string): string =>
-    raw.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+    raw
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
 
   const addPlan = () => {
     const name = normalizePlanName(newPlanName);
@@ -726,11 +747,7 @@ export function PipelineEditor({ onClose }: Props) {
     });
   };
 
-  const moveVisionDocKey = (
-    category: VisionCategoryKey,
-    idx: number,
-    delta: -1 | 1,
-  ) => {
+  const moveVisionDocKey = (category: VisionCategoryKey, idx: number, delta: -1 | 1) => {
     setDraft((prev) => {
       if (!prev) return prev;
       const current = prev.vision_doc_mapping[category] ?? [];
@@ -869,6 +886,10 @@ export function PipelineEditor({ onClose }: Props) {
             <Save className="mr-1 size-3" />
             {save.isPending ? "Guardando…" : "Guardar"}
           </Button>
+          {/* P1 — version history with rollback. Read-only browse for
+              everyone; the rollback action inside the drawer is admin-
+              gated by the backend so non-admins can still inspect. */}
+          <PipelineVersionHistoryButton />
           {/* Audit drawer trigger. Always visible — viewing history is
               a read-only action, no role gate. */}
           <Button
@@ -876,7 +897,7 @@ export function PipelineEditor({ onClose }: Props) {
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={() => setAuditOpen(true)}
-            title="Ver historial"
+            title="Ver auditoría"
           >
             <Clock className="size-3.5" />
           </Button>
@@ -918,10 +939,9 @@ export function PipelineEditor({ onClose }: Props) {
           <DialogHeader>
             <DialogTitle>¿Eliminar el pipeline?</DialogTitle>
             <DialogDescription>
-              Esto borra <span className="font-medium">todas las versiones</span> del
-              pipeline para este tenant. Las conversaciones existentes
-              conservarán su etapa actual, pero el bot dejará de procesar
-              nuevos turnos hasta que guardes un pipeline nuevo. No se puede
+              Esto borra <span className="font-medium">todas las versiones</span> del pipeline para
+              este tenant. Las conversaciones existentes conservarán su etapa actual, pero el bot
+              dejará de procesar nuevos turnos hasta que guardes un pipeline nuevo. No se puede
               deshacer.
             </DialogDescription>
           </DialogHeader>
@@ -946,9 +966,7 @@ export function PipelineEditor({ onClose }: Props) {
       </Dialog>
 
       <StageDeleteDialog
-        stage={
-          stagePendingDelete !== null ? draft.stages[stagePendingDelete] ?? null : null
-        }
+        stage={stagePendingDelete !== null ? (draft.stages[stagePendingDelete] ?? null) : null}
         onCancel={() => setStagePendingDelete(null)}
         onConfirm={() => {
           if (stagePendingDelete !== null) {
@@ -1079,7 +1097,9 @@ export function PipelineEditor({ onClose }: Props) {
                       className="text-destructive focus:text-destructive"
                       onClick={() => setStagePendingDelete(idx)}
                       disabled={!canEdit || draft.stages.length === 1}
-                      title={draft.stages.length === 1 ? "No puedes eliminar la última etapa" : undefined}
+                      title={
+                        draft.stages.length === 1 ? "No puedes eliminar la última etapa" : undefined
+                      }
                     >
                       <Trash2 className="mr-2 size-3.5" /> Eliminar etapa
                     </DropdownMenuItem>
@@ -1154,7 +1174,9 @@ export function PipelineEditor({ onClose }: Props) {
                       idError ? "border-destructive" : selected.id && "border-emerald-500",
                     )}
                     value={selected.id}
-                    onChange={(e) => updateStage(selectedIdx, { id: e.target.value.trim().toLowerCase() })}
+                    onChange={(e) =>
+                      updateStage(selectedIdx, { id: e.target.value.trim().toLowerCase() })
+                    }
                     placeholder="snake_case"
                     disabled={!canEdit}
                   />
@@ -1173,7 +1195,9 @@ export function PipelineEditor({ onClose }: Props) {
               <div>
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   timeout_hours{" "}
-                  <span className="font-mono normal-case text-muted-foreground/70">(0 = sin alerta, máx 8760)</span>
+                  <span className="font-mono normal-case text-muted-foreground/70">
+                    (0 = sin alerta, máx 8760)
+                  </span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -1186,7 +1210,9 @@ export function PipelineEditor({ onClose }: Props) {
                       timeoutError ? "border-destructive" : "border-emerald-500",
                     )}
                     value={selected.timeout_hours}
-                    onChange={(e) => updateStage(selectedIdx, { timeout_hours: Number(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      updateStage(selectedIdx, { timeout_hours: Number(e.target.value) || 0 })
+                    }
                     disabled={!canEdit}
                   />
                   <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
@@ -1197,7 +1223,9 @@ export function PipelineEditor({ onClose }: Props) {
                     )}
                   </span>
                 </div>
-                {timeoutError && <p className="mt-0.5 text-[10px] text-destructive">{timeoutError}</p>}
+                {timeoutError && (
+                  <p className="mt-0.5 text-[10px] text-destructive">{timeoutError}</p>
+                )}
               </div>
 
               {/* is_terminal toggle */}
@@ -1261,9 +1289,7 @@ export function PipelineEditor({ onClose }: Props) {
                     )}
                   />
                 </button>
-                <Label className="text-xs">
-                  Permitir movimiento hacia atrás automático
-                </Label>
+                <Label className="text-xs">Permitir movimiento hacia atrás automático</Label>
               </div>
 
               {/* Fase 6 — behavior_mode dropdown. Empty = use the per-turn
@@ -1410,9 +1436,7 @@ export function PipelineEditor({ onClose }: Props) {
               <RuleBuilder
                 stageLabel={selected.label || selected.id}
                 rules={selected.auto_enter_rules}
-                onChange={(next) =>
-                  updateStage(selectedIdx, { auto_enter_rules: next })
-                }
+                onChange={(next) => updateStage(selectedIdx, { auto_enter_rules: next })}
                 disabled={!canEdit}
               />
             </div>
@@ -1428,9 +1452,7 @@ export function PipelineEditor({ onClose }: Props) {
                 stageLabel={selected.label || selected.id}
                 rules={selected.auto_enter_rules}
                 catalog={draft.documents_catalog}
-                onChange={(next) =>
-                  updateStage(selectedIdx, { auto_enter_rules: next })
-                }
+                onChange={(next) => updateStage(selectedIdx, { auto_enter_rules: next })}
                 disabled={!canEdit}
               />
             </div>
@@ -1444,7 +1466,11 @@ export function PipelineEditor({ onClose }: Props) {
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground"
             onClick={() => setShowJson((v) => !v)}
           >
-            {showJson ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {showJson ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
             <Code2 className="size-3.5" />
             Ver JSON del pipeline
           </button>
@@ -1478,16 +1504,19 @@ export function PipelineEditor({ onClose }: Props) {
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground"
             onClick={() => setShowDocsCatalog((v) => !v)}
           >
-            {showDocsCatalog ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {showDocsCatalog ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
             <FileText className="size-3.5" />
             Catálogo de documentos ({draft.documents_catalog.length})
           </button>
           {showDocsCatalog && (
             <div className="space-y-3 px-4 pb-4">
               <p className="text-[11px] text-muted-foreground">
-                Define los documentos que tus clientes deben subir. Cada
-                entrada se vuelve un checkbox en la sección "Documentos
-                requeridos" de cada etapa y aparece en el panel
+                Define los documentos que tus clientes deben subir. Cada entrada se vuelve un
+                checkbox en la sección "Documentos requeridos" de cada etapa y aparece en el panel
                 "Documentos" del contacto.
               </p>
 
@@ -1495,10 +1524,7 @@ export function PipelineEditor({ onClose }: Props) {
               {draft.documents_catalog.length > 0 && (
                 <div className="space-y-1.5">
                   {draft.documents_catalog.map((doc, idx) => (
-                    <div
-                      key={doc.key}
-                      className="rounded-md border bg-card p-2"
-                    >
+                    <div key={doc.key} className="rounded-md border bg-card p-2">
                       <div className="mb-1.5 flex items-center justify-between gap-2">
                         <code className="truncate font-mono text-[10px] text-muted-foreground">
                           {doc.key}
@@ -1567,11 +1593,7 @@ export function PipelineEditor({ onClose }: Props) {
                         placeholder="Ej. CURP, Comprobante de ingresos"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            newDocLabel.trim() &&
-                            !previewCollides
-                          ) {
+                          if (e.key === "Enter" && newDocLabel.trim() && !previewCollides) {
                             e.preventDefault();
                             addDoc();
                           }
@@ -1581,14 +1603,16 @@ export function PipelineEditor({ onClose }: Props) {
                         <p
                           className={cn(
                             "mt-1 text-[10px]",
-                            previewCollides
-                              ? "text-destructive"
-                              : "text-muted-foreground",
+                            previewCollides ? "text-destructive" : "text-muted-foreground",
                           )}
                         >
-                          {previewCollides
-                            ? `Ya existe un documento con el ID ${previewKey}. Renómbralo.`
-                            : <>ID interno: <code className="font-mono">{previewKey}</code></>}
+                          {previewCollides ? (
+                            `Ya existe un documento con el ID ${previewKey}. Renómbralo.`
+                          ) : (
+                            <>
+                              ID interno: <code className="font-mono">{previewKey}</code>
+                            </>
+                          )}
                         </p>
                       )}
                     </div>
@@ -1602,20 +1626,15 @@ export function PipelineEditor({ onClose }: Props) {
                         placeholder="Ej. Recibo CFE / agua, no mayor a 3 meses"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            newDocLabel.trim() &&
-                            !previewCollides
-                          ) {
+                          if (e.key === "Enter" && newDocLabel.trim() && !previewCollides) {
                             e.preventDefault();
                             addDoc();
                           }
                         }}
                       />
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        Aparece en gris debajo del nombre. Útil para
-                        aclarar "qué versión exactamente" sin meterlo en
-                        el nombre.
+                        Aparece en gris debajo del nombre. Útil para aclarar "qué versión
+                        exactamente" sin meterlo en el nombre.
                       </p>
                     </div>
                     <Button
@@ -1635,9 +1654,9 @@ export function PipelineEditor({ onClose }: Props) {
 
               {draft.documents_catalog.length === 0 && (
                 <p className="text-[11px] italic text-muted-foreground">
-                  Aún no defines documentos. Agrega el primero arriba —
-                  cuando guardes el pipeline aparecerán como checkboxes en
-                  cada etapa para que marques cuáles requiere cada una.
+                  Aún no defines documentos. Agrega el primero arriba — cuando guardes el pipeline
+                  aparecerán como checkboxes en cada etapa para que marques cuáles requiere cada
+                  una.
                 </p>
               )}
             </div>
@@ -1654,7 +1673,11 @@ export function PipelineEditor({ onClose }: Props) {
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground"
             onClick={() => setShowDocsByPlan((v) => !v)}
           >
-            {showDocsByPlan ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {showDocsByPlan ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
             <FileText className="size-3.5" />
             Documentos por plan de crédito ({Object.keys(draft.docs_per_plan).length})
           </button>
@@ -1662,10 +1685,9 @@ export function PipelineEditor({ onClose }: Props) {
             <div className="space-y-3 px-4 pb-4">
               <p className="text-[11px] text-muted-foreground">
                 Por cada plan que tu agente identifica (campo{" "}
-                <code className="rounded bg-muted px-1 text-[10px]">plan_credito</code>),
-                marca los documentos del catálogo que el cliente debe entregar.
-                La regla "tiene todos los docs del plan completos" usa
-                exactamente este mapa.
+                <code className="rounded bg-muted px-1 text-[10px]">plan_credito</code>), marca los
+                documentos del catálogo que el cliente debe entregar. La regla "tiene todos los docs
+                del plan completos" usa exactamente este mapa.
               </p>
 
               {Object.keys(draft.docs_per_plan).length === 0 && (
@@ -1677,9 +1699,7 @@ export function PipelineEditor({ onClose }: Props) {
               {Object.entries(draft.docs_per_plan).map(([plan, docKeys]) => (
                 <div key={plan} className="rounded-md border bg-card p-2">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <code className="font-mono text-[11px] font-semibold">
-                      {plan}
-                    </code>
+                    <code className="font-mono text-[11px] font-semibold">{plan}</code>
                     <span className="text-[10px] text-muted-foreground">
                       {(docKeys || []).length} doc(s)
                     </span>
@@ -1730,9 +1750,7 @@ export function PipelineEditor({ onClose }: Props) {
                               {checked ? "✓" : ""}
                             </span>
                             <span className="flex-1">
-                              <span className="block font-medium text-foreground">
-                                {doc.label}
-                              </span>
+                              <span className="block font-medium text-foreground">{doc.label}</span>
                               <span className="block font-mono text-[9px] text-muted-foreground">
                                 {doc.key}
                               </span>
@@ -1748,9 +1766,7 @@ export function PipelineEditor({ onClose }: Props) {
               {canEdit && (
                 <div className="flex items-end gap-2 rounded-md border border-dashed bg-muted/20 p-2">
                   <div className="flex-1">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Nuevo plan
-                    </Label>
+                    <Label className="text-[10px] text-muted-foreground">Nuevo plan</Label>
                     <Input
                       value={newPlanName}
                       onChange={(e) => setNewPlanName(e.target.value)}
@@ -1764,8 +1780,8 @@ export function PipelineEditor({ onClose }: Props) {
                       }}
                     />
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      El nombre debe coincidir con el valor que tu agente
-                      escribe en <code>plan_credito</code>.
+                      El nombre debe coincidir con el valor que tu agente escribe en{" "}
+                      <code>plan_credito</code>.
                     </p>
                   </div>
                   <Button
@@ -1795,7 +1811,11 @@ export function PipelineEditor({ onClose }: Props) {
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium"
             onClick={() => setShowVisionMapping((v) => !v)}
           >
-            {showVisionMapping ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {showVisionMapping ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
             Auto-marcado de documentos con Vision (
             {Object.values(draft.vision_doc_mapping ?? {}).reduce(
               (acc, list) => acc + (Array.isArray(list) ? list.length : 0),
@@ -1807,14 +1827,12 @@ export function PipelineEditor({ onClose }: Props) {
           {showVisionMapping && (
             <div className="space-y-3 px-4 pb-4">
               <p className="text-[10px] text-muted-foreground">
-                Cuando Vision clasifica una imagen como una de estas
-                categorías, el bot escribe automáticamente los DOCS_*
-                seleccionados con <code>status=ok</code> (o{" "}
-                <code>rejected</code>+motivo si la calidad falla). Si
-                dejas la lista vacía, el bot solo emite el evento y el
-                operador marca manualmente. <strong>Para INE</strong>: el
-                primer DOCS_* en orden = lado frente, el segundo = lado
-                reverso (Vision detecta el lado).
+                Cuando Vision clasifica una imagen como una de estas categorías, el bot escribe
+                automáticamente los DOCS_* seleccionados con <code>status=ok</code> (o{" "}
+                <code>rejected</code>+motivo si la calidad falla). Si dejas la lista vacía, el bot
+                solo emite el evento y el operador marca manualmente. <strong>Para INE</strong>: el
+                primer DOCS_* en orden = lado frente, el segundo = lado reverso (Vision detecta el
+                lado).
               </p>
 
               {VISION_CATEGORIES.map((cat) => {
@@ -1827,9 +1845,7 @@ export function PipelineEditor({ onClose }: Props) {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <span className="text-xs font-medium">
-                          {VISION_CATEGORY_LABELS[cat]}
-                        </span>
+                        <span className="text-xs font-medium">{VISION_CATEGORY_LABELS[cat]}</span>
                         <span className="ml-2 font-mono text-[9px] text-muted-foreground">
                           {cat}
                         </span>
@@ -1847,9 +1863,7 @@ export function PipelineEditor({ onClose }: Props) {
                     {assigned.length > 0 && (
                       <ol className="mt-2 space-y-1">
                         {assigned.map((docKey, idx) => {
-                          const spec = draft.documents_catalog.find(
-                            (d) => d.key === docKey,
-                          );
+                          const spec = draft.documents_catalog.find((d) => d.key === docKey);
                           const sideHint =
                             cat === "ine"
                               ? idx === 0
@@ -1945,8 +1959,8 @@ export function PipelineEditor({ onClose }: Props) {
 
         {/* Footer note */}
         <p className="px-4 pb-4 pt-2 text-[10px] text-muted-foreground">
-          Cada guardado crea una nueva versión. Las conversaciones en etapas eliminadas
-          aparecerán como huérfanas en el Pipeline hasta ser movidas.
+          Cada guardado crea una nueva versión. Las conversaciones en etapas eliminadas aparecerán
+          como huérfanas en el Pipeline hasta ser movidas.
         </p>
       </div>
     </div>

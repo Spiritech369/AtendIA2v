@@ -104,6 +104,47 @@ async def get_pipeline(
     )
 
 
+HISTORY_CAP = 10
+
+
+def _stage_count(definition: dict | None) -> int:
+    if not isinstance(definition, dict):
+        return 0
+    stages = definition.get("stages")
+    return len(stages) if isinstance(stages, list) else 0
+
+
+def _next_history_index(history: list | None) -> int:
+    """One-up counter across the entire history so indices are stable
+    even after the cap drops old entries."""
+    if not isinstance(history, list) or not history:
+        return 1
+    indices = [
+        int(entry.get("index"))
+        for entry in history
+        if isinstance(entry, dict) and isinstance(entry.get("index"), int)
+    ]
+    return max(indices, default=0) + 1
+
+
+def _push_history(
+    history: list | None,
+    *,
+    definition: dict,
+    user: AuthUser | None,
+) -> list:
+    """Prepend a snapshot of `definition` to history, cap at HISTORY_CAP."""
+    history = list(history or [])
+    entry = {
+        "index": _next_history_index(history),
+        "captured_at": datetime.now(UTC).isoformat(),
+        "captured_by": str(user.user_id) if user is not None else None,
+        "stage_count": _stage_count(definition),
+        "definition": definition,
+    }
+    return [entry, *history][:HISTORY_CAP]
+
+
 @router.put("/pipeline", response_model=PipelineResponse)
 async def put_pipeline(
     body: PipelinePutBody,
@@ -115,9 +156,11 @@ async def put_pipeline(
     # `tenant_pipelines`. The previous design created a fresh row per
     # save to preserve history, but that drift accumulated unbounded
     # versions in production and confused operators who saw old data
-    # via the audit log. Audit trail still lives in `admin_events`
-    # (the `pipeline.saved` event below carries `stage_ids`) — the row
-    # in `tenant_pipelines` is just "the current definition".
+    # via the audit log. P1 reintroduces snapshot history *inline* on
+    # the row (history JSONB column, capped at 10) so version rollback
+    # works without bringing back row drift. The current row's
+    # `definition` is always the live state; `history[0]` is the same
+    # snapshot, `history[1+]` are older saves in newest-first order.
     existing = (
         await session.execute(
             select(TenantPipeline)
@@ -133,10 +176,14 @@ async def put_pipeline(
             version=1,
             definition=body.definition,
             active=True,
+            history=_push_history([], definition=body.definition, user=user),
         )
         session.add(new_row)
         new_version = 1
     else:
+        existing.history = _push_history(
+            existing.history, definition=body.definition, user=user
+        )
         existing.definition = body.definition
         existing.active = True
         new_row = existing
@@ -175,6 +222,202 @@ async def put_pipeline(
         definition=new_row.definition,
         active=new_row.active,
         created_at=new_row.created_at,
+    )
+
+
+# ── Pipeline versions (P1) ───────────────────────────────────────────
+
+
+class PipelineVersionListItem(BaseModel):
+    """Metadata for one snapshot in `tenant_pipelines.history`. The
+    `definition` payload is NOT included to keep the list view cheap —
+    callers fetch the full snapshot via the detail endpoint when the
+    operator drills in."""
+
+    index: int
+    captured_at: datetime
+    captured_by: UUID | None
+    stage_count: int
+    is_current: bool
+
+
+class PipelineVersionDetail(BaseModel):
+    index: int
+    captured_at: datetime
+    captured_by: UUID | None
+    stage_count: int
+    is_current: bool
+    definition: dict
+
+
+class PipelineRollbackBody(BaseModel):
+    index: int = Field(..., ge=1)
+
+
+async def _load_pipeline_row(
+    session: AsyncSession, tenant_id: UUID
+) -> TenantPipeline:
+    row = (
+        await session.execute(
+            select(TenantPipeline)
+            .where(TenantPipeline.tenant_id == tenant_id)
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no pipeline for tenant")
+    return row
+
+
+def _history_entries(row: TenantPipeline) -> list[dict]:
+    return list(row.history or [])
+
+
+@router.get(
+    "/pipeline/versions",
+    response_model=list[PipelineVersionListItem],
+)
+async def list_pipeline_versions(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[PipelineVersionListItem]:
+    row = await _load_pipeline_row(session, tenant_id)
+    entries = _history_entries(row)
+    if not entries:
+        return []
+    current_index = max(
+        (int(e.get("index", 0)) for e in entries if isinstance(e, dict)),
+        default=0,
+    )
+    out: list[PipelineVersionListItem] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        idx = int(entry.get("index") or 0)
+        captured_by_raw = entry.get("captured_by")
+        try:
+            captured_by = UUID(captured_by_raw) if captured_by_raw else None
+        except (TypeError, ValueError):
+            captured_by = None
+        out.append(
+            PipelineVersionListItem(
+                index=idx,
+                captured_at=datetime.fromisoformat(entry["captured_at"]),
+                captured_by=captured_by,
+                stage_count=int(entry.get("stage_count") or 0),
+                is_current=idx == current_index,
+            )
+        )
+    return out
+
+
+@router.get(
+    "/pipeline/versions/{index}",
+    response_model=PipelineVersionDetail,
+)
+async def get_pipeline_version(
+    index: int,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> PipelineVersionDetail:
+    row = await _load_pipeline_row(session, tenant_id)
+    entries = _history_entries(row)
+    target = next(
+        (e for e in entries if isinstance(e, dict) and int(e.get("index") or 0) == index),
+        None,
+    )
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"version index {index} not found")
+    current_index = max(
+        (int(e.get("index", 0)) for e in entries if isinstance(e, dict)),
+        default=0,
+    )
+    captured_by_raw = target.get("captured_by")
+    try:
+        captured_by = UUID(captured_by_raw) if captured_by_raw else None
+    except (TypeError, ValueError):
+        captured_by = None
+    return PipelineVersionDetail(
+        index=index,
+        captured_at=datetime.fromisoformat(target["captured_at"]),
+        captured_by=captured_by,
+        stage_count=int(target.get("stage_count") or 0),
+        is_current=index == current_index,
+        definition=target.get("definition") or {},
+    )
+
+
+@router.post("/pipeline/rollback", response_model=PipelineResponse)
+async def rollback_pipeline(
+    body: PipelineRollbackBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> PipelineResponse:
+    """Restore the pipeline definition to the snapshot at `history.index`.
+
+    Implementation parity with `put_pipeline`: the chosen definition is
+    pushed as a fresh history entry (so the operator can roll forward
+    again later) and written to `definition` for the runner to pick up.
+    Returns 409 if the chosen index is already the current snapshot —
+    avoids a no-op write that would still bump history.
+    """
+    row = await _load_pipeline_row(session, tenant_id)
+    entries = _history_entries(row)
+    target = next(
+        (e for e in entries if isinstance(e, dict) and int(e.get("index") or 0) == body.index),
+        None,
+    )
+    if target is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"version index {body.index} not found"
+        )
+    current_index = max(
+        (int(e.get("index", 0)) for e in entries if isinstance(e, dict)),
+        default=0,
+    )
+    if body.index == current_index:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "the requested version is already the current snapshot",
+        )
+
+    restored_definition = target.get("definition") or {}
+    row.history = _push_history(
+        row.history, definition=restored_definition, user=user
+    )
+    row.definition = restored_definition
+    row.active = True
+
+    stage_ids = [
+        str(s.get("id"))
+        for s in (restored_definition.get("stages") or [])
+        if isinstance(s, dict) and isinstance(s.get("id"), str)
+    ]
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="pipeline.rolled_back",
+        payload={
+            "rolled_back_to_index": body.index,
+            "stage_count": len(stage_ids),
+            "stage_ids": stage_ids,
+        },
+    )
+    await session.commit()
+    await session.refresh(row)
+    await _broadcast_pipeline_change(
+        tenant_id, version=row.version, stage_ids=stage_ids
+    )
+    return PipelineResponse(
+        version=row.version,
+        definition=row.definition,
+        active=row.active,
+        created_at=row.created_at,
     )
 
 

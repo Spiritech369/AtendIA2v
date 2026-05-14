@@ -67,6 +67,23 @@ export interface AuditLogResponse {
   has_more: boolean;
 }
 
+// P1 — pipeline version history. Each PUT snapshots the new definition
+// into `tenant_pipelines.history` (capped at 10 by the backend). The
+// list endpoint returns metadata only; the detail endpoint returns the
+// full nested definition for diff/restore.
+
+export interface PipelineVersionListItem {
+  index: number;
+  captured_at: string;
+  captured_by: string | null;
+  stage_count: number;
+  is_current: boolean;
+}
+
+export interface PipelineVersionDetail extends PipelineVersionListItem {
+  definition: Record<string, unknown>;
+}
+
 export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
   putPipeline: async (definition: Record<string, unknown>) =>
@@ -75,9 +92,20 @@ export const tenantsApi = {
     await api.delete("/tenants/pipeline");
   },
   getStageImpact: async (stageId: string) =>
-    (await api.get<StageImpactResponse>(`/tenants/pipeline/impacted-references/${encodeURIComponent(stageId)}`)).data,
+    (
+      await api.get<StageImpactResponse>(
+        `/tenants/pipeline/impacted-references/${encodeURIComponent(stageId)}`,
+      )
+    ).data,
   getPipelineAuditLog: async (params?: { limit?: number; before?: string }) =>
     (await api.get<AuditLogResponse>(`/tenants/pipeline/audit-log`, { params })).data,
+  // P1 endpoints
+  listPipelineVersions: async () =>
+    (await api.get<PipelineVersionListItem[]>("/tenants/pipeline/versions")).data,
+  getPipelineVersion: async (index: number) =>
+    (await api.get<PipelineVersionDetail>(`/tenants/pipeline/versions/${index}`)).data,
+  rollbackPipeline: async (index: number) =>
+    (await api.post<PipelineResponse>("/tenants/pipeline/rollback", { index })).data,
   getBrandFacts: async () => (await api.get<BrandFactsResponse>("/tenants/brand-facts")).data,
   putBrandFacts: async (brand_facts: Record<string, string>) =>
     (await api.put<BrandFactsResponse>("/tenants/brand-facts", { brand_facts })).data,
