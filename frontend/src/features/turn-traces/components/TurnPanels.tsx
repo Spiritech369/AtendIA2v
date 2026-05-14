@@ -2,6 +2,8 @@
 // TurnTraceInspector. Each one is self-contained, vertical-agnostic
 // (no hardcoded field names), and degrades cleanly when its data is
 // missing from the trace.
+
+import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowRight,
@@ -537,19 +539,29 @@ export function RulesEvaluatedPanel({ trace }: { trace: TurnTraceDetail }) {
   );
 }
 
-// ── Agent badge (Migration 045) ─────────────────────────────────────
+// ── Agent badge (Migration 045 + A15 deep link) ─────────────────────
 
 export function AgentBadge({ trace }: { trace: TurnTraceDetail }) {
   if (!trace.agent_id) return null;
+  // A15 — deep link to the agent editor for the agent that handled
+  // this turn. Operator clicks the chip → lands in /agents/$id with
+  // the right row preselected so they can inspect prompt/guardrails/KB
+  // filter without having to navigate the agents page manually.
   return (
-    <Badge
-      variant="outline"
-      className="border-violet-500/40 bg-violet-500/10 text-violet-700 text-[10px] font-mono"
-      title={`agent_id ${trace.agent_id}`}
+    <Link
+      to="/agents/$agentId"
+      params={{ agentId: trace.agent_id }}
+      className="inline-block"
+      title={`Ver agente ${trace.agent_id}`}
     >
-      <Bot className="mr-1 h-3 w-3" />
-      Agente {trace.agent_id.slice(0, 8)}
-    </Badge>
+      <Badge
+        variant="outline"
+        className="border-violet-500/40 bg-violet-500/10 text-violet-700 text-[10px] font-mono hover:bg-violet-500/20 transition-colors"
+      >
+        <Bot className="mr-1 h-3 w-3" />
+        Agente {trace.agent_id.slice(0, 8)}
+      </Badge>
+    </Link>
   );
 }
 

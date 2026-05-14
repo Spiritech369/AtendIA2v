@@ -29,6 +29,7 @@ import { Route as authAnalyticsRouteImport } from './routes/(auth)/analytics'
 import { Route as authAgentsRouteImport } from './routes/(auth)/agents'
 import { Route as authCustomersCustomerIdRouteImport } from './routes/(auth)/customers.$customerId'
 import { Route as authConversationsConversationIdRouteImport } from './routes/(auth)/conversations.$conversationId'
+import { Route as authAgentsAgentIdRouteImport } from './routes/(auth)/agents.$agentId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -130,10 +131,15 @@ const authConversationsConversationIdRoute =
     path: '/conversations/$conversationId',
     getParentRoute: () => authRouteRoute,
   } as any)
+const authAgentsAgentIdRoute = authAgentsAgentIdRouteImport.update({
+  id: '/$agentId',
+  path: '/$agentId',
+  getParentRoute: () => authAgentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
-  '/agents': typeof authAgentsRoute
+  '/agents': typeof authAgentsRouteWithChildren
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
@@ -149,12 +155,13 @@ export interface FileRoutesByFullPath {
   '/users': typeof authUsersRoute
   '/workflows': typeof authWorkflowsRoute
   '/': typeof authIndexRoute
+  '/agents/$agentId': typeof authAgentsAgentIdRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/agents': typeof authAgentsRoute
+  '/agents': typeof authAgentsRouteWithChildren
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/users': typeof authUsersRoute
   '/workflows': typeof authWorkflowsRoute
   '/': typeof authIndexRoute
+  '/agents/$agentId': typeof authAgentsAgentIdRoute
   '/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
@@ -177,7 +185,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)': typeof authRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/(auth)/agents': typeof authAgentsRoute
+  '/(auth)/agents': typeof authAgentsRouteWithChildren
   '/(auth)/analytics': typeof authAnalyticsRoute
   '/(auth)/appointments': typeof authAppointmentsRoute
   '/(auth)/audit-log': typeof authAuditLogRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/(auth)/users': typeof authUsersRoute
   '/(auth)/workflows': typeof authWorkflowsRoute
   '/(auth)/': typeof authIndexRoute
+  '/(auth)/agents/$agentId': typeof authAgentsAgentIdRoute
   '/(auth)/conversations/$conversationId': typeof authConversationsConversationIdRoute
   '/(auth)/customers/$customerId': typeof authCustomersCustomerIdRoute
 }
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/workflows'
     | '/'
+    | '/agents/$agentId'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
   fileRoutesByTo: FileRoutesByTo
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/workflows'
     | '/'
+    | '/agents/$agentId'
     | '/conversations/$conversationId'
     | '/customers/$customerId'
   id:
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/(auth)/users'
     | '/(auth)/workflows'
     | '/(auth)/'
+    | '/(auth)/agents/$agentId'
     | '/(auth)/conversations/$conversationId'
     | '/(auth)/customers/$customerId'
   fileRoutesById: FileRoutesById
@@ -410,8 +422,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authConversationsConversationIdRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/agents/$agentId': {
+      id: '/(auth)/agents/$agentId'
+      path: '/$agentId'
+      fullPath: '/agents/$agentId'
+      preLoaderRoute: typeof authAgentsAgentIdRouteImport
+      parentRoute: typeof authAgentsRoute
+    }
   }
 }
+
+interface authAgentsRouteChildren {
+  authAgentsAgentIdRoute: typeof authAgentsAgentIdRoute
+}
+
+const authAgentsRouteChildren: authAgentsRouteChildren = {
+  authAgentsAgentIdRoute: authAgentsAgentIdRoute,
+}
+
+const authAgentsRouteWithChildren = authAgentsRoute._addFileChildren(
+  authAgentsRouteChildren,
+)
 
 interface authCustomersRouteChildren {
   authCustomersCustomerIdRoute: typeof authCustomersCustomerIdRoute
@@ -426,7 +457,7 @@ const authCustomersRouteWithChildren = authCustomersRoute._addFileChildren(
 )
 
 interface authRouteRouteChildren {
-  authAgentsRoute: typeof authAgentsRoute
+  authAgentsRoute: typeof authAgentsRouteWithChildren
   authAnalyticsRoute: typeof authAnalyticsRoute
   authAppointmentsRoute: typeof authAppointmentsRoute
   authAuditLogRoute: typeof authAuditLogRoute
@@ -446,7 +477,7 @@ interface authRouteRouteChildren {
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
-  authAgentsRoute: authAgentsRoute,
+  authAgentsRoute: authAgentsRouteWithChildren,
   authAnalyticsRoute: authAnalyticsRoute,
   authAppointmentsRoute: authAppointmentsRoute,
   authAuditLogRoute: authAuditLogRoute,

@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -1565,6 +1565,58 @@ async def get_agent_versions(
     return _item(row).versions
 
 
+# Fields persisted into each version's snapshot. Picked to be the
+# minimum config that the runner reads + the operator authors. Sub-table
+# relations (guardrails, extraction_fields) are NOT snapshotted yet —
+# they live in separate tables and need their own versioning story.
+_SNAPSHOT_FIELDS: tuple[str, ...] = (
+    "role",
+    "behavior_mode",
+    "goal",
+    "style",
+    "tone",
+    "language",
+    "max_sentences",
+    "no_emoji",
+    "return_to_flow",
+    "system_prompt",
+    "active_intents",
+    "knowledge_config",
+    "flow_mode_rules",
+)
+
+
+def _capture_agent_snapshot(row: Agent) -> dict:
+    """Take a serializable picture of the agent's current config so a future
+    rollback can restore it exactly."""
+    snap: dict = {}
+    for field_name in _SNAPSHOT_FIELDS:
+        value = getattr(row, field_name, None)
+        # Defensive deepcopy on dict/list so later edits don't mutate the
+        # snapshot stored in ops_config.
+        if isinstance(value, (dict, list)):
+            snap[field_name] = deepcopy(value)
+        else:
+            snap[field_name] = value
+    return snap
+
+
+def _restore_agent_snapshot(row: Agent, snapshot: dict) -> None:
+    """Apply a captured snapshot onto the agent row. Unknown keys are
+    ignored so legacy snapshots stay forward-compatible."""
+    for field_name in _SNAPSHOT_FIELDS:
+        if field_name in snapshot:
+            setattr(row, field_name, snapshot[field_name])
+
+
+class RollbackBody(BaseModel):
+    """POST /agents/{id}/rollback body. Empty body = roll back to the
+    most recent prior version. With `version_id` = roll back to that
+    exact version (must exist in ops_config.versions)."""
+
+    version_id: str | None = None
+
+
 @router.post("/{agent_id}/versions")
 async def create_agent_version(
     agent_id: UUID,
@@ -1574,16 +1626,22 @@ async def create_agent_version(
 ) -> dict:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
     ops = _merged_ops(row)
+    existing = ops.get("versions", []) or []
+    display_version = f"v{len(existing) + 1}"
     version = {
-        "id": f"v{len(ops.get('versions', [])) + 1}",
-        "version": f"v{len(ops.get('versions', [])) + 1}",
+        # `id` is a UUID so it's unique even when display strings repeat
+        # (publish never bumps row.version automatically). The DebugPanel
+        # + version history UI use this id when targeting a rollback.
+        "id": str(uuid4()),
+        "version": display_version,
         "status": "draft",
         "author": user.email,
         "reason": "Nueva versión manual",
         "created_at": datetime.now(UTC).isoformat(),
         "performance_impact": "pendiente",
+        "snapshot": _capture_agent_snapshot(row),
     }
-    ops["versions"] = [version, *ops.get("versions", [])]
+    ops["versions"] = [version, *existing]
     row.ops_config = ops
     row.updated_at = datetime.now(UTC)
     await session.commit()
@@ -1606,13 +1664,19 @@ async def publish_agent(
     ops = _merged_ops(row)
     ops["versions"] = [
         {
-            "id": row.version,
+            # `id` is a UUID so it's unique per publish — `row.version` is
+            # a display string the operator can repeat across releases.
+            "id": str(uuid4()),
             "version": row.version,
             "status": "production",
             "author": user.email,
             "reason": "Publicado desde Operations Center",
             "created_at": datetime.now(UTC).isoformat(),
             "performance_impact": "monitoreando",
+            # Capture the config that's going live so a future rollback
+            # can restore it byte-for-byte (snapshot stored inline in
+            # ops_config.versions[i].snapshot).
+            "snapshot": _capture_agent_snapshot(row),
         },
         *ops.get("versions", []),
     ][:8]
@@ -1633,20 +1697,63 @@ async def publish_agent(
 @router.post("/{agent_id}/rollback", response_model=AgentItem)
 async def rollback_agent(
     agent_id: UUID,
+    body: RollbackBody = Body(default_factory=RollbackBody),
     user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
+    """Restore the agent to a previously-published version.
+
+    With `version_id` in the body: targets that exact entry in
+    ops_config.versions. Without it: targets the second-most-recent
+    entry (rollback-to-previous). The target must carry a `snapshot`
+    field; legacy entries without one return 409 so the operator knows
+    history exists but isn't restorable yet.
+    """
     row = await _get_agent_or_404(session, agent_id, tenant_id)
-    row.version = "v2.3"
-    row.status = "validation"
+    ops = _merged_ops(row)
+    versions: list[dict] = ops.get("versions") or []
+
+    target: dict | None = None
+    if body.version_id:
+        target = next((v for v in versions if v.get("id") == body.version_id), None)
+        if target is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"version_id {body.version_id!r} not in agent history",
+            )
+    else:
+        # Default: previous published version (index 1 — index 0 is current).
+        if len(versions) >= 2:
+            target = versions[1]
+        else:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "no previous version to roll back to",
+            )
+
+    snapshot = target.get("snapshot")
+    if not isinstance(snapshot, dict):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "this version predates snapshot persistence and cannot be restored",
+        )
+
+    _restore_agent_snapshot(row, snapshot)
+    row.version = str(target.get("version") or target.get("id") or row.version)
+    row.status = "production"
     row.updated_at = datetime.now(UTC)
+
     await emit_admin_event(
         session,
         tenant_id=tenant_id,
         actor_user_id=user.user_id,
         action="agent.rolled_back",
-        payload={"agent_id": str(row.id), "version": row.version},
+        payload={
+            "agent_id": str(row.id),
+            "version": row.version,
+            "via_version_id": body.version_id,
+        },
     )
     await session.commit()
     await session.refresh(row)

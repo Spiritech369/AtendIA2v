@@ -1,4 +1,4 @@
-import { Background, Controls, MarkerType, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import { Background, Controls, type Edge, MarkerType, type Node, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -35,28 +35,29 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
+import { DemoBadge } from "@/components/DemoBadge";
+import { NYIButton } from "@/components/NYIButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  agentsApi,
   type AgentItem,
   type AgentPayload,
+  agentsApi,
   type DecisionMap,
   type ExtractionField,
   type Guardrail,
   type PreviewResult,
   type ValidationResult,
 } from "@/features/agents/api";
-import { DemoBadge } from "@/components/DemoBadge";
-import { NYIButton } from "@/components/NYIButton";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+import { VersionHistoryButton } from "./VersionHistoryDrawer";
 
 const roleOptions = [
   { value: "reception", label: "Recepcionista", detail: "Entrada, calificación y captura" },
@@ -92,13 +93,7 @@ const intentOptions = [
 // Wired tabs: each one reads or writes data the runner actually uses
 // on every inbound turn. Decision Map / Pruebas remain hidden until
 // their backends are real.
-const tabs = [
-  "Identidad",
-  "Guardrails",
-  "Knowledge",
-  "Monitor",
-  "Extracción",
-] as const;
+const tabs = ["Identidad", "Guardrails", "Knowledge", "Monitor", "Extracción"] as const;
 
 type AgentTab = (typeof tabs)[number];
 type ComparisonResult = Awaited<ReturnType<typeof agentsApi.compare>>;
@@ -224,7 +219,12 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={cn("min-w-0 rounded-lg border border-white/10 bg-slate-950/70 shadow-sm shadow-black/20", className)}>
+    <section
+      className={cn(
+        "min-w-0 rounded-lg border border-white/10 bg-slate-950/70 shadow-sm shadow-black/20",
+        className,
+      )}
+    >
       <div className="flex min-h-10 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
           {icon}
@@ -237,8 +237,25 @@ function Panel({
   );
 }
 
-function MetricTile({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail?: string; tone?: "good" | "warn" | "bad" | "neutral" }) {
-  const color = tone === "good" ? "text-emerald-300" : tone === "warn" ? "text-amber-300" : tone === "bad" ? "text-red-300" : "text-slate-100";
+function MetricTile({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "good" | "warn" | "bad" | "neutral";
+}) {
+  const color =
+    tone === "good"
+      ? "text-emerald-300"
+      : tone === "warn"
+        ? "text-amber-300"
+        : tone === "bad"
+          ? "text-red-300"
+          : "text-slate-100";
   return (
     <button
       type="button"
@@ -252,13 +269,7 @@ function MetricTile({ label, value, detail, tone = "neutral" }: { label: string;
   );
 }
 
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <button
       type="button"
@@ -269,7 +280,12 @@ function Toggle({
         checked ? "border-sky-300/60 bg-sky-500" : "border-white/15 bg-slate-800",
       )}
     >
-      <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition", checked ? "left-4" : "left-0.5")} />
+      <span
+        className={cn(
+          "absolute top-0.5 h-4 w-4 rounded-full bg-white transition",
+          checked ? "left-4" : "left-0.5",
+        )}
+      />
     </button>
   );
 }
@@ -289,7 +305,12 @@ function AgentCard({
   onCompare: () => void;
   onMenu: (event: React.MouseEvent) => void;
 }) {
-  const riskTone = agent.metrics.risk_score >= 70 ? "text-red-300" : agent.metrics.risk_score >= 45 ? "text-amber-300" : "text-emerald-300";
+  const riskTone =
+    agent.metrics.risk_score >= 70
+      ? "text-red-300"
+      : agent.metrics.risk_score >= 45
+        ? "text-amber-300"
+        : "text-emerald-300";
   return (
     <button
       type="button"
@@ -297,19 +318,32 @@ function AgentCard({
       onContextMenu={onMenu}
       className={cn(
         "group w-full rounded-lg border p-3 text-left transition",
-        selected ? "border-sky-400/70 bg-sky-500/10" : "border-white/10 bg-white/[0.035] hover:border-sky-400/40 hover:bg-sky-500/5",
+        selected
+          ? "border-sky-400/70 bg-sky-500/10"
+          : "border-white/10 bg-white/[0.035] hover:border-sky-400/40 hover:bg-sky-500/5",
         compareSelected && "ring-1 ring-amber-300/70",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className={cn("h-2 w-2 rounded-full", agent.status === "production" ? "bg-emerald-400" : agent.status === "paused" ? "bg-amber-400" : "bg-sky-400")} />
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                agent.status === "production"
+                  ? "bg-emerald-400"
+                  : agent.status === "paused"
+                    ? "bg-amber-400"
+                    : "bg-sky-400",
+              )}
+            />
             <span className="truncate text-sm font-semibold text-slate-100">{agent.name}</span>
           </div>
           <div className="mt-1 text-[11px] text-slate-400">{roleLabel(agent.role)}</div>
         </div>
-        <span className={cn("text-xl font-semibold leading-none", scoreTone(agent.health.score))}>{agent.health.score}</span>
+        <span className={cn("text-xl font-semibold leading-none", scoreTone(agent.health.score))}>
+          {agent.health.score}
+        </span>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
@@ -328,7 +362,10 @@ function AgentCard({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <Badge variant="outline" className={cn("h-5 border text-[10px]", statusClass(agent.status))}>
+        <Badge
+          variant="outline"
+          className={cn("h-5 border text-[10px]", statusClass(agent.status))}
+        >
           {statusLabel(agent.status)}
         </Badge>
         <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
@@ -347,7 +384,12 @@ function AgentCard({
                 onCompare();
               }
             }}
-            className={cn("grid h-6 w-6 place-items-center rounded border", compareSelected ? "border-amber-300 bg-amber-400/20 text-amber-100" : "border-white/10 text-slate-400")}
+            className={cn(
+              "grid h-6 w-6 place-items-center rounded border",
+              compareSelected
+                ? "border-amber-300 bg-amber-400/20 text-amber-100"
+                : "border-white/10 text-slate-400",
+            )}
             title="Comparar"
           >
             <Check className="h-3.5 w-3.5" />
@@ -425,12 +467,21 @@ function TopBar({
         <Search className="h-3.5 w-3.5" />
         Ctrl/Cmd+K para buscar acción, agente o prueba
       </button>
-      <Badge variant="outline" className="hidden h-7 border-emerald-400/30 bg-emerald-500/10 text-emerald-200 lg:flex">
+      <Badge
+        variant="outline"
+        className="hidden h-7 border-emerald-400/30 bg-emerald-500/10 text-emerald-200 lg:flex"
+      >
         En vivo
       </Badge>
       {selected ? (
-        <Badge variant="outline" className="hidden h-7 border-white/10 bg-white/[0.035] text-slate-200 md:flex">
-          Salud IA <span className={cn("ml-1 font-semibold", scoreTone(selected.health.score))}>{selected.health.score}/100</span>
+        <Badge
+          variant="outline"
+          className="hidden h-7 border-white/10 bg-white/[0.035] text-slate-200 md:flex"
+        >
+          Salud IA{" "}
+          <span className={cn("ml-1 font-semibold", scoreTone(selected.health.score))}>
+            {selected.health.score}/100
+          </span>
         </Badge>
       ) : null}
       {dirty ? (
@@ -438,19 +489,46 @@ function TopBar({
           Cambios sin guardar
         </Badge>
       ) : null}
-      <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onValidate} disabled={!selected}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+        onClick={onValidate}
+        disabled={!selected}
+      >
         <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
         Validar
       </Button>
-      <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onRollback} disabled={!selected}>
+      {selected && <VersionHistoryButton agent={selected} />}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+        onClick={onRollback}
+        disabled={!selected}
+      >
         <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
         Revertir
       </Button>
-      <Button size="sm" className="h-8 bg-sky-600 text-xs hover:bg-sky-500" onClick={onSave} disabled={!selected || !dirty || saving}>
-        {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+      <Button
+        size="sm"
+        className="h-8 bg-sky-600 text-xs hover:bg-sky-500"
+        onClick={onSave}
+        disabled={!selected || !dirty || saving}
+      >
+        {saving ? (
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Save className="mr-1.5 h-3.5 w-3.5" />
+        )}
         Guardar
       </Button>
-      <Button size="sm" className="h-8 bg-emerald-600 text-xs hover:bg-emerald-500" onClick={onPublish} disabled={!selected}>
+      <Button
+        size="sm"
+        className="h-8 bg-emerald-600 text-xs hover:bg-emerald-500"
+        onClick={onPublish}
+        disabled={!selected}
+      >
         <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
         Publicar
       </Button>
@@ -459,7 +537,13 @@ function TopBar({
         Nuevo
       </Button>
       {dirty ? (
-        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={onDiscard} title="Descartar cambios">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-slate-400"
+          onClick={onDiscard}
+          title="Descartar cambios"
+        >
           <X className="h-4 w-4" />
         </Button>
       ) : null}
@@ -486,7 +570,11 @@ function IdentityPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Nombre</span>
-          <Input value={draft.name} onChange={(event) => onChange({ name: event.target.value })} className="h-8 border-white/10 bg-black/20 text-sm text-slate-100" />
+          <Input
+            value={draft.name}
+            onChange={(event) => onChange({ name: event.target.value })}
+            className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
+          />
         </label>
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Rol</span>
@@ -518,8 +606,7 @@ function IdentityPanel({
             ))}
           </select>
           <span className="text-[10px] text-slate-500">
-            Registro emocional. Ej: cálido = "¡Qué gusto saludarte!".
-            Directo = "Sí, lo tenemos.".
+            Registro emocional. Ej: cálido = "¡Qué gusto saludarte!". Directo = "Sí, lo tenemos.".
           </span>
         </label>
         <label className="space-y-1.5">
@@ -533,8 +620,7 @@ function IdentityPanel({
             className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
           />
           <span className="text-[10px] text-slate-500">
-            Forma de redactar. Define largo de oración, vocabulario,
-            estructura.
+            Forma de redactar. Define largo de oración, vocabulario, estructura.
           </span>
         </label>
         <label className="space-y-1.5">
@@ -568,8 +654,7 @@ function IdentityPanel({
       </div>
       <label className="mt-3 block space-y-1.5">
         <span className="text-[11px] text-slate-400">
-          Objetivo operativo{" "}
-          <span className="text-slate-500">— qué debe lograr</span>
+          Objetivo operativo <span className="text-slate-500">— qué debe lograr</span>
         </span>
         <Textarea
           value={draft.goal ?? ""}
@@ -588,9 +673,7 @@ function IdentityPanel({
       <label className="mt-3 block space-y-1.5">
         <span className="text-[11px] text-slate-400">
           Prompt maestro{" "}
-          <span className="text-slate-500">
-            — instrucciones específicas para el LLM
-          </span>
+          <span className="text-slate-500">— instrucciones específicas para el LLM</span>
         </span>
         <Textarea
           value={draft.system_prompt ?? ""}
@@ -602,9 +685,8 @@ function IdentityPanel({
           className="min-h-32 border-white/10 bg-black/20 font-mono text-xs text-slate-100"
         />
         <span className="text-[10px] text-slate-500">
-          Es la fuente de verdad sobre cómo se comporta el agente.
-          Tono / estilo / objetivo se le suman al inicio; esto puede
-          sobrescribirlos si lo necesitas. Pruébalo con "Vista previa"
+          Es la fuente de verdad sobre cómo se comporta el agente. Tono / estilo / objetivo se le
+          suman al inicio; esto puede sobrescribirlos si lo necesitas. Pruébalo con "Vista previa"
           antes de guardar.
         </span>
       </label>
@@ -615,11 +697,17 @@ function IdentityPanel({
         </div>
         <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
           <span className="text-xs text-slate-300">Regresar al flujo</span>
-          <Toggle checked={draft.return_to_flow} onChange={(value) => onChange({ return_to_flow: value })} />
+          <Toggle
+            checked={draft.return_to_flow}
+            onChange={(value) => onChange({ return_to_flow: value })}
+          />
         </div>
         <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
           <span className="text-xs text-slate-300">Predeterminado</span>
-          <Toggle checked={draft.is_default} onChange={(value) => onChange({ is_default: value })} />
+          <Toggle
+            checked={draft.is_default}
+            onChange={(value) => onChange({ is_default: value })}
+          />
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -670,18 +758,13 @@ function WhatsAppPreview({
   };
 
   return (
-    <Panel
-      title="Vista previa"
-      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
-    >
+    <Panel title="Vista previa" icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}>
       {/* Input row — the operator types the customer message that would
           arrive on WhatsApp and the agent's response is generated live
           using the saved+draft identity (tono / estilo / objetivo /
           prompt maestro). */}
       <div className="space-y-1.5">
-        <span className="text-[11px] text-slate-400">
-          Simula el mensaje del cliente
-        </span>
+        <span className="text-[11px] text-slate-400">Simula el mensaje del cliente</span>
         <div className="flex gap-2">
           <Input
             value={previewMessage}
@@ -736,10 +819,9 @@ function WhatsAppPreview({
             </div>
           ) : (
             <p className="text-[11px] italic text-slate-400">
-              Escribe un mensaje y presiona Enter para ver la respuesta real
-              del agente. Usa los campos del panel "Identidad" (tono,
-              estilo, objetivo, prompt maestro) sin que tengas que mandar
-              WhatsApp.
+              Escribe un mensaje y presiona Enter para ver la respuesta real del agente. Usa los
+              campos del panel "Identidad" (tono, estilo, objetivo, prompt maestro) sin que tengas
+              que mandar WhatsApp.
             </p>
           )}
         </div>
@@ -770,9 +852,7 @@ function WhatsAppPreview({
       {/* System prompt the LLM actually saw, for transparency */}
       {preview?.systemPrompt ? (
         <details className="mt-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[10px]">
-          <summary className="cursor-pointer text-slate-400">
-            Prompt enviado al LLM
-          </summary>
+          <summary className="cursor-pointer text-slate-400">Prompt enviado al LLM</summary>
           <pre className="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[10px] text-slate-300">
             {preview.systemPrompt}
           </pre>
@@ -794,14 +874,13 @@ function ExtractionReadonlyPanel() {
       icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
     >
       <p className="text-[11px] text-slate-400">
-        La extracción real la maneja el pipeline (catálogo de documentos +
-        campos del cliente). Edítalos desde el editor del pipeline; aquí
-        verás reflejado lo que el agente entiende cuando llega un mensaje.
+        La extracción real la maneja el pipeline (catálogo de documentos + campos del cliente).
+        Edítalos desde el editor del pipeline; aquí verás reflejado lo que el agente entiende cuando
+        llega un mensaje.
       </p>
       <p className="mt-3 text-[11px] text-slate-500">
-        Vista de solo lectura. Próxima iteración: listar aquí los docs y
-        custom fields activos de tu pipeline para que confirmes qué
-        extrae el agente sin tener que abrir el editor.
+        Vista de solo lectura. Próxima iteración: listar aquí los docs y custom fields activos de tu
+        pipeline para que confirmes qué extrae el agente sin tener que abrir el editor.
       </p>
     </Panel>
   );
@@ -871,10 +950,9 @@ function GuardrailsRealPanel({
       }
     >
       <p className="mb-3 text-[11px] text-slate-400">
-        Reglas duras que se inyectan al prompt del LLM como restricciones.
-        Cada regla activa se agrega al system prompt como bullet con
-        prefijo "no puedes romper". Pruébalas en la vista previa antes de
-        guardar.
+        Reglas duras que se inyectan al prompt del LLM como restricciones. Cada regla activa se
+        agrega al system prompt como bullet con prefijo "no puedes romper". Pruébalas en la vista
+        previa antes de guardar.
       </p>
 
       {guardrails.length === 0 ? (
@@ -884,22 +962,15 @@ function GuardrailsRealPanel({
       ) : (
         <div className="space-y-2">
           {guardrails.map((g) => (
-            <div
-              key={g.id}
-              className="rounded-md border border-white/10 bg-black/20 p-2.5"
-            >
+            <div key={g.id} className="rounded-md border border-white/10 bg-black/20 p-2.5">
               <div className="mb-2 flex items-center gap-2">
                 <Toggle
                   checked={g.active}
-                  onChange={(value) =>
-                    updateGuardrail(g.id, { active: value })
-                  }
+                  onChange={(value) => updateGuardrail(g.id, { active: value })}
                 />
                 <Input
                   value={g.name}
-                  onChange={(e) =>
-                    updateGuardrail(g.id, { name: e.target.value })
-                  }
+                  onChange={(e) => updateGuardrail(g.id, { name: e.target.value })}
                   placeholder="Nombre corto (ej. No prometer aprobación)"
                   className="h-7 flex-1 border-white/10 bg-black/30 text-xs"
                 />
@@ -916,9 +987,7 @@ function GuardrailsRealPanel({
               </div>
               <Textarea
                 value={g.rule_text}
-                onChange={(e) =>
-                  updateGuardrail(g.id, { rule_text: e.target.value })
-                }
+                onChange={(e) => updateGuardrail(g.id, { rule_text: e.target.value })}
                 placeholder="Ej. Nunca prometas aprobación, tasa o monto sin validación humana."
                 rows={2}
                 className="min-h-16 border-white/10 bg-black/30 text-xs text-slate-100"
@@ -974,23 +1043,19 @@ function KnowledgeRealPanel({
   };
 
   return (
-    <Panel
-      title="Conocimiento"
-      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
-    >
+    <Panel title="Conocimiento" icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}>
       <p className="mb-3 text-[11px] text-slate-400">
-        Elige las colecciones de Conocimiento que este agente puede leer.
-        Cuando llegue un mensaje, el runner filtrará las FAQs y el
-        catálogo a estas colecciones — el resto del KB del tenant queda
-        invisible para este agente. Sin selección = acceso a todo.
+        Elige las colecciones de Conocimiento que este agente puede leer. Cuando llegue un mensaje,
+        el runner filtrará las FAQs y el catálogo a estas colecciones — el resto del KB del tenant
+        queda invisible para este agente. Sin selección = acceso a todo.
       </p>
 
       {isLoading ? (
         <p className="text-[11px] italic text-slate-500">Cargando colecciones…</p>
       ) : !collections || collections.length === 0 ? (
         <p className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] italic text-slate-500">
-          No hay colecciones definidas en Conocimiento todavía. Créalas
-          desde la sección Conocimiento y vuelve aquí para vincular.
+          No hay colecciones definidas en Conocimiento todavía. Créalas desde la sección
+          Conocimiento y vuelve aquí para vincular.
         </p>
       ) : (
         <div className="space-y-1.5">
@@ -1021,16 +1086,10 @@ function KnowledgeRealPanel({
                   {checked ? "✓" : ""}
                 </span>
                 <span className="flex-1">
-                  <span className="block font-medium text-slate-100">
-                    {c.name}
-                  </span>
-                  <span className="block font-mono text-[10px] text-slate-500">
-                    {c.slug}
-                  </span>
+                  <span className="block font-medium text-slate-100">{c.name}</span>
+                  <span className="block font-mono text-[10px] text-slate-500">{c.slug}</span>
                   {c.description ? (
-                    <span className="block text-[10px] text-slate-400">
-                      {c.description}
-                    </span>
+                    <span className="block text-[10px] text-slate-400">{c.description}</span>
                   ) : null}
                 </span>
               </button>
@@ -1057,8 +1116,7 @@ function MonitorRealPanel({ agentId }: { agentId: string }) {
     refetchInterval: 30_000,
   });
 
-  const fmtCost = (n: number) =>
-    `$${n.toFixed(4)} USD`;
+  const fmtCost = (n: number) => `$${n.toFixed(4)} USD`;
   const fmtRelative = (iso: string | null) => {
     if (!iso) return "sin actividad";
     const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -1069,10 +1127,7 @@ function MonitorRealPanel({ agentId }: { agentId: string }) {
   };
 
   return (
-    <Panel
-      title="Monitor"
-      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
-    >
+    <Panel title="Monitor" icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}>
       {isLoading || !data ? (
         <p className="text-[11px] italic text-slate-500">Cargando métricas…</p>
       ) : (
@@ -1086,9 +1141,7 @@ function MonitorRealPanel({ agentId }: { agentId: string }) {
             </div>
             <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
               <div className="text-slate-500">Turnos en 24h</div>
-              <div className="mt-1 text-base font-semibold text-slate-100">
-                {data.turns_24h}
-              </div>
+              <div className="mt-1 text-base font-semibold text-slate-100">{data.turns_24h}</div>
             </div>
             <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
               <div className="text-slate-500">Costo 24h</div>
@@ -1119,9 +1172,8 @@ function MonitorRealPanel({ agentId }: { agentId: string }) {
           </div>
           {data.covers_default_fallback ? (
             <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 text-[10px] text-amber-200">
-              Este agente está marcado como predeterminado: las métricas
-              incluyen conversaciones sin agente explícitamente asignado
-              que cayeron en él vía fallback.
+              Este agente está marcado como predeterminado: las métricas incluyen conversaciones sin
+              agente explícitamente asignado que cayeron en él vía fallback.
             </p>
           ) : null}
         </>
@@ -1146,7 +1198,12 @@ function GuardrailsPanel({
       title="Guardrails"
       icon={<ShieldCheck className="h-4 w-4 text-amber-300" />}
       action={
-        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onAdd}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={onAdd}
+        >
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Regla
         </Button>
@@ -1162,13 +1219,23 @@ function GuardrailsPanel({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{guardrail.name}</div>
-                <div className="mt-1 line-clamp-2 text-[11px] text-slate-300">{guardrail.rule_text}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] text-slate-300">
+                  {guardrail.rule_text}
+                </div>
               </div>
-              <Toggle checked={guardrail.active} onChange={() => toast.info("Edita la regla desde el menú contextual")} />
+              <Toggle
+                checked={guardrail.active}
+                onChange={() => toast.info("Edita la regla desde el menú contextual")}
+              />
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px]">
               <span>{guardrail.violation_count} violaciones</span>
-              <Button size="sm" variant="outline" className="h-7 border-white/10 bg-black/20 text-[11px]" onClick={() => onTest(guardrail)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-white/10 bg-black/20 text-[11px]"
+                onClick={() => onTest(guardrail)}
+              >
                 <TestTube2 className="mr-1 h-3 w-3" />
                 Probar
               </Button>
@@ -1196,7 +1263,12 @@ function ExtractionPanel({
       title="Extracción de campos"
       icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}
       action={
-        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onAdd}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={onAdd}
+        >
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Campo
         </Button>
@@ -1216,21 +1288,46 @@ function ExtractionPanel({
           </thead>
           <tbody>
             {fields.map((field) => (
-              <tr key={field.id} onContextMenu={(event) => onContext(event, field)} className="border-b border-white/5 text-slate-200">
+              <tr
+                key={field.id}
+                onContextMenu={(event) => onContext(event, field)}
+                className="border-b border-white/5 text-slate-200"
+              >
                 <td className="py-2 pr-3">
                   <div className="font-medium">{field.label}</div>
                   <div className="text-[10px] text-slate-500">{field.field_key}</div>
                 </td>
                 <td className="py-2 pr-3 text-slate-400">{field.type}</td>
-                <td className="py-2 pr-3 text-emerald-300">{pct((field.confidence ?? field.confidence_threshold) * 100)}</td>
-                <td className="py-2 pr-3">{field.auto_save ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> : <span className="text-slate-500">Pendiente</span>}</td>
+                <td className="py-2 pr-3 text-emerald-300">
+                  {pct((field.confidence ?? field.confidence_threshold) * 100)}
+                </td>
                 <td className="py-2 pr-3">
-                  <Badge variant="outline" className={cn("h-5 border text-[10px]", field.status === "pending" ? "border-amber-300/30 bg-amber-500/10 text-amber-200" : "border-emerald-300/30 bg-emerald-500/10 text-emerald-200")}>
+                  {field.auto_save ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                  ) : (
+                    <span className="text-slate-500">Pendiente</span>
+                  )}
+                </td>
+                <td className="py-2 pr-3">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "h-5 border text-[10px]",
+                      field.status === "pending"
+                        ? "border-amber-300/30 bg-amber-500/10 text-amber-200"
+                        : "border-emerald-300/30 bg-emerald-500/10 text-emerald-200",
+                    )}
+                  >
                     {field.status ?? "confirmed"}
                   </Badge>
                 </td>
                 <td className="py-2 text-right">
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px] text-sky-200" onClick={() => onTest(field)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[11px] text-sky-200"
+                    onClick={() => onTest(field)}
+                  >
                     Ver
                   </Button>
                 </td>
@@ -1249,21 +1346,49 @@ function MonitorPanel({ agent }: { agent: AgentItem }) {
   return (
     <Panel title="Monitor en vivo" icon={<Activity className="h-4 w-4 text-emerald-300" />}>
       <div className="grid gap-2 sm:grid-cols-3">
-        <MetricTile label="Conversaciones" value={String(monitor.conversations_active)} tone="neutral" />
-        <MetricTile label="Leads en riesgo" value={String(monitor.leads_at_risk)} tone={monitor.leads_at_risk > 6 ? "bad" : "warn"} />
-        <MetricTile label="Esperando humano" value={String(monitor.leads_waiting_human)} tone={monitor.leads_waiting_human > 4 ? "warn" : "good"} />
+        <MetricTile
+          label="Conversaciones"
+          value={String(monitor.conversations_active)}
+          tone="neutral"
+        />
+        <MetricTile
+          label="Leads en riesgo"
+          value={String(monitor.leads_at_risk)}
+          tone={monitor.leads_at_risk > 6 ? "bad" : "warn"}
+        />
+        <MetricTile
+          label="Esperando humano"
+          value={String(monitor.leads_waiting_human)}
+          tone={monitor.leads_waiting_human > 4 ? "warn" : "good"}
+        />
       </div>
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
         {risky.map((lead, index) => (
-          <div key={String(lead.id ?? index)} className="rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-xs">
+          <div
+            key={String(lead.id ?? index)}
+            className="rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-xs"
+          >
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-red-100">{String(lead.name ?? "Lead en riesgo")}</span>
-              <Badge variant="outline" className="border-red-300/30 text-red-200">{String(lead.risk ?? "Alto")}</Badge>
+              <span className="font-semibold text-red-100">
+                {String(lead.name ?? "Lead en riesgo")}
+              </span>
+              <Badge variant="outline" className="border-red-300/30 text-red-200">
+                {String(lead.risk ?? "Alto")}
+              </Badge>
             </div>
-            <div className="mt-2 text-slate-300">{String(lead.reason ?? "Documento incompleto")}</div>
+            <div className="mt-2 text-slate-300">
+              {String(lead.reason ?? "Documento incompleto")}
+            </div>
             <div className="mt-3 flex gap-2">
               <NYIButton label="Abrir" size="sm" />
-              <Button size="sm" variant="outline" className="h-7 border-white/10 bg-black/20 text-[11px]" onClick={() => toast.success("Asignado a humano")}>Asignar</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-white/10 bg-black/20 text-[11px]"
+                onClick={() => toast.success("Asignado a humano")}
+              >
+                Asignar
+              </Button>
             </div>
           </div>
         ))}
@@ -1284,7 +1409,10 @@ function SupervisorPanel({ agent }: { agent: AgentItem }) {
           ["Handoff correcto", pct(supervisor.handoff_correctness)],
           ["Extracción confiable", pct(supervisor.extraction_reliability)],
         ].map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+          <div
+            key={label}
+            className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+          >
             <span className="text-slate-400">{label}</span>
             <span className="font-semibold text-emerald-300">{value}</span>
           </div>
@@ -1303,21 +1431,42 @@ function SupervisorPanel({ agent }: { agent: AgentItem }) {
 function KnowledgePanel({ agent }: { agent: AgentItem }) {
   const coverage = agent.knowledge_coverage;
   return (
-    <Panel title="Cobertura de conocimiento" icon={<BrainCircuit className="h-4 w-4 text-violet-300" />}>
+    <Panel
+      title="Cobertura de conocimiento"
+      icon={<BrainCircuit className="h-4 w-4 text-violet-300" />}
+    >
       <div className="grid gap-2 sm:grid-cols-3">
-        <MetricTile label="Cobertura" value={pct(coverage.coverage)} tone={coverage.coverage >= 80 ? "good" : "warn"} />
+        <MetricTile
+          label="Cobertura"
+          value={pct(coverage.coverage)}
+          tone={coverage.coverage >= 80 ? "good" : "warn"}
+        />
         <MetricTile label="FAQ conectadas" value={String(coverage.faq_answered)} tone="good" />
-        <MetricTile label="Sin respuesta" value={String(coverage.unanswered_queries)} tone={coverage.unanswered_queries > 10 ? "warn" : "good"} />
+        <MetricTile
+          label="Sin respuesta"
+          value={String(coverage.unanswered_queries)}
+          tone={coverage.unanswered_queries > 10 ? "warn" : "good"}
+        />
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {coverage.weak_topics.map((topic) => (
-          <Badge key={topic} variant="outline" className="border-red-300/20 bg-red-500/10 text-[10px] text-red-200">
+          <Badge
+            key={topic}
+            variant="outline"
+            className="border-red-300/20 bg-red-500/10 text-[10px] text-red-200"
+          >
             {topic}
           </Badge>
         ))}
       </div>
       <div className="mt-3 flex gap-2">
-        <Button size="sm" className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500" onClick={() => toast.success("FAQ preparada")}>Agregar FAQ</Button>
+        <Button
+          size="sm"
+          className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500"
+          onClick={() => toast.success("FAQ preparada")}
+        >
+          Agregar FAQ
+        </Button>
         <NYIButton label="Subir documento" />
         <NYIButton label="Ver fallidas" />
       </div>
@@ -1340,7 +1489,9 @@ function toFlowNodes(map: DecisionMap): Node[] {
       data: { label: String(node.label ?? id) },
       style: {
         background: enabled ? "rgba(14, 165, 233, 0.16)" : "rgba(71, 85, 105, 0.35)",
-        border: enabled ? "1px solid rgba(125, 211, 252, 0.55)" : "1px solid rgba(148, 163, 184, 0.2)",
+        border: enabled
+          ? "1px solid rgba(125, 211, 252, 0.55)"
+          : "1px solid rgba(148, 163, 184, 0.2)",
         color: "#e2e8f0",
         borderRadius: 8,
         fontSize: 11,
@@ -1381,7 +1532,12 @@ function DecisionMapPanel({
       icon={<GitBranch className="h-4 w-4 text-violet-300" />}
       action={
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onValidate}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+            onClick={onValidate}
+          >
             Validar
           </Button>
           <Button size="sm" className="h-7 bg-sky-600 text-xs hover:bg-sky-500" onClick={onSave}>
@@ -1391,7 +1547,14 @@ function DecisionMapPanel({
       }
     >
       <div className="h-72 overflow-hidden rounded-lg border border-white/10 bg-slate-950">
-        <ReactFlow nodes={nodes} edges={edges} fitView nodesDraggable={false} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          nodesDraggable={false}
+          nodesConnectable={false}
+          proOptions={{ hideAttribution: true }}
+        >
           <Background color="rgba(148, 163, 184, 0.16)" gap={18} />
           <Controls showInteractive={false} />
         </ReactFlow>
@@ -1415,7 +1578,12 @@ function ScenarioPanel({
       title="Pruebas de escenarios"
       icon={<FlaskConical className="h-4 w-4 text-emerald-300" />}
       action={
-        <Button size="sm" variant="outline" className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={onStress}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={onStress}
+        >
           Ejecutar todas
         </Button>
       }
@@ -1430,14 +1598,26 @@ function ScenarioPanel({
               className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-left text-xs transition hover:border-sky-300/30"
             >
               <span className="text-slate-200">{scenario.name}</span>
-              <Badge variant="outline" className={cn("h-5 text-[10px]", scenario.status === "failed" ? "border-red-300/30 text-red-200" : scenario.status === "warning" || scenario.status === "risky" ? "border-amber-300/30 text-amber-200" : "border-emerald-300/30 text-emerald-200")}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "h-5 text-[10px]",
+                  scenario.status === "failed"
+                    ? "border-red-300/30 text-red-200"
+                    : scenario.status === "warning" || scenario.status === "risky"
+                      ? "border-amber-300/30 text-amber-200"
+                      : "border-emerald-300/30 text-emerald-200",
+                )}
+              >
                 {scenario.status}
               </Badge>
             </button>
           ))}
         </div>
         <div className="grid place-items-center rounded-lg border border-white/10 bg-white/[0.035] p-3 text-center">
-          <div className="grid h-24 w-24 place-items-center rounded-full border-8 border-emerald-400/70 text-2xl font-semibold text-slate-100">{agent.scenarios.length}</div>
+          <div className="grid h-24 w-24 place-items-center rounded-full border-8 border-emerald-400/70 text-2xl font-semibold text-slate-100">
+            {agent.scenarios.length}
+          </div>
           <div className="mt-2 text-xs text-slate-400">Escenarios</div>
           <div className="mt-1 text-[11px] text-emerald-300">{passed} aprobados</div>
         </div>
@@ -1449,21 +1629,49 @@ function ScenarioPanel({
 function ValidationPanel({ validation }: { validation: ValidationResult | null }) {
   if (!validation) {
     return (
-      <Panel title="Validación antes de publicar" icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}>
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">Sin validación reciente.</div>
+      <Panel
+        title="Validación antes de publicar"
+        icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}
+      >
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">
+          Sin validación reciente.
+        </div>
       </Panel>
     );
   }
   return (
-    <Panel title="Validación antes de publicar" icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}>
-      <div className={cn("rounded-lg border p-3 text-sm", validation.status === "ok" ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100" : "border-red-300/30 bg-red-500/10 text-red-100")}>
+    <Panel
+      title="Validación antes de publicar"
+      icon={<ClipboardCheck className="h-4 w-4 text-sky-300" />}
+    >
+      <div
+        className={cn(
+          "rounded-lg border p-3 text-sm",
+          validation.status === "ok"
+            ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100"
+            : "border-red-300/30 bg-red-500/10 text-red-100",
+        )}
+      >
         {validation.summary}
       </div>
       <div className="mt-2 space-y-1">
         {validation.checks.map((check) => (
-          <div key={check.label} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+          <div
+            key={check.label}
+            className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+          >
             <span className="text-slate-300">{check.label}</span>
-            <span className={check.status === "ok" ? "text-emerald-300" : check.status === "warning" ? "text-amber-300" : "text-red-300"}>{check.status}</span>
+            <span
+              className={
+                check.status === "ok"
+                  ? "text-emerald-300"
+                  : check.status === "warning"
+                    ? "text-amber-300"
+                    : "text-red-300"
+              }
+            >
+              {check.status}
+            </span>
           </div>
         ))}
       </div>
@@ -1471,7 +1679,13 @@ function ValidationPanel({ validation }: { validation: ValidationResult | null }
   );
 }
 
-function ComparePanel({ comparison, onClose }: { comparison: ComparisonResult; onClose: () => void }) {
+function ComparePanel({
+  comparison,
+  onClose,
+}: {
+  comparison: ComparisonResult;
+  onClose: () => void;
+}) {
   const first = comparison.agents[0];
   const second = comparison.agents[1];
   if (!first || !second) return null;
@@ -1489,7 +1703,9 @@ function ComparePanel({ comparison, onClose }: { comparison: ComparisonResult; o
           <table className="w-full text-xs">
             <tbody>
               {comparison.differences.length === 0 ? (
-                <tr><td className="py-2 text-slate-400">Sin diferencias críticas.</td></tr>
+                <tr>
+                  <td className="py-2 text-slate-400">Sin diferencias críticas.</td>
+                </tr>
               ) : (
                 comparison.differences.map((diff) => (
                   <tr key={String(diff.field)} className="border-b border-white/5">
@@ -1505,7 +1721,10 @@ function ComparePanel({ comparison, onClose }: { comparison: ComparisonResult; o
         <Panel title="Métricas comparadas">
           <div className="space-y-2">
             {comparison.performance.map((metric) => (
-              <div key={String(metric.metric)} className="grid grid-cols-[1fr_70px_70px] items-center rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+              <div
+                key={String(metric.metric)}
+                className="grid grid-cols-[1fr_70px_70px] items-center rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+              >
                 <span className="text-slate-300">{String(metric.metric)}</span>
                 <span className="text-sky-200">{String(metric.a)}</span>
                 <span className="text-emerald-200">{String(metric.b)}</span>
@@ -1539,18 +1758,54 @@ function ContextMenuLayer({
 }) {
   if (!state) return null;
   const currentAgentId = state.kind === "agent" ? state.agentId : selected?.id;
-  const items = state.kind === "agent"
-    ? [
-        { label: "Duplicar", icon: Copy, action: () => currentAgentId && onDuplicate(currentAgentId) },
-        { label: "Deshabilitar", icon: Pause, action: () => currentAgentId && onDisable(currentAgentId) },
-        { label: "Exportar JSON", icon: FileJson, action: () => currentAgentId && onExport(currentAgentId) },
-        { label: "Eliminar", icon: Trash2, danger: true, action: () => currentAgentId && onDelete(currentAgentId) },
-      ]
-    : [
-        { label: "Probar", icon: TestTube2, action: () => onTestNested(state.kind, state.itemId) },
-        { label: "Copiar ID", icon: Copy, action: () => void navigator.clipboard.writeText(state.itemId).then(() => toast.success("ID copiado")) },
-        { label: "Ver historial", icon: History, action: () => toast.info("Feature en construcción", { description: '"Ver historial" estará disponible próximamente.' }) },
-      ];
+  const items =
+    state.kind === "agent"
+      ? [
+          {
+            label: "Duplicar",
+            icon: Copy,
+            action: () => currentAgentId && onDuplicate(currentAgentId),
+          },
+          {
+            label: "Deshabilitar",
+            icon: Pause,
+            action: () => currentAgentId && onDisable(currentAgentId),
+          },
+          {
+            label: "Exportar JSON",
+            icon: FileJson,
+            action: () => currentAgentId && onExport(currentAgentId),
+          },
+          {
+            label: "Eliminar",
+            icon: Trash2,
+            danger: true,
+            action: () => currentAgentId && onDelete(currentAgentId),
+          },
+        ]
+      : [
+          {
+            label: "Probar",
+            icon: TestTube2,
+            action: () => onTestNested(state.kind, state.itemId),
+          },
+          {
+            label: "Copiar ID",
+            icon: Copy,
+            action: () =>
+              void navigator.clipboard
+                .writeText(state.itemId)
+                .then(() => toast.success("ID copiado")),
+          },
+          {
+            label: "Ver historial",
+            icon: History,
+            action: () =>
+              toast.info("Feature en construcción", {
+                description: '"Ver historial" estará disponible próximamente.',
+              }),
+          },
+        ];
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div
@@ -1566,7 +1821,10 @@ function ContextMenuLayer({
               action();
               onClose();
             }}
-            className={cn("flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-white/10", danger && "text-red-200 hover:bg-red-500/10")}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-white/10",
+              danger && "text-red-200 hover:bg-red-500/10",
+            )}
           >
             <Icon className="h-3.5 w-3.5" />
             {label}
@@ -1588,8 +1846,14 @@ function CommandPalette({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-start bg-black/45 p-6 pt-24" onClick={onClose}>
-      <div className="mx-auto w-full max-w-xl rounded-xl border border-white/10 bg-slate-950 p-2 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-start bg-black/45 p-6 pt-24"
+      onClick={onClose}
+    >
+      <div
+        className="mx-auto w-full max-w-xl rounded-xl border border-white/10 bg-slate-950 p-2 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
           <Search className="h-4 w-4 text-slate-500" />
           <span className="text-sm text-slate-300">Comandos rápidos</span>
@@ -1626,7 +1890,10 @@ function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void 
   ];
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-6" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-950 p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-950 p-4 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-100">Atajos</div>
           <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400" onClick={onClose}>
@@ -1635,7 +1902,10 @@ function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
         <div className="space-y-2">
           {rows.map(([key, label]) => (
-            <div key={key} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
+            <div
+              key={key}
+              className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
+            >
               <span className="text-slate-300">{label}</span>
               <code className="rounded bg-black/30 px-2 py-1 text-slate-400">{key}</code>
             </div>
@@ -1680,7 +1950,11 @@ function Sidebar({
             </div>
             <div className="text-[11px] text-slate-500">{agents.length} perfiles configurados</div>
           </div>
-          <Button size="sm" className="h-8 bg-blue-600 text-xs hover:bg-blue-500" onClick={onCreate}>
+          <Button
+            size="sm"
+            className="h-8 bg-blue-600 text-xs hover:bg-blue-500"
+            onClick={onCreate}
+          >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Nuevo
           </Button>
@@ -1697,7 +1971,9 @@ function Sidebar({
       </div>
       <div className="flex-1 space-y-2 overflow-auto p-3">
         {loading ? (
-          Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 rounded-lg bg-white/10" />)
+          Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-28 rounded-lg bg-white/10" />
+          ))
         ) : agents.length === 0 ? (
           <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-sm text-slate-400">
             Sin agentes para este filtro.
@@ -1723,7 +1999,10 @@ function Sidebar({
             <span className="text-amber-300">{compareIds.length}/2</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full bg-amber-400" style={{ width: `${Math.min(compareIds.length, 2) * 50}%` }} />
+            <div
+              className="h-full bg-amber-400"
+              style={{ width: `${Math.min(compareIds.length, 2) * 50}%` }}
+            />
           </div>
         </div>
       </div>
@@ -1731,10 +2010,16 @@ function Sidebar({
   );
 }
 
-export function AgentsPage() {
+export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {}) {
   const queryClient = useQueryClient();
-  const agentsQuery = useQuery({ queryKey: ["agents", "operations-center"], queryFn: agentsApi.list });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const agentsQuery = useQuery({
+    queryKey: ["agents", "operations-center"],
+    queryFn: agentsApi.list,
+  });
+  // A15 — when reached via /agents/$agentId (e.g. from a DebugPanel
+  // deep-link), preselect that agent so the editor opens to the right
+  // row without an extra click.
+  const [selectedId, setSelectedId] = useState<string | null>(initialAgentId ?? null);
   const [draft, setDraft] = useState<AgentItem | null>(null);
   const [activeTab, setActiveTab] = useState<AgentTab>("Identidad");
   const [search, setSearch] = useState("");
@@ -1742,9 +2027,7 @@ export function AgentsPage() {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
-  const [previewMessage, setPreviewMessage] = useState(
-    "Hola, ¿qué tipo de crédito manejan?",
-  );
+  const [previewMessage, setPreviewMessage] = useState("Hola, ¿qué tipo de crédito manejan?");
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -1753,12 +2036,18 @@ export function AgentsPage() {
   const filteredAgents = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return agents;
-    return agents.filter((agent) => `${agent.name} ${agent.role} ${agent.goal ?? ""}`.toLowerCase().includes(needle));
+    return agents.filter((agent) =>
+      `${agent.name} ${agent.role} ${agent.goal ?? ""}`.toLowerCase().includes(needle),
+    );
   }, [agents, search]);
-  const selected = useMemo(() => agents.find((agent) => agent.id === selectedId) ?? null, [agents, selectedId]);
+  const selected = useMemo(
+    () => agents.find((agent) => agent.id === selectedId) ?? null,
+    [agents, selectedId],
+  );
   const dirty = Boolean(selected && draft && compactPatchKey(selected) !== compactPatchKey(draft));
 
-  const invalidateAgents = () => queryClient.invalidateQueries({ queryKey: ["agents", "operations-center"] });
+  const invalidateAgents = () =>
+    queryClient.invalidateQueries({ queryKey: ["agents", "operations-center"] });
 
   useEffect(() => {
     if (!selectedId && agents.length > 0) {
@@ -1892,7 +2181,8 @@ export function AgentsPage() {
       void invalidateAgents();
       toast.success("Guardrail creado");
     },
-    onError: (error: Error) => toast.error("No se pudo crear la regla", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("No se pudo crear la regla", { description: error.message }),
   });
 
   const createFieldMutation = useMutation({
@@ -1914,7 +2204,8 @@ export function AgentsPage() {
       void invalidateAgents();
       toast.success("Campo creado");
     },
-    onError: (error: Error) => toast.error("No se pudo crear el campo", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("No se pudo crear el campo", { description: error.message }),
   });
 
   const compareMutation = useMutation({
@@ -1933,41 +2224,51 @@ export function AgentsPage() {
       void invalidateAgents();
       toast.success("Decision Map guardado");
     },
-    onError: (error: Error) => toast.error("No se pudo guardar mapa", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("No se pudo guardar mapa", { description: error.message }),
   });
 
   const validateMapMutation = useMutation({
     mutationFn: (agent: AgentItem) => agentsApi.validateDecisionMap(agent.id, agent.decision_map),
     onSuccess: (result) => toast[result.status === "ok" ? "success" : "warning"](result.summary),
-    onError: (error: Error) => toast.error("No se pudo validar mapa", { description: error.message }),
+    onError: (error: Error) =>
+      toast.error("No se pudo validar mapa", { description: error.message }),
   });
 
   const runScenarioMutation = useMutation({
-    mutationFn: ({ agentId, scenarioId }: { agentId: string; scenarioId: string }) => agentsApi.runScenario(agentId, scenarioId),
+    mutationFn: ({ agentId, scenarioId }: { agentId: string; scenarioId: string }) =>
+      agentsApi.runScenario(agentId, scenarioId),
     onSuccess: (result) => toast.success(`Escenario ${String(result.status ?? "ejecutado")}`),
     onError: (error: Error) => toast.error("No se pudo ejecutar", { description: error.message }),
   });
 
   const stressMutation = useMutation({
     mutationFn: agentsApi.stressTest,
-    onSuccess: (result) => toast.success(`Suite ejecutada: ${result.passed}/${result.queued} aprobadas`),
-    onError: (error: Error) => toast.error("No se pudo ejecutar suite", { description: error.message }),
+    onSuccess: (result) =>
+      toast.success(`Suite ejecutada: ${result.passed}/${result.queued} aprobadas`),
+    onError: (error: Error) =>
+      toast.error("No se pudo ejecutar suite", { description: error.message }),
   });
 
   const exportAgent = async (agentId: string) => {
     try {
       const payload = await agentsApi.exportJson(agentId);
-      const name = String(payload.name ?? "agente").toLowerCase().replace(/\s+/g, "-");
+      const name = String(payload.name ?? "agente")
+        .toLowerCase()
+        .replace(/\s+/g, "-");
       downloadJson(`agent-${name}.json`, payload);
       toast.success("JSON exportado");
     } catch (error) {
-      toast.error("No se pudo exportar", { description: error instanceof Error ? error.message : "Error desconocido" });
+      toast.error("No se pudo exportar", {
+        description: error instanceof Error ? error.message : "Error desconocido",
+      });
     }
   };
 
   const deleteAgent = (agentId: string) => {
     const agent = agents.find((item) => item.id === agentId);
-    if (window.confirm(`¿Eliminar "${agent?.name ?? "este agente"}"?`)) deleteMutation.mutate(agentId);
+    if (window.confirm(`¿Eliminar "${agent?.name ?? "este agente"}"?`))
+      deleteMutation.mutate(agentId);
   };
 
   const toggleCompare = (id: string) => {
@@ -1999,7 +2300,10 @@ export function AgentsPage() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      const isTyping = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT";
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandsOpen(true);
@@ -2022,13 +2326,42 @@ export function AgentsPage() {
   }, [draft, dirty]);
 
   const commandActions = [
-    { label: "Crear agente", icon: <Plus className="h-4 w-4 text-sky-300" />, action: () => createMutation.mutate() },
-    { label: "Guardar configuración", icon: <Save className="h-4 w-4 text-emerald-300" />, action: saveActive },
-    { label: "Validar antes de publicar", icon: <ClipboardCheck className="h-4 w-4 text-amber-300" />, action: () => activeAgent && validateMutation.mutate(activeAgent) },
-    { label: "Publicar agente", icon: <UploadCloud className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && publishMutation.mutate(activeAgent.id) },
-    { label: "Generar preview WhatsApp", icon: <MessageCircle className="h-4 w-4 text-emerald-300" />, action: () => activeAgent && previewMutation.mutate({ agent: activeAgent, message: previewMessage }) },
-    { label: "Comparar seleccionados", icon: <GitBranch className="h-4 w-4 text-violet-300" />, action: runCompare },
-    { label: "Ver atajos", icon: <Sparkles className="h-4 w-4 text-sky-300" />, action: () => setShortcutsOpen(true) },
+    {
+      label: "Crear agente",
+      icon: <Plus className="h-4 w-4 text-sky-300" />,
+      action: () => createMutation.mutate(),
+    },
+    {
+      label: "Guardar configuración",
+      icon: <Save className="h-4 w-4 text-emerald-300" />,
+      action: saveActive,
+    },
+    {
+      label: "Validar antes de publicar",
+      icon: <ClipboardCheck className="h-4 w-4 text-amber-300" />,
+      action: () => activeAgent && validateMutation.mutate(activeAgent),
+    },
+    {
+      label: "Publicar agente",
+      icon: <UploadCloud className="h-4 w-4 text-emerald-300" />,
+      action: () => activeAgent && publishMutation.mutate(activeAgent.id),
+    },
+    {
+      label: "Generar preview WhatsApp",
+      icon: <MessageCircle className="h-4 w-4 text-emerald-300" />,
+      action: () =>
+        activeAgent && previewMutation.mutate({ agent: activeAgent, message: previewMessage }),
+    },
+    {
+      label: "Comparar seleccionados",
+      icon: <GitBranch className="h-4 w-4 text-violet-300" />,
+      action: runCompare,
+    },
+    {
+      label: "Ver atajos",
+      icon: <Sparkles className="h-4 w-4 text-sky-300" />,
+      action: () => setShortcutsOpen(true),
+    },
   ];
 
   return (
@@ -2066,16 +2399,42 @@ export function AgentsPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="truncate text-2xl font-semibold tracking-normal">{activeAgent.name}</h1>
-                    <Badge variant="outline" className={cn("border", statusClass(activeAgent.status))}>{statusLabel(activeAgent.status)}</Badge>
-                    <Badge variant="outline" className="border-white/10 bg-white/[0.035] text-slate-300">{activeAgent.version}</Badge>
+                    <h1 className="truncate text-2xl font-semibold tracking-normal">
+                      {activeAgent.name}
+                    </h1>
+                    <Badge
+                      variant="outline"
+                      className={cn("border", statusClass(activeAgent.status))}
+                    >
+                      {statusLabel(activeAgent.status)}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-white/10 bg-white/[0.035] text-slate-300"
+                    >
+                      {activeAgent.version}
+                    </Badge>
                   </div>
-                  <div className="mt-1 text-sm text-slate-400">{roleLabel(activeAgent.role)} · {roleDetail(activeAgent.role)}</div>
+                  <div className="mt-1 text-sm text-slate-400">
+                    {roleLabel(activeAgent.role)} · {roleDetail(activeAgent.role)}
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <MetricTile label="Salud" value={`${activeAgent.health.score}/100`} tone={activeAgent.health.score >= 88 ? "good" : "warn"} />
-                  <MetricTile label="Precisión" value={pct(activeAgent.metrics.response_accuracy)} tone="good" />
-                  <MetricTile label="Riesgo" value={String(activeAgent.metrics.risk_score)} tone={activeAgent.metrics.risk_score > 65 ? "bad" : "warn"} />
+                  <MetricTile
+                    label="Salud"
+                    value={`${activeAgent.health.score}/100`}
+                    tone={activeAgent.health.score >= 88 ? "good" : "warn"}
+                  />
+                  <MetricTile
+                    label="Precisión"
+                    value={pct(activeAgent.metrics.response_accuracy)}
+                    tone="good"
+                  />
+                  <MetricTile
+                    label="Riesgo"
+                    value={String(activeAgent.metrics.risk_score)}
+                    tone={activeAgent.metrics.risk_score > 65 ? "bad" : "warn"}
+                  />
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -2085,22 +2444,42 @@ export function AgentsPage() {
                       key={mode}
                       type="button"
                       onClick={() => updateDraft({ behavior_mode: mode })}
-                      className={cn("rounded-md px-3 py-1.5 text-xs transition", activeAgent.behavior_mode === mode ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-100")}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-xs transition",
+                        activeAgent.behavior_mode === mode
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-400 hover:bg-white/10 hover:text-slate-100",
+                      )}
                     >
                       {modeLabel(mode)}
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={() => duplicateMutation.mutate(activeAgent.id)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+                    onClick={() => duplicateMutation.mutate(activeAgent.id)}
+                  >
                     <Copy className="mr-1.5 h-3.5 w-3.5" />
                     Duplicar
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200" onClick={() => exportAgent(activeAgent.id)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+                    onClick={() => exportAgent(activeAgent.id)}
+                  >
                     <Download className="mr-1.5 h-3.5 w-3.5" />
                     Exportar
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 border-red-300/20 bg-red-500/10 text-xs text-red-100" onClick={() => disableMutation.mutate(activeAgent.id)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-red-300/20 bg-red-500/10 text-xs text-red-100"
+                    onClick={() => disableMutation.mutate(activeAgent.id)}
+                  >
                     <Pause className="mr-1.5 h-3.5 w-3.5" />
                     Pausar
                   </Button>
@@ -2112,7 +2491,12 @@ export function AgentsPage() {
                     key={tab}
                     type="button"
                     onClick={() => setActiveTab(tab)}
-                    className={cn("whitespace-nowrap rounded-md px-3 py-1.5 text-xs transition", activeTab === tab ? "bg-sky-600 text-white" : "text-slate-400 hover:bg-white/10 hover:text-slate-100")}
+                    className={cn(
+                      "whitespace-nowrap rounded-md px-3 py-1.5 text-xs transition",
+                      activeTab === tab
+                        ? "bg-sky-600 text-white"
+                        : "text-slate-400 hover:bg-white/10 hover:text-slate-100",
+                    )}
                   >
                     {tab}
                   </button>
@@ -2126,23 +2510,13 @@ export function AgentsPage() {
                   <IdentityPanel draft={activeAgent} onChange={updateDraft} />
                 ) : null}
                 {activeTab === "Guardrails" ? (
-                  <GuardrailsRealPanel
-                    draft={activeAgent}
-                    onChange={updateDraft}
-                  />
+                  <GuardrailsRealPanel draft={activeAgent} onChange={updateDraft} />
                 ) : null}
                 {activeTab === "Knowledge" ? (
-                  <KnowledgeRealPanel
-                    draft={activeAgent}
-                    onChange={updateDraft}
-                  />
+                  <KnowledgeRealPanel draft={activeAgent} onChange={updateDraft} />
                 ) : null}
-                {activeTab === "Monitor" ? (
-                  <MonitorRealPanel agentId={activeAgent.id} />
-                ) : null}
-                {activeTab === "Extracción" ? (
-                  <ExtractionReadonlyPanel />
-                ) : null}
+                {activeTab === "Monitor" ? <MonitorRealPanel agentId={activeAgent.id} /> : null}
+                {activeTab === "Extracción" ? <ExtractionReadonlyPanel /> : null}
               </div>
 
               <div className="space-y-3">
@@ -2165,7 +2539,10 @@ export function AgentsPage() {
             <div className="text-center">
               <Bot className="mx-auto h-12 w-12 text-slate-700" />
               <div className="mt-3 text-sm font-semibold text-slate-200">Selecciona un agente</div>
-              <Button className="mt-4 bg-blue-600 hover:bg-blue-500" onClick={() => createMutation.mutate()}>
+              <Button
+                className="mt-4 bg-blue-600 hover:bg-blue-500"
+                onClick={() => createMutation.mutate()}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Crear agente
               </Button>
@@ -2174,7 +2551,9 @@ export function AgentsPage() {
         )}
       </div>
 
-      {comparison ? <ComparePanel comparison={comparison} onClose={() => setComparison(null)} /> : null}
+      {comparison ? (
+        <ComparePanel comparison={comparison} onClose={() => setComparison(null)} />
+      ) : null}
       <ContextMenuLayer
         state={contextMenu}
         selected={activeAgent}
@@ -2185,13 +2564,25 @@ export function AgentsPage() {
         onDelete={deleteAgent}
         onTestNested={(kind, id) => {
           if (kind === "guardrail") {
-            void agentsApi.testGuardrail(id, "Ya estás aprobado por $80,000").then((result) => toast[result.violated ? "warning" : "success"](`Regla ${result.violated ? "activada" : "limpia"}`));
+            void agentsApi
+              .testGuardrail(id, "Ya estás aprobado por $80,000")
+              .then((result) =>
+                toast[result.violated ? "warning" : "success"](
+                  `Regla ${result.violated ? "activada" : "limpia"}`,
+                ),
+              );
           } else {
-            void agentsApi.testExtractionField(id, "Me llamo Juan Pérez y gano por nómina").then((result) => toast.success(`Extraído: ${result.value}`));
+            void agentsApi
+              .testExtractionField(id, "Me llamo Juan Pérez y gano por nómina")
+              .then((result) => toast.success(`Extraído: ${result.value}`));
           }
         }}
       />
-      <CommandPalette open={commandsOpen} onClose={() => setCommandsOpen(false)} actions={commandActions} />
+      <CommandPalette
+        open={commandsOpen}
+        onClose={() => setCommandsOpen(false)}
+        actions={commandActions}
+      />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );

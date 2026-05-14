@@ -4,7 +4,14 @@ export type AgentStatus = "draft" | "validation" | "testing" | "production" | "p
 export type BehaviorMode = "normal" | "conservative" | "strict";
 export type GuardrailSeverity = "critical" | "high" | "medium" | "low";
 export type GuardrailAction = "block" | "rewrite" | "warn" | "handoff";
-export type ExtractionFieldType = "text" | "number" | "date" | "boolean" | "enum" | "phone" | "currency";
+export type ExtractionFieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "boolean"
+  | "enum"
+  | "phone"
+  | "currency";
 
 export interface Guardrail {
   id: string;
@@ -99,6 +106,22 @@ export interface DecisionMap {
   edges: Array<Record<string, unknown>>;
 }
 
+export interface AgentVersionSnapshot {
+  role?: string;
+  behavior_mode?: BehaviorMode;
+  goal?: string | null;
+  style?: string | null;
+  tone?: string | null;
+  language?: string | null;
+  max_sentences?: number | null;
+  no_emoji?: boolean;
+  return_to_flow?: boolean;
+  system_prompt?: string | null;
+  active_intents?: string[];
+  knowledge_config?: Record<string, unknown>;
+  flow_mode_rules?: Record<string, unknown> | null;
+}
+
 export interface AgentVersion {
   id: string;
   version: string;
@@ -106,6 +129,11 @@ export interface AgentVersion {
   author: string;
   created_at: string;
   notes?: string;
+  reason?: string;
+  performance_impact?: string;
+  // Migration A1 — full config snapshot at publish time. Optional so
+  // versions published before snapshot persistence keep deserializing.
+  snapshot?: AgentVersionSnapshot | null;
 }
 
 export interface ScenarioRun {
@@ -227,42 +255,78 @@ export const agentsApi = {
   publish: async (id: string) => (await api.post<AgentItem>(`/agents/${id}/publish`)).data,
   rollback: async (id: string, version_id?: string) =>
     (await api.post<AgentItem>(`/agents/${id}/rollback`, version_id ? { version_id } : {})).data,
-  exportJson: async (id: string) => (await api.post<Record<string, unknown>>(`/agents/${id}/export`)).data,
+  exportJson: async (id: string) =>
+    (await api.post<Record<string, unknown>>(`/agents/${id}/export`)).data,
   compare: async (agent_ids: string[]) =>
-    (await api.post<{ agents: AgentItem[]; differences: Array<Record<string, unknown>>; performance: Array<Record<string, unknown>> }>("/agents/compare", { agent_ids })).data,
+    (
+      await api.post<{
+        agents: AgentItem[];
+        differences: Array<Record<string, unknown>>;
+        performance: Array<Record<string, unknown>>;
+      }>("/agents/compare", { agent_ids })
+    ).data,
   validateConfig: async (id: string, draft?: Partial<AgentPayload>) =>
     (await api.post<ValidationResult>(`/agents/${id}/validate-config`, draft ?? {})).data,
   previewResponse: async (id: string, message: string, draftConfig?: Partial<AgentPayload>) =>
-    (await api.post<PreviewResult>(`/agents/${id}/preview-response`, {
-      message,
-      draftConfig: draftConfig ?? {},
-      conversationContext: {},
-    })).data,
-  monitor: async (id: string) =>
-    (await api.get<AgentMonitorMetrics>(`/agents/${id}/monitor`)).data,
+    (
+      await api.post<PreviewResult>(`/agents/${id}/preview-response`, {
+        message,
+        draftConfig: draftConfig ?? {},
+        conversationContext: {},
+      })
+    ).data,
+  monitor: async (id: string) => (await api.get<AgentMonitorMetrics>(`/agents/${id}/monitor`)).data,
   createGuardrail: async (id: string, body: Omit<Guardrail, "id" | "violation_count">) =>
     (await api.post<Guardrail>(`/agents/${id}/guardrails`, body)).data,
   patchGuardrail: async (id: string, body: Omit<Guardrail, "id" | "violation_count">) =>
     (await api.patch<Guardrail>(`/guardrails/${id}`, body)).data,
   testGuardrail: async (id: string, text: string) =>
-    (await api.post<{ guardrail_id: string; violated: boolean; action: string }>(`/guardrails/${id}/test`, { text })).data,
-  createExtractionField: async (id: string, body: Omit<ExtractionField, "id" | "confidence" | "source" | "last_value" | "status">) =>
-    (await api.post<ExtractionField>(`/agents/${id}/extraction-fields`, body)).data,
-  patchExtractionField: async (id: string, body: Omit<ExtractionField, "id" | "confidence" | "source" | "last_value" | "status">) =>
-    (await api.patch<ExtractionField>(`/extraction-fields/${id}`, body)).data,
+    (
+      await api.post<{ guardrail_id: string; violated: boolean; action: string }>(
+        `/guardrails/${id}/test`,
+        { text },
+      )
+    ).data,
+  createExtractionField: async (
+    id: string,
+    body: Omit<ExtractionField, "id" | "confidence" | "source" | "last_value" | "status">,
+  ) => (await api.post<ExtractionField>(`/agents/${id}/extraction-fields`, body)).data,
+  patchExtractionField: async (
+    id: string,
+    body: Omit<ExtractionField, "id" | "confidence" | "source" | "last_value" | "status">,
+  ) => (await api.patch<ExtractionField>(`/extraction-fields/${id}`, body)).data,
   testExtractionField: async (id: string, text: string) =>
-    (await api.post<{ field_id: string; value: string; confidence: number; source_text: string; auto_saved: boolean }>(`/extraction-fields/${id}/test`, { text })).data,
+    (
+      await api.post<{
+        field_id: string;
+        value: string;
+        confidence: number;
+        source_text: string;
+        auto_saved: boolean;
+      }>(`/extraction-fields/${id}/test`, { text })
+    ).data,
   updateDecisionMap: async (id: string, body: DecisionMap) =>
     (await api.put<AgentItem>(`/agents/${id}/decision-map`, body)).data,
   validateDecisionMap: async (id: string, body: DecisionMap) =>
     (await api.post<ValidationResult>(`/agents/${id}/decision-map/validate`, body)).data,
   runScenario: async (id: string, scenario_id: string, message?: string) =>
-    (await api.post<Record<string, unknown>>(`/agents/${id}/scenarios/run`, { scenario_id, message })).data,
+    (
+      await api.post<Record<string, unknown>>(`/agents/${id}/scenarios/run`, {
+        scenario_id,
+        message,
+      })
+    ).data,
   stressTest: async (id: string) =>
-    (await api.post<{ queued: number; passed: number; failed: number }>(`/agents/${id}/scenarios/stress-test`)).data,
+    (
+      await api.post<{ queued: number; passed: number; failed: number }>(
+        `/agents/${id}/scenarios/stress-test`,
+      )
+    ).data,
   test: async (agent_config: Record<string, unknown>, message: string) =>
-    (await api.post<{ response: string; flow_mode: string; intent: string }>("/agents/test", {
-      agent_config,
-      message,
-    })).data,
+    (
+      await api.post<{ response: string; flow_mode: string; intent: string }>("/agents/test", {
+        agent_config,
+        message,
+      })
+    ).data,
 };
