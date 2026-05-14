@@ -9,27 +9,30 @@ The first implementation is intentionally deterministic and local-dev
 friendly. It returns seeded operational data while preserving REST contracts
 that can later be backed by the richer KB tables and workers.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi import status as http_status
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-
-from sqlalchemy import func, select, text as sql_text
+from sqlalchemy import func, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, demo_tenant
+from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
+from atendia.db.models.tenant_config import TenantCatalogItem, TenantFAQ
 from atendia.db.session import get_db_session
 
 router = APIRouter()
 AuthenticatedUser = Annotated[AuthUser, Depends(current_user)]
 
 
-def _empty_health() -> "HealthResponse":
+def _empty_health() -> HealthResponse:
     """Health shape for tenants with no KB data yet. UI shows empty state."""
     return HealthResponse(
         overall_score=0,
@@ -599,14 +602,78 @@ FUNNEL = [
 ]
 
 CARDS = [
-    BottomActionCard(id="conflicts", title="Conflictos detectados", value="32", trend="+12 vs ayer", cta="Ver conflictos", status="critical", sparkline=[5, 7, 6, 9, 8, 14, 11, 18, 16, 23]),
-    BottomActionCard(id="unanswered", title="Preguntas sin respuesta", value="118", trend="+18 vs ayer", cta="Ver preguntas", status="warning", sparkline=[7, 9, 8, 11, 10, 13, 12, 15, 16, 18]),
-    BottomActionCard(id="tests", title="Pruebas automaticas", value="24/30", trend="80% aprobadas", cta="Ver pruebas", status="good", sparkline=[12, 16, 14, 18, 15, 21, 19, 23, 20, 24]),
-    BottomActionCard(id="permissions", title="Violaciones de permisos", value="7", trend="+3 vs ayer", cta="Ver incidencias", status="critical", sparkline=[1, 2, 2, 3, 4, 3, 5, 4, 6, 7]),
-    BottomActionCard(id="promos", title="Promociones por vencer", value="5", trend="En proximos 7 dias", cta="Ver promociones", status="warning", sparkline=[8, 7, 7, 6, 6, 5, 5, 5, 5, 5]),
-    BottomActionCard(id="chunks", title="Editor de chunks", value="1,243", trend="Chunks activos", cta="Abrir editor", status="good", sparkline=[20, 21, 19, 24, 25, 27, 26, 29, 31, 33]),
-    BottomActionCard(id="rag", title="Analitica RAG", value="87%", trend="Rendimiento global", cta="Ver analitica", status="good", sparkline=[64, 65, 70, 68, 72, 75, 76, 80, 83, 87]),
-    BottomActionCard(id="index-errors", title="Docs con errores index.", value="14", trend="Requieren atencion", cta="Ver documentos", status="critical", sparkline=[9, 10, 11, 12, 12, 13, 12, 14, 13, 14]),
+    BottomActionCard(
+        id="conflicts",
+        title="Conflictos detectados",
+        value="32",
+        trend="+12 vs ayer",
+        cta="Ver conflictos",
+        status="critical",
+        sparkline=[5, 7, 6, 9, 8, 14, 11, 18, 16, 23],
+    ),
+    BottomActionCard(
+        id="unanswered",
+        title="Preguntas sin respuesta",
+        value="118",
+        trend="+18 vs ayer",
+        cta="Ver preguntas",
+        status="warning",
+        sparkline=[7, 9, 8, 11, 10, 13, 12, 15, 16, 18],
+    ),
+    BottomActionCard(
+        id="tests",
+        title="Pruebas automaticas",
+        value="24/30",
+        trend="80% aprobadas",
+        cta="Ver pruebas",
+        status="good",
+        sparkline=[12, 16, 14, 18, 15, 21, 19, 23, 20, 24],
+    ),
+    BottomActionCard(
+        id="permissions",
+        title="Violaciones de permisos",
+        value="7",
+        trend="+3 vs ayer",
+        cta="Ver incidencias",
+        status="critical",
+        sparkline=[1, 2, 2, 3, 4, 3, 5, 4, 6, 7],
+    ),
+    BottomActionCard(
+        id="promos",
+        title="Promociones por vencer",
+        value="5",
+        trend="En proximos 7 dias",
+        cta="Ver promociones",
+        status="warning",
+        sparkline=[8, 7, 7, 6, 6, 5, 5, 5, 5, 5],
+    ),
+    BottomActionCard(
+        id="chunks",
+        title="Editor de chunks",
+        value="1,243",
+        trend="Chunks activos",
+        cta="Abrir editor",
+        status="good",
+        sparkline=[20, 21, 19, 24, 25, 27, 26, 29, 31, 33],
+    ),
+    BottomActionCard(
+        id="rag",
+        title="Analitica RAG",
+        value="87%",
+        trend="Rendimiento global",
+        cta="Ver analitica",
+        status="good",
+        sparkline=[64, 65, 70, 68, 72, 75, 76, 80, 83, 87],
+    ),
+    BottomActionCard(
+        id="index-errors",
+        title="Docs con errores index.",
+        value="14",
+        trend="Requieren atencion",
+        cta="Ver documentos",
+        status="critical",
+        sparkline=[9, 10, 11, 12, 12, 13, 12, 14, 13, 14],
+    ),
 ]
 
 RETRIEVED_CHUNKS = [
@@ -711,9 +778,27 @@ CONFLICTS = [
 ]
 
 AUDIT_LOGS = [
-    AuditLogItem(id="audit-1", action="kb.source.reindexed", actor="AI Supervisor", target="Politicas_Credito_2024.docx", created_at="Hoy 08:36"),
-    AuditLogItem(id="audit-2", action="kb.simulation.marked_incomplete", actor="Centro Demo MX", target="¿Aceptan INE de otro estado?", created_at="Ayer 18:41"),
-    AuditLogItem(id="audit-3", action="kb.chunk.disabled", actor="Mariana Gomez", target="Promociones_Mayo_2024.pdf p.2", created_at="Ayer 11:03"),
+    AuditLogItem(
+        id="audit-1",
+        action="kb.source.reindexed",
+        actor="AI Supervisor",
+        target="Politicas_Credito_2024.docx",
+        created_at="Hoy 08:36",
+    ),
+    AuditLogItem(
+        id="audit-2",
+        action="kb.simulation.marked_incomplete",
+        actor="Centro Demo MX",
+        target="¿Aceptan INE de otro estado?",
+        created_at="Ayer 18:41",
+    ),
+    AuditLogItem(
+        id="audit-3",
+        action="kb.chunk.disabled",
+        actor="Mariana Gomez",
+        target="Promociones_Mayo_2024.pdf p.2",
+        created_at="Ayer 11:03",
+    ),
 ]
 
 
@@ -735,13 +820,48 @@ async def get_health_history(
     if not is_demo:
         return []
     return [
-        HealthHistoryPoint(date="2026-05-04", overall_score=82, retrieval_quality_score=80, answer_confidence_score=84),
-        HealthHistoryPoint(date="2026-05-05", overall_score=84, retrieval_quality_score=82, answer_confidence_score=85),
-        HealthHistoryPoint(date="2026-05-06", overall_score=83, retrieval_quality_score=81, answer_confidence_score=85),
-        HealthHistoryPoint(date="2026-05-07", overall_score=86, retrieval_quality_score=84, answer_confidence_score=87),
-        HealthHistoryPoint(date="2026-05-08", overall_score=87, retrieval_quality_score=85, answer_confidence_score=88),
-        HealthHistoryPoint(date="2026-05-09", overall_score=83, retrieval_quality_score=81, answer_confidence_score=86),
-        HealthHistoryPoint(date="2026-05-10", overall_score=89, retrieval_quality_score=87, answer_confidence_score=90),
+        HealthHistoryPoint(
+            date="2026-05-04",
+            overall_score=82,
+            retrieval_quality_score=80,
+            answer_confidence_score=84,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-05",
+            overall_score=84,
+            retrieval_quality_score=82,
+            answer_confidence_score=85,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-06",
+            overall_score=83,
+            retrieval_quality_score=81,
+            answer_confidence_score=85,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-07",
+            overall_score=86,
+            retrieval_quality_score=84,
+            answer_confidence_score=87,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-08",
+            overall_score=87,
+            retrieval_quality_score=85,
+            answer_confidence_score=88,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-09",
+            overall_score=83,
+            retrieval_quality_score=81,
+            answer_confidence_score=86,
+        ),
+        HealthHistoryPoint(
+            date="2026-05-10",
+            overall_score=89,
+            retrieval_quality_score=87,
+            answer_confidence_score=90,
+        ),
     ]
 
 
@@ -779,25 +899,19 @@ async def get_items(
         # legacy KB tables; the UI shows all items with "good" status.
         faq_count = (
             await session.execute(
-                sql_text(
-                    "SELECT COUNT(*) FROM tenant_faqs WHERE tenant_id = :t"
-                ),
+                sql_text("SELECT COUNT(*) FROM tenant_faqs WHERE tenant_id = :t"),
                 {"t": str(tenant_id)},
             )
         ).scalar_one()
         catalog_count = (
             await session.execute(
-                sql_text(
-                    "SELECT COUNT(*) FROM tenant_catalogs WHERE tenant_id = :t"
-                ),
+                sql_text("SELECT COUNT(*) FROM tenant_catalogs WHERE tenant_id = :t"),
                 {"t": str(tenant_id)},
             )
         ).scalar_one()
         docs_count = (
             await session.execute(
-                sql_text(
-                    "SELECT COUNT(*) FROM knowledge_documents WHERE tenant_id = :t"
-                ),
+                sql_text("SELECT COUNT(*) FROM knowledge_documents WHERE tenant_id = :t"),
                 {"t": str(tenant_id)},
             )
         ).scalar_one()
@@ -904,9 +1018,7 @@ async def get_unanswered_questions(
         try:
             total = (
                 await session.execute(
-                    sql_text(
-                        "SELECT COUNT(*) FROM kb_unanswered_questions WHERE tenant_id = :t"
-                    ),
+                    sql_text("SELECT COUNT(*) FROM kb_unanswered_questions WHERE tenant_id = :t"),
                     {"t": str(tenant_id)},
                 )
             ).scalar_one()
@@ -956,13 +1068,26 @@ async def simulate(
     body: SimulationRequest,
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> SimulationResponse:
-    # Demo tenants get the hardcoded showcase. Real tenants get a
-    # minimal stub that's coherent for an empty KB so the UI doesn't
-    # block on 501. Full RAG-driven simulate lives at /knowledge/test
-    # in knowledge_routes.py — this surface is for the command center
-    # cockpit only.
-    if not is_demo:
+    # Demo tenants → hardcoded showcase.
+    # Real tenants → ILIKE search across the tenant's FAQs / catalog /
+    # document chunks. Empty KB falls through to the "no content" stub
+    # so the UI still shows a coherent message. The full embedding /
+    # LLM-answer path lives at /knowledge/test in knowledge_routes.py;
+    # this surface is the cockpit's lightweight preview.
+    if is_demo:
+        return DEFAULT_SIMULATION.model_copy(
+            update={
+                "user_message": body.message,
+                "agent": body.agent,
+                "model": body.model,
+            }
+        )
+
+    retrieved = await _search_tenant_kb(session, tenant_id, body.message)
+    if not retrieved:
         return SimulationResponse(
             id="sim-stub",
             agent=body.agent,
@@ -982,13 +1107,128 @@ async def simulate(
             source_summary="0 fuentes",
             mode="sources_only",
         )
-    return DEFAULT_SIMULATION.model_copy(
-        update={
-            "user_message": body.message,
-            "agent": body.agent,
-            "model": body.model,
-        }
+    summary = f"{len(retrieved)} fuente{'s' if len(retrieved) != 1 else ''} reales"
+    return SimulationResponse(
+        id=f"sim-{datetime.now(UTC).timestamp():.0f}",
+        agent=body.agent,
+        model=body.model,
+        user_message=body.message,
+        prompt_preview=(
+            f"Pregunta: {body.message}\n\n"
+            f"Contexto: {len(retrieved)} fuente(s) recuperadas del KB del "
+            "tenant. Use /knowledge/test para una respuesta sintetizada por LLM."
+        ),
+        retrieved_chunks=retrieved,
+        confidence_score=60 if len(retrieved) >= 2 else 35,
+        coverage_score=min(100, len(retrieved) * 20),
+        risk_flags=[],
+        answer=(
+            "Encontré fuentes relevantes en el KB del tenant. Para una "
+            "respuesta sintetizada por el modelo, usa /knowledge/test "
+            "(esta vista del cockpit muestra solo el ranking de fuentes)."
+        ),
+        source_summary=summary,
+        mode="sources_only",
     )
+
+
+async def _search_tenant_kb(
+    session: AsyncSession, tenant_id: UUID, query: str
+) -> list[RetrievedChunk]:
+    """ILIKE-based search across FAQs, catalog items and document chunks.
+
+    Embedding search lives at /knowledge/test; the cockpit's simulate is
+    intentionally lighter so it stays usable without OpenAI access. Returns
+    up to 6 chunks ranked by source type (FAQs first, then catalog, then
+    document chunks) — operators typically curate FAQs as the highest
+    signal source so we rank them top.
+    """
+    like = f"%{query.strip()}%"
+    chunks: list[RetrievedChunk] = []
+
+    faq_rows = (
+        (
+            await session.execute(
+                select(TenantFAQ)
+                .where(
+                    TenantFAQ.tenant_id == tenant_id,
+                    func.lower(TenantFAQ.question + " " + TenantFAQ.answer).like(func.lower(like)),
+                )
+                .limit(3)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in faq_rows:
+        preview = f"{row.question}\n{row.answer}"
+        chunks.append(
+            RetrievedChunk(
+                id=str(row.id),
+                source_name=f"FAQ: {row.question[:60]}",
+                page_number=0,
+                preview=preview[:600],
+                retrieval_score=0.85,
+                freshness_status="fresh",
+                warnings=[],
+            )
+        )
+
+    catalog_rows = (
+        (
+            await session.execute(
+                select(TenantCatalogItem)
+                .where(
+                    TenantCatalogItem.tenant_id == tenant_id,
+                    TenantCatalogItem.name.ilike(like),
+                )
+                .limit(3)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in catalog_rows:
+        chunks.append(
+            RetrievedChunk(
+                id=str(row.id),
+                source_name=f"Catálogo: {row.name}",
+                page_number=0,
+                preview=row.name[:600],
+                retrieval_score=0.7,
+                freshness_status="fresh",
+                warnings=[],
+            )
+        )
+
+    if len(chunks) < 6:
+        doc_chunks = (
+            await session.execute(
+                select(KnowledgeChunk, KnowledgeDocument.filename)
+                .join(
+                    KnowledgeDocument,
+                    KnowledgeDocument.id == KnowledgeChunk.document_id,
+                )
+                .where(
+                    KnowledgeChunk.tenant_id == tenant_id,
+                    KnowledgeChunk.text.ilike(like),
+                )
+                .limit(6 - len(chunks))
+            )
+        ).all()
+        for row, filename in doc_chunks:
+            chunks.append(
+                RetrievedChunk(
+                    id=str(row.id),
+                    source_name=f"Doc: {filename}",
+                    page_number=getattr(row, "page_number", None) or 0,
+                    preview=row.text[:600],
+                    retrieval_score=0.6,
+                    freshness_status="fresh",
+                    warnings=[],
+                )
+            )
+    return chunks
 
 
 @router.get("/simulate/{simulation_id}", response_model=SimulationResponse)
@@ -1002,7 +1242,9 @@ async def mark_simulation_correct(simulation_id: str, _user: AuthenticatedUser) 
 
 
 @router.post("/simulate/{simulation_id}/mark-incomplete")
-async def mark_simulation_incomplete(simulation_id: str, _user: AuthenticatedUser) -> dict[str, str]:
+async def mark_simulation_incomplete(
+    simulation_id: str, _user: AuthenticatedUser
+) -> dict[str, str]:
     return {"id": simulation_id, "status": "incomplete"}
 
 
@@ -1062,9 +1304,7 @@ async def get_conflicts(
         try:
             total = (
                 await session.execute(
-                    sql_text(
-                        "SELECT COUNT(*) FROM kb_conflicts WHERE tenant_id = :t"
-                    ),
+                    sql_text("SELECT COUNT(*) FROM kb_conflicts WHERE tenant_id = :t"),
                     {"t": str(tenant_id)},
                 )
             ).scalar_one()
