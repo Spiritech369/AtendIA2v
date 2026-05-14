@@ -21,6 +21,11 @@ export default defineConfig({
     },
   },
   server: {
+    // Honor a PORT env var when set so Vite binds where a parent harness
+    // (preview sandbox, supervisor, etc.) expects it.
+    ...(process.env.PORT
+      ? { port: Number(process.env.PORT), strictPort: true }
+      : {}),
     proxy: {
       // En Docker → BACKEND_URL=http://backend:8001 (desde docker-compose)
       // Local sin Docker → fallback a localhost:8001

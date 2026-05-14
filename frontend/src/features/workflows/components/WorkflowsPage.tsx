@@ -47,6 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   workflowsApi,
+  type WorkflowNode,
   type SimulationResult,
   type WorkflowExecution,
   type WorkflowItem,
@@ -89,10 +90,26 @@ function duration(seconds: number | null) {
 }
 
 function Sparkline({ values, color = "#60a5fa" }: { values: number[]; color?: string }) {
-  const safe = values.length ? values : [20, 30, 25, 36, 44, 40, 52];
-  const max = Math.max(...safe, 1);
-  const points = safe
-    .map((value, index) => `${(index / Math.max(1, safe.length - 1)) * 78},${26 - (value / max) * 22}`)
+  const hasData = values.some((value) => value > 0);
+  if (!hasData) {
+    return (
+      <svg width="78" height="28" viewBox="0 0 78 28" aria-hidden>
+        <line
+          x1="2"
+          x2="76"
+          y1="22"
+          y2="22"
+          stroke="rgba(148,163,184,0.35)"
+          strokeWidth="1.2"
+          strokeDasharray="3 3"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+  const max = Math.max(...values, 1);
+  const points = values
+    .map((value, index) => `${(index / Math.max(1, values.length - 1)) * 78},${26 - (value / max) * 22}`)
     .join(" ");
   return (
     <svg width="78" height="28" viewBox="0 0 78 28" aria-hidden>
@@ -254,13 +271,20 @@ function ExecutionsPanel({
   selectedExecution,
   onSelectExecution,
   onContextMenu,
+  nodeFilter,
+  onClearNodeFilter,
 }: {
   workflow: WorkflowItem | null;
   executions: WorkflowExecution[];
   selectedExecution: WorkflowExecution | null;
   onSelectExecution: (execution: WorkflowExecution | null) => void;
   onContextMenu: (event: MouseEvent, actions: ContextAction[]) => void;
+  nodeFilter?: string | null;
+  onClearNodeFilter?: () => void;
 }) {
+  const nodeFilterLabel = nodeFilter
+    ? workflow?.definition.nodes.find((n) => n.id === nodeFilter)?.title ?? nodeFilter
+    : null;
   const qc = useQueryClient();
   const retry = useMutation({
     mutationFn: (execution: WorkflowExecution) =>
@@ -297,6 +321,18 @@ function ExecutionsPanel({
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
+      {nodeFilterLabel && (
+        <div className="flex items-center gap-1 border-b border-white/10 bg-blue-500/10 px-3 py-1 text-[10px] text-blue-200">
+          <span className="truncate">Filtrando por nodo: {nodeFilterLabel}</span>
+          <button
+            type="button"
+            className="ml-auto rounded px-1 text-[10px] text-blue-100 underline-offset-2 hover:underline"
+            onClick={onClearNodeFilter}
+          >
+            limpiar
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-[18px_1fr_54px_48px] border-b border-white/10 px-3 py-1.5 text-[10px] text-slate-500">
         <span />
         <span>Lead</span>
@@ -591,6 +627,7 @@ export function WorkflowsPage() {
   const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
   const [menu, setMenu] = useState<ContextState>(null);
   const [simOpen, setSimOpen] = useState(false);
+  const [executionNodeFilter, setExecutionNodeFilter] = useState<string | null>(null);
 
   const workflowsQuery = useQuery({
     queryKey: ["workflows"],
@@ -614,7 +651,21 @@ export function WorkflowsPage() {
     queryFn: () => selected ? workflowsApi.executions(selected.id) : Promise.resolve([]),
     refetchInterval: 10_000,
   });
-  const executions = executionsQuery.data ?? [];
+  const allExecutions = executionsQuery.data ?? [];
+  const executions = useMemo(() => {
+    if (!executionNodeFilter) return allExecutions;
+    return allExecutions.filter((execution) =>
+      execution.replay?.some((step) => step.node_id === executionNodeFilter) ||
+      execution.current_node_id === executionNodeFilter ||
+      execution.failed_node === executionNodeFilter,
+    );
+  }, [allExecutions, executionNodeFilter]);
+
+  // Drop the node filter the moment the operator switches workflows so the
+  // filter doesn't quietly hide every execution under a different graph.
+  useEffect(() => {
+    setExecutionNodeFilter(null);
+  }, [selected?.id]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["workflows"] });
 
@@ -713,15 +764,23 @@ export function WorkflowsPage() {
     toast.success("Vista borrada");
   };
 
-  // JSON import: takes the file the user picked, tries to coerce it into the
-  // shape `workflowsApi.create` expects. We deliberately do NOT trust the
-  // file's `id`, `tenant_id`, or timestamps — those are server-assigned. We
-  // also reject anything that doesn't at least have a name + trigger_type
-  // so we surface a usable error instead of a 422 from the backend.
+  // JSON import. Caps and strip rules mirror the respond.io contract:
+  //   - File must be JSON, ≤ 400 KB, ≤ 100 nodes / 150 edges.
+  //   - Must have name + trigger_type.
+  //   - `id`, `tenant_id`, timestamps, metrics, validation are NEVER trusted
+  //     from the file — server-assigned.
+  //   - Name collisions get auto-numbered: "Foo" → "Foo (2)" → "Foo (3)".
+  //   - We strip references the current workspace can't resolve (agent_id /
+  //     pool / stage_id / workflow_id / user_id) and tell the operator what
+  //     was dropped via a validation toast.
   const onPickJsonFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = ""; // reset so picking the same file again re-fires
+    event.target.value = "";
     if (!file) return;
+    if (file.size > 400 * 1024) {
+      toast.error("Archivo demasiado grande", { description: "Máximo 400 KB." });
+      return;
+    }
     const reader = new FileReader();
     reader.onerror = () => toast.error("No se pudo leer el archivo");
     reader.onload = () => {
@@ -731,20 +790,80 @@ export function WorkflowsPage() {
           toast.error("JSON inválido", { description: "Falta `name` o `trigger_type`." });
           return;
         }
+        const definition = parsed.definition ?? { nodes: [], edges: [] };
+        const nodes = Array.isArray(definition.nodes) ? definition.nodes : [];
+        const edges = Array.isArray(definition.edges) ? definition.edges : [];
+        if (nodes.length > 100) {
+          toast.error("Workflow excede el límite", { description: `${nodes.length} nodos (máx 100).` });
+          return;
+        }
+        if (edges.length > 150) {
+          toast.error("Workflow excede el límite", { description: `${edges.length} aristas (máx 150).` });
+          return;
+        }
+        if (!nodes.length) {
+          toast.error("JSON inválido", { description: "El workflow no tiene nodos." });
+          return;
+        }
+
+        const stripped: string[] = [];
+        const knownAgentIds = new Set<string>();
+        // We don't have a tenant-scoped agent/pool/stage list here; the
+        // backend will validate references when the operator activates the
+        // workflow. What we *can* do now is wipe foreign IDs (UUID-looking
+        // strings) and let the operator re-select via the typed pickers,
+        // because importing across tenants almost always means the IDs are
+        // stale. The heuristic is: strip any `agent_id`/`user_id`/`pool`/
+        // `workflow_id`/`stage_id` whose value doesn't appear in this
+        // tenant's known list. For now, with no known list, we just blank
+        // them and report.
+        const sanitizedNodes = nodes.map((node) => {
+          if (!node || typeof node !== "object") return node;
+          const cfg = (node as { config?: Record<string, unknown> }).config ?? {};
+          const out: Record<string, unknown> = { ...cfg };
+          for (const key of ["agent_id", "user_id", "pool", "stage_id", "workflow_id"]) {
+            if (typeof out[key] === "string" && (out[key] as string).length > 0) {
+              stripped.push(`${(node as { id?: string }).id ?? "?"}.${key}`);
+              out[key] = "";
+            }
+          }
+          if (knownAgentIds.size && typeof out.agent_id === "string" && knownAgentIds.has(out.agent_id)) {
+            // (placeholder — currently unreachable; kept so the audit branch
+            // works once we wire a tenant agent list into this page).
+          }
+          return { ...(node as object), config: out };
+        });
+
+        // Name-collision numbering. We only see workflows the current tenant
+        // can list, so this is safe to dedupe locally before the POST.
+        const existingNames = new Set(workflows.map((w) => w.name));
+        let candidate = parsed.name;
+        if (existingNames.has(candidate)) {
+          let n = 2;
+          while (existingNames.has(`${parsed.name} (${n})`)) n++;
+          candidate = `${parsed.name} (${n})`;
+        }
+
         const body: Partial<WorkflowItem> = {
-          name: parsed.name,
+          name: candidate,
           description: parsed.description,
           trigger_type: parsed.trigger_type,
           trigger_config: parsed.trigger_config ?? {},
-          definition: parsed.definition ?? { nodes: [], edges: [] },
-          active: false, // imported workflows always land in draft
+          definition: { nodes: sanitizedNodes as WorkflowNode[], edges, ops: definition.ops },
+          active: false,
         };
         workflowsApi
           .create(body)
           .then((workflow) => {
             void invalidate();
             setSelectedId(workflow.id);
-            toast.success("Workflow importado", { description: `"${workflow.name}" creado en borrador.` });
+            const renamed = candidate !== parsed.name;
+            const lines = [
+              `"${workflow.name}" creado en borrador.`,
+              renamed ? `Renombrado para evitar colisión.` : null,
+              stripped.length ? `${stripped.length} referencias limpiadas — vuelve a seleccionarlas.` : null,
+            ].filter(Boolean) as string[];
+            toast.success("Workflow importado", { description: lines.join(" ") });
           })
           .catch((error) => toast.error("Importación rechazada", { description: error?.message ?? String(error) }));
       } catch (error) {
@@ -767,8 +886,32 @@ export function WorkflowsPage() {
     else if (action === "delete") remove.mutate(workflow.id);
     else if (action === "toggle") toggle.mutate(workflow);
     else if (action === "export") {
-      void navigator.clipboard.writeText(JSON.stringify(workflow, null, 2));
-      toast.success("Workflow copiado como JSON");
+      // We export a clean, importable shape — no metrics, validation, health,
+      // version_history, ids, or timestamps. The importer will refuse those
+      // anyway, but a small file is more useful for diffing and sharing.
+      const exportable = {
+        name: workflow.name,
+        description: workflow.description,
+        trigger_type: workflow.trigger_type,
+        trigger_config: workflow.trigger_config,
+        definition: workflow.definition,
+      };
+      const json = JSON.stringify(exportable, null, 2);
+      try {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${workflow.name.replace(/[^a-z0-9-_]+/gi, "_")}.workflow.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        void navigator.clipboard.writeText(json).catch(() => undefined);
+        toast.success("Workflow exportado", { description: "Archivo descargado y copiado al portapapeles." });
+      } catch (error) {
+        toast.error("No se pudo exportar", { description: error instanceof Error ? error.message : String(error) });
+      }
     } else if (action === "compare") {
       void workflowsApi.compare(workflow.id).then(() => toast.success("Comparación generada"));
     } else if (action === "restore") {
@@ -793,16 +936,18 @@ export function WorkflowsPage() {
     const metrics = workflows.map((workflow) => workflow.metrics);
     const total = (key: keyof WorkflowMetrics) => metrics.reduce((sum, item) => sum + Number(item[key] ?? 0), 0);
     const averageSuccess = metrics.length ? Math.round(metrics.reduce((sum, item) => sum + item.success_rate, 0) / metrics.length) : 0;
-    const spark = workflows[0]?.metrics.sparkline ?? [20, 30, 42, 36, 50, 48, 62];
+    const spark = workflows[0]?.metrics.sparkline ?? [];
+    // We don't yet store a real "vs ayer" comparison; show em-dash instead of inventing one.
+    const noDelta = "— vs ayer";
     return [
-      { label: "Flujos activos", value: String(workflows.filter((workflow) => workflow.active).length), delta: "↑ 5 vs ayer", status: "ok" as const, values: spark },
-      { label: "Flujos críticos", value: String(workflows.filter((workflow) => workflow.health.status === "critical").length), delta: "↑ 1 vs ayer", status: "critical" as const, values: spark.map((value) => 100 - value) },
-      { label: "Ejecuciones hoy", value: formatNumber(total("executions_today")), delta: "↑ 12.6% vs ayer", status: "info" as const, values: spark },
-      { label: "Tasa de éxito", value: `${averageSuccess}%`, delta: "↑ 2.8 pp vs ayer", status: "ok" as const, values: spark },
-      { label: "Leads afectados", value: formatNumber(total("leads_affected_today")), delta: "↑ 18 vs ayer", status: "warn" as const, values: spark },
-      { label: "Handoffs fallidos", value: formatNumber(total("failed_handoffs")), delta: "↓ 5 vs ayer", status: "critical" as const, values: spark.map((value) => value / 2) },
-      { label: "Documentos detenidos", value: formatNumber(total("documents_blocked")), delta: "↑ 6 vs ayer", status: "warn" as const, values: spark },
-      { label: "Errores últimas 24h", value: formatNumber(total("critical_failures_24h")), delta: "↑ 14 vs ayer", status: "critical" as const, values: spark.map((value) => 100 - value) },
+      { label: "Flujos activos", value: String(workflows.filter((workflow) => workflow.active).length), delta: noDelta, status: "ok" as const, values: spark },
+      { label: "Flujos críticos", value: String(workflows.filter((workflow) => workflow.health.status === "critical").length), delta: noDelta, status: "critical" as const, values: spark },
+      { label: "Ejecuciones hoy", value: formatNumber(total("executions_today")), delta: noDelta, status: "info" as const, values: spark },
+      { label: "Tasa de éxito", value: `${averageSuccess}%`, delta: noDelta, status: "ok" as const, values: spark },
+      { label: "Leads afectados", value: formatNumber(total("leads_affected_today")), delta: noDelta, status: "warn" as const, values: spark },
+      { label: "Handoffs fallidos", value: formatNumber(total("failed_handoffs")), delta: noDelta, status: "critical" as const, values: spark },
+      { label: "Documentos detenidos", value: formatNumber(total("documents_blocked")), delta: noDelta, status: "warn" as const, values: spark },
+      { label: "Errores últimas 24h", value: formatNumber(total("critical_failures_24h")), delta: noDelta, status: "critical" as const, values: spark },
     ];
   }, [workflows]);
 
@@ -925,7 +1070,18 @@ export function WorkflowsPage() {
 
         <div className="flex min-h-0 flex-col gap-2">
           {selected ? (
-            <WorkflowEditor workflow={selected} onRunSimulation={() => setSimOpen(true)} onContextMenu={openContextMenu} />
+            <WorkflowEditor
+              workflow={selected}
+              onRunSimulation={() => setSimOpen(true)}
+              onContextMenu={openContextMenu}
+              onShowExecutions={(nodeId) => {
+                setExecutionNodeFilter(nodeId);
+                const node = selected.definition.nodes.find((n) => n.id === nodeId);
+                toast.success("Filtrando ejecuciones", {
+                  description: node?.title ? `Nodo: ${node.title}` : `Nodo ${nodeId}`,
+                });
+              }}
+            />
           ) : (
             <div className="flex flex-1 items-center justify-center rounded-md border border-white/10 bg-[#0d1822] text-sm text-slate-500">Selecciona un workflow para editarlo.</div>
           )}
@@ -936,7 +1092,15 @@ export function WorkflowsPage() {
         </div>
 
         <div className="flex min-h-0 flex-col gap-2">
-          <ExecutionsPanel workflow={selected} executions={executions} selectedExecution={selectedExecution} onSelectExecution={setSelectedExecution} onContextMenu={openContextMenu} />
+          <ExecutionsPanel
+            workflow={selected}
+            executions={executions}
+            selectedExecution={selectedExecution}
+            onSelectExecution={setSelectedExecution}
+            onContextMenu={openContextMenu}
+            nodeFilter={executionNodeFilter}
+            onClearNodeFilter={() => setExecutionNodeFilter(null)}
+          />
           <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-2">
             <ValidationPanel workflow={selected} />
             <SafetyPanel

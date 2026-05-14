@@ -106,6 +106,7 @@ export interface WorkflowItem {
   dependencies: WorkflowDependency[];
   safety_rules: Record<string, boolean>;
   version_history: WorkflowVersion[];
+  webhook_url: string | null;
 }
 
 export interface WorkflowExecution {
@@ -160,6 +161,16 @@ export interface WorkflowTemplate {
   created_at: string;
   updated_at: string;
 }
+
+export interface PipelineStageDef {
+  id: string;
+  label: string;
+  color: string | null;
+}
+
+export const pipelineStagesApi = {
+  list: async () => (await api.get<PipelineStageDef[]>("/pipeline/stages")).data,
+};
 
 export const workflowsApi = {
   list: async () => (await api.get<WorkflowItem[]>("/workflows")).data,

@@ -64,8 +64,11 @@ TRIGGERS: frozenset[str] = frozenset({
     "stage_entered",
     "stage_changed",
     "conversation_created",
+    "conversation_closed",
     "appointment_created",
     "bot_paused",
+    "webhook_received",
+    "tag_updated",
 })
 
 NODE_TYPES: frozenset[str] = frozenset({
@@ -80,6 +83,9 @@ NODE_TYPES: frozenset[str] = frozenset({
     "pause_bot",
     "delay",
     "condition",
+    "jump_to",
+    "http_request",
+    "branch",
     # Operations Center visual/editor node aliases. The execution engine
     # treats unknown side-effect aliases as pass-through actions, while the
     # API validation/simulation layer gives operators richer diagnostics.
@@ -175,12 +181,66 @@ def validate_definition(definition: dict) -> None:
         if node.get("type") == "condition":
             field = config.get("field", "")
             _ensure_condition_field_allowed(field)
+        if node.get("type") == "branch":
+            branches = config.get("branches")
+            if not isinstance(branches, list) or not branches:
+                raise WorkflowValidationError(
+                    f"branch node {node['id']} needs at least one branch",
+                )
+            for index, branch in enumerate(branches):
+                if not isinstance(branch, dict):
+                    raise WorkflowValidationError(
+                        f"branch node {node['id']} branch #{index} must be an object",
+                    )
+                label = branch.get("label")
+                if not isinstance(label, str) or not label.strip():
+                    raise WorkflowValidationError(
+                        f"branch node {node['id']} branch #{index} needs a non-empty label",
+                    )
+                group = branch.get("group")
+                if not isinstance(group, dict):
+                    raise WorkflowValidationError(
+                        f"branch node {node['id']} branch {label!r} needs a group",
+                    )
+                _validate_branch_group(group, where=f"branch {label!r}")
+        if node.get("type") == "jump_to":
+            target = config.get("target_node_id")
+            if not isinstance(target, str) or not target:
+                raise WorkflowValidationError(
+                    f"jump_to node {node['id']} needs target_node_id",
+                )
+        if node.get("type") == "http_request":
+            method = str(config.get("method", "")).upper()
+            if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+                raise WorkflowValidationError(
+                    f"http_request node {node['id']} method must be GET/POST/PUT/PATCH/DELETE",
+                )
+            url = config.get("url")
+            if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
+                raise WorkflowValidationError(
+                    f"http_request node {node['id']} url must start with http:// or https://",
+                )
+            timeout = int(config.get("timeout_seconds", 10) or 10)
+            if timeout < 1 or timeout > 60:
+                raise WorkflowValidationError(
+                    f"http_request node {node['id']} timeout must be 1..60 seconds",
+                )
 
     for edge in edges:
         if not isinstance(edge, dict):
             raise WorkflowValidationError("edges must be objects")
         if edge.get("from") not in ids or edge.get("to") not in ids:
             raise WorkflowValidationError("edge references an unknown node")
+
+    # jump_to targets must reference a real node in the same graph.
+    for node in nodes:
+        if node.get("type") != "jump_to":
+            continue
+        target = (node.get("config") or {}).get("target_node_id")
+        if target not in ids:
+            raise WorkflowValidationError(
+                f"jump_to node {node['id']} target {target!r} not in definition",
+            )
 
     # Condition nodes must have both true and false branches so executions
     # don't dead-end silently.
@@ -194,6 +254,57 @@ def validate_definition(definition: dict) -> None:
             )
 
     _ensure_acyclic(node_by_id, edges)
+
+
+# Operators accepted by the `branch` step's individual rules. Keep this list
+# tight on purpose — anything fancier (regex, "in", date math) belongs in a
+# typed extension, not in a string-soup config.
+_BRANCH_OPERATORS: frozenset[str] = frozenset({
+    "eq",
+    "neq",
+    "exists",
+    "not_exists",
+    "contains",
+    "not_contains",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+})
+
+
+def _validate_branch_group(group: dict, *, where: str, depth: int = 0) -> None:
+    """A group is ``{op: 'and'|'or', rules: [...]}`` where each rule is either a
+    leaf ``{field, operator, value}`` or another nested group. Depth is capped
+    to keep evaluation cost bounded — operators don't need deep nesting.
+    """
+    if depth > 3:
+        raise WorkflowValidationError(f"{where}: group nesting exceeds 3")
+    op = group.get("op")
+    if op not in {"and", "or"}:
+        raise WorkflowValidationError(f"{where}: group op must be 'and' or 'or'")
+    rules = group.get("rules")
+    if not isinstance(rules, list) or not rules:
+        raise WorkflowValidationError(f"{where}: group needs at least one rule")
+    if len(rules) > 20:
+        raise WorkflowValidationError(f"{where}: group exceeds 20 rules")
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            raise WorkflowValidationError(f"{where}: rule #{index} must be an object")
+        if "rules" in rule:
+            _validate_branch_group(rule, where=f"{where} > rule #{index}", depth=depth + 1)
+            continue
+        field = rule.get("field", "")
+        if not isinstance(field, str) or "." not in field:
+            raise WorkflowValidationError(
+                f"{where}: rule #{index} needs a 'namespace.key' field, got {field!r}",
+            )
+        _ensure_condition_field_allowed(field)
+        operator = rule.get("operator", "eq")
+        if operator not in _BRANCH_OPERATORS:
+            raise WorkflowValidationError(
+                f"{where}: rule #{index} operator {operator!r} not in {sorted(_BRANCH_OPERATORS)}",
+            )
 
 
 def _ensure_condition_field_allowed(field: str) -> None:
@@ -224,18 +335,19 @@ def _ensure_condition_field_allowed(field: str) -> None:
 def _ensure_acyclic(node_by_id: dict[str, dict], edges: list[dict]) -> None:
     """Reject cycles in the synchronous control-flow graph.
 
-    Edges leaving a ``delay`` node don't count: a delay pauses execution and
-    re-enqueues the next node as a fresh job, so a back-edge through a delay
-    isn't a tight loop — the persisted ``MAX_STEPS`` counter caps it.
+    Edges leaving a ``delay`` or ``jump_to`` node don't count: ``delay`` pauses
+    execution and re-enqueues the next node as a fresh job, and ``jump_to``
+    intentionally creates loops (for retry-question flows, menu loops, etc.).
+    The persisted ``MAX_STEPS`` counter caps either case.
     """
-    delay_ids: set[str] = {
-        nid for nid, n in node_by_id.items() if n.get("type") == "delay"
+    bypass_ids: set[str] = {
+        nid for nid, n in node_by_id.items() if n.get("type") in {"delay", "jump_to"}
     }
     adj: dict[str, list[str]] = {nid: [] for nid in node_by_id}
     for edge in edges:
         src = edge.get("from")
         dst = edge.get("to")
-        if src in delay_ids:
+        if src in bypass_ids:
             continue
         if src in adj and dst is not None:
             adj[src].append(dst)
@@ -433,6 +545,22 @@ def _trigger_matches(config: dict, payload: dict) -> bool:
     from_stage = config.get("from")
     if from_stage and payload.get("from") != from_stage:
         return False
+    # tag_updated filters. ``action`` may be "added"/"removed"; ``tags`` is a
+    # list — the trigger fires only if at least one of those tags appears in
+    # the corresponding side of the event payload.
+    action = config.get("action")
+    if action:
+        if payload.get("action") != action:
+            return False
+    expected_tags = config.get("tags")
+    if isinstance(expected_tags, list) and expected_tags:
+        changed = payload.get("changed_tags")
+        if not isinstance(changed, list) or not any(t in changed for t in expected_tags):
+            return False
+    # conversation_closed: filter by category (operator-defined free-form).
+    expected_category = config.get("category")
+    if expected_category and payload.get("category") != expected_category:
+        return False
     return True
 
 
@@ -493,7 +621,29 @@ async def execute_workflow(
                 )
             execution.current_node_id = current
             execution.steps_completed += 1
-            next_node = await _execute_node(session, workflow, execution, node, edges)
+            try:
+                next_node = await _execute_node(session, workflow, execution, node, edges)
+            except _ExecutionFailure as exc:
+                # If the operator wired a "failure" edge from this node, route
+                # to it instead of failing the whole execution. We stash the
+                # per-step failure in output_json["step_failures"] so the audit
+                # log can show why the branch was taken, but we do NOT set
+                # execution.error/error_code — those are reserved for the
+                # whole-execution failure path.
+                failure_branch = _next_node(edges, current, "failure")
+                if failure_branch is not None:
+                    output = dict(execution.output_json or {})
+                    failures = list(output.get("step_failures") or [])
+                    failures.append({
+                        "node_id": current,
+                        "error_code": exc.code,
+                        "error": str(exc)[:500],
+                    })
+                    output["step_failures"] = failures
+                    execution.output_json = output
+                    current = failure_branch
+                    continue
+                raise
             if node.get("type") == "delay":
                 execution.status = "paused"
                 await session.flush()
@@ -580,6 +730,32 @@ async def _execute_node(
     elif node_type == "condition":
         result = await _resolve_condition(session, execution, config)
         return _next_node(edges, node["id"], "true" if result else "false")
+    elif node_type == "branch":
+        label = await _resolve_branch(session, execution, config)
+        # Try the matched branch label; if no edge for it (or no branch
+        # matched), fall back to the "else" edge. If neither exists, the
+        # graph dead-ends and the execution completes.
+        chosen = _next_node(edges, node["id"], label) if label else None
+        if chosen is not None:
+            return chosen
+        return _next_node(edges, node["id"], "else")
+    elif node_type == "jump_to":
+        # Target is structurally validated to exist by validate_definition; we
+        # still guard at runtime in case the definition mutated between
+        # validate and execute.
+        target = str(config.get("target_node_id") or "")
+        return target or None
+    elif node_type == "http_request":
+        ok = await _node_http_request(session, workflow, execution, node, config)
+        if not ok:
+            # Routes to the "failure" edge via the universal handler in
+            # execute_workflow, or surfaces as a workflow failure if none.
+            raise _ExecutionFailure("http_request returned non-2xx or errored", code="HTTP_REQUEST_FAILED")
+        # Honor explicit "success" branch if the operator wired one.
+        explicit = _next_node(edges, node["id"], "success")
+        if explicit is not None:
+            return explicit
+        return _next_node(edges, node["id"])
     return _next_node(edges, node["id"])
 
 
@@ -898,6 +1074,67 @@ async def _node_pause_bot(
     )
 
 
+async def _node_http_request(
+    session: AsyncSession,
+    workflow: Workflow,
+    execution: WorkflowExecution,
+    node: dict,
+    config: dict,
+) -> bool:
+    """Call an external HTTP service.
+
+    Returns True on a 2xx response, False otherwise. The caller routes to the
+    ``success`` / ``failure`` edge based on this boolean. Idempotent via
+    ``WorkflowActionRun`` so retries from a failed node don't double-send.
+
+    Responses are stashed under ``execution.output_json['http_responses'][node_id]``
+    so downstream nodes (and the audit log) can read status/body without us
+    having to design a full variable namespace yet.
+    """
+    import httpx  # lazy import: only spawned engines need it
+    method = str(config.get("method", "GET")).upper()
+    url = str(config.get("url", ""))
+    timeout = max(1, min(60, int(config.get("timeout_seconds", 10) or 10)))
+    headers_raw = config.get("headers") or {}
+    headers = {str(k): str(v) for k, v in headers_raw.items()} if isinstance(headers_raw, dict) else {}
+    body = config.get("body")
+
+    fresh = await _record_action(session, execution, node["id"])
+    if not fresh:
+        # Idempotent retry — preserve whatever the prior attempt stored.
+        prior = (execution.output_json or {}).get("http_responses", {}).get(node["id"], {})
+        return bool(prior.get("ok", False))
+
+    response_summary: dict[str, Any] = {"method": method, "url": url}
+    ok = False
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.request(
+                method,
+                url,
+                headers=headers,
+                json=body if isinstance(body, (dict, list)) else None,
+            )
+        response_summary["status_code"] = response.status_code
+        response_summary["ok"] = 200 <= response.status_code < 300
+        # Cap body to 4KB so a runaway 50MB payload can't blow up the JSONB row.
+        try:
+            response_summary["body"] = response.json()
+        except Exception:
+            response_summary["body"] = response.text[:4096]
+        ok = response_summary["ok"]
+    except httpx.HTTPError as exc:
+        response_summary["error"] = type(exc).__name__
+        response_summary["ok"] = False
+
+    output = dict(execution.output_json or {})
+    http_responses = dict(output.get("http_responses") or {})
+    http_responses[node["id"]] = response_summary
+    output["http_responses"] = http_responses
+    execution.output_json = output
+    return ok
+
+
 async def _node_delay(
     session: AsyncSession,
     workflow: Workflow,
@@ -912,6 +1149,85 @@ async def _node_delay(
     next_node = _next_node(edges, node["id"])
     execution.current_node_id = next_node
     await _enqueue_workflow_step(execution.id, next_node, defer_seconds=seconds, node_id=node["id"])
+
+
+async def _resolve_branch(
+    session: AsyncSession,
+    execution: WorkflowExecution,
+    config: dict,
+) -> str | None:
+    """Return the label of the first branch whose group evaluates True.
+
+    Each branch is ``{label, group}``. ``group`` is ``{op: and|or, rules}``;
+    a rule is either a leaf ``{field, operator, value}`` or a nested group.
+    """
+    branches = config.get("branches") or []
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        group = branch.get("group")
+        if not isinstance(group, dict):
+            continue
+        if await _eval_group(session, execution, group):
+            return str(branch.get("label"))
+    return None
+
+
+async def _eval_group(
+    session: AsyncSession,
+    execution: WorkflowExecution,
+    group: dict,
+) -> bool:
+    op = group.get("op", "and")
+    rules = group.get("rules") or []
+    if not rules:
+        return False
+    results: list[bool] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        if "rules" in rule:
+            results.append(await _eval_group(session, execution, rule))
+        else:
+            results.append(await _eval_rule(session, execution, rule))
+    return all(results) if op == "and" else any(results)
+
+
+async def _eval_rule(
+    session: AsyncSession,
+    execution: WorkflowExecution,
+    rule: dict,
+) -> bool:
+    field = rule.get("field", "")
+    namespace, _, key = field.partition(".")
+    operator = rule.get("operator", "eq")
+    expected = rule.get("value")
+    actual = await _read_condition_value(session, execution, namespace, key)
+    if operator == "eq":
+        return actual == expected
+    if operator == "neq":
+        return actual != expected
+    if operator == "exists":
+        return actual is not None
+    if operator == "not_exists":
+        return actual is None
+    if operator == "contains":
+        return isinstance(actual, str) and isinstance(expected, str) and expected in actual
+    if operator == "not_contains":
+        return not (isinstance(actual, str) and isinstance(expected, str) and expected in actual)
+    # Numeric comparators: coerce both sides, but a failure short-circuits to False.
+    try:
+        if operator == "gt":
+            return float(actual) > float(expected)  # type: ignore[arg-type]
+        if operator == "gte":
+            return float(actual) >= float(expected)  # type: ignore[arg-type]
+        if operator == "lt":
+            return float(actual) < float(expected)  # type: ignore[arg-type]
+        if operator == "lte":
+            return float(actual) <= float(expected)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return False
 
 
 async def _resolve_condition(

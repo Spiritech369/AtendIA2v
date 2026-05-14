@@ -197,6 +197,7 @@ class WorkflowItem(BaseModel):
     dependencies: list[dict]
     safety_rules: dict
     version_history: list[dict]
+    webhook_url: str | None = None
 
 
 class ExecutionItem(BaseModel):
@@ -291,55 +292,103 @@ def _default_safety_rules(overrides: dict | None = None) -> dict:
     return rules
 
 
+_MUSTACHE_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}")
+
+
+def _scan_definition_strings(definition: dict) -> list[tuple[str, int]]:
+    """Yield (string_value, node_index_1based) for every string inside node configs.
+
+    Index 1 = trigger row in the editor; subsequent nodes are 2..N. We use a
+    1-based "used_in" so the operator sees row numbers that match the UI.
+    """
+    out: list[tuple[str, int]] = []
+    nodes = definition.get("nodes") or []
+    for idx, node in enumerate(nodes, start=1):
+        config = node.get("config") or {}
+        for value in _walk_strings(config):
+            out.append((value, idx))
+    return out
+
+
+def _walk_strings(obj):
+    if isinstance(obj, str):
+        yield obj
+        return
+    if isinstance(obj, dict):
+        for value in obj.values():
+            yield from _walk_strings(value)
+        return
+    if isinstance(obj, (list, tuple)):
+        for value in obj:
+            yield from _walk_strings(value)
+
+
 def _default_variables(workflow: Workflow) -> list[dict]:
+    """Variables actually referenced in this workflow's node configs.
+
+    We surface every ``{{name}}`` mustache token that appears in any node's
+    config, with which row(s) reference it. Operator-supplied overrides under
+    ``definition.ops.variable_status`` and ``definition.ops.variable_values``
+    still win — those are real persisted values, not fixtures.
+    """
     ops = _ops(workflow.definition)
     statuses = ops.get("variable_status") if isinstance(ops.get("variable_status"), dict) else {}
-    last_values = {
-        "nombre": "Juan Pérez",
-        "telefono": "5512345678",
-        "tipo_credito": "nómina",
-        "plan_credito": "36 meses",
-        "modelo_moto": "DM 200",
-        "documentos_faltantes": "INE, comprobante",
-        "asesor_asignado": "Ana Díaz",
-        "lifecycle_stage": "calificado",
-    }
-    created_in = {
-        "nombre": "trigger",
-        "telefono": "trigger",
-        "tipo_credito": "n4",
-        "plan_credito": "n4",
-        "modelo_moto": "n5",
-        "documentos_faltantes": "n5",
-        "asesor_asignado": "n7",
-        "lifecycle_stage": "n11",
-    }
+    last_values = ops.get("variable_values") if isinstance(ops.get("variable_values"), dict) else {}
+    used: dict[str, set[int]] = {}
+    for raw, idx in _scan_definition_strings(workflow.definition or {}):
+        for match in _MUSTACHE_RE.findall(raw):
+            used.setdefault(match, set()).add(idx)
     return [
         {
             "name": f"{{{{{name}}}}}",
             "raw_name": name,
-            "created_in": created_in.get(name, "trigger"),
-            "used_in": [idx for idx in [2, 5, 8, 9] if (len(name) + idx) % 2 == 0] or [2],
+            "created_in": "trigger",
+            "used_in": sorted(rows),
             "last_value": last_values.get(name),
             "status": str(statuses.get(name, "ok")),
         }
-        for name in _VARIABLE_NAMES
+        for name, rows in sorted(used.items())
     ]
 
 
 def _default_dependencies(workflow: Workflow) -> list[dict]:
+    """External references actually present in this workflow's node configs.
+
+    Scans node configs for shapes we know how to introspect: ``template`` ->
+    whatsapp_template, ``agent_id`` -> ai_agent, ``pool`` -> advisor_pool,
+    ``pipeline_id``/``stage_id`` -> pipeline_stage, ``workflow_id`` ->
+    linked_workflow. ``definition.ops.dependency_status`` can override status.
+    """
     ops = _ops(workflow.definition)
     dep_status = ops.get("dependency_status") if isinstance(ops.get("dependency_status"), dict) else {}
-    items = [
-        ("ai_agent", "Recepcionista"),
-        ("ai_agent", "Sales Agent"),
-        ("whatsapp_template", "bienvenida_v3"),
-        ("knowledge_base", "requisitos_credito"),
-        ("custom_field", "plan_credito"),
-        ("advisor_pool", "Ventas Monterrey"),
-        ("business_hours", "Horario laboral Monterrey"),
-        ("linked_workflow", "Reactivación documentos"),
-    ]
+    nodes = (workflow.definition or {}).get("nodes") or []
+    seen: list[tuple[str, str]] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    def add(dep_type: str, name: str) -> None:
+        key = (dep_type, name)
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        seen.append(key)
+
+    for node in nodes:
+        config = node.get("config") or {}
+        if not isinstance(config, dict):
+            continue
+        if isinstance(config.get("template"), str):
+            add("whatsapp_template", config["template"])
+        if isinstance(config.get("agent_id"), str):
+            add("ai_agent", config["agent_id"])
+        if isinstance(config.get("pool"), str):
+            add("advisor_pool", config["pool"])
+        if isinstance(config.get("stage_id"), str):
+            add("pipeline_stage", config["stage_id"])
+        if isinstance(config.get("pipeline_id"), str):
+            add("pipeline", config["pipeline_id"])
+        if isinstance(config.get("workflow_id"), str):
+            add("linked_workflow", config["workflow_id"])
+
     return [
         {
             "type": dep_type,
@@ -347,33 +396,37 @@ def _default_dependencies(workflow: Workflow) -> list[dict]:
             "status": str(dep_status.get(name, "ok")),
             "details": {
                 "last_checked": datetime.now(UTC).isoformat(),
-                "owner": "Operaciones",
             },
         }
-        for dep_type, name in items
+        for dep_type, name in seen
     ]
 
 
 def _base_metrics(workflow: Workflow) -> dict:
+    """Per-workflow KPI snapshot.
+
+    We don't yet have a real aggregator that materializes daily counts per
+    workflow, so we honestly return zeros for a fresh workflow. Anything an
+    operator has explicitly persisted under ``definition.ops.metrics`` wins.
+    """
     ops = _ops(workflow.definition)
     metrics = ops.get("metrics") if isinstance(ops.get("metrics"), dict) else {}
-    seed = sum(ord(ch) for ch in str(workflow.id))
     defaults = {
-        "executions_today": seed % 160 + 40,
-        "success_rate": max(52, min(99, 96 - seed % 38)),
-        "failure_rate": seed % 28,
-        "avg_duration_seconds": seed % 80 + 12,
-        "dropoff_rate": seed % 56,
-        "leads_affected_today": seed % 90 + 8,
-        "failed_handoffs": seed % 12,
-        "documents_blocked": seed % 25,
-        "missed_followups": seed % 18,
-        "appointments_not_confirmed": seed % 9,
-        "blocked_opportunity_mxn": (seed % 90 + 12) * 1000,
-        "critical_failures_24h": seed % 5,
-        "ai_low_confidence_events": seed % 14,
-        "last_run_minutes_ago": seed % 180,
-        "sparkline": [max(8, (seed + i * 17) % 100) for i in range(7)],
+        "executions_today": 0,
+        "success_rate": 0,
+        "failure_rate": 0,
+        "avg_duration_seconds": 0,
+        "dropoff_rate": 0,
+        "leads_affected_today": 0,
+        "failed_handoffs": 0,
+        "documents_blocked": 0,
+        "missed_followups": 0,
+        "appointments_not_confirmed": 0,
+        "blocked_opportunity_mxn": 0,
+        "critical_failures_24h": 0,
+        "ai_low_confidence_events": 0,
+        "last_run_minutes_ago": 0,
+        "sparkline": [],
     }
     defaults.update(metrics)
     return defaults
@@ -575,6 +628,11 @@ def _item(row: Workflow) -> WorkflowItem:
         dependencies=_default_dependencies(row),
         safety_rules=_default_safety_rules(ops.get("safety_rules")),
         version_history=_version_history(row),
+        webhook_url=(
+            f"/api/v1/webhooks/workflow/{row.webhook_token}"
+            if row.trigger_type == "webhook_received" and row.webhook_token
+            else None
+        ),
     )
 
 
@@ -695,6 +753,9 @@ async def create_workflow(
         except WorkflowValidationError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     row = Workflow(tenant_id=tenant_id, **body.model_dump())
+    if row.trigger_type == "webhook_received" and not row.webhook_token:
+        import secrets
+        row.webhook_token = secrets.token_urlsafe(24)
     session.add(row)
     await session.flush()
     await emit_admin_event(
@@ -762,6 +823,16 @@ async def patch_workflow(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     for key, value in values.items():
         setattr(row, key, value)
+    # Auto-mint a webhook_token the first time the operator picks the
+    # webhook trigger. Tokens are URL-safe and globally unique (partial
+    # index); we clear them again if they switch off the webhook trigger so
+    # an old URL doesn't keep accepting calls for a workflow that no longer
+    # wants them.
+    if row.trigger_type == "webhook_received" and not row.webhook_token:
+        import secrets
+        row.webhook_token = secrets.token_urlsafe(24)
+    elif row.trigger_type != "webhook_received" and row.webhook_token:
+        row.webhook_token = None
     row.version = (row.version or 1) + 1
     row.updated_at = datetime.now(UTC)
     await emit_admin_event(

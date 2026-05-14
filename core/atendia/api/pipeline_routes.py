@@ -598,6 +598,39 @@ async def _board_cards_one_shot(
     return grouped
 
 
+class PipelineStageDef(BaseModel):
+    id: str
+    label: str
+    color: str | None = None
+
+
+@router.get("/stages", response_model=list[PipelineStageDef])
+async def list_pipeline_stages(
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[PipelineStageDef]:
+    """Lightweight stages list for pickers (move_stage, stage_entered trigger, etc.).
+
+    Returns an empty list if no active pipeline exists, so callers can render an
+    informative empty state without handling 404.
+    """
+    definition = (
+        await session.execute(
+            select(TenantPipeline.definition)
+            .where(TenantPipeline.tenant_id == tenant_id, TenantPipeline.active.is_(True))
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if not isinstance(definition, dict):
+        return []
+    return [
+        PipelineStageDef(id=str(s["id"]), label=str(s.get("label") or s["id"]), color=s.get("color"))
+        for s in _stage_defs(definition)
+    ]
+
+
 @router.get("/board", response_model=PipelineBoardResponse)
 async def get_pipeline_board(
     user: AuthUser = Depends(current_user),

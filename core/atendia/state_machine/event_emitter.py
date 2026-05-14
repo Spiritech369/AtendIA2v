@@ -14,7 +14,7 @@ class EventEmitter:
     async def emit(
         self,
         *,
-        conversation_id: UUID,
+        conversation_id: UUID | None,
         tenant_id: UUID,
         event_type: EventType,
         payload: dict,

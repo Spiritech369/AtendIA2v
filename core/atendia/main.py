@@ -61,6 +61,7 @@ from atendia.api.workflows_routes import (
 from atendia.realtime.ws_routes import router as ws_router
 from atendia.tools import register_all_tools
 from atendia.webhooks.meta_routes import router as meta_webhook_router
+from atendia.webhooks.workflow_routes import router as workflow_webhook_router
 
 
 @asynccontextmanager
@@ -147,6 +148,7 @@ app.include_router(
 )
 app.include_router(runner_router, prefix="/api/v1")
 app.include_router(meta_webhook_router)
+app.include_router(workflow_webhook_router, prefix="/api/v1/webhooks", tags=["webhooks"])
 app.include_router(ws_router)
 
 

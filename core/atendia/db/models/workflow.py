@@ -19,6 +19,9 @@ class Workflow(Base):
     trigger_config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     definition: Mapped[dict] = mapped_column(JSONB, default=dict, server_default='{"nodes":[],"edges":[]}')
     active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Public token used to identify this workflow on POST /webhooks/workflow/{token}.
+    # NULL unless the operator selected the "webhook_received" trigger.
+    webhook_token: Mapped[str | None] = mapped_column(String(48), unique=True)
     # Optimistic-locking counter (migration 028). PATCH/toggle increments this
     # only when the client's expected version matches the row — two concurrent
     # admin edits result in 409 instead of last-write-wins.

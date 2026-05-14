@@ -16,6 +16,9 @@ class EventType(str, Enum):
     ERROR_OCCURRED = "error_occurred"
     CONVERSATION_UPDATED = "conversation_updated"
     CONVERSATION_DELETED = "conversation_deleted"
+    CONVERSATION_CLOSED = "conversation_closed"
+    WEBHOOK_RECEIVED = "webhook_received"
+    TAG_UPDATED = "tag_updated"
 
 
 class Event(BaseModel):

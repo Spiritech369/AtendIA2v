@@ -984,6 +984,22 @@ class ConversationPatchBody(BaseModel):
     assigned_user_id: UUID | None = None
     assigned_agent_id: UUID | None = None
     tags: list[str] | None = Field(default=None, max_length=10)
+    status: str | None = Field(
+        default=None,
+        description="Conversation status. Use 'resolved'/'closed' to close.",
+    )
+    close_reason: str | None = Field(default=None, max_length=200)
+    close_category: str | None = Field(default=None, max_length=60)
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        allowed = {"active", "resolved", "closed", "archived"}
+        if value not in allowed:
+            raise ValueError(f"status must be one of {sorted(allowed)}")
+        return value
 
     @field_validator("tags")
     @classmethod
@@ -1026,7 +1042,7 @@ async def patch_conversation(
     """Partial update: change stage, assign/unassign user, set tags."""
     own = (
         await session.execute(
-            select(Conversation.id, Conversation.current_stage).where(
+            select(Conversation.id, Conversation.current_stage, Conversation.status).where(
                 Conversation.id == conversation_id,
                 Conversation.tenant_id == tenant_id,
                 Conversation.deleted_at.is_(None),
@@ -1083,8 +1099,28 @@ async def patch_conversation(
                 raise HTTPException(status.HTTP_404_NOT_FOUND, "assigned agent not found")
         values["assigned_agent_id"] = body.assigned_agent_id
 
+    tags_before: list[str] = []
+    tags_after: list[str] = []
     if "tags" in fields and body.tags is not None:
+        # Pre-image fetch so we can diff added vs removed cleanly. Keeps the
+        # event payload deterministic regardless of order in the new list.
+        prior_tags = (
+            await session.execute(
+                select(Conversation.tags).where(Conversation.id == conversation_id)
+            )
+        ).scalar_one_or_none()
+        tags_before = list(prior_tags or [])
+        tags_after = list(body.tags)
         values["tags"] = body.tags
+
+    closing = False
+    closed_states = {"resolved", "closed", "archived"}
+    if "status" in fields and body.status is not None:
+        values["status"] = body.status
+        # "Closing" means transitioning *into* a terminal status from a
+        # non-terminal one. Re-PATCHing the same closed status doesn't
+        # re-fire the trigger.
+        closing = body.status in closed_states and own.status not in closed_states
 
     if values:
         await session.execute(
@@ -1109,6 +1145,53 @@ async def patch_conversation(
             event_type=EventType.CONVERSATION_UPDATED,
             payload={"fields": list(values.keys()), "by": str(user.user_id)},
         )
+        if closing:
+            # Separate trigger event so workflows can react to the transition
+            # specifically. The payload carries the operator-supplied reason
+            # and category, plus a fixed "source: user" because the API path
+            # is always user-driven (bot/workflow-driven closes will set this
+            # to the right source when they're added).
+            await emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.CONVERSATION_CLOSED,
+                payload={
+                    "status": body.status,
+                    "reason": body.close_reason,
+                    "category": body.close_category,
+                    "source": "user",
+                    "by": str(user.user_id),
+                },
+            )
+        # Tag diff: fire one event per side that changed. The engine matcher
+        # filters by ``action`` and intersects ``tags`` against ``changed_tags``.
+        if "tags" in fields:
+            added = sorted(set(tags_after) - set(tags_before))
+            removed = sorted(set(tags_before) - set(tags_after))
+            if added:
+                await emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.TAG_UPDATED,
+                    payload={
+                        "action": "added",
+                        "changed_tags": added,
+                        "current_tags": tags_after,
+                        "by": str(user.user_id),
+                    },
+                )
+            if removed:
+                await emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.TAG_UPDATED,
+                    payload={
+                        "action": "removed",
+                        "changed_tags": removed,
+                        "current_tags": tags_after,
+                        "by": str(user.user_id),
+                    },
+                )
 
         await session.commit()
 
