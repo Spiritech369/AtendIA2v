@@ -55,6 +55,7 @@ import {
 } from "@/features/agents/api";
 import { DemoBadge } from "@/components/DemoBadge";
 import { NYIButton } from "@/components/NYIButton";
+import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const roleOptions = [
@@ -88,14 +89,14 @@ const intentOptions = [
   "HUMAN_REQUESTED",
 ];
 
-// Trimmed tabs: only the surfaces that are wired to the runner and
-// reflect real state. Decision Map / Monitor / Knowledge / Pruebas /
-// Guardrails were stubs (persisted but not consumed by the runner)
-// and confused operators into thinking they were live. They can be
-// re-added once their backends are real — issue tracked in the Agent
-// IA audit notes.
+// Wired tabs: each one reads or writes data the runner actually uses
+// on every inbound turn. Decision Map / Pruebas remain hidden until
+// their backends are real.
 const tabs = [
   "Identidad",
+  "Guardrails",
+  "Knowledge",
+  "Monitor",
   "Extracción",
 ] as const;
 
@@ -802,6 +803,329 @@ function ExtractionReadonlyPanel() {
         custom fields activos de tu pipeline para que confirmes qué
         extrae el agente sin tener que abrir el editor.
       </p>
+    </Panel>
+  );
+}
+
+// ── Real Guardrails: edits `agent.ops_config.guardrails` directly on
+// the draft so saving the agent persists them. The runner reads each
+// active rule's `rule_text` and appends it to the system prompt as a
+// "REGLAS QUE NO PUEDES ROMPER" block, so the LLM treats them as hard
+// constraints. Editing here has immediate effect on the next inbound.
+function GuardrailsRealPanel({
+  draft,
+  onChange,
+}: {
+  draft: AgentItem;
+  onChange: (patch: Partial<AgentItem>) => void;
+}) {
+  const guardrails = draft.guardrails ?? [];
+
+  const setAll = (next: Guardrail[]) => {
+    onChange({
+      guardrails: next,
+      ops_config: { ...(draft.ops_config ?? {}), guardrails: next },
+    } as Partial<AgentItem>);
+  };
+
+  const addGuardrail = () => {
+    const id = `gr_${Date.now().toString(36)}`;
+    setAll([
+      ...guardrails,
+      {
+        id,
+        name: "Nueva regla",
+        severity: "medium",
+        rule_text: "",
+        allowed_examples: [],
+        forbidden_examples: [],
+        active: true,
+        enforcement_mode: "rewrite",
+        violation_count: 0,
+      },
+    ]);
+  };
+
+  const updateGuardrail = (id: string, patch: Partial<Guardrail>) => {
+    setAll(guardrails.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  };
+
+  const removeGuardrail = (id: string) => {
+    setAll(guardrails.filter((g) => g.id !== id));
+  };
+
+  return (
+    <Panel
+      title="Guardrails"
+      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+          onClick={addGuardrail}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          Agregar regla
+        </Button>
+      }
+    >
+      <p className="mb-3 text-[11px] text-slate-400">
+        Reglas duras que se inyectan al prompt del LLM como restricciones.
+        Cada regla activa se agrega al system prompt como bullet con
+        prefijo "no puedes romper". Pruébalas en la vista previa antes de
+        guardar.
+      </p>
+
+      {guardrails.length === 0 ? (
+        <p className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] italic text-slate-500">
+          Sin reglas. Agrega la primera arriba.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {guardrails.map((g) => (
+            <div
+              key={g.id}
+              className="rounded-md border border-white/10 bg-black/20 p-2.5"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <Toggle
+                  checked={g.active}
+                  onChange={(value) =>
+                    updateGuardrail(g.id, { active: value })
+                  }
+                />
+                <Input
+                  value={g.name}
+                  onChange={(e) =>
+                    updateGuardrail(g.id, { name: e.target.value })
+                  }
+                  placeholder="Nombre corto (ej. No prometer aprobación)"
+                  className="h-7 flex-1 border-white/10 bg-black/30 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-rose-300 hover:bg-rose-500/10"
+                  onClick={() => removeGuardrail(g.id)}
+                  aria-label={`Eliminar ${g.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <Textarea
+                value={g.rule_text}
+                onChange={(e) =>
+                  updateGuardrail(g.id, { rule_text: e.target.value })
+                }
+                placeholder="Ej. Nunca prometas aprobación, tasa o monto sin validación humana."
+                rows={2}
+                className="min-h-16 border-white/10 bg-black/30 text-xs text-slate-100"
+              />
+              <p className="mt-1 text-[10px] text-slate-500">
+                {g.active
+                  ? "Activa — va al system prompt en cada turno."
+                  : "Desactivada — guardada pero el LLM no la ve."}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+// ── Real Knowledge: writes `agent.knowledge_config.collection_ids`,
+// which the runner uses to scope FAQ + catalog lookups. The collection
+// list comes from `GET /api/v1/knowledge/collections`.
+function KnowledgeRealPanel({
+  draft,
+  onChange,
+}: {
+  draft: AgentItem;
+  onChange: (patch: Partial<AgentItem>) => void;
+}) {
+  const { data: collections, isLoading } = useQuery({
+    queryKey: ["kb", "collections"],
+    queryFn: async () =>
+      (
+        await api.get<
+          Array<{ id: string; slug: string; name: string; description: string | null }>
+        >("/knowledge/collections")
+      ).data,
+    staleTime: 30_000,
+  });
+  const cfg = (draft.knowledge_config ?? {}) as {
+    collection_ids?: string[];
+  };
+  const selected = new Set(cfg.collection_ids ?? []);
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange({
+      knowledge_config: {
+        ...cfg,
+        collection_ids: Array.from(next),
+      },
+    } as Partial<AgentItem>);
+  };
+
+  return (
+    <Panel
+      title="Conocimiento"
+      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
+    >
+      <p className="mb-3 text-[11px] text-slate-400">
+        Elige las colecciones de Conocimiento que este agente puede leer.
+        Cuando llegue un mensaje, el runner filtrará las FAQs y el
+        catálogo a estas colecciones — el resto del KB del tenant queda
+        invisible para este agente. Sin selección = acceso a todo.
+      </p>
+
+      {isLoading ? (
+        <p className="text-[11px] italic text-slate-500">Cargando colecciones…</p>
+      ) : !collections || collections.length === 0 ? (
+        <p className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] italic text-slate-500">
+          No hay colecciones definidas en Conocimiento todavía. Créalas
+          desde la sección Conocimiento y vuelve aquí para vincular.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {collections.map((c) => {
+            const checked = selected.has(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggle(c.id)}
+                aria-pressed={checked}
+                className={cn(
+                  "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left text-[11px] transition",
+                  checked
+                    ? "border-emerald-500/40 bg-emerald-500/5"
+                    : "border-white/10 bg-black/20 hover:bg-white/[0.04]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                    checked
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-white/20 bg-black/30",
+                  )}
+                  aria-hidden
+                >
+                  {checked ? "✓" : ""}
+                </span>
+                <span className="flex-1">
+                  <span className="block font-medium text-slate-100">
+                    {c.name}
+                  </span>
+                  <span className="block font-mono text-[10px] text-slate-500">
+                    {c.slug}
+                  </span>
+                  {c.description ? (
+                    <span className="block text-[10px] text-slate-400">
+                      {c.description}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-3 text-[10px] text-slate-500">
+        {selected.size === 0
+          ? "Sin restricción — el agente puede consultar todas las FAQs y catálogo del tenant."
+          : `${selected.size} colección(es) seleccionada(s). El resto del KB queda fuera de alcance.`}
+      </p>
+    </Panel>
+  );
+}
+
+// ── Real Monitor: pulls runtime metrics from /agents/{id}/monitor,
+// which aggregates over `turn_traces` joined through
+// `conversations.assigned_agent_id`. Refreshes every 30s.
+function MonitorRealPanel({ agentId }: { agentId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["agents", agentId, "monitor"],
+    queryFn: () => agentsApi.monitor(agentId),
+    refetchInterval: 30_000,
+  });
+
+  const fmtCost = (n: number) =>
+    `$${n.toFixed(4)} USD`;
+  const fmtRelative = (iso: string | null) => {
+    if (!iso) return "sin actividad";
+    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (seconds < 60) return `hace ${seconds}s`;
+    if (seconds < 3600) return `hace ${Math.floor(seconds / 60)} min`;
+    if (seconds < 86400) return `hace ${Math.floor(seconds / 3600)} h`;
+    return `hace ${Math.floor(seconds / 86400)} d`;
+  };
+
+  return (
+    <Panel
+      title="Monitor"
+      icon={<MessageCircle className="h-4 w-4 text-emerald-300" />}
+    >
+      {isLoading || !data ? (
+        <p className="text-[11px] italic text-slate-500">Cargando métricas…</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+              <div className="text-slate-500">Conversaciones activas (24h)</div>
+              <div className="mt-1 text-base font-semibold text-emerald-300">
+                {data.active_conversations_24h}
+              </div>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+              <div className="text-slate-500">Turnos en 24h</div>
+              <div className="mt-1 text-base font-semibold text-slate-100">
+                {data.turns_24h}
+              </div>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+              <div className="text-slate-500">Costo 24h</div>
+              <div className="mt-1 text-base font-semibold text-slate-100">
+                {fmtCost(data.cost_usd_24h)}
+              </div>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+              <div className="text-slate-500">Latencia promedio</div>
+              <div className="mt-1 text-base font-semibold text-slate-100">
+                {data.avg_latency_ms} ms
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-slate-400">
+            <div>
+              <span className="text-slate-500">Turnos totales:</span>{" "}
+              <span className="text-slate-200">{data.turns_total}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Costo total:</span>{" "}
+              <span className="text-slate-200">{fmtCost(data.cost_usd_total)}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Último turno:</span>{" "}
+              <span className="text-slate-200">{fmtRelative(data.last_turn_at)}</span>
+            </div>
+          </div>
+          {data.covers_default_fallback ? (
+            <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 text-[10px] text-amber-200">
+              Este agente está marcado como predeterminado: las métricas
+              incluyen conversaciones sin agente explícitamente asignado
+              que cayeron en él vía fallback.
+            </p>
+          ) : null}
+        </>
+      )}
     </Panel>
   );
 }
@@ -1800,6 +2124,21 @@ export function AgentsPage() {
               <div className="space-y-3">
                 {activeTab === "Identidad" ? (
                   <IdentityPanel draft={activeAgent} onChange={updateDraft} />
+                ) : null}
+                {activeTab === "Guardrails" ? (
+                  <GuardrailsRealPanel
+                    draft={activeAgent}
+                    onChange={updateDraft}
+                  />
+                ) : null}
+                {activeTab === "Knowledge" ? (
+                  <KnowledgeRealPanel
+                    draft={activeAgent}
+                    onChange={updateDraft}
+                  />
+                ) : null}
+                {activeTab === "Monitor" ? (
+                  <MonitorRealPanel agentId={activeAgent.id} />
                 ) : null}
                 {activeTab === "Extracción" ? (
                   <ExtractionReadonlyPanel />

@@ -35,6 +35,7 @@ async def lookup_faq(
     embedding: list[float],
     top_k: int = 3,
     score_threshold: float = 0.5,
+    collection_ids: list[UUID] | None = None,
 ) -> list[FAQMatch] | ToolNoDataResult:
     """Return the top-k FAQs whose embedding is closest to `embedding`.
 
@@ -44,6 +45,13 @@ async def lookup_faq(
 
     Rows with `embedding IS NULL` are excluded — the partial-ingestion
     case where some FAQs aren't embedded yet shouldn't break ranking.
+
+    When ``collection_ids`` is non-empty, results are restricted to FAQs
+    whose ``collection_id`` is in that list — the runner uses this to
+    enforce ``agent.knowledge_config.collection_ids`` so different
+    agents on the same tenant can be scoped to different knowledge sets
+    (e.g. a "Soporte" agent only sees soporte collections, never sales).
+    Empty/None means "no scoping" — every FAQ in the tenant is fair game.
     """
     distance = TenantFAQ.embedding.cosine_distance(embedding)
     stmt = (
@@ -55,6 +63,8 @@ async def lookup_faq(
         .order_by(distance)
         .limit(top_k)
     )
+    if collection_ids:
+        stmt = stmt.where(TenantFAQ.collection_id.in_(collection_ids))
     rows = (await session.execute(stmt)).all()
     matches = [
         FAQMatch(pregunta=faq.question, respuesta=faq.answer, score=float(score))

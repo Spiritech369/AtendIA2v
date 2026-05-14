@@ -1252,6 +1252,100 @@ async def preview_agent_response(
     return await _preview_response(row, body.message, body.draft_config)
 
 
+@router.get("/{agent_id}/monitor")
+async def agent_monitor(
+    agent_id: UUID,
+    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Aggregate runtime metrics for an agent over the last 24h, plus
+    rolling totals since the agent was created.
+
+    Joins through ``conversations.assigned_agent_id`` so the numbers
+    reflect what this specific agent did — not tenant-wide traffic. If
+    the agent is `is_default=True`, we also count traces from
+    conversations that had no `assigned_agent_id` (those routed through
+    the default fallback path on the runner).
+    """
+    row = await _get_agent_or_404(session, agent_id, tenant_id)
+    from atendia.db.models.conversation import Conversation
+    from atendia.db.models.turn_trace import TurnTrace
+
+    # Conversations attached to this agent (assigned + default-fallback).
+    conv_filter = Conversation.assigned_agent_id == agent_id
+    if row.is_default:
+        conv_filter = (Conversation.assigned_agent_id == agent_id) | (
+            Conversation.assigned_agent_id.is_(None)
+        )
+
+    cutoff_24h = datetime.now(UTC) - timedelta(hours=24)
+
+    # All-time totals
+    totals = (
+        await session.execute(
+            select(
+                func.count(TurnTrace.id),
+                func.coalesce(func.sum(TurnTrace.total_cost_usd), 0),
+                func.coalesce(func.avg(TurnTrace.total_latency_ms), 0),
+            )
+            .join(Conversation, Conversation.id == TurnTrace.conversation_id)
+            .where(Conversation.tenant_id == tenant_id, conv_filter)
+        )
+    ).one()
+    total_turns, total_cost, avg_latency = totals
+
+    # Last-24h slice
+    last_24h = (
+        await session.execute(
+            select(
+                func.count(TurnTrace.id),
+                func.coalesce(func.sum(TurnTrace.total_cost_usd), 0),
+            )
+            .join(Conversation, Conversation.id == TurnTrace.conversation_id)
+            .where(
+                Conversation.tenant_id == tenant_id,
+                conv_filter,
+                TurnTrace.created_at >= cutoff_24h,
+            )
+        )
+    ).one()
+    turns_24h, cost_24h = last_24h
+
+    # Active conversations
+    active_convs = (
+        await session.execute(
+            select(func.count(func.distinct(Conversation.id)))
+            .where(
+                Conversation.tenant_id == tenant_id,
+                conv_filter,
+                Conversation.deleted_at.is_(None),
+                Conversation.last_activity_at >= cutoff_24h,
+            )
+        )
+    ).scalar_one()
+
+    # Latest turn timestamp (so the UI can show "last seen 3 min ago")
+    last_turn_at = (
+        await session.execute(
+            select(func.max(TurnTrace.created_at))
+            .join(Conversation, Conversation.id == TurnTrace.conversation_id)
+            .where(Conversation.tenant_id == tenant_id, conv_filter)
+        )
+    ).scalar_one()
+
+    return {
+        "active_conversations_24h": int(active_convs or 0),
+        "turns_total": int(total_turns or 0),
+        "turns_24h": int(turns_24h or 0),
+        "cost_usd_total": float(total_cost or 0),
+        "cost_usd_24h": float(cost_24h or 0),
+        "avg_latency_ms": int(float(avg_latency or 0)),
+        "last_turn_at": last_turn_at.isoformat() if last_turn_at else None,
+        "covers_default_fallback": bool(row.is_default),
+    }
+
+
 @router.get("/{agent_id}/guardrails")
 async def list_agent_guardrails(
     agent_id: UUID,

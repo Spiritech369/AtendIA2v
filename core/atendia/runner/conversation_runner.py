@@ -505,8 +505,49 @@ class ConversationRunner:
             brand_facts = dict(brand_facts)
             if agent_row.goal:
                 brand_facts["agent_goal"] = agent_row.goal
-            if agent_row.system_prompt:
-                brand_facts["agent_system_prompt"] = agent_row.system_prompt
+            # Compose the system-prompt-like brand fact from the
+            # operator-authored prompt plus any active guardrails. The
+            # composer reads `agent_system_prompt` as a single block, so
+            # we concatenate here. Guardrails are operator-defined business
+            # rules ("don't promise rates", "always confirm name") that
+            # *must* survive — they go in their own labeled section so
+            # the LLM treats them as hard constraints rather than style
+            # suggestions.
+            prompt_parts: list[str] = []
+            if agent_row.system_prompt and agent_row.system_prompt.strip():
+                prompt_parts.append(agent_row.system_prompt.strip())
+            active_rules = [
+                str(g.get("rule_text", "")).strip()
+                for g in (
+                    (agent_row.ops_config or {}).get("guardrails") or []
+                )
+                if isinstance(g, dict)
+                and g.get("active") is True
+                and g.get("rule_text")
+            ]
+            if active_rules:
+                rendered = "\n".join(f"- {r}" for r in active_rules)
+                prompt_parts.append(
+                    "REGLAS QUE NO PUEDES ROMPER (guardrails):\n" + rendered
+                )
+            if prompt_parts:
+                brand_facts["agent_system_prompt"] = "\n\n".join(prompt_parts)
+
+        # Knowledge-base scoping. The agent's `knowledge_config` may
+        # carry a list of collection ids the agent is *allowed* to read
+        # from. When set, every KB lookup downstream (lookup_faq,
+        # search_catalog) is filtered to those collections; otherwise the
+        # agent sees the full tenant KB. Mis-shaped values are tolerated
+        # silently — a future migration can validate the schema.
+        agent_collection_ids: list[UUID] = []
+        if agent_row is not None:
+            raw = (agent_row.knowledge_config or {}).get("collection_ids") or []
+            if isinstance(raw, list):
+                for item in raw:
+                    try:
+                        agent_collection_ids.append(UUID(str(item)))
+                    except (ValueError, TypeError):
+                        continue
 
         # Phase 3c.2 — deterministic flow_mode for this turn.
         # We feed pick_flow_mode an ExtractedFields built from the canonical
@@ -551,6 +592,7 @@ class ConversationRunner:
                 catalog_hits = await search_catalog(
                     session=self._session, tenant_id=tenant_id,
                     query=str(interes_value), embedding=None, limit=1,
+                    collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(catalog_hits, list) and catalog_hits:
                     quote_result = await quote(
@@ -578,6 +620,7 @@ class ConversationRunner:
                 faq_result = await lookup_faq(
                     session=self._session, tenant_id=tenant_id,
                     embedding=embedding, top_k=3,
+                    collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(faq_result, list):
                     action_payload = {
@@ -598,6 +641,7 @@ class ConversationRunner:
             keyword_hits = await search_catalog(
                 session=self._session, tenant_id=tenant_id,
                 query=query_text, embedding=None,
+                collection_ids=agent_collection_ids or None,
             )
             if isinstance(keyword_hits, list) and keyword_hits:
                 action_payload = {
@@ -614,6 +658,7 @@ class ConversationRunner:
                 semantic_hits = await search_catalog(
                     session=self._session, tenant_id=tenant_id,
                     query=query_text, embedding=embedding,
+                    collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(semantic_hits, list):
                     action_payload = {

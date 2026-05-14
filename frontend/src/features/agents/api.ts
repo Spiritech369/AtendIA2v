@@ -187,6 +187,17 @@ export interface ValidationResult {
   checks: Array<{ label: string; status: string }>;
 }
 
+export interface AgentMonitorMetrics {
+  active_conversations_24h: number;
+  turns_total: number;
+  turns_24h: number;
+  cost_usd_total: number;
+  cost_usd_24h: number;
+  avg_latency_ms: number;
+  last_turn_at: string | null;
+  covers_default_fallback: boolean;
+}
+
 export interface PreviewResult {
   rawResponse: string;
   finalResponse: string;
@@ -227,6 +238,8 @@ export const agentsApi = {
       draftConfig: draftConfig ?? {},
       conversationContext: {},
     })).data,
+  monitor: async (id: string) =>
+    (await api.get<AgentMonitorMetrics>(`/agents/${id}/monitor`)).data,
   createGuardrail: async (id: string, body: Omit<Guardrail, "id" | "violation_count">) =>
     (await api.post<Guardrail>(`/agents/${id}/guardrails`, body)).data,
   patchGuardrail: async (id: string, body: Omit<Guardrail, "id" | "violation_count">) =>

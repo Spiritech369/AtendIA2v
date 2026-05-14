@@ -52,6 +52,7 @@ async def search_catalog(
     query: str,
     embedding: list[float] | None = None,
     limit: int = 5,
+    collection_ids: list[UUID] | None = None,
 ) -> list[CatalogResult] | ToolNoDataResult:
     """Hybrid alias-keyword + semantic catalog lookup.
 
@@ -60,6 +61,11 @@ async def search_catalog(
     when provided, it's used as the semantic fallback query vector.
     Pass `None` to skip semantic entirely (saves the API call when the
     caller knows alias-keyword is sufficient).
+
+    ``collection_ids`` restricts results to catalog items inside those
+    collections — used to enforce ``agent.knowledge_config.collection_ids``
+    so each agent only sees the products it's supposed to. Empty/None
+    means no scoping.
     """
     # Path 1: alias-keyword match. JSONB `?|` is "any-of" — true if the
     # array contains any element from the right-hand array.
@@ -72,6 +78,10 @@ async def search_catalog(
         )
         .limit(limit)
     )
+    if collection_ids:
+        keyword_stmt = keyword_stmt.where(
+            TenantCatalogItem.collection_id.in_(collection_ids)
+        )
     keyword_hits = (await session.execute(keyword_stmt)).scalars().all()
     if keyword_hits:
         return [_to_result(item, score=1.0) for item in keyword_hits]
@@ -93,6 +103,10 @@ async def search_catalog(
         .order_by(distance)
         .limit(limit)
     )
+    if collection_ids:
+        semantic_stmt = semantic_stmt.where(
+            TenantCatalogItem.collection_id.in_(collection_ids)
+        )
     rows = (await session.execute(semantic_stmt)).all()
     if not rows:
         return ToolNoDataResult(hint=f"no semantic match for {query!r}")
