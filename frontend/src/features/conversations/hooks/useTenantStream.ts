@@ -5,6 +5,7 @@ import { useWebSocket, type WSEvent } from "@/api/ws-client";
 import { useAuthStore } from "@/stores/auth";
 
 interface ConversationEvent extends WSEvent {
+  type?: string;
   conversation_id?: string;
 }
 
@@ -25,6 +26,15 @@ export function useTenantStream(): void {
 
   const onEvent = useCallback(
     (e: ConversationEvent) => {
+      // Config-shaped events carry no conversation_id; bail out of the
+      // per-conversation invalidations and only refresh the caches that
+      // depend on the config that changed.
+      if (e.type === "pipeline_updated") {
+        void queryClient.invalidateQueries({ queryKey: ["tenants", "pipeline"] });
+        void queryClient.invalidateQueries({ queryKey: ["pipeline"] });
+        return;
+      }
+
       // List queries always re-fetch.
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       void queryClient.invalidateQueries({ queryKey: ["handoffs"] });

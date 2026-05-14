@@ -26,11 +26,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.config import get_settings
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
 from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
+from atendia.realtime.publisher import publish_tenant_event
+
+
+async def _broadcast_pipeline_change(
+    tenant_id: UUID, *, version: int | None, stage_ids: list[str] | None
+) -> None:
+    """Fire a tenant-scoped WS event so every open dashboard tab can
+    invalidate its pipeline cache without polling. Best-effort: a
+    transient Redis hiccup never fails the route — operators just see
+    the change after the next normal refetch."""
+    try:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(get_settings().redis_url)
+        try:
+            await publish_tenant_event(
+                redis,
+                tenant_id=str(tenant_id),
+                event={
+                    "type": "pipeline_updated",
+                    "data": {"version": version, "stage_ids": stage_ids},
+                },
+            )
+        finally:
+            await redis.aclose()
+    except Exception:  # pragma: no cover - WS is fire-and-forget
+        pass
 
 router = APIRouter()
 
@@ -125,6 +153,9 @@ async def put_pipeline(
     )
     await session.commit()
     await session.refresh(new_row)
+    await _broadcast_pipeline_change(
+        tenant_id, version=new_row.version, stage_ids=stage_ids
+    )
     return PipelineResponse(
         version=new_row.version,
         definition=new_row.definition,
@@ -339,6 +370,7 @@ async def delete_pipeline(
         payload={"removed_versions": int(versions or 0)},
     )
     await session.commit()
+    await _broadcast_pipeline_change(tenant_id, version=None, stage_ids=None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

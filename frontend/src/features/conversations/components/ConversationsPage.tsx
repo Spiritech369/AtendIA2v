@@ -54,7 +54,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { inboxConfigApi } from "@/features/config/api";
+import { inboxConfigApi, tenantsApi } from "@/features/config/api";
 import type { ConversationListItem, MessageItem } from "@/features/conversations/api";
 import { conversationsApi } from "@/features/conversations/api";
 import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
@@ -515,11 +515,57 @@ function FilterRail({
   onAgentChange: (agent: string | null) => void;
   stageRings: StageRing[];
 }) {
-  const stageCounts = useMemo(() => {
+  // Pipeline is the source of truth for which stages can exist. Counting
+  // conversations alone (the old behavior) only ever surfaces stages
+  // that currently hold at least one conversation, so an empty pipeline
+  // stage like "papeleria_completa" with zero customers is invisible —
+  // and a removed stage that still holds legacy conversations sticks
+  // around forever. PipelineEditor invalidates this query on save, so
+  // creating/deleting a stage refreshes the rail without a reload.
+  const pipeline = useQuery({
+    queryKey: ["tenants", "pipeline"],
+    queryFn: tenantsApi.getPipeline,
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const pipelineStages = useMemo(() => {
+    const raw = (pipeline.data?.definition as
+      | { stages?: Array<{ id: string; label?: string }> }
+      | undefined)?.stages;
+    return raw ?? [];
+  }, [pipeline.data]);
+
+  const countsById = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of items) map.set(item.current_stage, (map.get(item.current_stage) ?? 0) + 1);
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    return map;
   }, [items]);
+
+  // Build the rail entries from the pipeline definition, in pipeline
+  // order. Append any "orphan" stage ids still present on conversations
+  // but missing from the pipeline so the operator can still find +
+  // re-stage those — sorted to the bottom and visually unchanged.
+  const stageCounts = useMemo<Array<{ id: string; label: string; count: number; orphan: boolean }>>(() => {
+    if (pipelineStages.length === 0) {
+      // No pipeline yet: fall back to inferring from conversations so
+      // legacy tenants don't see an empty rail.
+      return Array.from(countsById.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([id, count]) => ({ id, label: id, count, orphan: false }));
+    }
+    const knownIds = new Set(pipelineStages.map((s) => s.id));
+    const fromPipeline = pipelineStages.map((s) => ({
+      id: s.id,
+      label: s.label?.trim() || s.id,
+      count: countsById.get(s.id) ?? 0,
+      orphan: false,
+    }));
+    const orphans = Array.from(countsById.entries())
+      .filter(([id]) => !knownIds.has(id))
+      .map(([id, count]) => ({ id, label: id, count, orphan: true }));
+    return [...fromPipeline, ...orphans];
+  }, [pipelineStages, countsById]);
 
   const agentCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -575,11 +621,11 @@ function FilterRail({
               expanded={expanded}
               onClick={() => onStageChange(null)}
             />
-            {stageCounts.slice(0, 8).map(([stage, count]) => {
-              const visual = stageVisual(stage, undefined, stageRings);
+            {stageCounts.map(({ id, label, count, orphan }) => {
+              const visual = stageVisual(id, undefined, stageRings);
               return (
                 <RailButton
-                  key={stage}
+                  key={id}
                   icon={
                     <span
                       className={cn("text-xs", !visual.hexColor && visual.text)}
@@ -588,11 +634,11 @@ function FilterRail({
                       {visual.emoji}
                     </span>
                   }
-                  label={stage}
+                  label={orphan ? `${label} (sin pipeline)` : label}
                   count={count}
-                  active={activeStage === stage}
+                  active={activeStage === id}
                   expanded={expanded}
-                  onClick={() => onStageChange(activeStage === stage ? null : stage)}
+                  onClick={() => onStageChange(activeStage === id ? null : id)}
                 />
               );
             })}
