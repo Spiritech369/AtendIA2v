@@ -31,26 +31,43 @@ async def load_active_pipeline(session: AsyncSession, tenant_id: UUID) -> Pipeli
 async def resolve_initial_stage(session: AsyncSession, tenant_id: UUID) -> str:
     """First stage id for a freshly-created conversation.
 
-    Looks up the tenant's active pipeline and returns ``stages[0].id``. The
-    raw-SQL `INSERT INTO conversations` paths in the webhooks and worker
-    rely on this so a new conversation lands in a stage that *exists* in
-    the tenant's pipeline — the DB column's `server_default='greeting'`
-    only fits the demo seed, and any custom pipeline (e.g. Crédito Dinamo)
-    that doesn't define a `greeting` stage strands the conversation in a
-    state the evaluator can't recognize.
+    Looks up the tenant's active pipeline and returns ``stages[0].id``.
+    If the tenant has no active pipeline yet — a brand-new signup that
+    hasn't published one — this seeds the generic starter pipeline
+    from :mod:`atendia.state_machine.default_pipeline` so the
+    conversation lands in a real stage instead of the ghost
+    ``"greeting"`` value the DB column still server-defaults to. The
+    seeded pipeline is editable / replaceable; the next ``PUT
+    /tenants/pipeline`` overwrites it under the single-version policy.
 
-    Falls back to ``'greeting'`` when the tenant has no pipeline so the
-    legacy demo flow stays intact.
+    The empty-stages defensive fallback still returns ``"greeting"``
+    because that case implies a manually-corrupted definition — the
+    operator needs to notice it, and crashing further down the runner
+    is worse than logging and continuing on the legacy default.
     """
+    from atendia.state_machine.default_pipeline import (
+        ensure_default_pipeline,
+    )
+
     try:
         pipeline = await load_active_pipeline(session, tenant_id)
     except PipelineNotFoundError:
-        logger.warning(
-            "resolve_initial_stage: no active pipeline for tenant=%s; "
-            "falling back to 'greeting'",
-            tenant_id,
-        )
-        return "greeting"
+        seeded = await ensure_default_pipeline(session, tenant_id)
+        if seeded:
+            logger.info(
+                "resolve_initial_stage: seeded starter pipeline for tenant=%s",
+                tenant_id,
+            )
+        # Re-load — another concurrent caller may have seeded it under us.
+        try:
+            pipeline = await load_active_pipeline(session, tenant_id)
+        except PipelineNotFoundError:
+            logger.warning(
+                "resolve_initial_stage: seeding starter pipeline for "
+                "tenant=%s failed; falling back to 'greeting'",
+                tenant_id,
+            )
+            return "greeting"
     if not pipeline.stages:
         logger.warning(
             "resolve_initial_stage: active pipeline for tenant=%s has empty "
