@@ -34,23 +34,23 @@ async def _should_route_baileys(session, tenant_id_str: str) -> bool:
     """
     try:
         row = (
-            await session.execute(
-                text(
-                    "SELECT enabled, prefer_over_meta, last_status "
-                    "FROM tenant_baileys_config WHERE tenant_id = :t"
-                ),
-                {"t": tenant_id_str},
+            (
+                await session.execute(
+                    text(
+                        "SELECT enabled, prefer_over_meta, last_status "
+                        "FROM tenant_baileys_config WHERE tenant_id = :t"
+                    ),
+                    {"t": tenant_id_str},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
     except Exception:
         return False
     if row is None:
         return False
-    return bool(
-        row["enabled"]
-        and row["prefer_over_meta"]
-        and row["last_status"] == "connected"
-    )
+    return bool(row["enabled"] and row["prefer_over_meta"] and row["last_status"] == "connected")
 
 
 async def _send_via_baileys(
@@ -69,9 +69,7 @@ async def _send_via_baileys(
             error="baileys_does_not_support_templates",
         )
     try:
-        result = await baileys_client.send_text(
-            UUID(tenant_id_str), msg.to_phone_e164, msg.text
-        )
+        result = await baileys_client.send_text(UUID(tenant_id_str), msg.to_phone_e164, msg.text)
     except baileys_client.BaileysBridgeUnavailable as exc:
         return DeliveryReceipt(
             message_id=internal_message_id,
@@ -150,7 +148,9 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
                     base_url=settings.meta_base_url,
                 )
                 receipt = await adapter.send(
-                    msg, phone_number_id=cfg.phone_number_id, message_id=message_id,
+                    msg,
+                    phone_number_id=cfg.phone_number_id,
+                    message_id=message_id,
                 )
 
             # Update breaker state from receipt (T20)
@@ -166,7 +166,7 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
                     outbox.status = "pending"
                     outbox.last_error = receipt.error
                     await session.commit()
-                    raise Retry(defer=2 ** job_try)
+                    raise Retry(defer=2**job_try)
 
             conv_id = await _persist_outbound(session, msg, message_id, receipt)
             outbox.status = "sent" if receipt.status == "sent" else "failed"
@@ -208,61 +208,69 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
 
 
 async def _persist_outbound(session, msg: OutboundMessage, message_id: str, receipt):
-    cust_id = (await session.execute(
-        text(
-            "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
-            "ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164 "
-            "RETURNING id"
-        ),
-        {"t": msg.tenant_id, "p": msg.to_phone_e164},
-    )).scalar()
+    cust_id = (
+        await session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
+                "ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164 "
+                "RETURNING id"
+            ),
+            {"t": msg.tenant_id, "p": msg.to_phone_e164},
+        )
+    ).scalar()
     # Exclude soft-deleted conversations so a send dispatched after the
     # operator deleted the chat opens a fresh one instead of attaching
     # to the hidden tombstone.
-    conv_id = (await session.execute(
-        text(
-            "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
-            "AND deleted_at IS NULL "
-            "ORDER BY last_activity_at DESC LIMIT 1"
-        ),
-        {"t": msg.tenant_id, "c": cust_id},
-    )).scalar()
+    conv_id = (
+        await session.execute(
+            text(
+                "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                "AND deleted_at IS NULL "
+                "ORDER BY last_activity_at DESC LIMIT 1"
+            ),
+            {"t": msg.tenant_id, "c": cust_id},
+        )
+    ).scalar()
     if conv_id is None:
         from atendia.state_machine.pipeline_loader import resolve_initial_stage
 
         initial_stage = await resolve_initial_stage(session, UUID(msg.tenant_id))
-        conv_id = (await session.execute(
-            text(
-                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-                "VALUES (:t, :c, :s) RETURNING id"
-            ),
-            {"t": msg.tenant_id, "c": cust_id, "s": initial_stage},
-        )).scalar()
+        conv_id = (
+            await session.execute(
+                text(
+                    "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                    "VALUES (:t, :c, :s) RETURNING id"
+                ),
+                {"t": msg.tenant_id, "c": cust_id, "s": initial_stage},
+            )
+        ).scalar()
         await session.execute(
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
             {"c": conv_id},
         )
-    conv_id = (await session.execute(
-        text(
-            "INSERT INTO messages "
-            "(id, conversation_id, tenant_id, direction, text, channel_message_id, "
-            "delivery_status, sent_at) "
-            "VALUES (:id, :c, :t, 'outbound', :txt, :cmid, :st, :ts) "
-            "ON CONFLICT (id) DO UPDATE SET "
-            "channel_message_id = COALESCE(messages.channel_message_id, EXCLUDED.channel_message_id), "
-            "delivery_status = EXCLUDED.delivery_status "
-            "RETURNING conversation_id"
-        ),
-        {
-            "id": message_id,
-            "c": conv_id,
-            "t": msg.tenant_id,
-            "txt": msg.text or "",
-            "cmid": receipt.channel_message_id,
-            "st": receipt.status,
-            "ts": datetime.now(UTC),
-        },
-    )).scalar_one()
+    conv_id = (
+        await session.execute(
+            text(
+                "INSERT INTO messages "
+                "(id, conversation_id, tenant_id, direction, text, channel_message_id, "
+                "delivery_status, sent_at) "
+                "VALUES (:id, :c, :t, 'outbound', :txt, :cmid, :st, :ts) "
+                "ON CONFLICT (id) DO UPDATE SET "
+                "channel_message_id = COALESCE(messages.channel_message_id, EXCLUDED.channel_message_id), "
+                "delivery_status = EXCLUDED.delivery_status "
+                "RETURNING conversation_id"
+            ),
+            {
+                "id": message_id,
+                "c": conv_id,
+                "t": msg.tenant_id,
+                "txt": msg.text or "",
+                "cmid": receipt.channel_message_id,
+                "st": receipt.status,
+                "ts": datetime.now(UTC),
+            },
+        )
+    ).scalar_one()
     return conv_id
 
 
@@ -281,16 +289,20 @@ async def dispatch_outbox(ctx: dict) -> dict:
     try:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(OutboundOutbox)
-                    .where(
-                        OutboundOutbox.status == "pending",
-                        OutboundOutbox.available_at <= datetime.now(UTC),
+                (
+                    await session.execute(
+                        select(OutboundOutbox)
+                        .where(
+                            OutboundOutbox.status == "pending",
+                            OutboundOutbox.available_at <= datetime.now(UTC),
+                        )
+                        .order_by(OutboundOutbox.created_at.asc())
+                        .limit(50)
                     )
-                    .order_by(OutboundOutbox.created_at.asc())
-                    .limit(50)
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for row in rows:
                 job = await redis.enqueue_job(
                     "send_outbound",
@@ -315,8 +327,10 @@ class WorkerSettings:
     Workflow jobs live on a separate queue so a slow workflow can't starve
     ``send_outbound``. See :class:`WorkflowWorkerSettings` below.
     """
+
     from arq.cron import cron
 
+    from atendia.queue.appointment_reminder_worker import poll_appointment_reminders
     from atendia.queue.followup_worker import poll_followups
 
     functions: ClassVar = [send_outbound, dispatch_outbox, index_document, force_summary]
@@ -325,6 +339,14 @@ class WorkerSettings:
         # from overlapping if a single poll takes >60s under load.
         cron(dispatch_outbox, second={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57}, unique=True),
         cron(poll_followups, second={0}, unique=True, run_at_startup=False),
+        # Sprint B.4 — appointment 24h reminders. Offset by 30s so it
+        # doesn't compete with the followup poller on second={0}.
+        cron(
+            poll_appointment_reminders,
+            second={30},
+            unique=True,
+            run_at_startup=False,
+        ),
     ]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_jobs = 10
@@ -341,6 +363,7 @@ class WorkflowWorkerSettings:
     ``_queue_name=arq:queue:workflows``. Splitting queues keeps a noisy
     workflow tenant from blocking outbound message delivery.
     """
+
     from arq.cron import cron
 
     from atendia.workflows.engine import WORKFLOW_QUEUE_NAME
