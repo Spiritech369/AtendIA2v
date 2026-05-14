@@ -49,6 +49,7 @@ from atendia.api.field_suggestions_routes import (
 from atendia.api.navigation_routes import router as navigation_router
 from atendia.api.notifications_routes import router as notifications_router
 from atendia.api.pipeline_routes import router as pipeline_router
+from atendia.api.reports_routes import router as reports_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
 from atendia.api.turn_traces_routes import router as turn_traces_router
@@ -81,6 +82,7 @@ app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytic
 app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["appointments"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(reports_router, prefix="/api/v1/reports", tags=["reports"])
 app.include_router(customer_dashboard_router, prefix="/api/v1/dashboard", tags=["customers-dashboard"])
 app.include_router(customer_risks_router, prefix="/api/v1/risks", tags=["customer-risks"])
 app.include_router(customer_ai_review_router, prefix="/api/v1/ai/review-queue", tags=["ai-review"])

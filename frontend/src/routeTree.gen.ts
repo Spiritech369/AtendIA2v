@@ -15,6 +15,7 @@ import { Route as authIndexRouteImport } from './routes/(auth)/index'
 import { Route as authWorkflowsRouteImport } from './routes/(auth)/workflows'
 import { Route as authUsersRouteImport } from './routes/(auth)/users'
 import { Route as authTurnTracesRouteImport } from './routes/(auth)/turn-traces'
+import { Route as authReportsRouteImport } from './routes/(auth)/reports'
 import { Route as authPipelineRouteImport } from './routes/(auth)/pipeline'
 import { Route as authKnowledgeRouteImport } from './routes/(auth)/knowledge'
 import { Route as authInboxSettingsRouteImport } from './routes/(auth)/inbox-settings'
@@ -58,6 +59,11 @@ const authUsersRoute = authUsersRouteImport.update({
 const authTurnTracesRoute = authTurnTracesRouteImport.update({
   id: '/turn-traces',
   path: '/turn-traces',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authReportsRoute = authReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authPipelineRoute = authPipelineRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/inbox-settings': typeof authInboxSettingsRoute
   '/knowledge': typeof authKnowledgeRoute
   '/pipeline': typeof authPipelineRoute
+  '/reports': typeof authReportsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/users': typeof authUsersRoute
   '/workflows': typeof authWorkflowsRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/inbox-settings': typeof authInboxSettingsRoute
   '/knowledge': typeof authKnowledgeRoute
   '/pipeline': typeof authPipelineRoute
+  '/reports': typeof authReportsRoute
   '/turn-traces': typeof authTurnTracesRoute
   '/users': typeof authUsersRoute
   '/workflows': typeof authWorkflowsRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/(auth)/inbox-settings': typeof authInboxSettingsRoute
   '/(auth)/knowledge': typeof authKnowledgeRoute
   '/(auth)/pipeline': typeof authPipelineRoute
+  '/(auth)/reports': typeof authReportsRoute
   '/(auth)/turn-traces': typeof authTurnTracesRoute
   '/(auth)/users': typeof authUsersRoute
   '/(auth)/workflows': typeof authWorkflowsRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/inbox-settings'
     | '/knowledge'
     | '/pipeline'
+    | '/reports'
     | '/turn-traces'
     | '/users'
     | '/workflows'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/inbox-settings'
     | '/knowledge'
     | '/pipeline'
+    | '/reports'
     | '/turn-traces'
     | '/users'
     | '/workflows'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/(auth)/inbox-settings'
     | '/(auth)/knowledge'
     | '/(auth)/pipeline'
+    | '/(auth)/reports'
     | '/(auth)/turn-traces'
     | '/(auth)/users'
     | '/(auth)/workflows'
@@ -322,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/turn-traces'
       fullPath: '/turn-traces'
       preLoaderRoute: typeof authTurnTracesRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/reports': {
+      id: '/(auth)/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof authReportsRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/pipeline': {
@@ -469,6 +488,7 @@ interface authRouteRouteChildren {
   authInboxSettingsRoute: typeof authInboxSettingsRoute
   authKnowledgeRoute: typeof authKnowledgeRoute
   authPipelineRoute: typeof authPipelineRoute
+  authReportsRoute: typeof authReportsRoute
   authTurnTracesRoute: typeof authTurnTracesRoute
   authUsersRoute: typeof authUsersRoute
   authWorkflowsRoute: typeof authWorkflowsRoute
@@ -489,6 +509,7 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authInboxSettingsRoute: authInboxSettingsRoute,
   authKnowledgeRoute: authKnowledgeRoute,
   authPipelineRoute: authPipelineRoute,
+  authReportsRoute: authReportsRoute,
   authTurnTracesRoute: authTurnTracesRoute,
   authUsersRoute: authUsersRoute,
   authWorkflowsRoute: authWorkflowsRoute,
