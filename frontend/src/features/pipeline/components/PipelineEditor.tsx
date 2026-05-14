@@ -1123,91 +1123,141 @@ export function PipelineEditor({ onClose }: Props) {
             Catálogo de documentos ({draft.documents_catalog.length})
           </button>
           {showDocsCatalog && (
-            <div className="space-y-2 px-4 pb-4">
+            <div className="space-y-3 px-4 pb-4">
               <p className="text-[11px] text-muted-foreground">
                 Define los documentos que tus clientes deben subir. Cada
                 entrada se vuelve un checkbox en la sección "Documentos
-                requeridos" de cada etapa, y aparece en el panel
+                requeridos" de cada etapa y aparece en el panel
                 "Documentos" del contacto.
               </p>
 
-              <div className="space-y-1.5">
-                {draft.documents_catalog.map((doc, idx) => (
-                  <div
-                    key={doc.key}
-                    className="grid grid-cols-[1fr_2fr_2fr_auto] items-center gap-2 rounded-md border bg-card px-2 py-1.5"
-                  >
-                    <code className="truncate font-mono text-[10px] text-muted-foreground">
-                      {doc.key}
-                    </code>
-                    <Input
-                      value={doc.label}
-                      onChange={(e) => updateDoc(idx, { label: e.target.value })}
-                      placeholder="Etiqueta visible"
-                      className="h-7 text-xs"
-                      disabled={!canEdit}
-                    />
-                    <Input
-                      value={doc.hint}
-                      onChange={(e) => updateDoc(idx, { hint: e.target.value })}
-                      placeholder="Pista opcional"
-                      className="h-7 text-xs"
-                      disabled={!canEdit}
-                    />
+              {/* List of existing entries */}
+              {draft.documents_catalog.length > 0 && (
+                <div className="space-y-1.5">
+                  {draft.documents_catalog.map((doc, idx) => (
+                    <div
+                      key={doc.key}
+                      className="rounded-md border bg-card p-2"
+                    >
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <code className="truncate font-mono text-[10px] text-muted-foreground">
+                          {doc.key}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-destructive hover:bg-destructive/10"
+                          onClick={() => removeDoc(idx)}
+                          disabled={!canEdit}
+                          aria-label={`Eliminar ${doc.label || doc.key}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">
+                            Nombre visible
+                          </Label>
+                          <Input
+                            value={doc.label}
+                            onChange={(e) => updateDoc(idx, { label: e.target.value })}
+                            placeholder="Ej. CURP"
+                            className="h-7 text-xs"
+                            disabled={!canEdit}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">
+                            Pista (opcional)
+                          </Label>
+                          <Input
+                            value={doc.hint}
+                            onChange={(e) => updateDoc(idx, { hint: e.target.value })}
+                            placeholder="Ej. 18 caracteres alfanuméricos"
+                            className="h-7 text-xs"
+                            disabled={!canEdit}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add-row */}
+              {canEdit && (
+                <div className="rounded-md border border-dashed bg-muted/20 p-2">
+                  <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Agregar documento
+                  </p>
+                  <div className="space-y-1.5">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">
+                        ID interno
+                      </Label>
+                      <Input
+                        value={newDocKey}
+                        onChange={(e) => setNewDocKey(e.target.value)}
+                        placeholder="Ej. curp (se guarda como DOCS_CURP)"
+                        className="h-7 font-mono text-[11px]"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">
+                        Nombre visible
+                      </Label>
+                      <Input
+                        value={newDocLabel}
+                        onChange={(e) => setNewDocLabel(e.target.value)}
+                        placeholder="Ej. CURP"
+                        className="h-7 text-xs"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newDocKey.trim() && newDocLabel.trim()) {
+                            e.preventDefault();
+                            addDoc();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">
+                        Pista (opcional)
+                      </Label>
+                      <Input
+                        value={newDocHint}
+                        onChange={(e) => setNewDocHint(e.target.value)}
+                        placeholder="Ej. 18 caracteres alfanuméricos"
+                        className="h-7 text-xs"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newDocKey.trim() && newDocLabel.trim()) {
+                            e.preventDefault();
+                            addDoc();
+                          }
+                        }}
+                      />
+                    </div>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="h-7 px-2 text-destructive hover:bg-destructive/10"
-                      onClick={() => removeDoc(idx)}
-                      disabled={!canEdit}
-                      aria-label={`Eliminar ${doc.label}`}
+                      className="h-7 w-full"
+                      onClick={addDoc}
+                      disabled={!newDocKey.trim() || !newDocLabel.trim()}
                     >
-                      <Trash2 className="size-3.5" />
+                      <Plus className="mr-1 size-3.5" />
+                      Agregar al catálogo
                     </Button>
                   </div>
-                ))}
-              </div>
-
-              {canEdit && (
-                <div className="grid grid-cols-[1fr_2fr_2fr_auto] items-center gap-2 rounded-md border border-dashed bg-muted/20 px-2 py-1.5">
-                  <Input
-                    value={newDocKey}
-                    onChange={(e) => setNewDocKey(e.target.value)}
-                    placeholder="curp o DOCS_CURP"
-                    className="h-7 font-mono text-[11px]"
-                  />
-                  <Input
-                    value={newDocLabel}
-                    onChange={(e) => setNewDocLabel(e.target.value)}
-                    placeholder="CURP"
-                    className="h-7 text-xs"
-                  />
-                  <Input
-                    value={newDocHint}
-                    onChange={(e) => setNewDocHint(e.target.value)}
-                    placeholder="Pista (opcional)"
-                    className="h-7 text-xs"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2"
-                    onClick={addDoc}
-                    disabled={!newDocKey.trim() || !newDocLabel.trim()}
-                    aria-label="Agregar documento"
-                  >
-                    <Plus className="size-3.5" />
-                  </Button>
                 </div>
               )}
 
               {draft.documents_catalog.length === 0 && (
                 <p className="text-[11px] italic text-muted-foreground">
-                  Vacío. Agrega tu primer documento arriba o usa la plantilla
-                  por defecto (INE, comprobante de domicilio, etc.) creando
-                  un tenant nuevo.
+                  Aún no defines documentos. Agrega el primero arriba —
+                  cuando guardes el pipeline aparecerán como checkboxes en
+                  cada etapa para que marques cuáles requiere cada una.
                 </p>
               )}
             </div>
