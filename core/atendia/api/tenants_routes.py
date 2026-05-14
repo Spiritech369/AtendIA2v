@@ -111,30 +111,44 @@ async def put_pipeline(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PipelineResponse:
-    # Find the current max version (there might be 0 rows on first save).
-    max_version = (
+    # Single-version policy: each tenant keeps exactly one row in
+    # `tenant_pipelines`. The previous design created a fresh row per
+    # save to preserve history, but that drift accumulated unbounded
+    # versions in production and confused operators who saw old data
+    # via the audit log. Audit trail still lives in `admin_events`
+    # (the `pipeline.saved` event below carries `stage_ids`) — the row
+    # in `tenant_pipelines` is just "the current definition".
+    existing = (
         await session.execute(
-            select(TenantPipeline.version)
+            select(TenantPipeline)
             .where(TenantPipeline.tenant_id == tenant_id)
             .order_by(TenantPipeline.version.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
-    new_version = (max_version or 0) + 1
 
-    # Deactivate all prior versions, then insert + activate the new one.
-    await session.execute(
-        update(TenantPipeline)
-        .where(TenantPipeline.tenant_id == tenant_id)
-        .values(active=False)
-    )
-    new_row = TenantPipeline(
-        tenant_id=tenant_id,
-        version=new_version,
-        definition=body.definition,
-        active=True,
-    )
-    session.add(new_row)
+    if existing is None:
+        new_row = TenantPipeline(
+            tenant_id=tenant_id,
+            version=1,
+            definition=body.definition,
+            active=True,
+        )
+        session.add(new_row)
+        new_version = 1
+    else:
+        existing.definition = body.definition
+        existing.active = True
+        new_row = existing
+        new_version = existing.version
+        # Tidy up any straggler rows from before the single-version
+        # policy landed.
+        await session.execute(
+            delete(TenantPipeline).where(
+                TenantPipeline.tenant_id == tenant_id,
+                TenantPipeline.id != existing.id,
+            )
+        )
     # Audit emit before commit so it lands in the same transaction; the
     # AuditLogDrawer surfaces this. We only record the stage-id list +
     # high-level shape, not the full definition, to keep the payload
