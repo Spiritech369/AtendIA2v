@@ -1,3 +1,4 @@
+from atendia.db.models.advisor import Advisor, Vehicle
 from atendia.db.models.agent import Agent
 from atendia.db.models.appointment import Appointment
 from atendia.db.models.conversation import Conversation, ConversationRead, ConversationStateRow
@@ -58,10 +59,11 @@ from atendia.db.models.workflow import (
 )
 
 __all__ = [
+    "Advisor",
+    "AdvisorPool",
     "Agent",
     "AIAgent",
     "Appointment",
-    "AdvisorPool",
     "BusinessHoursRule",
     "Conversation",
     "ConversationRead",
@@ -108,6 +110,7 @@ __all__ = [
     "TenantUser",
     "ToolCallRow",
     "TurnTrace",
+    "Vehicle",
     "WhatsAppTemplate",
     "Workflow",
     "WorkflowActionRun",

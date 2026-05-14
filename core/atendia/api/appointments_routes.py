@@ -15,10 +15,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
-from atendia.api._deps import current_tenant_id, current_user, get_advisor_provider, get_vehicle_provider, get_messaging_provider
+from atendia.api._deps import (
+    current_tenant_id,
+    current_user,
+    get_advisor_provider,
+    get_messaging_provider,
+    get_vehicle_provider,
+    require_tenant_admin,
+)
 from atendia.providers.advisors import AdvisorProvider
-from atendia.providers.vehicles import VehicleProvider
 from atendia.providers.messaging import MessageActionProvider
+from atendia.providers.vehicles import VehicleProvider
+from atendia.db.models.advisor import Advisor, Vehicle
 from atendia.db.models.appointment import Appointment
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.customer import Customer
@@ -318,10 +326,22 @@ def calculate_appointment_risk(
         actions.append(recommended)
 
     starts_in = appt.scheduled_at - now
-    if appt.status in {"scheduled", "rescheduled"} and timedelta(0) <= starts_in <= timedelta(hours=2):
-        add(25, "starts_soon_unconfirmed", "Empieza en menos de 2 horas y no está confirmada.", "Enviar confirmación por WhatsApp")
+    if appt.status in {"scheduled", "rescheduled"} and timedelta(0) <= starts_in <= timedelta(
+        hours=2
+    ):
+        add(
+            25,
+            "starts_soon_unconfirmed",
+            "Empieza en menos de 2 horas y no está confirmada.",
+            "Enviar confirmación por WhatsApp",
+        )
     if appt.last_customer_reply_at and now - appt.last_customer_reply_at > timedelta(hours=12):
-        add(15, "no_recent_reply", "Cliente sin respuesta reciente por más de 12 horas.", "Enviar recordatorio corto")
+        add(
+            15,
+            "no_recent_reply",
+            "Cliente sin respuesta reciente por más de 12 horas.",
+            "Enviar recordatorio corto",
+        )
     if not customer.phone_e164:
         add(30, "missing_phone", "Cliente sin teléfono WhatsApp.", "Capturar teléfono")
     if not appt.advisor_name:
@@ -334,20 +354,42 @@ def calculate_appointment_risk(
         add(15, "down_payment_unconfirmed", "Enganche no confirmado.", "Confirmar enganche")
     attrs = customer.attrs or {}
     if int(attrs.get("previous_no_shows") or 0) > 0:
-        add(20, "previous_no_show", "Cliente con no-show previo.", "Confirmar asistencia con humano")
+        add(
+            20, "previous_no_show", "Cliente con no-show previo.", "Confirmar asistencia con humano"
+        )
     if "advisor_overlap" in conflicts:
-        add(25, "advisor_overlap", "Traslape con otra cita del asesor.", "Reprogramar o cambiar asesor")
+        add(
+            25,
+            "advisor_overlap",
+            "Traslape con otra cita del asesor.",
+            "Reprogramar o cambiar asesor",
+        )
     if "vehicle_overlap" in conflicts:
         add(25, "vehicle_overlap", "Traslape de unidad.", "Cambiar unidad")
     if appt.ai_confidence is not None and appt.ai_confidence < 0.7:
-        add(10, "low_ai_confidence", "Cita creada por IA con baja confianza.", "Revisar datos extraídos")
+        add(
+            10,
+            "low_ai_confidence",
+            "Cita creada por IA con baja confianza.",
+            "Revisar datos extraídos",
+        )
     local_start = _as_tz(appt.scheduled_at, appt.timezone or DEFAULT_TIMEZONE).time()
     local_end = _as_tz(_end_for(appt), appt.timezone or DEFAULT_TIMEZONE).time()
     if local_start < WORKDAY_START or local_end > WORKDAY_END:
-        add(15, "outside_business_hours", "Cita fuera de horario laboral.", "Reprogramar dentro de horario")
+        add(
+            15,
+            "outside_business_hours",
+            "Cita fuera de horario laboral.",
+            "Reprogramar dentro de horario",
+        )
     last_message = str((appt.ops_config or {}).get("last_customer_message") or "").lower()
     if any(word in last_message for word in ("duda", "no puedo", "caro", "cancel", "molest")):
-        add(10, "friction_message", "Último mensaje contiene duda o fricción.", "Enviar respuesta de aclaración")
+        add(
+            10,
+            "friction_message",
+            "Último mensaje contiene duda o fricción.",
+            "Enviar respuesta de aclaración",
+        )
 
     score = max(0, min(100, score))
     return {
@@ -358,7 +400,9 @@ def calculate_appointment_risk(
     }
 
 
-def _build_conflict_map(rows: list[tuple[Appointment, Customer]]) -> tuple[dict[UUID, set[str]], list[dict]]:
+def _build_conflict_map(
+    rows: list[tuple[Appointment, Customer]],
+) -> tuple[dict[UUID, set[str]], list[dict]]:
     conflict_map: dict[UUID, set[str]] = defaultdict(set)
     conflicts: list[dict] = []
     active = [(a, c) for a, c in rows if a.status in ACTIVE_STATUSES]
@@ -368,16 +412,44 @@ def _build_conflict_map(rows: list[tuple[Appointment, Customer]]) -> tuple[dict[
         local_end = _as_tz(_end_for(appt), appt.timezone or DEFAULT_TIMEZONE)
         if not appt.advisor_name:
             conflict_map[appt.id].add("missing_advisor")
-            conflicts.append({"appointment_id": str(appt.id), "type": "missing_advisor", "severity": "high", "message": "Cita sin asesor asignado"})
+            conflicts.append(
+                {
+                    "appointment_id": str(appt.id),
+                    "type": "missing_advisor",
+                    "severity": "high",
+                    "message": "Cita sin asesor asignado",
+                }
+            )
         if appt.appointment_type == "test_drive" and not appt.vehicle_label:
             conflict_map[appt.id].add("missing_vehicle")
-            conflicts.append({"appointment_id": str(appt.id), "type": "missing_vehicle", "severity": "high", "message": "Prueba de manejo sin unidad"})
+            conflicts.append(
+                {
+                    "appointment_id": str(appt.id),
+                    "type": "missing_vehicle",
+                    "severity": "high",
+                    "message": "Prueba de manejo sin unidad",
+                }
+            )
         if not customer.phone_e164:
             conflict_map[appt.id].add("missing_phone")
-            conflicts.append({"appointment_id": str(appt.id), "type": "missing_phone", "severity": "critical", "message": "Cliente sin WhatsApp"})
+            conflicts.append(
+                {
+                    "appointment_id": str(appt.id),
+                    "type": "missing_phone",
+                    "severity": "critical",
+                    "message": "Cliente sin WhatsApp",
+                }
+            )
         if local.time() < WORKDAY_START or local_end.time() > WORKDAY_END:
             conflict_map[appt.id].add("outside_business_hours")
-            conflicts.append({"appointment_id": str(appt.id), "type": "outside_business_hours", "severity": "medium", "message": "Fuera de horario laboral"})
+            conflicts.append(
+                {
+                    "appointment_id": str(appt.id),
+                    "type": "outside_business_hours",
+                    "severity": "medium",
+                    "message": "Fuera de horario laboral",
+                }
+            )
 
     for i, (a, ac) in enumerate(active):
         a_end = _end_for(a)
@@ -389,20 +461,46 @@ def _build_conflict_map(rows: list[tuple[Appointment, Customer]]) -> tuple[dict[
             if a.advisor_id and a.advisor_id == b.advisor_id:
                 conflict_map[a.id].add("advisor_overlap")
                 conflict_map[b.id].add("advisor_overlap")
-                conflicts.append({"appointment_id": str(a.id), "related_appointment_id": str(b.id), "type": "advisor_overlap", "severity": "critical", "message": f"Traslape de asesor: {a.advisor_name}"})
+                conflicts.append(
+                    {
+                        "appointment_id": str(a.id),
+                        "related_appointment_id": str(b.id),
+                        "type": "advisor_overlap",
+                        "severity": "critical",
+                        "message": f"Traslape de asesor: {a.advisor_name}",
+                    }
+                )
             if a.vehicle_id and a.vehicle_id == b.vehicle_id:
                 conflict_map[a.id].add("vehicle_overlap")
                 conflict_map[b.id].add("vehicle_overlap")
-                conflicts.append({"appointment_id": str(a.id), "related_appointment_id": str(b.id), "type": "vehicle_overlap", "severity": "critical", "message": f"Traslape de unidad: {a.vehicle_label}"})
+                conflicts.append(
+                    {
+                        "appointment_id": str(a.id),
+                        "related_appointment_id": str(b.id),
+                        "type": "vehicle_overlap",
+                        "severity": "critical",
+                        "message": f"Traslape de unidad: {a.vehicle_label}",
+                    }
+                )
             if a.customer_id == b.customer_id and a.scheduled_at.date() == b.scheduled_at.date():
                 conflict_map[a.id].add("duplicate_customer_day")
                 conflict_map[b.id].add("duplicate_customer_day")
-                conflicts.append({"appointment_id": str(a.id), "related_appointment_id": str(b.id), "type": "duplicate_customer_day", "severity": "medium", "message": f"Citas duplicadas para {ac.name or bc.name}"})
+                conflicts.append(
+                    {
+                        "appointment_id": str(a.id),
+                        "related_appointment_id": str(b.id),
+                        "type": "duplicate_customer_day",
+                        "severity": "medium",
+                        "message": f"Citas duplicadas para {ac.name or bc.name}",
+                    }
+                )
 
     return conflict_map, conflicts
 
 
-def _item(appt: Appointment, customer: Customer, conflict_types: set[str] | None = None) -> AppointmentItem:
+def _item(
+    appt: Appointment, customer: Customer, conflict_types: set[str] | None = None
+) -> AppointmentItem:
     risk = calculate_appointment_risk(appt, customer, conflict_types)
     return AppointmentItem(
         id=appt.id,
@@ -509,21 +607,22 @@ async def _find_conflicts(
 ) -> list[AppointmentConflictItem]:
     lower = scheduled_at - APPOINTMENT_CONFLICT_WINDOW
     upper = scheduled_at + APPOINTMENT_CONFLICT_WINDOW
-    stmt = (
-        select(Appointment.id, Appointment.scheduled_at, Appointment.service, Appointment.status)
-        .where(
-            Appointment.tenant_id == tenant_id,
-            Appointment.customer_id == customer_id,
-            Appointment.deleted_at.is_(None),
-            Appointment.status.in_(ACTIVE_STATUSES),
-            Appointment.scheduled_at >= lower,
-            Appointment.scheduled_at <= upper,
-        )
+    stmt = select(
+        Appointment.id, Appointment.scheduled_at, Appointment.service, Appointment.status
+    ).where(
+        Appointment.tenant_id == tenant_id,
+        Appointment.customer_id == customer_id,
+        Appointment.deleted_at.is_(None),
+        Appointment.status.in_(ACTIVE_STATUSES),
+        Appointment.scheduled_at >= lower,
+        Appointment.scheduled_at <= upper,
     )
     if exclude_id is not None:
         stmt = stmt.where(Appointment.id != exclude_id)
     return [
-        AppointmentConflictItem(id=row.id, scheduled_at=row.scheduled_at, service=row.service, status=row.status)
+        AppointmentConflictItem(
+            id=row.id, scheduled_at=row.scheduled_at, service=row.service, status=row.status
+        )
         for row in (await session.execute(stmt)).all()
     ]
 
@@ -551,7 +650,9 @@ async def _find_exact_appointment_id(
     ).scalar_one_or_none()
 
 
-def _append_log(row: Appointment, action: str, actor: AuthUser | None, payload: dict[str, Any] | None = None) -> None:
+def _append_log(
+    row: Appointment, action: str, actor: AuthUser | None, payload: dict[str, Any] | None = None
+) -> None:
     entry = {
         "id": f"log_{datetime.now(UTC).timestamp():.0f}",
         "action": action,
@@ -583,7 +684,6 @@ async def _recalculate_row(session: AsyncSession, row: Appointment, customer: Cu
     row.risk_level = risk["level"]
     row.risk_reasons = risk["reasons"]
     row.recommended_actions = risk["recommended_actions"]
-
 
 
 async def _query_rows(
@@ -666,21 +766,40 @@ async def appointment_kpis(
     now = datetime.now(UTC)
     local_now = datetime.now(ZoneInfo(DEFAULT_TIMEZONE))
     day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
-    day_end = (local_now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).astimezone(UTC)
-    week_start = (local_now - timedelta(days=local_now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
+    day_end = (
+        local_now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    ).astimezone(UTC)
+    week_start = (
+        (local_now - timedelta(days=local_now.weekday()))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .astimezone(UTC)
+    )
     week_end = week_start + timedelta(days=7)
-    rows = await _query_rows(session, tenant_id=tenant_id, date_from=week_start, date_to=week_end, limit=300)
+    rows = await _query_rows(
+        session, tenant_id=tenant_id, date_from=week_start, date_to=week_end, limit=300
+    )
     conflict_map, conflicts = _build_conflict_map(rows)
     items = [_item(appt, customer, conflict_map.get(appt.id, set())) for appt, customer in rows]
     today = [item for item in items if day_start <= item.scheduled_at < day_end]
-    estimated = sum(220000 for item in items if item.status in ACTIVE_STATUSES and item.appointment_type in {"test_drive", "quote", "financing"})
+    estimated = sum(
+        220000
+        for item in items
+        if item.status in ACTIVE_STATUSES
+        and item.appointment_type in {"test_drive", "quote", "financing"}
+    )
     return {
         "today": len(today),
         "confirmed": sum(1 for item in items if item.status == "confirmed"),
         "high_risk": sum(1 for item in items if item.risk_level in {"high", "critical"}),
-        "probable_no_show": sum(1 for item in items if item.risk_score >= 61 and item.status in ACTIVE_STATUSES),
-        "missing_advisor": sum(1 for item in items if not item.advisor_name and item.status in ACTIVE_STATUSES),
-        "incomplete_docs": sum(1 for item in items if not item.documents_complete and item.status in ACTIVE_STATUSES),
+        "probable_no_show": sum(
+            1 for item in items if item.risk_score >= 61 and item.status in ACTIVE_STATUSES
+        ),
+        "missing_advisor": sum(
+            1 for item in items if not item.advisor_name and item.status in ACTIVE_STATUSES
+        ),
+        "incomplete_docs": sum(
+            1 for item in items if not item.documents_complete and item.status in ACTIVE_STATUSES
+        ),
         "estimated_opportunity_mxn": estimated,
         "this_week": len(items),
         "conflicts": len(conflicts),
@@ -697,7 +816,9 @@ async def appointment_conflicts(
     date_to: datetime | None = Query(None),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
-    rows = await _query_rows(session, tenant_id=tenant_id, date_from=date_from, date_to=date_to, limit=300)
+    rows = await _query_rows(
+        session, tenant_id=tenant_id, date_from=date_from, date_to=date_to, limit=300
+    )
     _map, conflicts = _build_conflict_map(rows)
     return conflicts
 
@@ -709,64 +830,84 @@ async def priority_feed(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
     now = datetime.now(UTC)
-    rows = await _query_rows(session, tenant_id=tenant_id, date_from=now - timedelta(days=2), date_to=now + timedelta(days=14), limit=300)
+    rows = await _query_rows(
+        session,
+        tenant_id=tenant_id,
+        date_from=now - timedelta(days=2),
+        date_to=now + timedelta(days=14),
+        limit=300,
+    )
     conflict_map, _conflicts = _build_conflict_map(rows)
     priorities: list[dict] = []
     for appt, customer in rows:
         item = _item(appt, customer, conflict_map.get(appt.id, set()))
         starts_in = item.scheduled_at - now
         if item.risk_level in {"critical", "high"}:
-            priorities.append({
-                "id": f"risk_{item.id}",
-                "appointment_id": str(item.id),
-                "severity": item.risk_level,
-                "reason": item.risk_reasons[0]["message"] if item.risk_reasons else "Riesgo alto",
-                "customer": item.customer_name or item.customer_phone,
-                "time": item.scheduled_at.isoformat(),
-                "vehicle": item.vehicle_label,
-                "recommended_action": item.recommended_actions[0]["label"] if item.recommended_actions else "Revisar cita",
-                "actions": ["send-reminder", "reschedule"],
-                "sort": 0 if item.risk_level == "critical" else 1,
-            })
+            priorities.append(
+                {
+                    "id": f"risk_{item.id}",
+                    "appointment_id": str(item.id),
+                    "severity": item.risk_level,
+                    "reason": item.risk_reasons[0]["message"]
+                    if item.risk_reasons
+                    else "Riesgo alto",
+                    "customer": item.customer_name or item.customer_phone,
+                    "time": item.scheduled_at.isoformat(),
+                    "vehicle": item.vehicle_label,
+                    "recommended_action": item.recommended_actions[0]["label"]
+                    if item.recommended_actions
+                    else "Revisar cita",
+                    "actions": ["send-reminder", "reschedule"],
+                    "sort": 0 if item.risk_level == "critical" else 1,
+                }
+            )
         elif timedelta(0) <= starts_in <= timedelta(hours=2) and item.status == "scheduled":
-            priorities.append({
-                "id": f"soon_{item.id}",
-                "appointment_id": str(item.id),
-                "severity": "medium",
-                "reason": f"Cita en {int(starts_in.total_seconds() // 60)} min sin confirmar",
-                "customer": item.customer_name or item.customer_phone,
-                "time": item.scheduled_at.isoformat(),
-                "vehicle": item.vehicle_label,
-                "recommended_action": "Enviar WhatsApp",
-                "actions": ["send-reminder", "confirm"],
-                "sort": 2,
-            })
-        elif item.status == "completed" and not any(log.get("action") == "follow_up_created" for log in item.action_log):
-            priorities.append({
-                "id": f"follow_{item.id}",
-                "appointment_id": str(item.id),
-                "severity": "low",
-                "reason": "Cita completada sin seguimiento",
-                "customer": item.customer_name or item.customer_phone,
-                "time": item.scheduled_at.isoformat(),
-                "vehicle": item.vehicle_label,
-                "recommended_action": "Crear seguimiento",
-                "actions": ["create-follow-up"],
-                "sort": 5,
-            })
+            priorities.append(
+                {
+                    "id": f"soon_{item.id}",
+                    "appointment_id": str(item.id),
+                    "severity": "medium",
+                    "reason": f"Cita en {int(starts_in.total_seconds() // 60)} min sin confirmar",
+                    "customer": item.customer_name or item.customer_phone,
+                    "time": item.scheduled_at.isoformat(),
+                    "vehicle": item.vehicle_label,
+                    "recommended_action": "Enviar WhatsApp",
+                    "actions": ["send-reminder", "confirm"],
+                    "sort": 2,
+                }
+            )
+        elif item.status == "completed" and not any(
+            log.get("action") == "follow_up_created" for log in item.action_log
+        ):
+            priorities.append(
+                {
+                    "id": f"follow_{item.id}",
+                    "appointment_id": str(item.id),
+                    "severity": "low",
+                    "reason": "Cita completada sin seguimiento",
+                    "customer": item.customer_name or item.customer_phone,
+                    "time": item.scheduled_at.isoformat(),
+                    "vehicle": item.vehicle_label,
+                    "recommended_action": "Crear seguimiento",
+                    "actions": ["create-follow-up"],
+                    "sort": 5,
+                }
+            )
         elif item.status == "no_show":
-            priorities.append({
-                "id": f"noshow_{item.id}",
-                "appointment_id": str(item.id),
-                "severity": "high",
-                "reason": "No-show pendiente de reactivación",
-                "customer": item.customer_name or item.customer_phone,
-                "time": item.scheduled_at.isoformat(),
-                "vehicle": item.vehicle_label,
-                "recommended_action": "Reactivar por WhatsApp",
-                "actions": ["send-reminder", "reschedule"],
-                "sort": 6,
-            })
+            priorities.append(
+                {
+                    "id": f"noshow_{item.id}",
+                    "appointment_id": str(item.id),
+                    "severity": "high",
+                    "reason": "No-show pendiente de reactivación",
+                    "customer": item.customer_name or item.customer_phone,
+                    "time": item.scheduled_at.isoformat(),
+                    "vehicle": item.vehicle_label,
+                    "recommended_action": "Reactivar por WhatsApp",
+                    "actions": ["send-reminder", "reschedule"],
+                    "sort": 6,
+                }
+            )
     return sorted(priorities, key=lambda row: (row["sort"], row["time"]))[:12]
 
 
@@ -777,15 +918,33 @@ async def appointment_funnel(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
     local_now = datetime.now(ZoneInfo(DEFAULT_TIMEZONE))
-    start = (local_now - timedelta(days=local_now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
-    rows = await _query_rows(session, tenant_id=tenant_id, date_from=start, date_to=start + timedelta(days=7), limit=300)
+    start = (
+        (local_now - timedelta(days=local_now.weekday()))
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+        .astimezone(UTC)
+    )
+    rows = await _query_rows(
+        session, tenant_id=tenant_id, date_from=start, date_to=start + timedelta(days=7), limit=300
+    )
     items = [_item(appt, customer) for appt, customer in rows]
     total = max(len(items), 1)
     stages = [
         ("Agendadas", len(items), 4),
-        ("Confirmadas", sum(1 for item in items if item.status in {"confirmed", "arrived", "completed"}), 3),
+        (
+            "Confirmadas",
+            sum(1 for item in items if item.status in {"confirmed", "arrived", "completed"}),
+            3,
+        ),
         ("Llegaron", sum(1 for item in items if item.status in {"arrived", "completed"}), 6),
-        ("Cotizadas", sum(1 for item in items if item.appointment_type in {"quote", "financing"} or item.status == "completed"), 2),
+        (
+            "Cotizadas",
+            sum(
+                1
+                for item in items
+                if item.appointment_type in {"quote", "financing"} or item.status == "completed"
+            ),
+            2,
+        ),
         ("Enganche listo", sum(1 for item in items if item.down_payment_confirmed), -1),
         ("Vendidas", max(1, sum(1 for item in items if item.status == "completed") // 3), 2),
         ("No-show", sum(1 for item in items if item.status == "no_show"), -3),
@@ -811,9 +970,27 @@ async def supervisor_recommendations(
     return {
         "health": "Óptima" if len(priorities) < 6 else "Atención requerida",
         "recommendations": [
-            {"id": "rec_confirm", "severity": "high", "title": "Confirmar citas próximas", "detail": "Prioriza citas en las siguientes 2 horas sin confirmación.", "action": "Enviar recordatorios"},
-            {"id": "rec_advisor", "severity": "medium", "title": "Balancear carga de asesores", "detail": "María y Diego tienen ventanas disponibles antes de las 17:00.", "action": "Reasignar citas"},
-            {"id": "rec_docs", "severity": "medium", "title": "Solicitar documentos faltantes", "detail": "Hay clientes con INE o comprobante pendiente.", "action": "Solicitar documentos"},
+            {
+                "id": "rec_confirm",
+                "severity": "high",
+                "title": "Confirmar citas próximas",
+                "detail": "Prioriza citas en las siguientes 2 horas sin confirmación.",
+                "action": "Enviar recordatorios",
+            },
+            {
+                "id": "rec_advisor",
+                "severity": "medium",
+                "title": "Balancear carga de asesores",
+                "detail": "María y Diego tienen ventanas disponibles antes de las 17:00.",
+                "action": "Reasignar citas",
+            },
+            {
+                "id": "rec_docs",
+                "severity": "medium",
+                "title": "Solicitar documentos faltantes",
+                "detail": "Hay clientes con INE o comprobante pendiente.",
+                "action": "Solicitar documentos",
+            },
         ],
         "risks_today": len([p for p in priorities if p["severity"] in {"critical", "high"}]),
         "open_slots": [
@@ -838,6 +1015,101 @@ async def vehicles(
     return await provider.list_vehicles()
 
 
+class AdvisorCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    phone: str | None = Field(default=None, max_length=40)
+    max_per_day: int = Field(default=6, ge=0, le=100)
+    close_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class VehicleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=160)
+    status: str = Field(default="available", max_length=30)
+    available_for_test_drive: bool = True
+
+
+@router.post("/advisors", status_code=status.HTTP_201_CREATED)
+async def create_advisor(
+    body: AdvisorCreate,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    advisor = Advisor(
+        tenant_id=tenant_id,
+        id=body.id,
+        name=body.name,
+        phone=body.phone,
+        max_per_day=body.max_per_day,
+        close_rate=body.close_rate,
+    )
+    session.add(advisor)
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"advisor '{body.id}' already exists for this tenant",
+        ) from exc
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="advisor.create",
+        payload={"id": body.id, "name": body.name},
+    )
+    return {
+        "id": advisor.id,
+        "name": advisor.name,
+        "phone": advisor.phone,
+        "max_per_day": advisor.max_per_day,
+        "close_rate": advisor.close_rate,
+    }
+
+
+@router.post("/vehicles", status_code=status.HTTP_201_CREATED)
+async def create_vehicle(
+    body: VehicleCreate,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    vehicle = Vehicle(
+        tenant_id=tenant_id,
+        id=body.id,
+        label=body.label,
+        status=body.status,
+        available_for_test_drive=body.available_for_test_drive,
+    )
+    session.add(vehicle)
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"vehicle '{body.id}' already exists for this tenant",
+        ) from exc
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="vehicle.create",
+        payload={"id": body.id, "label": body.label},
+    )
+    return {
+        "id": vehicle.id,
+        "label": vehicle.label,
+        "status": vehicle.status,
+        "available_for_test_drive": vehicle.available_for_test_drive,
+    }
+
+
 @router.post("/parse-natural-language", response_model=ParseNaturalResponse)
 async def parse_natural_language(body: ParseNaturalBody) -> ParseNaturalResponse:
     return _parse_natural_appointment(body.text, body.timezone, body.now)
@@ -858,7 +1130,11 @@ async def create_appointment(
         customer_id=body.customer_id,
     )
     scheduled_utc = body.scheduled_at.astimezone(UTC)
-    ends_utc = body.ends_at.astimezone(UTC) if body.ends_at else scheduled_utc + _duration_for(body.appointment_type)
+    ends_utc = (
+        body.ends_at.astimezone(UTC)
+        if body.ends_at
+        else scheduled_utc + _duration_for(body.appointment_type)
+    )
     service = body.service.strip()
     conflicts = await _find_conflicts(
         session,
@@ -972,7 +1248,9 @@ async def patch_appointment(
     if status_value in STATUS_TIMESTAMPS:
         values[STATUS_TIMESTAMPS[status_value]] = datetime.now(UTC)
     values["updated_at"] = datetime.now(UTC)
-    await session.execute(update(Appointment).where(Appointment.id == appointment_id).values(**values))
+    await session.execute(
+        update(Appointment).where(Appointment.id == appointment_id).values(**values)
+    )
     await session.flush()
     appt, customer = await _get_row(session, tenant_id=tenant_id, appointment_id=appointment_id)
     _append_log(appt, "patched", user, {"fields": sorted(k for k in values if k != "updated_at")})
@@ -982,7 +1260,10 @@ async def patch_appointment(
         tenant_id=tenant_id,
         actor_user_id=user.user_id,
         action="appointment.patched",
-        payload={"appointment_id": str(appointment_id), "fields": sorted(k for k in values if k != "updated_at")},
+        payload={
+            "appointment_id": str(appointment_id),
+            "fields": sorted(k for k in values if k != "updated_at"),
+        },
     )
     await session.commit()
     appt, customer = await _get_row(session, tenant_id=tenant_id, appointment_id=appointment_id)
@@ -998,7 +1279,11 @@ async def delete_appointment(
 ) -> None:
     result = await session.execute(
         update(Appointment)
-        .where(Appointment.id == appointment_id, Appointment.tenant_id == tenant_id, Appointment.deleted_at.is_(None))
+        .where(
+            Appointment.id == appointment_id,
+            Appointment.tenant_id == tenant_id,
+            Appointment.deleted_at.is_(None),
+        )
         .values(deleted_at=datetime.now(UTC), updated_at=datetime.now(UTC))
     )
     if result.rowcount == 0:
@@ -1047,7 +1332,14 @@ async def confirm_appointment(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentItem:
-    return await _action_update(appointment_id, user, tenant_id, session, "confirmed", {"status": "confirmed", "confirmed_at": datetime.now(UTC)})
+    return await _action_update(
+        appointment_id,
+        user,
+        tenant_id,
+        session,
+        "confirmed",
+        {"status": "confirmed", "confirmed_at": datetime.now(UTC)},
+    )
 
 
 @router.post("/{appointment_id}/send-reminder", response_model=AppointmentItem)
@@ -1079,7 +1371,9 @@ async def send_location(
     messaging: MessageActionProvider = Depends(get_messaging_provider),
 ) -> AppointmentItem:
     result = await messaging.send_location(appointment_id)
-    return await _action_update(appointment_id, user, tenant_id, session, "location_sent", payload=result)
+    return await _action_update(
+        appointment_id, user, tenant_id, session, "location_sent", payload=result
+    )
 
 
 @router.post("/{appointment_id}/mark-arrived", response_model=AppointmentItem)
@@ -1089,7 +1383,14 @@ async def mark_arrived(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentItem:
-    return await _action_update(appointment_id, user, tenant_id, session, "arrived", {"status": "arrived", "arrived_at": datetime.now(UTC)})
+    return await _action_update(
+        appointment_id,
+        user,
+        tenant_id,
+        session,
+        "arrived",
+        {"status": "arrived", "arrived_at": datetime.now(UTC)},
+    )
 
 
 @router.post("/{appointment_id}/mark-completed", response_model=AppointmentItem)
@@ -1099,7 +1400,14 @@ async def mark_completed(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentItem:
-    return await _action_update(appointment_id, user, tenant_id, session, "completed", {"status": "completed", "completed_at": datetime.now(UTC)})
+    return await _action_update(
+        appointment_id,
+        user,
+        tenant_id,
+        session,
+        "completed",
+        {"status": "completed", "completed_at": datetime.now(UTC)},
+    )
 
 
 @router.post("/{appointment_id}/mark-no-show", response_model=AppointmentItem)
@@ -1109,7 +1417,14 @@ async def mark_no_show(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentItem:
-    return await _action_update(appointment_id, user, tenant_id, session, "no_show", {"status": "no_show", "no_show_at": datetime.now(UTC)})
+    return await _action_update(
+        appointment_id,
+        user,
+        tenant_id,
+        session,
+        "no_show",
+        {"status": "no_show", "no_show_at": datetime.now(UTC)},
+    )
 
 
 @router.post("/{appointment_id}/reschedule", response_model=AppointmentItem)
@@ -1177,7 +1492,9 @@ async def request_documents(
     messaging: MessageActionProvider = Depends(get_messaging_provider),
 ) -> AppointmentItem:
     result = await messaging.request_documents(appointment_id)
-    return await _action_update(appointment_id, user, tenant_id, session, "documents_requested", payload=result)
+    return await _action_update(
+        appointment_id, user, tenant_id, session, "documents_requested", payload=result
+    )
 
 
 @router.post("/{appointment_id}/create-follow-up", response_model=AppointmentItem)
@@ -1191,10 +1508,14 @@ async def create_follow_up(
     payload = {"title": (body.title if body else "Seguimiento posterior a cita")}
     if body and body.due_at:
         payload["due_at"] = body.due_at.isoformat()
-    return await _action_update(appointment_id, user, tenant_id, session, "follow_up_created", payload=payload)
+    return await _action_update(
+        appointment_id, user, tenant_id, session, "follow_up_created", payload=payload
+    )
 
 
-def _parse_natural_appointment(text: str, timezone: str, now: datetime | None = None) -> ParseNaturalResponse:
+def _parse_natural_appointment(
+    text: str, timezone: str, now: datetime | None = None
+) -> ParseNaturalResponse:
     zone = ZoneInfo(timezone)
     base = (now or datetime.now(zone)).astimezone(zone)
     lower = text.lower()
@@ -1269,10 +1590,27 @@ def _parse_natural_appointment(text: str, timezone: str, now: datetime | None = 
             break
 
     customer_name = None
-    name_match = re.search(r"(?:para|con|a)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)", text)
+    name_match = re.search(
+        r"(?:para|con|a)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)", text
+    )
     if name_match:
         customer_name = name_match.group(1).strip()
-        stop_words = [" el ", " la ", " mañana", " hoy", " viernes", " jueves", " lunes", " martes", " miércoles", " miercoles", " sábado", " sabado", " domingo", " para "]
+        stop_words = [
+            " el ",
+            " la ",
+            " mañana",
+            " hoy",
+            " viernes",
+            " jueves",
+            " lunes",
+            " martes",
+            " miércoles",
+            " miercoles",
+            " sábado",
+            " sabado",
+            " domingo",
+            " para ",
+        ]
         for token in stop_words:
             pos = customer_name.lower().find(token.strip())
             if pos > 0:
@@ -1280,7 +1618,9 @@ def _parse_natural_appointment(text: str, timezone: str, now: datetime | None = 
 
     phone_match = re.search(r"(\+?52)?\s?(\d{10})", text)
     phone = phone_match.group(0).replace(" ", "") if phone_match else None
-    money_match = re.search(r"\$?\s?(\d{1,3}(?:,\d{3})+|\d+)\s*(mil)?(?:\s+de\s+enganche|.*enganche)?", lower)
+    money_match = re.search(
+        r"\$?\s?(\d{1,3}(?:,\d{3})+|\d+)\s*(mil)?(?:\s+de\s+enganche|.*enganche)?", lower
+    )
     down_payment = None
     if "enganche" in lower and money_match:
         amount = int(money_match.group(1).replace(",", ""))

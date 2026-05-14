@@ -10,6 +10,7 @@ Three building blocks:
 * `require_superadmin` — gate for `/api/v1/admin/*` style routes.
 * `require_tenant_admin` — gate for tenant config/admin writes.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -55,9 +56,7 @@ async def current_tenant_id(
     """
     if user.role in TENANT_SCOPED_ROLES:
         if user.tenant_id is None:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, "operator session missing tenant_id"
-            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "operator session missing tenant_id")
         return user.tenant_id
     if user.role == "superadmin":
         if tid is not None:
@@ -102,51 +101,79 @@ async def demo_tenant(
 
 
 # ── Provider factories ────────────────────────────────────────────────────────
-# Each factory returns a demo implementation when is_demo=True, or raises 501
-# when the real implementation is not yet built. When a real provider is ready,
-# swap the import inside the factory — routes do not change.
+# Each factory returns:
+# * is_demo=True  → the hardcoded demo provider (constants).
+# * is_demo=False → for advisors/vehicles, the DB-backed provider so the
+#   operator's own data shows up. The factory still returns Empty when no
+#   session is available (used by legacy tests and code paths that don't
+#   have a request scope); route-facing FastAPI deps pass the session
+#   through so the DB-backed provider gets used end-to-end.
 
 
 def _get_advisor_provider_for(is_demo: bool) -> AdvisorProvider:
+    """Sessionless factory — used by tests and code paths without DB access.
+
+    Non-demo still returns Empty here; the route-facing
+    ``get_advisor_provider`` dep is what wires the DB-backed provider.
+    """
     if is_demo:
         from atendia._demo.providers import DemoAdvisorProvider
+
         return DemoAdvisorProvider()
-    # Non-demo tenants get an empty provider instead of 501 — keeps the
-    # appointments UI usable (empty advisor list) until a DB-backed
-    # advisor provider lands.
     from atendia.providers.empty import EmptyAdvisorProvider
+
     return EmptyAdvisorProvider()
 
 
 def _get_vehicle_provider_for(is_demo: bool) -> VehicleProvider:
     if is_demo:
         from atendia._demo.providers import DemoVehicleProvider
+
         return DemoVehicleProvider()
     from atendia.providers.empty import EmptyVehicleProvider
+
     return EmptyVehicleProvider()
 
 
 def _get_messaging_provider_for(is_demo: bool) -> MessageActionProvider:
     if is_demo:
         from atendia._demo.providers import DemoMessageActionProvider
+
         return DemoMessageActionProvider()
     # No-op messaging — the appointment side-effect (send reminder etc.)
     # acks as "noop" so the UI doesn't error. When real Meta-backed
     # messaging lands we swap this for the real adapter.
     from atendia.providers.empty import EmptyMessageActionProvider
+
     return EmptyMessageActionProvider()
 
 
 async def get_advisor_provider(
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> AdvisorProvider:
-    return _get_advisor_provider_for(is_demo)
+    if is_demo:
+        from atendia._demo.providers import DemoAdvisorProvider
+
+        return DemoAdvisorProvider()
+    from atendia.providers.db_advisors import DBAdvisorProvider
+
+    return DBAdvisorProvider(session=session, tenant_id=tenant_id)
 
 
 async def get_vehicle_provider(
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> VehicleProvider:
-    return _get_vehicle_provider_for(is_demo)
+    if is_demo:
+        from atendia._demo.providers import DemoVehicleProvider
+
+        return DemoVehicleProvider()
+    from atendia.providers.db_vehicles import DBVehicleProvider
+
+    return DBVehicleProvider(session=session, tenant_id=tenant_id)
 
 
 async def get_messaging_provider(
