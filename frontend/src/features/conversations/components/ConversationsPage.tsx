@@ -367,7 +367,7 @@ function ConversationContextMenu({
 }: {
   menu: ContextMenuState;
   onClose: () => void;
-  allStages: string[];
+  allStages: Array<{ id: string; label: string }>;
   currentUserId: string | undefined;
 }) {
   const queryClient = useQueryClient();
@@ -443,19 +443,19 @@ function ConversationContextMenu({
         <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Mover a etapa
         </div>
-        {allStages.map((stage) => (
+        {allStages.map(({ id, label }) => (
           <button
-            key={stage}
+            key={id}
             type="button"
             className={cn(
               "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-              menu.conv.current_stage === stage && "font-medium text-primary",
+              menu.conv.current_stage === id && "font-medium text-primary",
             )}
             onClick={() =>
-              patchMutation.mutate({ id: menu.conv.id, body: { current_stage: stage } })
+              patchMutation.mutate({ id: menu.conv.id, body: { current_stage: id } })
             }
           >
-            <ChevronRight className="size-3" aria-hidden="true" /> {stage}
+            <ChevronRight className="size-3" aria-hidden="true" /> {label}
           </button>
         ))}
         <Separator className="my-1" />
@@ -1793,10 +1793,41 @@ export function ConversationsPage() {
     );
   }, [allItems, hasActiveFilters, selectedConversationId, visibleItems]);
 
-  const allStages = useMemo(() => {
-    const set = new Set(allItems.map((item) => item.current_stage));
-    return Array.from(set).sort();
-  }, [allItems]);
+  // "Mover a etapa" submenu source: prefer the tenant's pipeline so
+  // empty stages are reachable; fall back to inferring from
+  // conversations only when no pipeline is defined. Orphan stages
+  // (still pointed at by a conversation but missing from the pipeline)
+  // are appended at the bottom so the operator can rescue them.
+  const movePipelineQuery = useQuery({
+    queryKey: ["tenants", "pipeline"],
+    queryFn: tenantsApi.getPipeline,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const allStages = useMemo<Array<{ id: string; label: string }>>(() => {
+    const conversationStageIds = new Set(allItems.map((item) => item.current_stage));
+    const pipelineStages = (
+      movePipelineQuery.data?.definition as
+        | { stages?: Array<{ id: string; label?: string }> }
+        | undefined
+    )?.stages;
+    if (pipelineStages && pipelineStages.length > 0) {
+      const knownIds = new Set(pipelineStages.map((s) => s.id));
+      const orphans = Array.from(conversationStageIds)
+        .filter((id) => !knownIds.has(id))
+        .sort();
+      return [
+        ...pipelineStages.map((s) => ({
+          id: s.id,
+          label: s.label?.trim() || s.id,
+        })),
+        ...orphans.map((id) => ({ id, label: `${id} (sin pipeline)` })),
+      ];
+    }
+    return Array.from(conversationStageIds)
+      .sort()
+      .map((id) => ({ id, label: id }));
+  }, [allItems, movePipelineQuery.data]);
 
   const toggleFilter = useCallback((filter: QuickFilterId) => {
     setQuickFilters((current) => {
