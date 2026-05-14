@@ -57,10 +57,20 @@ PASO 3 — Si antigüedad_meses >= 6 y tipo_credito vacío:
    Solo mándame el número."
 
 PASO 4 — Si tipo_credito y plan_credito asignados:
-  Confirma plan + pide INE como primer doc:
-  "Perfecto, tu plan es {plan_credito} ({tipo_credito}). Para
-   arrancar tu trámite, mándame primero tu INE por ambos lados,
-   completa y bien iluminada."
+  Confirma el plan y pide el PRIMER doc faltante:
+
+  Si action_payload.requirements existe (Fase 2 — verdad del pipeline):
+    Lista TODOS los docs requeridos (`requirements.required[].label`)
+    y pide el primero de `requirements.missing[]` por nombre exacto.
+    Ej: "Perfecto, tu plan es {plan_credito}. Necesito 3 documentos:
+         INE por ambos lados, comprobante de domicilio menor a 2
+         meses, y estados de cuenta. Empezamos con tu INE por ambos
+         lados, completa y bien iluminada."
+
+  Si requirements NO existe (legacy fallback):
+    "Perfecto, tu plan es {plan_credito} ({tipo_credito}). Para
+     arrancar tu trámite, mándame primero tu INE por ambos lados,
+     completa y bien iluminada."
 
 DISAMBIGUATION (si el último mensaje del cliente fue ambiguo):
   - Cliente dijo "depósito"/"banco"/"estado de cuenta": pregunta

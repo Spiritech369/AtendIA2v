@@ -47,8 +47,39 @@ _VISION_JSON_SCHEMA = {
                 "required": ["ambos_lados", "legible", "fecha_iso",
                              "institucion", "modelo", "notas"],
             },
+            # Fase 3 — structured quality assessment used by the runner
+            # to set DOCS_X.status deterministically. Nullable so that
+            # `moto` / `unrelated` categories (no doc to assess) return
+            # null instead of bogus booleans.
+            "quality_check": {
+                "type": ["object", "null"],
+                "additionalProperties": False,
+                "properties": {
+                    "four_corners_visible": {"type": "boolean"},
+                    "legible": {"type": "boolean"},
+                    "not_blurry": {"type": "boolean"},
+                    "no_flash_glare": {"type": "boolean"},
+                    "not_cut": {"type": "boolean"},
+                    "side": {
+                        "type": "string",
+                        "enum": ["front", "back", "unknown"],
+                    },
+                    "valid_for_credit_file": {"type": "boolean"},
+                    "rejection_reason": {"type": ["string", "null"]},
+                },
+                "required": [
+                    "four_corners_visible",
+                    "legible",
+                    "not_blurry",
+                    "no_flash_glare",
+                    "not_cut",
+                    "side",
+                    "valid_for_credit_file",
+                    "rejection_reason",
+                ],
+            },
         },
-        "required": ["category", "confidence", "metadata"],
+        "required": ["category", "confidence", "metadata", "quality_check"],
         "additionalProperties": False,
     },
 }
@@ -56,7 +87,7 @@ _VISION_JSON_SCHEMA = {
 
 _SYSTEM_PROMPT = """\
 Eres un clasificador de imágenes para una concesionaria de motocicletas
-en México. Recibes una imagen y devuelves JSON con tres campos:
+en México. Recibes una imagen y devuelves JSON con cuatro campos:
 
   - category: una de [ine, comprobante, recibo_nomina, estado_cuenta,
               constancia_sat, factura, imss, moto, unrelated]
@@ -68,6 +99,30 @@ en México. Recibes una imagen y devuelves JSON con tres campos:
       * institucion (str|null): banco / SAT / IMSS / proveedor de servicio si aplica
       * modelo (str|null): modelo de moto si category == moto
       * notas (str|null): observación libre corta
+  - quality_check (object|null): SIEMPRE rellena este objeto cuando
+    category sea un documento (ine, comprobante, recibo_nomina,
+    estado_cuenta, constancia_sat, factura, imss). PON null sólo si
+    category es "moto" o "unrelated".
+
+quality_check tiene EXACTAMENTE estos campos:
+    * four_corners_visible (bool): true sólo si las 4 esquinas del
+      documento están visibles dentro de la foto (sin cortes).
+    * legible (bool): true sólo si los datos clave (nombre, fecha,
+      número) se leen claramente.
+    * not_blurry (bool): true sólo si la imagen está enfocada.
+    * no_flash_glare (bool): true sólo si NO hay reflejo del flash
+      que tape datos importantes.
+    * not_cut (bool): true sólo si no falta una parte del documento.
+    * side ("front" | "back" | "unknown"): para INE, qué lado se ve;
+      "unknown" si no aplica o no se distingue.
+    * valid_for_credit_file (bool): TU veredicto final — true sólo si
+      TODAS las anteriores son true Y el documento sirve para
+      expediente de crédito.
+    * rejection_reason (str|null): cuando valid_for_credit_file=false,
+      escribe UNA frase corta y accionable en español que el bot pueda
+      reusar para pedirle al cliente que mande la foto de nuevo
+      (ej. "se ve con reflejo y no se leen los datos", "está cortada
+      por una esquina"). Si valid_for_credit_file=true, devuelve null.
 
 Reglas:
 - Sé objetivo: clasifica lo que VES en la imagen, no lo que crees que el usuario quiso mandar.
@@ -76,6 +131,8 @@ Reglas:
 - "moto" para foto de motocicleta (no scooter eléctrico ni bici).
 - "unrelated" para selfies, screenshots, paisajes, comida, cualquier otra cosa.
 - confidence < 0.5 si la imagen está borrosa, oscura o muy alejada.
+- En quality_check, no inventes razones de rechazo si todo se ve bien;
+  null es la respuesta correcta.
 """
 
 

@@ -18,6 +18,11 @@ class HandoffReason(str, Enum):
     USER_SIGNALED_PAPELERIA_COMPLETA = "user_signaled_papeleria_completa"
     PAPELERIA_COMPLETA_FORM_PENDING = "papeleria_completa_form_pending"
     ANTIGUEDAD_LT_6M = "antiguedad_lt_6m"
+    # Fase 4 — fired when the conversation enters a stage whose
+    # `pause_bot_on_enter=true`. The runner derives the reason from
+    # `stage.handoff_reason` (when set) or falls back to this generic.
+    STAGE_TRIGGERED_HANDOFF = "stage_triggered_handoff"
+    DOCS_COMPLETE_FOR_PLAN = "docs_complete_for_plan"
 
 
 class HandoffSummary(BaseModel):

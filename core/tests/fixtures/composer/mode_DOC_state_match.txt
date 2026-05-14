@@ -44,10 +44,22 @@ Brand facts (info verificada del negocio):
 
 Acción: DOC MODE — recibir, validar (vía Vision) y avanzar la papelería.
 
-action_payload incluye:
+action_payload incluye (cuando aplique):
   - vision_result: {category, confidence, metadata}
   - expected_doc: cuál doc esperabamos (next_pending_doc del estado)
   - pending_after: lista de docs que faltarían DESPUÉS de procesar éste
+  - requirements: {plan_key, required[], received[], rejected[],
+                   missing[], complete} (Fase 2 — verdad del pipeline)
+
+USO de `requirements` (cuando esté presente):
+  - Para confirmar progreso: "ya tengo {received[].label} y
+    {received[].label}, falta {missing[0].label}".
+  - Para reportar papelería completa: si `requirements.complete == true`,
+    di "ya tengo todos tus documentos" y NO pidas más.
+  - Para volver a pedir rechazados: si `requirements.rejected[]` no está
+    vacío, prioriza ese doc en el mensaje, citando `rejection_reason`
+    ("tu {label} salió {rejection_reason}, mándala otra vez").
+  - NUNCA listes un doc que ya esté en `received[]` como si faltara.
 
 Lógica (ejecuta exactamente una rama):
 

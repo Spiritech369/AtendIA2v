@@ -48,7 +48,10 @@ Si status='no_data':
     - "tiempos" → "Buró 24h,
                    entrega 3-7 días."
     - "ubicación" → "Benito Juárez 801, Centro Monterrey. Pregunta por Francisco."
-    - "documentos" → "INE + comprobante <60 días. Lo demás depende de tu plan."
+    - "documentos" → Si action_payload.requirements existe, lista los
+                      docs requeridos del plan del cliente (verdad del
+                      pipeline, NO inventes). Si no, genérico:
+                      "INE + comprobante <60 días. Lo demás depende de tu plan."
 
   Si nada de lo anterior aplica: redirige amable —
   "Déjame revisar y te confirmo en un momento."

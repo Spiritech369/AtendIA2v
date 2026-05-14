@@ -6,6 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from atendia.contracts.flow_mode import FlowMode
 from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule
 
+# Fase 6 — flow modes a stage can pin. Stored as the lower-case string
+# value of FlowMode so the JSONB shape stays readable. Validated in
+# StageDefinition; the runner reads stage.behavior_mode and overrides
+# the per-turn router result when set.
+_FLOW_MODE_VALUES: frozenset[str] = frozenset(m.value for m in FlowMode)
+
 _FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 # Auto-enter rule paths use dot-separated nesting so
@@ -191,6 +197,36 @@ class StageDefinition(BaseModel):
     # Terminal stages override this — a terminal stage never allows
     # backward movement regardless of this flag.
     allow_auto_backward: bool = False
+    # Fase 4 — when the conversation transitions INTO this stage, the
+    # runner sets `conversations.bot_paused = true`, persists a
+    # `human_handoffs` row, emits BOT_PAUSED + HUMAN_HANDOFF_REQUESTED
+    # system events, and skips composer/outbound for this turn. The
+    # operator dashboard takes over. Default false — opt-in per stage
+    # (typical use: a "Papelería completa" stage).
+    pause_bot_on_enter: bool = False
+    # Reason string persisted on the handoff row when pause_bot_on_enter
+    # fires. Free-form so tenants can use their own taxonomy without a
+    # contract change; the canonical strings live in HandoffReason but
+    # any non-empty string is accepted.
+    handoff_reason: str | None = None
+    # Fase 6 — opt-in behaviour pin. When None (default), the per-turn
+    # flow router decides based on pipeline.flow_mode_rules (legacy
+    # behavior, no regression for tenants who already authored rules).
+    # When set, the runner uses this mode verbatim for the turn — handy
+    # for tenants who want "this stage is always DOC mode" without
+    # writing rule expressions.
+    behavior_mode: str | None = None
+
+    @field_validator("behavior_mode")
+    @classmethod
+    def _validate_behavior_mode(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if v not in _FLOW_MODE_VALUES:
+            raise ValueError(
+                f"behavior_mode {v!r} must be one of {sorted(_FLOW_MODE_VALUES)}"
+            )
+        return v
 
     @model_validator(mode="after")
     def _no_duplicate_field_names(self) -> "StageDefinition":
@@ -263,6 +299,15 @@ class PipelineDefinition(BaseModel):
     # writes a `DOCS_<KEY>.status equals "ok"` condition into the
     # stage's auto_enter_rules. Order matters (display order in the UI).
     documents_catalog: list[DocumentSpec] = Field(default_factory=list)
+    # Fase 3 — mapping from Vision category to the canonical
+    # customer.attrs key(s) the runner writes when the image is
+    # accepted. Keys are vision categories ("ine", "comprobante", …);
+    # values are lists of DOCS_* keys. INE typically maps to a 2-key
+    # list (frente + reverso) so the runner writes both when
+    # quality_check.side == "unknown" AND metadata.ambos_lados is true.
+    # Empty dict = no auto-writing on Vision; tenants relying on
+    # manual operator marking keep that behaviour by leaving this empty.
+    vision_doc_mapping: dict[str, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_stage_ids_unique(self) -> "PipelineDefinition":

@@ -3,10 +3,17 @@
 Called from conversation_runner after the per-turn NLU result is merged
 into conversation_state.extracted_data. Stays a thin orchestrator over
 the pure decision logic in field_extraction_mapping.decide_action.
+
+Returns the list of AUTO-applied changes so the caller can fan out
+FIELD_UPDATED system events (see runner/conversation_events.py). The
+SUGGEST path is intentionally NOT surfaced — those values aren't on
+the customer yet, they're pending operator review.
 """
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -24,6 +31,21 @@ from atendia.runner.field_extraction_mapping import (
 _log = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class AppliedFieldChange:
+    """A single AUTO-applied entity → attr write.
+
+    `entity_key` is what NLU produced, `attr_key` is the canonical
+    customer.attrs key after `map_entity_to_attr`. `old_value` may be
+    None when the field was previously empty.
+    """
+    entity_key: str
+    attr_key: str
+    old_value: Any
+    new_value: Any
+    confidence: float
+
+
 async def apply_ai_extractions(
     *,
     session: AsyncSession,
@@ -33,25 +55,30 @@ async def apply_ai_extractions(
     turn_number: int,
     entities: dict[str, ExtractedField],
     inbound_text: str | None = None,
-) -> None:
+) -> list[AppliedFieldChange]:
     """Walk every entity, classify with decide_action, then persist.
 
     Reads customer.attrs once, applies all AUTO changes in a single
     UPDATE, then inserts FieldSuggestion rows for each SUGGEST case.
+
+    Returns the list of AUTO changes (in input order) so the caller can
+    emit FIELD_UPDATED events / system messages. Returns an empty list
+    when nothing changed (customer missing, no entities, all SKIP/NOOP).
     """
     if not entities:
-        return
+        return []
 
     customer = (
         await session.execute(select(Customer).where(Customer.id == customer_id))
     ).scalar_one_or_none()
     if customer is None:
         _log.warning("apply_ai_extractions: customer %s not found", customer_id)
-        return
+        return []
 
     current_attrs: dict = dict(customer.attrs or {})
     next_attrs = dict(current_attrs)
     suggestions: list[FieldSuggestion] = []
+    applied: list[AppliedFieldChange] = []
     dirty = False
 
     for entity_key, field in entities.items():
@@ -69,6 +96,13 @@ async def apply_ai_extractions(
         if action == Action.AUTO:
             next_attrs[attr_key] = field.value
             dirty = True
+            applied.append(AppliedFieldChange(
+                entity_key=entity_key,
+                attr_key=attr_key,
+                old_value=current,
+                new_value=field.value,
+                confidence=float(field.confidence),
+            ))
         elif action == Action.SUGGEST:
             suggestions.append(
                 FieldSuggestion(
@@ -91,3 +125,5 @@ async def apply_ai_extractions(
 
     for sugg in suggestions:
         session.add(sugg)
+
+    return applied

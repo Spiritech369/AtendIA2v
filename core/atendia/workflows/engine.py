@@ -54,14 +54,18 @@ from atendia.db.models.workflow import (
 )
 from atendia.queue.outbox import stage_outbound
 
-# Trigger types match EventType.value (lowercase). Forward-contract triggers
-# (conversation_created, appointment_created, bot_paused) don't emit events
-# yet — they're listed so the API rejects unknown values.
+# Trigger types match EventType.value (lowercase). Adding a trigger here
+# must be paired with an EventType enum entry AND a runtime emit site so
+# the engine actually fires for that signal. Forward-contract triggers
+# without an emitter yet are tolerated (the API rejects unknown values,
+# but a workflow listening to e.g. `conversation_created` is just inert
+# until that signal is wired).
 TRIGGERS: frozenset[str] = frozenset({
     "message_received",
     "field_extracted",
     "field_updated",
     "stage_entered",
+    "stage_exited",
     "stage_changed",
     "conversation_created",
     "conversation_closed",
@@ -69,6 +73,14 @@ TRIGGERS: frozenset[str] = frozenset({
     "bot_paused",
     "webhook_received",
     "tag_updated",
+    # Fase 1+3+4 — emitted by conversation_runner / vision_to_attrs /
+    # stage_entry_handoff. Workflows reacting to these can drive
+    # downstream automations (alerts, assignments, task creation)
+    # without polling.
+    "document_accepted",
+    "document_rejected",
+    "docs_complete_for_plan",
+    "human_handoff_requested",
 })
 
 NODE_TYPES: frozenset[str] = frozenset({

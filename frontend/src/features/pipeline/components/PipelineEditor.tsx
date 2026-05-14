@@ -87,7 +87,7 @@ export interface AutoEnterRulesDraft {
   conditions: ConditionDraft[];
 }
 
-interface StageDraft {
+export interface StageDraft {
   id: string;
   label: string;
   timeout_hours: number;
@@ -99,7 +99,41 @@ interface StageDraft {
   // M1: never let auto-rules move a conversation backward unless this is
   // explicitly true. Terminal stages always block backward regardless.
   allow_auto_backward?: boolean;
+  // Fase 6 — opt-in flow-mode override per stage. Empty string ("") in
+  // the editor means "use the per-turn flow router rules". The
+  // serialiser strips the empty value so the JSONB stays clean.
+  behavior_mode?: BehaviorMode | "";
+  // Fase 4 — when entered, pause the bot and create a handoff. The
+  // matching reason string is persisted on `human_handoffs.reason`.
+  pause_bot_on_enter?: boolean;
+  handoff_reason?: string;
 }
+
+// Mirror of FlowMode in core/atendia/contracts/flow_mode.py. Kept as a
+// readonly tuple so the dropdown options stay in lockstep with both
+// validator branches.
+export const BEHAVIOR_MODES = [
+  "PLAN",
+  "SALES",
+  "DOC",
+  "OBSTACLE",
+  "RETENTION",
+  "SUPPORT",
+] as const;
+export type BehaviorMode = (typeof BEHAVIOR_MODES)[number];
+
+// Curated reasons surfaced in the dropdown. Operators can still type a
+// custom string (free-form text) — these are the canonical ones the
+// backend HandoffReason enum understands. Free-form strings are
+// accepted by StageDefinition.handoff_reason validator on the backend.
+export const HANDOFF_REASON_PRESETS: Array<{ value: string; label: string }> = [
+  { value: "docs_complete_for_plan", label: "Papelería completa" },
+  { value: "stage_triggered_handoff", label: "Handoff genérico por etapa" },
+  { value: "antiguedad_lt_6m", label: "Antigüedad menor a 6 meses" },
+  { value: "obstacle_no_solution", label: "Obstáculo sin solución" },
+  { value: "user_signaled_papeleria_completa", label: "Cliente dijo: ya envié todo" },
+  { value: "papeleria_completa_form_pending", label: "Falta formulario después de papelería" },
+];
 
 export interface DocumentSpecDraft {
   key: string;
@@ -107,13 +141,41 @@ export interface DocumentSpecDraft {
   hint: string;
 }
 
-interface PipelineDraft {
+export interface PipelineDraft {
   stages: StageDraft[];
   docs_per_plan: Record<string, string[]>;
   documents_catalog: DocumentSpecDraft[];
+  // Fase 3 — Vision category → list of DOCS_* keys to write. Tenant-
+  // editable so each business decides whether `ine` → DOCS_INE (single)
+  // or DOCS_INE_FRENTE + DOCS_INE_REVERSO (split).
+  vision_doc_mapping: Record<string, string[]>;
   fallback?: string;
   extra: Record<string, unknown>;
 }
+
+// Categories the Vision classifier produces. Mirror of
+// core/atendia/contracts/vision_result.py VisionCategory; new entries
+// need to match both sides or the editor silently swallows them.
+export const VISION_CATEGORIES = [
+  "ine",
+  "comprobante",
+  "recibo_nomina",
+  "estado_cuenta",
+  "constancia_sat",
+  "factura",
+  "imss",
+] as const;
+export type VisionCategoryKey = (typeof VISION_CATEGORIES)[number];
+
+const VISION_CATEGORY_LABELS: Record<VisionCategoryKey, string> = {
+  ine: "INE",
+  comprobante: "Comprobante de domicilio",
+  recibo_nomina: "Recibo de nómina",
+  estado_cuenta: "Estado de cuenta",
+  constancia_sat: "Constancia SAT",
+  factura: "Factura",
+  imss: "IMSS",
+};
 
 // Mirrors the backend regex in pipeline_definition.py — uppercase, must
 // start with DOCS_, identifier-shaped suffix.
@@ -179,13 +241,19 @@ function serializeAutoEnterRules(rules: AutoEnterRulesDraft | undefined): Record
   return { enabled: rules.enabled, match: rules.match, conditions };
 }
 
-function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft {
+export function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft {
   const def = raw ?? {};
   const rawStages = Array.isArray(def.stages) ? def.stages : [];
   const stages: StageDraft[] = rawStages.flatMap((s: unknown, idx: number) => {
     if (typeof s !== "object" || s === null) return [];
     const obj = s as Record<string, unknown>;
     if (typeof obj.id !== "string") return [];
+    // Fase 6 — accept any of the 6 known modes; reject typos so the
+    // dropdown doesn't render a phantom value the backend won't take.
+    const rawBehavior = typeof obj.behavior_mode === "string" ? obj.behavior_mode : "";
+    const behaviorMode = (BEHAVIOR_MODES as readonly string[]).includes(rawBehavior)
+      ? (rawBehavior as BehaviorMode)
+      : "";
     return [
       {
         id: obj.id,
@@ -195,6 +263,9 @@ function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft 
         color: typeof obj.color === "string" ? obj.color : defaultColor(idx),
         auto_enter_rules: parseAutoEnterRules(obj.auto_enter_rules),
         allow_auto_backward: obj.allow_auto_backward === true,
+        behavior_mode: behaviorMode,
+        pause_bot_on_enter: obj.pause_bot_on_enter === true,
+        handoff_reason: typeof obj.handoff_reason === "string" ? obj.handoff_reason : "",
       },
     ];
   });
@@ -217,19 +288,51 @@ function parsePipeline(raw: Record<string, unknown> | undefined): PipelineDraft 
       })
     : [];
   const fallback = typeof def.fallback === "string" ? def.fallback : undefined;
+  // Fase 3 — vision_doc_mapping shape: { "ine": ["DOCS_INE_FRENTE", ...], ... }
+  // Tolerate operator-edited noise: skip non-string values and non-array entries.
+  const rawVdm =
+    typeof def.vision_doc_mapping === "object" && def.vision_doc_mapping !== null
+      ? (def.vision_doc_mapping as Record<string, unknown>)
+      : {};
+  const vision_doc_mapping: Record<string, string[]> = {};
+  for (const [cat, keys] of Object.entries(rawVdm)) {
+    if (!Array.isArray(keys)) continue;
+    vision_doc_mapping[cat] = keys.filter(
+      (k): k is string => typeof k === "string" && DOC_KEY_RE.test(k),
+    );
+  }
   const extra: Record<string, unknown> = { ...def };
   delete extra.stages;
   delete extra.docs_per_plan;
   delete extra.documents_catalog;
   delete extra.fallback;
-  return { stages, docs_per_plan: docs, documents_catalog, fallback, extra };
+  delete extra.vision_doc_mapping;
+  return {
+    stages,
+    docs_per_plan: docs,
+    documents_catalog,
+    vision_doc_mapping,
+    fallback,
+    extra,
+  };
+}
+
+export function serialisePipelineDraft(draft: PipelineDraft): Record<string, unknown> {
+  return serialise(draft);
 }
 
 function serialise(draft: PipelineDraft): Record<string, unknown> {
+  // Strip empty vision_doc_mapping entries so the persisted JSONB
+  // doesn't accumulate noise after toggling.
+  const visionMapping: Record<string, string[]> = {};
+  for (const [cat, keys] of Object.entries(draft.vision_doc_mapping ?? {})) {
+    if (Array.isArray(keys) && keys.length > 0) visionMapping[cat] = keys;
+  }
   return {
     ...draft.extra,
     stages: draft.stages.map((s) => {
       const rulesSerialized = serializeAutoEnterRules(s.auto_enter_rules);
+      const handoffReason = (s.handoff_reason ?? "").trim();
       return {
         id: s.id,
         label: s.label,
@@ -238,6 +341,9 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
         ...(s.is_terminal ? { is_terminal: true } : {}),
         ...(s.allow_auto_backward ? { allow_auto_backward: true } : {}),
         ...(rulesSerialized ? { auto_enter_rules: rulesSerialized } : {}),
+        ...(s.behavior_mode ? { behavior_mode: s.behavior_mode } : {}),
+        ...(s.pause_bot_on_enter ? { pause_bot_on_enter: true } : {}),
+        ...(handoffReason ? { handoff_reason: handoffReason } : {}),
       };
     }),
     docs_per_plan: draft.docs_per_plan,
@@ -246,6 +352,9 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
       label: d.label,
       ...(d.hint ? { hint: d.hint } : {}),
     })),
+    ...(Object.keys(visionMapping).length > 0
+      ? { vision_doc_mapping: visionMapping }
+      : {}),
     ...(draft.fallback ? { fallback: draft.fallback } : {}),
   };
 }
@@ -253,6 +362,10 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
 // Mirrors backend _RULE_FIELD_RE in pipeline_definition.py. Accepts
 // dot-separated identifiers (DOCS_INE.status, modelo_interes).
 const RULE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
+
+export function validatePipelineDraft(draft: PipelineDraft): string | null {
+  return validate(draft);
+}
 
 function validate(draft: PipelineDraft): string | null {
   if (draft.stages.length === 0) return "El pipeline debe tener al menos una etapa.";
@@ -283,6 +396,19 @@ function validate(draft: PipelineDraft): string | null {
     if (s.is_terminal && s.allow_auto_backward) {
       return `"${s.id}": una etapa terminal no puede permitir movimiento hacia atrás.`;
     }
+    // Fase 6 — behavior_mode is open-set on the type but pinned to the
+    // 6 known modes; reject typed-in JSON drift before save.
+    if (
+      s.behavior_mode &&
+      !(BEHAVIOR_MODES as readonly string[]).includes(s.behavior_mode)
+    ) {
+      return `"${s.id}": behavior_mode "${s.behavior_mode}" no es uno de ${BEHAVIOR_MODES.join(", ")}.`;
+    }
+    // Fase 4 — handoff_reason without pause_bot_on_enter is a config
+    // mistake (the reason would never reach human_handoffs.payload).
+    if ((s.handoff_reason ?? "").trim() && !s.pause_bot_on_enter) {
+      return `"${s.id}": handoff_reason solo aplica cuando "Pausar bot al entrar" está activo.`;
+    }
     const rules = s.auto_enter_rules;
     if (rules?.enabled) {
       if (rules.conditions.length === 0) {
@@ -307,6 +433,23 @@ function validate(draft: PipelineDraft): string | null {
         if (c.value === undefined || c.value === null || c.value === "") {
           return `"${s.id}": condición #${i + 1} (${c.operator}) requiere un valor.`;
         }
+      }
+    }
+  }
+  // Fase 3 — vision_doc_mapping: every referenced DOCS_* must exist
+  // in documents_catalog. Catching this here is friendlier than
+  // letting the runtime helper silently skip the write.
+  const catalogKeys = new Set(draft.documents_catalog.map((d) => d.key));
+  for (const [cat, keys] of Object.entries(draft.vision_doc_mapping ?? {})) {
+    if (!(VISION_CATEGORIES as readonly string[]).includes(cat)) {
+      return `Mapeo Vision: categoría "${cat}" no es válida (debe ser una de ${VISION_CATEGORIES.join(", ")}).`;
+    }
+    for (const key of keys) {
+      if (!DOC_KEY_RE.test(key)) {
+        return `Mapeo Vision (${cat}): "${key}" no es un DOCS_* válido.`;
+      }
+      if (!catalogKeys.has(key)) {
+        return `Mapeo Vision (${cat}): el documento "${key}" no está en el catálogo.`;
       }
     }
   }
@@ -345,6 +488,7 @@ export function PipelineEditor({ onClose }: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showDocsByPlan, setShowDocsByPlan] = useState(false);
   const [showDocsCatalog, setShowDocsCatalog] = useState(true);
+  const [showVisionMapping, setShowVisionMapping] = useState(false);
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocHint, setNewDocHint] = useState("");
   const [newPlanName, setNewPlanName] = useState("");
@@ -365,6 +509,7 @@ export function PipelineEditor({ onClose }: Props) {
         ],
         docs_per_plan: {},
         documents_catalog: [],
+        vision_doc_mapping: {},
         fallback: "escalate_to_human",
         extra: {},
       };
@@ -559,6 +704,43 @@ export function PipelineEditor({ onClose }: Props) {
       return {
         ...prev,
         docs_per_plan: { ...prev.docs_per_plan, [plan]: next },
+      };
+    });
+  };
+
+  // Fase 3 — vision_doc_mapping mutations. Each Vision category maps
+  // to an ordered list of DOCS_* keys. For INE (multi-side doc) order
+  // matters: index 0 = front-side key, index 1 = back-side key. For
+  // single-key categories we just append/remove from the list.
+  const toggleVisionDocKey = (category: VisionCategoryKey, docKey: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = prev.vision_doc_mapping[category] ?? [];
+      const next = current.includes(docKey)
+        ? current.filter((k) => k !== docKey)
+        : [...current, docKey];
+      const mapping = { ...prev.vision_doc_mapping };
+      if (next.length === 0) delete mapping[category];
+      else mapping[category] = next;
+      return { ...prev, vision_doc_mapping: mapping };
+    });
+  };
+
+  const moveVisionDocKey = (
+    category: VisionCategoryKey,
+    idx: number,
+    delta: -1 | 1,
+  ) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = prev.vision_doc_mapping[category] ?? [];
+      const target = idx + delta;
+      if (target < 0 || target >= current.length) return prev;
+      const next = [...current];
+      [next[idx], next[target]] = [next[target] as string, next[idx] as string];
+      return {
+        ...prev,
+        vision_doc_mapping: { ...prev.vision_doc_mapping, [category]: next },
       };
     });
   };
@@ -1083,6 +1265,140 @@ export function PipelineEditor({ onClose }: Props) {
                   Permitir movimiento hacia atrás automático
                 </Label>
               </div>
+
+              {/* Fase 6 — behavior_mode dropdown. Empty = use the per-turn
+                  flow router rules (legacy behaviour). Any non-empty value
+                  pins this stage's mode regardless of router output. */}
+              <div className="flex flex-col gap-1.5" data-field="behavior_mode">
+                <Label className="text-xs" htmlFor="behavior-mode-select">
+                  Modo del Composer
+                  <span className="ml-1 text-muted-foreground">
+                    (opcional, fija el prompt-block que se usa en esta etapa)
+                  </span>
+                </Label>
+                <select
+                  id="behavior-mode-select"
+                  className="h-8 rounded-md border bg-background px-2 text-xs disabled:opacity-50"
+                  disabled={!canEdit}
+                  value={selected.behavior_mode ?? ""}
+                  onChange={(e) =>
+                    updateStage(selectedIdx, {
+                      behavior_mode: (e.target.value as BehaviorMode | "") || "",
+                    })
+                  }
+                >
+                  <option value="">— Usar reglas del router (default) —</option>
+                  {BEHAVIOR_MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fase 4 — pause_bot_on_enter toggle + handoff_reason input.
+                  When the conversation enters this stage, the runner pauses
+                  the bot, persists a `human_handoffs` row tagged with the
+                  selected reason, and emits the BOT_PAUSED + HUMAN_HANDOFF
+                  events. The reason input becomes editable only when the
+                  toggle is on. */}
+              <div className="flex items-center gap-3" data-field="pause_bot_on_enter">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={selected.pause_bot_on_enter === true}
+                  onClick={() =>
+                    updateStage(selectedIdx, {
+                      pause_bot_on_enter: !(selected.pause_bot_on_enter === true),
+                    })
+                  }
+                  disabled={!canEdit}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    selected.pause_bot_on_enter ? "bg-primary" : "bg-muted",
+                    !canEdit && "cursor-not-allowed opacity-50",
+                  )}
+                  title="Cuando la conversación entra a esta etapa, pausa el bot y crea un handoff humano"
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block size-4 rounded-full bg-white shadow-lg transition-transform",
+                      selected.pause_bot_on_enter ? "translate-x-4" : "translate-x-0",
+                    )}
+                  />
+                </button>
+                <Label className="text-xs">
+                  Pausar bot al entrar
+                  <span className="ml-1 text-muted-foreground">
+                    (crea handoff humano automático)
+                  </span>
+                </Label>
+              </div>
+
+              {selected.pause_bot_on_enter && (
+                <div className="flex flex-col gap-1.5" data-field="handoff_reason">
+                  <Label className="text-xs" htmlFor="handoff-reason-input">
+                    Razón del handoff
+                    <span className="ml-1 text-muted-foreground">
+                      (se guarda en <code>human_handoffs.reason</code>)
+                    </span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <select
+                      id="handoff-reason-input"
+                      className="h-8 flex-1 rounded-md border bg-background px-2 text-xs disabled:opacity-50"
+                      disabled={!canEdit}
+                      value={
+                        HANDOFF_REASON_PRESETS.some(
+                          (r) => r.value === (selected.handoff_reason ?? ""),
+                        )
+                          ? selected.handoff_reason
+                          : "__custom__"
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "__custom__") {
+                          // Leave the current value; the input below
+                          // becomes the source of truth.
+                          if (
+                            HANDOFF_REASON_PRESETS.some(
+                              (r) => r.value === (selected.handoff_reason ?? ""),
+                            )
+                          ) {
+                            updateStage(selectedIdx, { handoff_reason: "" });
+                          }
+                          return;
+                        }
+                        updateStage(selectedIdx, { handoff_reason: v });
+                      }}
+                    >
+                      {HANDOFF_REASON_PRESETS.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                      <option value="__custom__">Personalizado…</option>
+                    </select>
+                    <Input
+                      className="h-8 flex-1 text-xs"
+                      placeholder="o escribe una razón personalizada"
+                      disabled={!canEdit}
+                      value={
+                        HANDOFF_REASON_PRESETS.some(
+                          (r) => r.value === (selected.handoff_reason ?? ""),
+                        )
+                          ? ""
+                          : (selected.handoff_reason ?? "")
+                      }
+                      onChange={(e) =>
+                        updateStage(selectedIdx, {
+                          handoff_reason: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* M2: per-stage auto-enter rules. RuleBuilder owns the toggle,
@@ -1465,6 +1781,164 @@ export function PipelineEditor({ onClose }: Props) {
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Fase 3 — Vision auto-write mapping. Each Vision category maps
+            to the DOCS_* customer-attrs keys the runner should write
+            when an image classifies as that category. Empty list per
+            category = manual operator marking (legacy behaviour). */}
+        <div className="border-t" data-section="vision_doc_mapping">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium"
+            onClick={() => setShowVisionMapping((v) => !v)}
+          >
+            {showVisionMapping ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            Auto-marcado de documentos con Vision (
+            {Object.values(draft.vision_doc_mapping ?? {}).reduce(
+              (acc, list) => acc + (Array.isArray(list) ? list.length : 0),
+              0,
+            )}{" "}
+            mapeos)
+          </button>
+
+          {showVisionMapping && (
+            <div className="space-y-3 px-4 pb-4">
+              <p className="text-[10px] text-muted-foreground">
+                Cuando Vision clasifica una imagen como una de estas
+                categorías, el bot escribe automáticamente los DOCS_*
+                seleccionados con <code>status=ok</code> (o{" "}
+                <code>rejected</code>+motivo si la calidad falla). Si
+                dejas la lista vacía, el bot solo emite el evento y el
+                operador marca manualmente. <strong>Para INE</strong>: el
+                primer DOCS_* en orden = lado frente, el segundo = lado
+                reverso (Vision detecta el lado).
+              </p>
+
+              {VISION_CATEGORIES.map((cat) => {
+                const assigned = draft.vision_doc_mapping[cat] ?? [];
+                return (
+                  <div
+                    key={cat}
+                    className="rounded-md border bg-muted/10 p-2"
+                    data-vision-category={cat}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-medium">
+                          {VISION_CATEGORY_LABELS[cat]}
+                        </span>
+                        <span className="ml-2 font-mono text-[9px] text-muted-foreground">
+                          {cat}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {assigned.length === 0
+                          ? "Sin mapear (manual)"
+                          : `${assigned.length} doc${assigned.length === 1 ? "" : "s"}`}
+                      </span>
+                    </div>
+
+                    {/* Ordered list of currently-assigned DOCS_*. For INE
+                        we show the order indicator (frente/reverso) so
+                        operators know which side maps to which key. */}
+                    {assigned.length > 0 && (
+                      <ol className="mt-2 space-y-1">
+                        {assigned.map((docKey, idx) => {
+                          const spec = draft.documents_catalog.find(
+                            (d) => d.key === docKey,
+                          );
+                          const sideHint =
+                            cat === "ine"
+                              ? idx === 0
+                                ? "lado frente"
+                                : idx === 1
+                                  ? "lado reverso"
+                                  : `lado ${idx + 1}`
+                              : null;
+                          return (
+                            <li
+                              key={docKey}
+                              className="flex items-center gap-2 rounded border bg-background px-2 py-1 text-[11px]"
+                            >
+                              <span className="flex-1">
+                                {spec?.label ?? docKey}
+                                <span className="ml-1 font-mono text-[9px] text-muted-foreground">
+                                  {docKey}
+                                </span>
+                                {sideHint && (
+                                  <span className="ml-2 inline-flex items-center rounded bg-indigo-100 px-1.5 py-0 text-[9px] text-indigo-900">
+                                    {sideHint}
+                                  </span>
+                                )}
+                              </span>
+                              {assigned.length > 1 && canEdit && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="rounded p-0.5 hover:bg-muted disabled:opacity-30"
+                                    disabled={idx === 0}
+                                    onClick={() => moveVisionDocKey(cat, idx, -1)}
+                                    title="Subir (más prioridad / lado frente para INE)"
+                                  >
+                                    <ChevronRight className="size-3 -rotate-90" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded p-0.5 hover:bg-muted disabled:opacity-30"
+                                    disabled={idx === assigned.length - 1}
+                                    onClick={() => moveVisionDocKey(cat, idx, 1)}
+                                    title="Bajar"
+                                  >
+                                    <ChevronRight className="size-3 rotate-90" />
+                                  </button>
+                                </>
+                              )}
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  className="rounded p-0.5 hover:bg-rose-100"
+                                  onClick={() => toggleVisionDocKey(cat, docKey)}
+                                  title="Quitar mapeo"
+                                >
+                                  <X className="size-3 text-rose-600" />
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    )}
+
+                    {/* Available documents from the catalog the operator
+                        can add. We hide the ones already assigned. */}
+                    {canEdit && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {draft.documents_catalog
+                          .filter((d) => !assigned.includes(d.key))
+                          .map((d) => (
+                            <button
+                              type="button"
+                              key={d.key}
+                              className="rounded-full border border-dashed bg-background px-2 py-0.5 text-[10px] hover:bg-muted"
+                              onClick={() => toggleVisionDocKey(cat, d.key)}
+                              title={d.hint || undefined}
+                            >
+                              + {d.label}
+                            </button>
+                          ))}
+                        {draft.documents_catalog.length === 0 && (
+                          <span className="text-[10px] italic text-muted-foreground">
+                            Primero agrega documentos al catálogo arriba.
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

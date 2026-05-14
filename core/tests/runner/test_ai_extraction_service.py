@@ -129,11 +129,11 @@ async def _run(
     *,
     turn: int = 1,
     inbound_text: str | None = None,
-) -> None:
+) -> list:
     engine = create_async_engine(get_settings().database_url)
     SessionMaker = async_sessionmaker(engine, expire_on_commit=False)
     async with SessionMaker() as session:
-        await apply_ai_extractions(
+        applied = await apply_ai_extractions(
             session=session,
             tenant_id=tenant_id,
             customer_id=customer_id,
@@ -144,6 +144,7 @@ async def _run(
         )
         await session.commit()
     await engine.dispose()
+    return applied
 
 
 def test_auto_applies_to_empty_attrs(fresh_seed):
@@ -225,3 +226,36 @@ def test_ignores_unknown_entities(fresh_seed):
     asyncio.run(_run(tid, cid, conv, entities))
     assert _read_attrs(cid) == {}
     assert _read_suggestions(cid) == []
+
+
+def test_returns_applied_changes_for_auto_writes(fresh_seed):
+    """The returned list drives FIELD_UPDATED system events; SUGGEST and
+    SKIP paths must NOT appear there — only AUTO writes that actually
+    landed on customer.attrs."""
+    tid, cid, conv = fresh_seed
+    entities = {
+        "brand": ExtractedField(value="Honda", confidence=0.95, source_turn=1),    # AUTO
+        "model": ExtractedField(value="Civic", confidence=0.70, source_turn=1),    # SUGGEST
+        "city": ExtractedField(value="GDL", confidence=0.30, source_turn=1),       # SKIP
+    }
+    applied = asyncio.run(_run(tid, cid, conv, entities))
+
+    # Only AUTO ends up in the returned list.
+    assert [c.attr_key for c in applied] == ["marca"]
+    assert applied[0].old_value is None
+    assert applied[0].new_value == "Honda"
+    assert applied[0].confidence == pytest.approx(0.95)
+
+
+def test_returns_empty_when_no_auto_changes(seed_with_attrs):
+    """NOOP (same value) + SUGGEST (different value, lower conf) must
+    both yield zero AppliedFieldChange entries — neither modifies attrs."""
+    tid, cid, conv = seed_with_attrs
+    entities = {
+        # NOOP — marca already 'Honda'
+        "brand": ExtractedField(value="Honda", confidence=0.95, source_turn=1),
+        # SUGGEST — plan_credito already '10', new value differs
+        "plan": ExtractedField(value="15", confidence=0.95, source_turn=1),
+    }
+    applied = asyncio.run(_run(tid, cid, conv, entities))
+    assert applied == []

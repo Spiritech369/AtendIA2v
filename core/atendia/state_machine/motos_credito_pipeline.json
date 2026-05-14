@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "stages": [
+    {
+      "id": "nuevo_lead",
+      "label": "Nuevo lead",
+      "color": "#6366f1",
+      "timeout_hours": 24,
+      "required_fields": [],
+      "actions_allowed": [
+        "greet",
+        "ask_field",
+        "ask_clarification"
+      ],
+      "behavior_mode": "PLAN"
+    },
+    {
+      "id": "calificacion_inicial",
+      "label": "Calificación inicial",
+      "color": "#3b82f6",
+      "timeout_hours": 48,
+      "required_fields": [
+        {
+          "name": "antiguedad_laboral_meses",
+          "description": "Cuántos meses lleva en su empleo actual"
+        }
+      ],
+      "actions_allowed": [
+        "ask_field",
+        "lookup_faq",
+        "ask_clarification"
+      ],
+      "behavior_mode": "PLAN",
+      "auto_enter_rules": {
+        "enabled": true,
+        "match": "all",
+        "conditions": [
+          {
+            "field": "cumple_antiguedad",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "plan_seleccionado",
+      "label": "Plan seleccionado",
+      "color": "#0ea5e9",
+      "timeout_hours": 48,
+      "required_fields": [
+        {
+          "name": "tipo_credito",
+          "description": "Tipo de comprobación de ingresos"
+        },
+        {
+          "name": "plan_credito",
+          "description": "Plan + porcentaje de enganche"
+        }
+      ],
+      "actions_allowed": [
+        "ask_field",
+        "lookup_faq"
+      ],
+      "behavior_mode": "PLAN",
+      "auto_enter_rules": {
+        "enabled": true,
+        "match": "all",
+        "conditions": [
+          {
+            "field": "plan_credito",
+            "operator": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "id": "papeleria_incompleta",
+      "label": "Papelería incompleta",
+      "color": "#f59e0b",
+      "timeout_hours": 72,
+      "actions_allowed": [
+        "ask_field",
+        "lookup_faq"
+      ],
+      "behavior_mode": "DOC",
+      "auto_enter_rules": {
+        "enabled": true,
+        "match": "any",
+        "conditions": [
+          {
+            "field": "DOCS_INE_FRENTE.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_INE_REVERSO.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_COMPROBANTE_DOMICILIO.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_ESTADOS_CUENTA_NOMINA.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_RECIBOS_NOMINA.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_CONSTANCIA_SAT.status",
+            "operator": "equals",
+            "value": "ok"
+          },
+          {
+            "field": "DOCS_RECIBO_PENSION.status",
+            "operator": "equals",
+            "value": "ok"
+          }
+        ]
+      }
+    },
+    {
+      "id": "papeleria_completa",
+      "label": "Papelería completa",
+      "color": "#10b981",
+      "pause_bot_on_enter": true,
+      "handoff_reason": "docs_complete_for_plan",
+      "actions_allowed": [
+        "escalate_to_human",
+        "ask_clarification"
+      ],
+      "auto_enter_rules": {
+        "enabled": true,
+        "match": "all",
+        "conditions": [
+          {
+            "field": "plan_credito",
+            "operator": "docs_complete_for_plan"
+          }
+        ]
+      }
+    },
+    {
+      "id": "revision_humana",
+      "label": "Revisión humana",
+      "color": "#22c55e",
+      "is_terminal": true,
+      "actions_allowed": [
+        "escalate_to_human"
+      ]
+    }
+  ],
+  "fallback": "ask_clarification",
+  "nlu": {
+    "history_turns": 3
+  },
+  "composer": {
+    "history_turns": 3
+  },
+  "flow_mode_rules": [],
+  "docs_per_plan": {
+    "nomina_tarjeta_10": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO",
+      "DOCS_COMPROBANTE_DOMICILIO",
+      "DOCS_ESTADOS_CUENTA_NOMINA"
+    ],
+    "nomina_efectivo_20": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO",
+      "DOCS_COMPROBANTE_DOMICILIO",
+      "DOCS_RECIBOS_NOMINA"
+    ],
+    "negocio_sat_15": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO",
+      "DOCS_COMPROBANTE_DOMICILIO",
+      "DOCS_CONSTANCIA_SAT"
+    ],
+    "pensionado_imss_15": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO",
+      "DOCS_COMPROBANTE_DOMICILIO",
+      "DOCS_RECIBO_PENSION"
+    ],
+    "sin_comprobantes_25": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO",
+      "DOCS_COMPROBANTE_DOMICILIO"
+    ]
+  },
+  "documents_catalog": [
+    {
+      "key": "DOCS_INE_FRENTE",
+      "label": "INE — frente",
+      "hint": "Foto del lado del nombre, las 4 esquinas visibles, sin reflejo."
+    },
+    {
+      "key": "DOCS_INE_REVERSO",
+      "label": "INE — reverso",
+      "hint": "Foto del lado de la dirección, completa y legible."
+    },
+    {
+      "key": "DOCS_COMPROBANTE_DOMICILIO",
+      "label": "Comprobante de domicilio",
+      "hint": "Recibo de luz / agua / gas / internet, menor a 2 meses."
+    },
+    {
+      "key": "DOCS_ESTADOS_CUENTA_NOMINA",
+      "label": "Estados de cuenta donde se vea la nómina",
+      "hint": "Últimos 3 meses con depósitos de tu patrón claramente visibles."
+    },
+    {
+      "key": "DOCS_RECIBOS_NOMINA",
+      "label": "Recibos de nómina",
+      "hint": "Últimos 3 recibos / talones. Membrete del patrón + firma."
+    },
+    {
+      "key": "DOCS_CONSTANCIA_SAT",
+      "label": "Constancia de situación fiscal (SAT)",
+      "hint": "Reciente (< 3 meses), del portal del SAT."
+    },
+    {
+      "key": "DOCS_RECIBO_PENSION",
+      "label": "Comprobante de pensión IMSS",
+      "hint": "Último estado de cuenta de la pensión."
+    }
+  ],
+  "vision_doc_mapping": {
+    "ine": [
+      "DOCS_INE_FRENTE",
+      "DOCS_INE_REVERSO"
+    ],
+    "comprobante": [
+      "DOCS_COMPROBANTE_DOMICILIO"
+    ],
+    "estado_cuenta": [
+      "DOCS_ESTADOS_CUENTA_NOMINA"
+    ],
+    "recibo_nomina": [
+      "DOCS_RECIBOS_NOMINA"
+    ],
+    "constancia_sat": [
+      "DOCS_CONSTANCIA_SAT"
+    ],
+    "imss": [
+      "DOCS_RECIBO_PENSION"
+    ]
+  }
+}

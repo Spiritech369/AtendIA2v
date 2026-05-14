@@ -9,6 +9,7 @@ import {
   shouldSkipText,
 } from "@/features/conversations/lib/cleanInternalNotes";
 import { MediaContent } from "./MediaContent";
+import { SystemEventBubble, hasStructuredSystemEvent } from "./SystemEventBubble";
 
 interface Props {
   message: MessageItem;
@@ -30,6 +31,14 @@ export function MessageBubble({ message, hasTrace, isSelected, onDebug }: Props)
   const isSystem = message.direction === "system";
   const clickable = hasTrace && onDebug;
   const [copied, setCopied] = useState(false);
+
+  // Fase 1 — runner-emitted system events (stage moved, plan updated,
+  // doc accepted/rejected) carry `metadata.event_type` and deserve a
+  // richer bubble (icon + color + secondary line). Legacy system
+  // messages without event_type keep the original plain italic look.
+  if (isSystem && hasStructuredSystemEvent(message.metadata)) {
+    return <SystemEventBubble text={message.text} metadata={message.metadata} />;
+  }
 
   const media = extractMedia(message.metadata);
   const cleanedText = cleanInternalNotes(message.text);

@@ -420,8 +420,74 @@ const TRIGGER_CATALOG: TriggerDef[] = [
   {
     value: "bot_paused",
     label: "Bot pausado",
-    description: "Un humano pausó el bot para esta conversación.",
+    description: "Un humano (o un stage auto-handoff) pausó el bot para esta conversación.",
     fields: [],
+  },
+  // Fase 1+3+4 triggers — wired in the runner so workflows can react
+  // to docs received, papelería completa, and handoff requests
+  // without polling. Keep this block in sync with TRIGGERS in
+  // core/atendia/workflows/engine.py.
+  {
+    value: "document_accepted",
+    label: "Documento aceptado",
+    description: "Vision validó una imagen y se marcó un DOCS_* en el cliente.",
+    fields: [
+      {
+        key: "document_type",
+        label: "Tipo de documento (opcional)",
+        kind: "text",
+        placeholder: "DOCS_INE_FRENTE, ine, comprobante…",
+        description: "Limita el trigger a un DOCS_* específico. Vacío = cualquier doc aceptado.",
+      },
+    ],
+  },
+  {
+    value: "document_rejected",
+    label: "Documento rechazado",
+    description: "Vision rechazó una imagen (reflejo, ilegible, etc.).",
+    fields: [
+      {
+        key: "document_type",
+        label: "Tipo de documento (opcional)",
+        kind: "text",
+        placeholder: "DOCS_INE_FRENTE, ine, comprobante…",
+      },
+    ],
+  },
+  {
+    value: "docs_complete_for_plan",
+    label: "Papelería completa",
+    description: "El cliente cumplió todos los documentos requeridos por su plan.",
+    fields: [
+      {
+        key: "plan_credito",
+        label: "Filtrar por plan (opcional)",
+        kind: "text",
+        placeholder: "nomina_tarjeta_10, sin_comprobantes_25…",
+        description: "Si lo dejas vacío, dispara para cualquier plan.",
+      },
+    ],
+  },
+  {
+    value: "human_handoff_requested",
+    label: "Handoff humano solicitado",
+    description: "El bot solicitó intervención humana (papelería completa, fuera de 24h, error, etc.).",
+    fields: [
+      {
+        key: "reason",
+        label: "Razón específica (opcional)",
+        kind: "select",
+        options: [
+          { value: "", label: "Cualquier razón" },
+          { value: "docs_complete_for_plan", label: "Papelería completa" },
+          { value: "outside_24h_window", label: "Fuera de 24h" },
+          { value: "composer_failed", label: "Composer falló" },
+          { value: "obstacle_no_solution", label: "Obstáculo sin solución" },
+          { value: "stage_triggered_handoff", label: "Stage con auto-handoff" },
+          { value: "antiguedad_lt_6m", label: "Antigüedad < 6 meses" },
+        ],
+      },
+    ],
   },
 ];
 

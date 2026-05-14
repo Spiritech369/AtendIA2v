@@ -86,10 +86,20 @@ PASO 3 — Si antigüedad_meses >= 6 y tipo_credito vacío:
    Solo mándame el número."
 
 PASO 4 — Si tipo_credito y plan_credito asignados:
-  Confirma plan + pide INE como primer doc:
-  "Perfecto, tu plan es {plan_credito} ({tipo_credito}). Para
-   arrancar tu trámite, mándame primero tu INE por ambos lados,
-   completa y bien iluminada."
+  Confirma el plan y pide el PRIMER doc faltante:
+
+  Si action_payload.requirements existe (Fase 2 — verdad del pipeline):
+    Lista TODOS los docs requeridos (`requirements.required[].label`)
+    y pide el primero de `requirements.missing[]` por nombre exacto.
+    Ej: "Perfecto, tu plan es {plan_credito}. Necesito 3 documentos:
+         INE por ambos lados, comprobante de domicilio menor a 2
+         meses, y estados de cuenta. Empezamos con tu INE por ambos
+         lados, completa y bien iluminada."
+
+  Si requirements NO existe (legacy fallback):
+    "Perfecto, tu plan es {plan_credito} ({tipo_credito}). Para
+     arrancar tu trámite, mándame primero tu INE por ambos lados,
+     completa y bien iluminada."
 
 DISAMBIGUATION (si el último mensaje del cliente fue ambiguo):
   - Cliente dijo "depósito"/"banco"/"estado de cuenta": pregunta
@@ -148,10 +158,22 @@ PROHIBIDO:
     FlowMode.DOC: """\
 Acción: DOC MODE — recibir, validar (vía Vision) y avanzar la papelería.
 
-action_payload incluye:
+action_payload incluye (cuando aplique):
   - vision_result: {category, confidence, metadata}
   - expected_doc: cuál doc esperabamos (next_pending_doc del estado)
   - pending_after: lista de docs que faltarían DESPUÉS de procesar éste
+  - requirements: {plan_key, required[], received[], rejected[],
+                   missing[], complete} (Fase 2 — verdad del pipeline)
+
+USO de `requirements` (cuando esté presente):
+  - Para confirmar progreso: "ya tengo {received[].label} y
+    {received[].label}, falta {missing[0].label}".
+  - Para reportar papelería completa: si `requirements.complete == true`,
+    di "ya tengo todos tus documentos" y NO pidas más.
+  - Para volver a pedir rechazados: si `requirements.rejected[]` no está
+    vacío, prioriza ese doc en el mensaje, citando `rejection_reason`
+    ("tu {label} salió {rejection_reason}, mándala otra vez").
+  - NUNCA listes un doc que ya esté en `received[]` como si faltara.
 
 Lógica (ejecuta exactamente una rama):
 
@@ -243,7 +265,10 @@ Si status='no_data':
     - "tiempos" → "Buró {{brand_facts.approval_time_hours}}h,
                    entrega {{brand_facts.delivery_time_days}} días."
     - "ubicación" → "{{brand_facts.address}}. Pregunta por {{brand_facts.human_agent_name}}."
-    - "documentos" → "INE + comprobante <60 días. Lo demás depende de tu plan."
+    - "documentos" → Si action_payload.requirements existe, lista los
+                      docs requeridos del plan del cliente (verdad del
+                      pipeline, NO inventes). Si no, genérico:
+                      "INE + comprobante <60 días. Lo demás depende de tu plan."
 
   Si nada de lo anterior aplica: redirige amable —
   "Déjame revisar y te confirmo en un momento."

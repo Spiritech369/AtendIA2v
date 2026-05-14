@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.config import get_settings
 from atendia.contracts.event import EventType
+from atendia.contracts.flow_mode import FlowMode
 from atendia.contracts.message import Message
 from atendia.contracts.tone import Tone
 from atendia.contracts.vision_result import VisionResult
@@ -20,7 +21,18 @@ from atendia.runner.composer_protocol import (
     ComposerOutput,
     ComposerProvider,
 )
+from atendia.runner.conversation_events import (
+    emit_bot_paused,
+    emit_document_event,
+    emit_field_updated,
+    emit_stage_changed,
+    emit_system_event,
+)
 from atendia.runner.nlu_protocol import NLUProvider
+from atendia.runner.vision_to_attrs import (
+    VisionDocWrite,
+    apply_vision_to_attrs,
+)
 from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
 from atendia.state_machine.event_emitter import EventEmitter
 from atendia.state_machine.orchestrator import process_turn
@@ -28,6 +40,10 @@ from atendia.state_machine.pipeline_loader import load_active_pipeline
 from atendia.tools.base import ToolNoDataResult
 from atendia.tools.embeddings import generate_embedding
 from atendia.tools.lookup_faq import lookup_faq
+from atendia.tools.lookup_requirements import (
+    RequirementsResult,
+    lookup_requirements,
+)
 from atendia.tools.quote import quote
 from atendia.tools.search_catalog import search_catalog
 from atendia.tools.vision import classify_image
@@ -205,6 +221,18 @@ class ConversationRunner:
         pipeline = await load_active_pipeline(self._session, tenant_id)
         agent_row = await self._load_agent(conversation_id=conversation_id, tenant_id=tenant_id)
 
+        # Customer id is resolved once at the top of the turn and reused
+        # by: (a) Vision-to-attrs (Fase 3, runs right after Vision),
+        # (b) apply_ai_extractions (Fase 1, after NLU merges), and
+        # (c) lookup_requirements (Fase 2, after action dispatch).
+        # Single SELECT keeps the conversation-wide invariant aligned.
+        customer_id_for_ext = (
+            await self._session.execute(
+                text("SELECT customer_id FROM conversations WHERE id = :cid"),
+                {"cid": conversation_id},
+            )
+        ).scalar_one_or_none()
+
         state_before = {
             "current_stage": current_stage,
             "extracted_data": extracted_jsonb or {},
@@ -330,6 +358,30 @@ class ConversationRunner:
         else:
             nlu, usage = await nlu_task
 
+        # Fase 1 + Fase 3 — Vision side-effects in one pass:
+        #   1. apply_vision_to_attrs writes customer.attrs[DOCS_X] using
+        #      pipeline.vision_doc_mapping + VisionResult.quality_check.
+        #   2. For each write, emit a DOCUMENT_ACCEPTED / _REJECTED
+        #      system event so the chat timeline mirrors the attrs state.
+        # When the tenant has no vision_doc_mapping configured, we fall
+        # back to the Fase 1 category-level event (still useful: the
+        # operator sees "Documento aceptado — INE" even if nothing was
+        # written to attrs).
+        if vision_result is not None:
+            try:
+                await self._process_vision_result(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    customer_id=customer_id_for_ext,
+                    pipeline=pipeline,
+                    vision_result=vision_result,
+                )
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    "process_vision_result failed for conv=%s", conversation_id,
+                )
+
         # Surface NLU-level errors as ERROR_OCCURRED events for observability.
         nlu_errors = [a for a in nlu.ambiguities if a.startswith("nlu_error:")]
         if nlu_errors:
@@ -361,17 +413,14 @@ class ConversationRunner:
 
         # Cascade extractions to customer.attrs / field_suggestions.
         # Pure side-effect on the same session; never fails the turn.
+        # The returned `applied_changes` drives FIELD_UPDATED system
+        # messages (a curated subset of fields — see conversation_events
+        # ._TIMELINE_WORTHY_FIELDS).
         try:
             from atendia.runner.ai_extraction_service import apply_ai_extractions
 
-            customer_id_for_ext = (
-                await self._session.execute(
-                    text("SELECT customer_id FROM conversations WHERE id = :cid"),
-                    {"cid": conversation_id},
-                )
-            ).scalar_one_or_none()
             if customer_id_for_ext is not None:
-                await apply_ai_extractions(
+                applied_changes = await apply_ai_extractions(
                     session=self._session,
                     tenant_id=tenant_id,
                     customer_id=customer_id_for_ext,
@@ -380,6 +429,27 @@ class ConversationRunner:
                     entities=nlu.entities,
                     inbound_text=inbound.text,
                 )
+                # Fan out FIELD_UPDATED system events. The helper itself
+                # filters by _TIMELINE_WORTHY_FIELDS, so passing every
+                # change is safe — non-noisy fields are silently dropped.
+                for change in applied_changes:
+                    try:
+                        await emit_field_updated(
+                            self._session,
+                            tenant_id=tenant_id,
+                            conversation_id=conversation_id,
+                            attr_key=change.attr_key,
+                            old_value=change.old_value,
+                            new_value=change.new_value,
+                            confidence=change.confidence,
+                            source="nlu",
+                        )
+                    except Exception:
+                        import logging as _logging
+                        _logging.getLogger(__name__).exception(
+                            "emit_field_updated failed for conv=%s key=%s",
+                            conversation_id, change.attr_key,
+                        )
         except Exception:
             import logging as _logging
 
@@ -480,6 +550,62 @@ class ConversationRunner:
                 event_type=EventType.STAGE_ENTERED,
                 payload={"to": next_stage_id},
             )
+            # Fase 1 — system message in the chat timeline so the
+            # operator SEES "Conversación movida a X" inline. Looks up
+            # stage labels from pipeline.stages; falls back to the raw
+            # id when labels aren't defined.
+            from_label = next(
+                (s.label for s in pipeline.stages if s.id == previous_stage),
+                None,
+            )
+            to_label = next(
+                (s.label for s in pipeline.stages if s.id == next_stage_id),
+                None,
+            )
+            try:
+                await emit_stage_changed(
+                    self._session,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    from_stage=previous_stage,
+                    to_stage=next_stage_id,
+                    from_label=from_label,
+                    to_label=to_label,
+                    reason=decision.reason,
+                )
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    "emit_stage_changed failed for conv=%s %s->%s",
+                    conversation_id, previous_stage, next_stage_id,
+                )
+
+        # Fase 4 — stage-entry handoff. When the just-entered stage has
+        # `pause_bot_on_enter=true`, we (a) flip bot_paused=true on the
+        # conversation, (b) persist a `human_handoffs` row with a
+        # snapshot summary, (c) emit BOT_PAUSED + HUMAN_HANDOFF_REQUESTED
+        # (+ DOCS_COMPLETE_FOR_PLAN when the stage's auto_enter_rules
+        # used that operator), and (d) signal the composer block below
+        # to skip — the operator answers from here on. Fail-soft: if
+        # anything raises, we leave the conversation in its new stage
+        # without pausing so the bot doesn't get stuck silent on a bug.
+        auto_handoff_triggered = False
+        if next_stage_id != previous_stage:
+            try:
+                auto_handoff_triggered = await self._trigger_stage_entry_handoff(
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    pipeline=pipeline,
+                    new_stage_id=next_stage_id,
+                    last_inbound_text=inbound.text,
+                    merged_extracted=merged_extracted,
+                )
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    "stage_entry_handoff failed for conv=%s stage=%s",
+                    conversation_id, next_stage_id,
+                )
 
         # ===== Phase 3b: tone, tools, 24h check, Composer =====
 
@@ -574,6 +700,25 @@ class ConversationRunner:
             inbound_text=inbound.text,
             pending_confirmation=pending_confirmation,
         )
+
+        # Fase 6 — stage-level override. When the just-entered stage
+        # pins `behavior_mode`, it wins over the router's verdict.
+        # We look up the FINAL stage (post auto_enter_rules), not the
+        # stage where the turn started, so a Plan→DOC transition that
+        # happens this turn lands the customer's reply in DOC mode.
+        final_stage_def = next(
+            (s for s in pipeline.stages if s.id == next_stage_id), None,
+        )
+        stage_pinned_mode = getattr(final_stage_def, "behavior_mode", None)
+        if stage_pinned_mode:
+            try:
+                flow_mode = FlowMode(stage_pinned_mode)
+            except (ValueError, KeyError):
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "stage %s behavior_mode=%r is invalid; using router's %s",
+                    next_stage_id, stage_pinned_mode, flow_mode,
+                )
 
         # ===== Phase 3c.1: real-data tool dispatch =====
         # quote / lookup_faq / search_catalog now hit the real catalog/FAQ
@@ -686,6 +831,30 @@ class ConversationRunner:
         elif decision.action == "close":
             action_payload = {"payment_link": None}
 
+        # Fase 2 — surface the plan's doc requirements as auxiliary
+        # context for the composer. Runs AFTER the action-specific
+        # dispatch so every composed action (ask_field, lookup_faq,
+        # search_catalog, …) gets the same shape under
+        # `action_payload["requirements"]`. The composer reads it to
+        # answer "para tu plan necesito X, Y, Z" — or to acknowledge
+        # progress ("ya tengo INE, falta comprobante y estados de
+        # cuenta"). When the customer hasn't picked a plan yet OR the
+        # pipeline doesn't have docs_per_plan configured, the call
+        # returns ToolNoDataResult and we skip silently.
+        try:
+            await self._attach_requirements_to_payload(
+                action_payload=action_payload,
+                pipeline=pipeline,
+                customer_id=customer_id_for_ext,
+                action=decision.action,
+            )
+        except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "attach_requirements_to_payload failed for conv=%s",
+                conversation_id,
+            )
+
         # 24h window check.
         last_activity_at = (await self._session.execute(
             text("SELECT last_activity_at FROM conversations WHERE id = :cid"),
@@ -700,7 +869,17 @@ class ConversationRunner:
         composer_output: ComposerOutput | None = None
         composer_usage = None
 
-        if not inside_24h and decision.action in COMPOSED_ACTIONS:
+        # Fase 4 — auto-handoff for stage_entry. When pause_bot_on_enter
+        # fired above, the bot has already produced its closing system
+        # event ("Bot pausado — handoff humano"); we MUST NOT also run
+        # Composer because the operator's first message is the next
+        # outbound the customer should see. We still fall through to
+        # turn_trace persistence so the turn is audited.
+        if auto_handoff_triggered:
+            # Mirror the outside-24h branch by skipping composer + outbound
+            # without raising; turn_trace is still written below.
+            pass
+        elif not inside_24h and decision.action in COMPOSED_ACTIONS:
             # Outside 24h: no compose, no enqueue. Create handoff for visibility.
             from atendia.contracts.handoff_summary import HandoffReason
             from atendia.runner.handoff_helper import (
@@ -909,6 +1088,340 @@ class ConversationRunner:
             )
 
         return trace
+
+    async def _trigger_stage_entry_handoff(
+        self,
+        *,
+        tenant_id: UUID,
+        conversation_id: UUID,
+        pipeline: Any,
+        new_stage_id: str,
+        last_inbound_text: str,
+        merged_extracted: dict[str, Any],
+    ) -> bool:
+        """Pause the bot + persist handoff + emit events for an opt-in stage.
+
+        Returns True when the stage has `pause_bot_on_enter=true` and the
+        handoff was triggered; False otherwise. Caller uses the bool to
+        skip Composer/outbound for this turn.
+
+        The summary is built from the SAME `extracted_data` snapshot the
+        rest of the turn sees, so the operator dashboard reads a
+        coherent state (extracted fields, plan, docs received/pending)
+        — no race where the handoff lands first with stale fields.
+        """
+        stage = next(
+            (s for s in pipeline.stages if s.id == new_stage_id), None,
+        )
+        if stage is None or not getattr(stage, "pause_bot_on_enter", False):
+            return False
+
+        from atendia.contracts.extracted_fields import ExtractedFields
+        from atendia.contracts.handoff_summary import HandoffReason
+        from atendia.runner.handoff_helper import (
+            build_handoff_summary,
+            persist_handoff,
+        )
+
+        # Translate the per-turn extracted_data map to the ExtractedFields
+        # shape the summary builder expects (it's a Pydantic model with
+        # a known field list; extras are ignored).
+        ext_fields_data = {
+            k: v["value"] for k, v in merged_extracted.items()
+            if k in ExtractedFields.model_fields and v.get("value") is not None
+        }
+        try:
+            ext_fields = ExtractedFields.model_validate(ext_fields_data)
+        except Exception:
+            ext_fields = ExtractedFields()
+
+        # Resolve the reason: prefer stage-level override; fall back to
+        # the generic STAGE_TRIGGERED_HANDOFF when the operator didn't
+        # configure one. Strings not in the enum become the generic so
+        # `human_handoffs.reason` stays a known label.
+        reason_value: str | None = getattr(stage, "handoff_reason", None)
+        try:
+            reason = (
+                HandoffReason(reason_value)
+                if reason_value
+                else HandoffReason.STAGE_TRIGGERED_HANDOFF
+            )
+        except ValueError:
+            reason = HandoffReason.STAGE_TRIGGERED_HANDOFF
+
+        summary = build_handoff_summary(
+            reason=reason,
+            extracted=ext_fields,
+            last_inbound_text=last_inbound_text,
+            suggested_next_action=(
+                f"Revisar la conversación: entró a {stage.label or stage.id}."
+            ),
+            docs_per_plan=pipeline.docs_per_plan,
+        )
+        await persist_handoff(
+            session=self._session,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            summary=summary,
+        )
+
+        # Flip the bot_paused gate so subsequent inbound turns short-
+        # circuit at the top of run_turn until an operator resumes.
+        await self._session.execute(
+            text(
+                "UPDATE conversations SET bot_paused = true WHERE id = :cid"
+            ),
+            {"cid": conversation_id},
+        )
+
+        # Fase 1 events — visible in chat + workflows engine.
+        # DOCS_COMPLETE_FOR_PLAN gets its own bubble when the stage's
+        # auto_enter_rules used that operator (so the timeline reads
+        # "Sistema: docs completos → Bot pausado → Handoff humano").
+        if self._stage_uses_docs_complete_for_plan(stage):
+            try:
+                await emit_system_event(
+                    self._session,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    event_type=EventType.DOCS_COMPLETE_FOR_PLAN,
+                    text=(
+                        f"Sistema: Papelería completa para "
+                        f"{(ext_fields.plan_credito.value if ext_fields.plan_credito else 'el plan del cliente')}"
+                    ),
+                    payload={
+                        "plan_credito": (
+                            ext_fields.plan_credito.value
+                            if ext_fields.plan_credito else None
+                        ),
+                        "docs_recibidos": summary.docs_recibidos,
+                    },
+                )
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    "emit DOCS_COMPLETE_FOR_PLAN failed for conv=%s",
+                    conversation_id,
+                )
+
+        await emit_bot_paused(
+            self._session,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            reason=reason.value,
+        )
+
+        # HUMAN_HANDOFF_REQUESTED — both the events table (workflows
+        # listen to it) and a chat bubble so the operator notices.
+        await self._emitter.emit(
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+            payload={"reason": reason.value, "stage": stage.id},
+        )
+        await emit_system_event(
+            self._session,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+            text=f"Sistema: Handoff humano solicitado — {reason.value}",
+            payload={
+                "reason": reason.value,
+                "stage": stage.id,
+                "stage_label": getattr(stage, "label", None),
+                "suggested_next_action": summary.suggested_next_action,
+            },
+        )
+        return True
+
+    @staticmethod
+    def _stage_uses_docs_complete_for_plan(stage: Any) -> bool:
+        """Inspect a stage's auto_enter_rules for the operator that
+        signals papelería completa. Used by the handoff trigger to
+        decide whether to emit the DOCS_COMPLETE_FOR_PLAN bubble."""
+        rules = getattr(stage, "auto_enter_rules", None)
+        if rules is None or not getattr(rules, "enabled", False):
+            return False
+        for cond in getattr(rules, "conditions", []) or []:
+            if getattr(cond, "operator", None) == "docs_complete_for_plan":
+                return True
+        return False
+
+    async def _attach_requirements_to_payload(
+        self,
+        *,
+        action_payload: dict,
+        pipeline: Any,  # PipelineDefinition; loose-typed to avoid a circular import.
+        customer_id: UUID | None,
+        action: str,
+    ) -> None:
+        """Enrich `action_payload` with the customer's plan requirements.
+
+        Mutates `action_payload` in place — adds a `requirements` key
+        whose value is the JSON-serialized RequirementsResult. Composer
+        prompts can then list received / missing docs verbatim.
+
+        No-op when:
+          - The action is one the composer doesn't render (escalate, etc.).
+          - The customer has no plan_credito yet.
+          - The pipeline has no `docs_per_plan` configured for the plan.
+          - `action_payload` is not a dict (e.g. some legacy paths set
+            the payload to `None`).
+          - A key called `requirements` is already present (e.g. set by
+            a future tool path — don't clobber).
+        """
+        # Limit fan-out: paths like `escalate_to_human` don't reach the
+        # composer at all; for those we'd be doing work for nothing.
+        # Keep this aligned with COMPOSED_ACTIONS in outbound_dispatcher.
+        if action not in COMPOSED_ACTIONS:
+            return
+        if not isinstance(action_payload, dict):
+            return
+        if "requirements" in action_payload:
+            return
+        if customer_id is None:
+            return
+        row = (await self._session.execute(
+            text("SELECT attrs FROM customers WHERE id = :cid"),
+            {"cid": customer_id},
+        )).fetchone()
+        if row is None:
+            return
+        attrs = dict(row[0] or {})
+        plan_credito = attrs.get("plan_credito")
+        # Customer-stored shape is sometimes the {value, confidence}
+        # wrapper inherited from the extraction layer — unwrap before
+        # passing along, mirroring docs_complete_for_plan.
+        if isinstance(plan_credito, dict) and "value" in plan_credito:
+            plan_credito = plan_credito["value"]
+        if not plan_credito:
+            return
+        result = lookup_requirements(
+            pipeline=pipeline,
+            plan_credito=str(plan_credito),
+            customer_attrs=attrs,
+        )
+        if isinstance(result, RequirementsResult):
+            action_payload["requirements"] = result.model_dump(mode="json")
+
+    async def _process_vision_result(
+        self,
+        *,
+        tenant_id: UUID,
+        conversation_id: UUID,
+        customer_id: UUID | None,
+        pipeline: Any,
+        vision_result: VisionResult,
+    ) -> None:
+        """Single entry point for Vision side-effects.
+
+        Two halves, both fail-soft:
+
+        1. **Attrs write** — Fase 3. When the tenant configured a
+           `pipeline.vision_doc_mapping` entry for this category,
+           `apply_vision_to_attrs` writes ``customer.attrs[DOCS_X]`` to
+           the canonical ``{status, confidence, verified_at,
+           rejection_reason?, side?}`` shape. Each write becomes a
+           ``DOCUMENT_ACCEPTED`` / ``DOCUMENT_REJECTED`` event so the
+           chat timeline mirrors the attrs state.
+
+        2. **Fallback event** — Fase 1 behaviour. When the tenant has
+           no mapping (or category is `unrelated`), we still emit a
+           single category-level event so the operator at least sees
+           "Documento aceptado — INE" in the timeline, even though
+           nothing was written to attrs (operator marks it manually).
+
+        Skipped entirely for ``category == moto`` (product photo).
+        """
+        from atendia.contracts.vision_result import VisionCategory
+
+        category = vision_result.category
+        confidence = float(vision_result.confidence)
+
+        if category == VisionCategory.MOTO:
+            return  # product photo, not a doc — no chat bubble either
+
+        meta = vision_result.metadata if isinstance(vision_result.metadata, dict) else {}
+        notas = meta.get("notas") or None
+
+        if category == VisionCategory.UNRELATED:
+            # No attrs write possible (no doc), but the operator still
+            # benefits from a rejection bubble explaining the noise.
+            reason = "no parece un documento del crédito"
+            if notas:
+                reason = f"{reason} ({notas})"
+            await emit_document_event(
+                self._session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                accepted=False,
+                document_type=category.value,
+                confidence=confidence,
+                reason=reason,
+                metadata=meta,
+            )
+            return
+
+        # Doc category — try the structured Fase 3 path first.
+        writes: list[VisionDocWrite] = []
+        if customer_id is not None:
+            writes = await apply_vision_to_attrs(
+                session=self._session,
+                customer_id=customer_id,
+                pipeline=pipeline,
+                vision_result=vision_result,
+            )
+
+        if writes:
+            # Emit one event per attrs row touched. The Fase 1
+            # SystemEventBubble keys off `metadata.event_type` so we
+            # pass the doc_key + side under the payload to give the
+            # operator full context.
+            for w in writes:
+                await emit_document_event(
+                    self._session,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    accepted=w.accepted,
+                    document_type=w.doc_key,
+                    confidence=w.confidence,
+                    reason=w.rejection_reason,
+                    metadata={
+                        "vision_category": category.value,
+                        "side": w.side,
+                        "notas": notas,
+                    },
+                )
+            return
+
+        # No mapping for this category (or no customer) — fall back to
+        # the Fase 1 category-level event. Keeps the contract that
+        # every Vision call yields at least one timeline bubble.
+        qc = vision_result.quality_check
+        if qc is not None:
+            accepted = qc.valid_for_credit_file
+            reason = qc.rejection_reason if not accepted else None
+        else:
+            legible = meta.get("legible")
+            accepted = confidence >= 0.60 and legible is not False
+            if accepted:
+                reason = None
+            elif legible is False:
+                reason = "ilegible — pídela de nuevo con buena luz y sin reflejo"
+            else:
+                reason = f"baja confianza ({confidence:.0%})"
+            if reason and notas:
+                reason = f"{reason} — {notas}"
+        await emit_document_event(
+            self._session,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            accepted=accepted,
+            document_type=category.value,
+            confidence=confidence,
+            reason=reason,
+            metadata=meta,
+        )
 
     async def _load_agent(self, *, conversation_id: UUID, tenant_id: UUID):
         from atendia.db.models.agent import Agent
