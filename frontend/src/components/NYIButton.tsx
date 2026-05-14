@@ -18,7 +18,14 @@ interface NYIButtonProps {
  * Replaces toast.info(...) stubs for features not yet built.
  * Visual: amber color + lock icon.
  * Distinct from DemoBadge (violet), which marks simulated-but-implemented features.
+ *
+ * Sprint B.2 gating: by default the button renders `null` so production
+ * users never see aspirational chrome. Set `VITE_SHOW_NYI=true` in dev
+ * to surface them while the team is reviewing/triaging which to build
+ * next. Tests opt in explicitly via the same env var or by mocking it.
  */
+const SHOW_NYI = import.meta.env?.VITE_SHOW_NYI === "true";
+
 export function NYIButton({
   label,
   icon: Icon,
@@ -26,6 +33,9 @@ export function NYIButton({
   variant = "outline",
   className,
 }: NYIButtonProps) {
+  if (!SHOW_NYI) {
+    return null;
+  }
   return (
     <Button
       size={size}

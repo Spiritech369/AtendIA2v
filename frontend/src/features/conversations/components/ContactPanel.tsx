@@ -48,7 +48,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { NYIButton } from "@/components/NYIButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -490,9 +489,28 @@ function ContactIdentitySection({ customerId }: { customerId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickActionsSection({ phone }: { phone: string }) {
+  // wa.me accepts the E.164 number with no leading '+' and opens the
+  // operator's WhatsApp client (web or mobile) targeting that customer.
+  // Strip the leading '+' if present so the deep-link works on both.
+  const waPhone = phone.replace(/^\+/, "");
   return (
     <div className="flex gap-1.5 px-3 pb-3">
-      <NYIButton label="Abrir WhatsApp" icon={MessageCircle} className="flex-1 h-7" />
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="flex-1 h-7 gap-1 text-xs"
+        aria-label="Abrir WhatsApp"
+      >
+        <a
+          href={`https://wa.me/${waPhone}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          Abrir WhatsApp
+        </a>
+      </Button>
       <Button
         variant="outline"
         size="sm"
