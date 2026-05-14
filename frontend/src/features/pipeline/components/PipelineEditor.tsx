@@ -1179,15 +1179,18 @@ export function PipelineEditor({ onClose }: Props) {
                         </div>
                         <div>
                           <Label className="text-[10px] text-muted-foreground">
-                            Pista (opcional)
+                            Descripción corta (opcional)
                           </Label>
                           <Input
                             value={doc.hint}
                             onChange={(e) => updateDoc(idx, { hint: e.target.value })}
-                            placeholder="Ej. 18 caracteres alfanuméricos"
+                            placeholder="Ej. Frente y vuelta, vigente"
                             className="h-7 text-xs"
                             disabled={!canEdit}
                           />
+                          <p className="mt-0.5 text-[10px] text-muted-foreground">
+                            Aparece en gris debajo del nombre.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1240,12 +1243,12 @@ export function PipelineEditor({ onClose }: Props) {
                     </div>
                     <div>
                       <Label className="text-[10px] text-muted-foreground">
-                        Pista (opcional)
+                        Descripción corta (opcional)
                       </Label>
                       <Input
                         value={newDocHint}
                         onChange={(e) => setNewDocHint(e.target.value)}
-                        placeholder="Ej. 18 caracteres alfanuméricos"
+                        placeholder="Ej. Recibo CFE / agua, no mayor a 3 meses"
                         className="h-7 text-xs"
                         onKeyDown={(e) => {
                           if (
@@ -1258,6 +1261,11 @@ export function PipelineEditor({ onClose }: Props) {
                           }
                         }}
                       />
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        Aparece en gris debajo del nombre. Útil para
+                        aclarar "qué versión exactamente" sin meterlo en
+                        el nombre.
+                      </p>
                     </div>
                     <Button
                       type="button"
