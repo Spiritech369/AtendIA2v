@@ -60,11 +60,13 @@ export type RuleOperator =
   | "greater_than"
   | "less_than"
   | "in"
-  | "not_in";
+  | "not_in"
+  | "docs_complete_for_plan";
 
 export const OPERATORS_WITHOUT_VALUE: ReadonlySet<RuleOperator> = new Set([
   "exists",
   "not_exists",
+  "docs_complete_for_plan",
 ]);
 
 export const OPERATORS_NEEDING_LIST: ReadonlySet<RuleOperator> = new Set([
@@ -341,11 +343,11 @@ export function PipelineEditor({ onClose }: Props) {
   const [draft, setDraft] = useState<PipelineDraft | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [showJson, setShowJson] = useState(false);
-  const [showDocsJson, setShowDocsJson] = useState(false);
+  const [showDocsByPlan, setShowDocsByPlan] = useState(false);
   const [showDocsCatalog, setShowDocsCatalog] = useState(true);
-  const [docsRaw, setDocsRaw] = useState("");
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocHint, setNewDocHint] = useState("");
+  const [newPlanName, setNewPlanName] = useState("");
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
 
@@ -353,7 +355,6 @@ export function PipelineEditor({ onClose }: Props) {
     if (query.data) {
       const parsed = parsePipeline(query.data.definition);
       setDraft(parsed);
-      setDocsRaw(JSON.stringify(parsed.docs_per_plan, null, 2));
       if (parsed.stages.length > 0 && selectedIdx === null) setSelectedIdx(0);
     } else if (query.isError) {
       const seed: PipelineDraft = {
@@ -362,13 +363,12 @@ export function PipelineEditor({ onClose }: Props) {
           { id: "en_conversacion", label: "En conversación", timeout_hours: 12, is_terminal: false, color: "#3b82f6" },
           { id: "propuesta", label: "Propuesta", timeout_hours: 48, is_terminal: false, color: "#f59e0b" },
         ],
-        docs_per_plan: { default: [] },
+        docs_per_plan: {},
         documents_catalog: [],
         fallback: "escalate_to_human",
         extra: {},
       };
       setDraft(seed);
-      setDocsRaw(JSON.stringify(seed.docs_per_plan, null, 2));
       setSelectedIdx(0);
     }
   }, [query.data, query.isError]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -392,17 +392,9 @@ export function PipelineEditor({ onClose }: Props) {
   const save = useMutation({
     mutationFn: async () => {
       if (!draft) throw new Error("No draft");
-      let docs: Record<string, string[]>;
-      try {
-        const parsed = JSON.parse(docsRaw);
-        if (typeof parsed !== "object" || parsed === null) throw new Error("not object");
-        docs = parsed as Record<string, string[]>;
-      } catch {
-        throw new Error("docs_per_plan no es JSON válido (esperado un objeto)");
-      }
       const v = validate(draft);
       if (v) throw new Error(v);
-      return tenantsApi.putPipeline(serialise({ ...draft, docs_per_plan: docs }));
+      return tenantsApi.putPipeline(serialise(draft));
     },
     onSuccess: (data) => {
       toast.success(`Pipeline guardado (v${data.version})`);
@@ -524,6 +516,49 @@ export function PipelineEditor({ onClose }: Props) {
       return {
         ...prev,
         documents_catalog: prev.documents_catalog.filter((_, i) => i !== idx),
+      };
+    });
+  };
+
+  // docs_per_plan CRUD. Plan names are stored as the operator typed them
+  // (they appear in `customer.attrs.plan_credito` exactly as the AI agent
+  // extracted them — typically snake_case or short tokens).
+  const normalizePlanName = (raw: string): string =>
+    raw.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+
+  const addPlan = () => {
+    const name = normalizePlanName(newPlanName);
+    if (!name) return;
+    setDraft((prev) => {
+      if (!prev) return prev;
+      if (prev.docs_per_plan[name]) return prev;
+      return {
+        ...prev,
+        docs_per_plan: { ...prev.docs_per_plan, [name]: [] },
+      };
+    });
+    setNewPlanName("");
+  };
+
+  const removePlan = (name: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev.docs_per_plan };
+      delete next[name];
+      return { ...prev, docs_per_plan: next };
+    });
+  };
+
+  const togglePlanDoc = (plan: string, docKey: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = prev.docs_per_plan[plan] ?? [];
+      const next = current.includes(docKey)
+        ? current.filter((k) => k !== docKey)
+        : [...current, docKey];
+      return {
+        ...prev,
+        docs_per_plan: { ...prev.docs_per_plan, [plan]: next },
       };
     });
   };
@@ -1293,30 +1328,143 @@ export function PipelineEditor({ onClose }: Props) {
           )}
         </div>
 
-        {/* Docs per plan section */}
+        {/* Docs-per-plan: which documents each credit plan requires.
+            Used by the new `docs_complete_for_plan` operator so a stage
+            can auto-enter when "every doc this customer's plan needs
+            has status=ok". */}
         <div className="border-t">
           <button
             type="button"
             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setShowDocsJson((v) => !v)}
+            onClick={() => setShowDocsByPlan((v) => !v)}
           >
-            {showDocsJson ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-            Documentos por plan de crédito
+            {showDocsByPlan ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            <FileText className="size-3.5" />
+            Documentos por plan de crédito ({Object.keys(draft.docs_per_plan).length})
           </button>
-          {showDocsJson && (
-            <div className="px-4 pb-4">
-              <p className="mb-2 text-[10px] text-muted-foreground">
-                Mapa <code>plan → lista de campos</code>. Ej:{" "}
-                <code>{`{"36m":["docs_ine","docs_comprobante"]}`}</code>
+          {showDocsByPlan && (
+            <div className="space-y-3 px-4 pb-4">
+              <p className="text-[11px] text-muted-foreground">
+                Por cada plan que tu agente identifica (campo{" "}
+                <code className="rounded bg-muted px-1 text-[10px]">plan_credito</code>),
+                marca los documentos del catálogo que el cliente debe entregar.
+                La regla "tiene todos los docs del plan completos" usa
+                exactamente este mapa.
               </p>
-              <Textarea
-                rows={6}
-                spellCheck={false}
-                className="font-mono text-[11px]"
-                value={docsRaw}
-                onChange={(e) => setDocsRaw(e.target.value)}
-                disabled={!canEdit}
-              />
+
+              {Object.keys(draft.docs_per_plan).length === 0 && (
+                <p className="rounded-md border border-dashed border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">
+                  Aún no defines planes. Agrega el primero abajo.
+                </p>
+              )}
+
+              {Object.entries(draft.docs_per_plan).map(([plan, docKeys]) => (
+                <div key={plan} className="rounded-md border bg-card p-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <code className="font-mono text-[11px] font-semibold">
+                      {plan}
+                    </code>
+                    <span className="text-[10px] text-muted-foreground">
+                      {(docKeys || []).length} doc(s)
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto h-6 px-1.5 text-destructive hover:bg-destructive/10"
+                      onClick={() => removePlan(plan)}
+                      disabled={!canEdit}
+                      aria-label={`Eliminar plan ${plan}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                  {draft.documents_catalog.length === 0 ? (
+                    <p className="text-[11px] italic text-muted-foreground">
+                      Primero define documentos en el catálogo (arriba).
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {draft.documents_catalog.map((doc) => {
+                        const checked = (docKeys || []).includes(doc.key);
+                        return (
+                          <button
+                            key={doc.key}
+                            type="button"
+                            onClick={() => togglePlanDoc(plan, doc.key)}
+                            disabled={!canEdit}
+                            aria-pressed={checked}
+                            className={cn(
+                              "flex items-start gap-2 rounded-md border px-2 py-1.5 text-left text-[11px] transition",
+                              checked
+                                ? "border-emerald-500/40 bg-emerald-500/5"
+                                : "border-border bg-background hover:bg-muted/40",
+                              !canEdit && "cursor-not-allowed opacity-50",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "mt-0.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded border",
+                                checked
+                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                  : "border-input bg-background",
+                              )}
+                              aria-hidden
+                            >
+                              {checked ? "✓" : ""}
+                            </span>
+                            <span className="flex-1">
+                              <span className="block font-medium text-foreground">
+                                {doc.label}
+                              </span>
+                              <span className="block font-mono text-[9px] text-muted-foreground">
+                                {doc.key}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {canEdit && (
+                <div className="flex items-end gap-2 rounded-md border border-dashed bg-muted/20 p-2">
+                  <div className="flex-1">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Nuevo plan
+                    </Label>
+                    <Input
+                      value={newPlanName}
+                      onChange={(e) => setNewPlanName(e.target.value)}
+                      placeholder="Ej. nomina_tarjeta, tradicional"
+                      className="h-7 font-mono text-[11px]"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newPlanName.trim()) {
+                          e.preventDefault();
+                          addPlan();
+                        }
+                      }}
+                    />
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      El nombre debe coincidir con el valor que tu agente
+                      escribe en <code>plan_credito</code>.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7"
+                    onClick={addPlan}
+                    disabled={!newPlanName.trim()}
+                  >
+                    <Plus className="mr-1 size-3.5" />
+                    Agregar plan
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

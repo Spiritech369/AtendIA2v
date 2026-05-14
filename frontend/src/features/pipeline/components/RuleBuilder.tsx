@@ -76,6 +76,7 @@ export const OPERATOR_LABELS: Record<RuleOperator, string> = {
   less_than: "es menor que",
   in: "está en",
   not_in: "no está en",
+  docs_complete_for_plan: "tiene todos los docs del plan completos",
 };
 
 const ALL_OPERATORS: RuleOperator[] = [
@@ -88,6 +89,7 @@ const ALL_OPERATORS: RuleOperator[] = [
   "less_than",
   "in",
   "not_in",
+  "docs_complete_for_plan",
 ];
 
 // Document-status enum from the user's spec. Used as suggestions when the

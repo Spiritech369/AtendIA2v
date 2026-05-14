@@ -45,24 +45,50 @@ export interface DocumentCatalogEntry {
 // rebuild from scratch.
 const DOC_STATUS_RE = /^(DOCS_[A-Z_]+)\.status$/;
 
-function deriveSelectedDocs(rules: AutoEnterRulesDraft | undefined): Set<string> | null {
+// Two doc-rule shapes the operator can author through this UI:
+//   * "all_validated" — every selected doc must have status=ok
+//     (match=all, operator=equals "ok"). Use this for stages like
+//     "Papelería completa" where uploads must be reviewed.
+//   * "any_arrived"   — any selected doc has any status value at all
+//     (match=any, operator=exists). Use this for stages like
+//     "Documentos pendientes" where the trigger is "the customer
+//     started uploading".
+export type DocRuleMode = "all_validated" | "any_arrived";
+
+function deriveDocRule(
+  rules: AutoEnterRulesDraft | undefined,
+): { mode: DocRuleMode; docs: Set<string> } | null {
   if (!rules || rules.conditions.length === 0) return null;
+  // Sniff the mode from the first condition's operator. Then require
+  // every condition to be consistent — mixed shapes fall through to
+  // the generic RuleBuilder.
+  const first = rules.conditions[0]!;
+  if (first.operator !== "equals" && first.operator !== "exists") return null;
+  const mode: DocRuleMode =
+    first.operator === "equals" ? "all_validated" : "any_arrived";
   const docs = new Set<string>();
   for (const c of rules.conditions) {
     const match = c.field.match(DOC_STATUS_RE);
-    if (!match) return null; // mixed rule, leave doc-mode untouched
-    if (c.operator !== "equals" || c.value !== "ok") return null;
+    if (!match) return null;
+    if (mode === "all_validated") {
+      if (c.operator !== "equals" || c.value !== "ok") return null;
+    } else {
+      if (c.operator !== "exists") return null;
+    }
     docs.add(match[1]!);
   }
-  return docs;
+  return { mode, docs };
 }
 
-function buildDocConditions(selectedKeys: Iterable<string>): ConditionDraft[] {
-  return Array.from(selectedKeys).map((key) => ({
-    field: `${key}.status`,
-    operator: "equals" as const,
-    value: "ok",
-  }));
+function buildDocConditions(
+  selectedKeys: Iterable<string>,
+  mode: DocRuleMode,
+): ConditionDraft[] {
+  return Array.from(selectedKeys).map((key) =>
+    mode === "all_validated"
+      ? { field: `${key}.status`, operator: "equals" as const, value: "ok" }
+      : { field: `${key}.status`, operator: "exists" as const },
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -80,31 +106,41 @@ export function DocumentRuleBuilder({
   onChange: (next: AutoEnterRulesDraft | undefined) => void;
   disabled?: boolean;
 }) {
-  const selected = deriveSelectedDocs(rules);
-  const docMode = selected !== null; // rules-shape match for doc-only conditions
+  const parsed = deriveDocRule(rules);
+  const docMode = parsed !== null;
+  const mode: DocRuleMode = parsed?.mode ?? "all_validated";
+  const selected = parsed?.docs ?? null;
   const enabled = rules?.enabled === true;
+
+  const writeRule = (
+    nextMode: DocRuleMode,
+    nextSelected: Set<string>,
+  ) => {
+    if (nextSelected.size === 0) {
+      onChange(undefined);
+      return;
+    }
+    onChange({
+      enabled: enabled || true,
+      match: nextMode === "all_validated" ? "all" : "any",
+      conditions: buildDocConditions(nextSelected, nextMode),
+    });
+  };
 
   const toggleDoc = (key: string) => {
     const current = new Set(selected ?? []);
     if (current.has(key)) current.delete(key);
     else current.add(key);
-    if (current.size === 0) {
-      // Empty set + enabled would fail backend validation. Collapse rules
-      // to undefined so we don't accidentally ship "enabled:true,
-      // conditions:[]".
-      onChange(undefined);
-      return;
-    }
-    onChange({
-      enabled: enabled || true, // turning on a doc auto-activates the rule
-      match: "all",
-      conditions: buildDocConditions(current),
-    });
+    writeRule(mode, current);
   };
 
-  // If the stage already has a non-doc rule, the doc UI is read-only
-  // (showing 0 docs selected). The operator should use the generic
-  // RuleBuilder instead. We surface that with a hint.
+  const setMode = (nextMode: DocRuleMode) => {
+    if (nextMode === mode) return;
+    writeRule(nextMode, new Set(selected ?? []));
+  };
+
+  // If the stage already has a non-doc rule, the doc UI is read-only.
+  // The operator should use the generic RuleBuilder instead.
   if (rules && rules.conditions.length > 0 && !docMode) {
     return (
       <div className="rounded-md border border-dashed border-border bg-muted/20 p-3 text-[11px] text-muted-foreground">
@@ -126,11 +162,57 @@ export function DocumentRuleBuilder({
         <div>
           <p className="text-xs font-semibold">Documentos requeridos</p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Marca los documentos que deben quedar en{" "}
-            <code className="rounded bg-muted px-1 text-[10px]">status = ok</code>{" "}
-            para que la conversación entre a "{stageLabel}".
+            Marca los documentos que disparan la entrada a "{stageLabel}".
           </p>
         </div>
+      </div>
+
+      {/* Mode picker: the same checklist generates two different rule
+          shapes depending on whether the operator wants "any doc
+          arrived" or "all docs validated". */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => setMode("any_arrived")}
+          disabled={disabled}
+          aria-pressed={mode === "any_arrived"}
+          className={cn(
+            "rounded-md border px-2 py-1.5 text-left text-[11px] transition",
+            mode === "any_arrived"
+              ? "border-amber-500/40 bg-amber-500/5"
+              : "border-border bg-background hover:bg-muted/40",
+            disabled && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <span className="block font-medium text-foreground">
+            Cualquier doc llegó
+          </span>
+          <span className="block text-[10px] text-muted-foreground">
+            Dispara cuando llegue cualquiera de los seleccionados, sin
+            importar si ya está validado.
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("all_validated")}
+          disabled={disabled}
+          aria-pressed={mode === "all_validated"}
+          className={cn(
+            "rounded-md border px-2 py-1.5 text-left text-[11px] transition",
+            mode === "all_validated"
+              ? "border-emerald-500/40 bg-emerald-500/5"
+              : "border-border bg-background hover:bg-muted/40",
+            disabled && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <span className="block font-medium text-foreground">
+            Todos validados
+          </span>
+          <span className="block text-[10px] text-muted-foreground">
+            Dispara cuando los seleccionados tengan{" "}
+            <code className="rounded bg-muted px-1 text-[9px]">status = ok</code>.
+          </span>
+        </button>
       </div>
       {catalog.length === 0 && (
         <p className="rounded-md border border-dashed border-border bg-muted/20 px-2.5 py-2 text-[11px] text-muted-foreground">

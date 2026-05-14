@@ -115,8 +115,19 @@ def _is_field_payload_segment(seg: str, current: dict) -> bool:
     return seg in current
 
 
-def evaluate_condition(condition: Condition, fields: dict[str, Any]) -> bool:
-    """Pure operator dispatch. Mirrors the FE OperatorSelector contract."""
+def evaluate_condition(
+    condition: Condition,
+    fields: dict[str, Any],
+    *,
+    docs_per_plan: dict[str, list] | None = None,
+) -> bool:
+    """Pure operator dispatch. Mirrors the FE OperatorSelector contract.
+
+    ``docs_per_plan`` is required only by ``docs_complete_for_plan`` —
+    the evaluator passes the active pipeline's mapping down through
+    ``evaluate_rule_group`` / ``evaluate_pipeline_rules``. Other
+    operators ignore it.
+    """
     value = resolve_field_path(fields, condition.field)
     op = condition.operator
     expected = condition.value
@@ -147,14 +158,52 @@ def evaluate_condition(condition: Condition, fields: dict[str, Any]) -> bool:
         return isinstance(expected, list) and value in expected
     if op == "not_in":
         return isinstance(expected, list) and value not in expected
+    if op == "docs_complete_for_plan":
+        # Plan-aware aggregate: "every document this plan requires has
+        # status=ok on the customer". `condition.field` names the field
+        # that holds the plan id (typically `plan_credito`). The list of
+        # required docs comes from `pipeline.docs_per_plan[plan]`. Each
+        # doc key resolves to `customer.attrs.<KEY>.status` (via
+        # `resolve_field_path`).
+        if not docs_per_plan:
+            return False
+        # `resolve_field_path` only unwraps the canonical
+        # `{value, confidence}` extraction shape. Customer.attrs can hold
+        # the raw value or a one-key `{value: ...}` partial. Tolerate
+        # both so the operator works in production data.
+        plan = value
+        if isinstance(plan, dict) and "value" in plan:
+            plan = plan["value"]
+        if not isinstance(plan, str) or not plan:
+            return False
+        required = docs_per_plan.get(plan)
+        if not isinstance(required, list) or not required:
+            return False
+        for doc_key in required:
+            if not isinstance(doc_key, str):
+                continue
+            status = resolve_field_path(fields, f"{doc_key}.status")
+            if isinstance(status, dict) and "value" in status:
+                status = status["value"]
+            if not (isinstance(status, str) and status.lower() == "ok"):
+                return False
+        return True
     return False
 
 
-def evaluate_rule_group(rules: AutoEnterRules, fields: dict[str, Any]) -> bool:
+def evaluate_rule_group(
+    rules: AutoEnterRules,
+    fields: dict[str, Any],
+    *,
+    docs_per_plan: dict[str, list] | None = None,
+) -> bool:
     """Run every condition under ``rules.match`` semantics."""
     if not rules.enabled or not rules.conditions:
         return False
-    results = (evaluate_condition(c, fields) for c in rules.conditions)
+    results = (
+        evaluate_condition(c, fields, docs_per_plan=docs_per_plan)
+        for c in rules.conditions
+    )
     if rules.match == "all":
         return all(results)
     return any(results)
@@ -306,12 +355,21 @@ async def evaluate_pipeline_rules(
         state.extracted_data if state else None,
     )
 
+    # Plan-aware aggregate operators need the docs_per_plan table to
+    # resolve "all required docs for this plan are ok". Built once here
+    # so we don't re-read the pipeline JSON per condition.
+    docs_per_plan = pipeline.docs_per_plan or {}
+
     # Run each enabled rule group; collect the stages that match.
     matching: list[StageDefinition] = []
     for stage in pipeline.stages:
         if not stage.auto_enter_rules:
             continue
-        if evaluate_rule_group(stage.auto_enter_rules, fields):
+        if evaluate_rule_group(
+            stage.auto_enter_rules,
+            fields,
+            docs_per_plan=docs_per_plan,
+        ):
             matching.append(stage)
 
     target = select_best_stage(

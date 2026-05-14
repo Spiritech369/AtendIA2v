@@ -18,7 +18,15 @@ _RULE_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*
 
 # Operators that consume a value vs. operators that only check presence.
 # Mirror the frontend OperatorSelector so both sides stay in lockstep.
-_PRESENCE_OPERATORS: frozenset[str] = frozenset({"exists", "not_exists"})
+#
+# `docs_complete_for_plan` is a plan-aware aggregate: its `field` names
+# the conversation/customer attribute that holds the plan id (typically
+# `plan_credito`), and the evaluator looks up the docs that plan requires
+# in `pipeline.docs_per_plan[plan]` and checks every `.status == "ok"`.
+# Like the presence operators it takes no `value`.
+_PRESENCE_OPERATORS: frozenset[str] = frozenset(
+    {"exists", "not_exists", "docs_complete_for_plan"}
+)
 _LIST_OPERATORS: frozenset[str] = frozenset({"in", "not_in"})
 _VALUE_OPERATORS: frozenset[str] = frozenset({
     "equals", "not_equals", "contains", "greater_than", "less_than", "in", "not_in",
@@ -97,6 +105,7 @@ class Condition(BaseModel):
         "less_than",
         "in",
         "not_in",
+        "docs_complete_for_plan",
     ]
     value: Any | None = None
 
