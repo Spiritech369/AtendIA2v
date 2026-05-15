@@ -103,6 +103,42 @@ Net deltas (compared to Sprint A/B/C baseline):
 - Test `test_load_active_pipeline_picks_up_new_version_without_restart` corregido en `53ee4c3` (faltaba `fallback` requerido en la definition).
 - 3 stale tests en `test_demo_tenant_dep.py` corregidos en `2d3d967` (esperaban 501 ya removido por `d9c7f40`).
 
+### Quick wins (D9 + D10 + D11) + W6/W8 entregados (2026-05-15 tarde) — 12 commits
+
+After C2 the team picked D9-D11 from the decision matrix (latent bug
+cleanup) followed by W6+W8 (sub-workflow + ask-question nodes). Both
+batches shipped in one session.
+
+| Commit | Item | Cambio |
+|---|---|---|
+| `6c29ee2` | D10 | DocumentRuleBuilder.test.tsx: 8 TS errors → 0; 6 vitest failures → 0 (added `catalog={CATALOG_FIXTURE}` to render calls). Typecheck baseline 10 → 2 |
+| `cea026f` | D9 core | Migración 049 corrige `appointments.created_by_type` default (era `'''user'''` triple-quoted → ahora `'user'`). 2 regression tests + workaround del test de Sprint B.4 removido |
+| `77ef98e` | D9 extended | Migración 050 corrige 7 columnas más con la **misma clase de bug** en agents, appointments, customer_notes, knowledge_documents, workflow_executions. Cero columnas con el patrón triple-quoted restantes |
+| `1cb3577` | D11 φ1 | `B008` (FastAPI `Depends()` pattern) ignorado a nivel proyecto: ruff baseline 1,784 → 1,004 (−780) |
+| `f18ede4` | D11 φ2 | `ruff format .` aplicado a 334 archivos. `ruff format --check .` ahora exit 0. 1,004 → 456 (−548) |
+| `91f4c05` | D11 φ3 | Safe auto-fixes (I001/F401/RUF100/RUF022/F541/B009/RUF021/UP012). 2 false-positives capturados (F401 en re-exports + RUF100 en file-level noqa). 456 → 232 (−224) |
+| `40c623b` | W6/W8 docs | Design + implementation plan (8 tasks) |
+| `13efc53` | W6/W8 Task 1 | Migración 051: `workflow_executions.parent_execution_id` (UUID self-FK) + `awaiting_variable` (String(80)) |
+| `e893ef1` | W6/W8 Task 2 | `_detects_workflow_recursion` helper walks parent chain (max depth 5); `trigger_workflow` + `ask_question` añadidos a `NODE_TYPES` |
+| `2490a48` | W6 Task 3 | `_node_trigger_workflow` — fire-and-forget child execution con recursion guard + same-tenant check |
+| `4f2e61e` | W8 Task 4 | `_node_ask_question` pausa execution (status `paused` + `awaiting_variable`); resume hook en `evaluate_event(MESSAGE_RECEIVED)` |
+| `039b3e0` | W6/W8 Task 5 | `validate_definition` rechaza configs malformadas en save-time (UUID inválido para `target_workflow_id`, variable name no-identifier para `ask_question`) |
+| `f50dc0c` | W6 Task 6 | Frontend: form inline en WorkflowEditor para `trigger_workflow` (dropdown filtrando self-workflow + helper) |
+| `e93df51` | W8 Task 7 | Frontend: form inline en WorkflowEditor para `ask_question` (textarea + variable input + type select con email/number/phone disabled) |
+| `639a03f` | W6/W8 Task 8a | Biome cleanup en 6 workflow files que quedaron como leftover de Tasks 6+7 |
+
+#### Bugs pre-existentes detectados durante W6/W8
+
+* `workflow_executions.status` tiene un CHECK constraint `{running, completed, failed, paused}` (no `waiting_for_response` como asumió el design doc). Workaround: usar `paused` + `awaiting_variable IS NOT NULL` para distinguir ask_question pauses de delay pauses. Documentado en el commit `4f2e61e` y el design doc updated TBD.
+* `workflow_variables` es per-workflow (key `(workflow_id, name)`), no per-execution. Implicación: dos executions concurrentes del mismo workflow comparten variable state — pre-existing engine design choice, not caused by W8 work. Flagged for future revisit.
+* `_node_message` requiere un inbound recent (24h window check) → `ask_question` hereda este constraint. Fine en flujos normales (cliente acaba de escribir), pero documentar para casos edge.
+
+#### Net deltas
+
+* Backend: +3 migrations (049, 050, 051), +2 new node types, +1 helper (recursion detection), +1 hook (MESSAGE_RECEIVED resume), +19 new tests
+* Frontend: +2 inline forms (trigger_workflow, ask_question), +6 tests, typecheck baseline 10 → 2, ruff baseline 1,784 → 232
+* Class of bug fixed: triple-quoted server_default eliminada de las 8 columnas afectadas
+
 ---
 
 ## 1. Mapa de superficie vs respond.io (12 secciones)
@@ -273,9 +309,9 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | W3 | 🟠 | Per-node retry policy. | 2-3d | abierto |
 | W4 | 🟠 | Design-time loop detection. | 1.5d | abierto |
 | W5 | 🟠 | Reverse dependency view: "qué workflows referencian este agent". | 1-1.5d | abierto |
-| W6 | 🟠 | Sub-workflow step ("Trigger Another Workflow"). | ~1w | abierto |
+| ~~W6~~ | — | ~~Sub-workflow step ("Trigger Another Workflow")~~ | — | ✅ **cerrado por Tasks 1-3 + 5-6 (commits `13efc53` → `f50dc0c`, MVP fire-and-forget)** |
 | W7 | 🟠 | Update Field / Pause Bot UI forms. | 1d | abierto |
-| W8 | 🟠 | Ask Question step. | 3-4d | abierto |
+| ~~W8~~ | — | ~~Ask Question step (espera respuesta cliente, valida tipo, guarda)~~ | — | ✅ **cerrado por Tasks 1-2 + 4-5 + 7 (commits `13efc53` → `e93df51`, MVP solo text)** |
 | W9 | 🟡 | Canvas comments / annotations. | 1.5d | abierto |
 | W10 | 🟡 | Auto-layout para arrows. | 2-3d | abierto |
 | W13 | 🟡 | Test-mode que no dispare HTTP / sends reales. | 1.5d | abierto |
@@ -378,9 +414,9 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 
 | # | Item | Status |
 |---|---|---|
-| **D9** | Bug pre-existente migration 026: `created_by_type` default = `'''user'''` (3 comillas literales) → viola check constraint en raw INSERT | Migration nueva: `ALTER COLUMN ... SET DEFAULT 'user'` |
-| **D10** | 8 TS errors pre-existentes en `DocumentRuleBuilder.test.tsx` (falta prop `catalog`) | Pasar `catalog={[]}` en cada render |
-| **D11** | Frontend lint baseline: 1840 errores ruff. CI debería estar rojo o el step se está saltando | Verificar CI status, decidir fix masivo vs baseline-file vs disable selectivo |
+| ~~**D9**~~ | ~~Bug pre-existente migration 026: `created_by_type` default = `'''user'''` (3 comillas literales) → viola check constraint en raw INSERT~~ | ✅ **cerrado por `cea026f` (mig 049, fix core) + `77ef98e` (mig 050, fix 7 columnas adicionales con la misma clase de bug)** |
+| ~~**D10**~~ | ~~8 TS errors pre-existentes en `DocumentRuleBuilder.test.tsx` (falta prop `catalog`)~~ | ✅ **cerrado por `6c29ee2` (typecheck baseline 10 → 2)** |
+| ~~**D11**~~ | ~~Frontend lint baseline: 1840 errores ruff. CI debería estar rojo o el step se está saltando~~ | ✅ **cerrado en 3 fases por `1cb3577` + `f18ede4` + `91f4c05` (ruff baseline 1,784 → 232, −87%)** |
 
 ### ⚪ Diferido **explícitamente** (status quo aceptable)
 
