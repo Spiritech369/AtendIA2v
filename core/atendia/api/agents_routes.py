@@ -16,6 +16,7 @@ from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.config import get_settings
 from atendia.db.models.agent import Agent
+from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
 
 router = APIRouter()
@@ -1212,6 +1213,57 @@ async def get_agent_health(
 ) -> dict:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
     return _item(row).health
+
+
+class WorkflowRefItem(BaseModel):
+    id: UUID
+    name: str
+    active: bool
+    version: int
+    # assign_agent node ids inside this workflow that point at the agent
+    node_ids: list[str]
+
+
+@router.get("/{agent_id}/workflows", response_model=list[WorkflowRefItem])
+async def list_workflows_referencing_agent(
+    agent_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[WorkflowRefItem]:
+    """W5 — reverse dependency: workflows whose definition has an
+    ``assign_agent`` node pointing at this agent. Answers "what breaks
+    if I disable/delete this agent". 404 if the agent isn't in tenant.
+    """
+    await _get_agent_or_404(session, agent_id, tenant_id)
+    rows = (
+        (await session.execute(select(Workflow).where(Workflow.tenant_id == tenant_id)))
+        .scalars()
+        .all()
+    )
+    target = str(agent_id)
+    out: list[WorkflowRefItem] = []
+    for wf in rows:
+        nodes = (wf.definition or {}).get("nodes", [])
+        node_ids = [
+            str(n.get("id"))
+            for n in nodes
+            if isinstance(n, dict)
+            and n.get("type") == "assign_agent"
+            and isinstance(n.get("config"), dict)
+            and str(n["config"].get("agent_id")) == target
+        ]
+        if node_ids:
+            out.append(
+                WorkflowRefItem(
+                    id=wf.id,
+                    name=wf.name,
+                    active=wf.active,
+                    version=wf.version,
+                    node_ids=node_ids,
+                )
+            )
+    return out
 
 
 @router.get("/{agent_id}/metrics/snapshot")

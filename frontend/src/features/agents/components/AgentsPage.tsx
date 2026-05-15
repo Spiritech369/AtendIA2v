@@ -60,6 +60,7 @@ import {
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
+import { AgentWorkflowRefs } from "./AgentWorkflowRefs";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { VersionHistoryButton } from "./VersionHistoryDrawer";
 
@@ -2635,6 +2636,7 @@ function ResumenTab({
         />
         <NextBestActionCard action={nba} />
       </div>
+      <AgentWorkflowRefs agentId={agent.id} />
     </div>
   );
 }
