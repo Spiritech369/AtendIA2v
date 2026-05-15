@@ -17,12 +17,14 @@ import {
   Gavel,
   Plus,
   Sparkles,
+  Zap,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import type { TurnTraceDetail } from "@/features/turn-traces/api";
 import {
   type Anomaly,
+  analyzeActions,
   type ClassifiedEntity,
   type CostSlice,
   classifyEntities,
@@ -255,6 +257,38 @@ export function KnowledgePanel({ trace }: { trace: TurnTraceDetail }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Actions panel (composer_output.action_payload) ──────────────────
+
+export function ActionsPanel({ trace }: { trace: TurnTraceDetail }) {
+  const actions = analyzeActions(trace);
+  if (actions.length === 0) {
+    return (
+      <div className="space-y-2">
+        <PanelHeader icon={Zap} title="Acciones" />
+        <div className="text-xs text-muted-foreground">Sin acciones disparadas este turno.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <PanelHeader icon={Zap} title="Acciones" count={actions.length} />
+      <div className="space-y-1">
+        {actions.map((a) => (
+          <details key={a.name} className="rounded-md border bg-card text-xs">
+            <summary className="cursor-pointer px-2 py-1.5">
+              <span className="font-mono font-medium">{a.name}</span>
+              <span className="ml-2 text-muted-foreground">· {a.preview}</span>
+            </summary>
+            <pre className="max-h-32 overflow-auto border-t bg-muted/30 p-2 text-[10px]">
+              {JSON.stringify(a.raw, null, 2)}
+            </pre>
+          </details>
+        ))}
+      </div>
     </div>
   );
 }

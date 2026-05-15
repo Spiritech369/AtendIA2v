@@ -436,6 +436,42 @@ export function readFactPack(trace: TurnTraceDetail): FactPack {
   };
 }
 
+// ── Actions (composer_output.action_payload) ────────────────────────
+
+export interface ActionItem {
+  name: string;
+  preview: string;
+  raw: unknown;
+}
+
+export function analyzeActions(trace: TurnTraceDetail): ActionItem[] {
+  const co = trace.composer_output as { action_payload?: Record<string, unknown> } | null;
+  const payload = co?.action_payload;
+  if (!payload || typeof payload !== "object") return [];
+  return Object.entries(payload).map(([name, raw]) => ({
+    name,
+    preview: previewForAction(name, raw),
+    raw,
+  }));
+}
+
+function previewForAction(name: string, raw: unknown): string {
+  if (raw == null || typeof raw !== "object") return String(raw ?? "");
+  const obj = raw as Record<string, unknown>;
+  if (name === "quote") {
+    return `plan=${obj.plan} · monto=${obj.monto_mensual} · ${obj.plazo_meses}m`;
+  }
+  if (name === "lookup_faq") {
+    const q = String(obj.question ?? "");
+    return q.length > 60 ? `${q.slice(0, 60)}…` : q;
+  }
+  // Fallback: first 2 key/value pairs joined.
+  return Object.entries(obj)
+    .slice(0, 2)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" · ");
+}
+
 // ── Outbound preview ────────────────────────────────────────────────
 
 export function outboundPreviews(trace: TurnTraceDetail): string[] {

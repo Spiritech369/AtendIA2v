@@ -13,6 +13,7 @@ import { agentsApi } from "@/features/agents/api";
 import { turnTracesApi } from "@/features/turn-traces/api";
 import { FlowModeBadge } from "@/features/turn-traces/components/FlowModeBadge";
 import {
+  ActionsPanel,
   AgentBadge,
   AnomalyChips,
   CostBreakdown,
@@ -108,6 +109,8 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
           <EntityPills trace={t} />
           <Separator />
           <KnowledgePanel trace={t} />
+          <Separator />
+          <ActionsPanel trace={t} />
           <Separator />
           <StateDiff trace={t} />
           <Separator />
