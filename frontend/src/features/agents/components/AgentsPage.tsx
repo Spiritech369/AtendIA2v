@@ -60,6 +60,7 @@ import {
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
+import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { VersionHistoryButton } from "./VersionHistoryDrawer";
 
 const roleOptions = [
@@ -3135,6 +3136,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
 
   const agents = agentsQuery.data ?? [];
   const filteredAgents = useMemo(() => {
@@ -3434,6 +3436,11 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
   const saveActive = () => {
     if (draft && dirty) saveMutation.mutate(draft);
   };
+  // A11 — single confirm gate for the three publish entry points
+  // (command palette, top bar, ops panel).
+  const requestPublish = () => {
+    if (activeAgent) setPublishConfirmOpen(true);
+  };
 
   const runCompare = () => {
     if (compareIds.length < 2) {
@@ -3490,7 +3497,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
     {
       label: "Publicar agente",
       icon: <UploadCloud className="h-4 w-4 text-emerald-300" />,
-      action: () => activeAgent && publishMutation.mutate(activeAgent.id),
+      action: requestPublish,
     },
     {
       label: "Generar preview WhatsApp",
@@ -3520,7 +3527,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
         onDiscard={() => selected && setDraft(cloneAgent(selected))}
         onCreate={() => createMutation.mutate()}
         onValidate={() => activeAgent && validateMutation.mutate(activeAgent)}
-        onPublish={() => activeAgent && publishMutation.mutate(activeAgent.id)}
+        onPublish={requestPublish}
         onRollback={() => activeAgent && rollbackMutation.mutate(activeAgent.id)}
         onOpenCommands={() => setCommandsOpen(true)}
       />
@@ -3708,7 +3715,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
                   onStressTest={() => stressMutation.mutate(activeAgent.id)}
                   stressTestLoading={stressMutation.isPending}
                   onSave={saveActive}
-                  onPublish={() => publishMutation.mutate(activeAgent.id)}
+                  onPublish={requestPublish}
                 />
                 <OperationalSidebar
                   agent={activeAgent}
@@ -3827,6 +3834,17 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
         actions={commandActions}
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <PublishConfirmDialog
+        open={publishConfirmOpen}
+        agentName={activeAgent?.name ?? ""}
+        version={activeAgent?.version ?? ""}
+        pending={publishMutation.isPending}
+        onConfirm={() => {
+          if (activeAgent) publishMutation.mutate(activeAgent.id);
+          setPublishConfirmOpen(false);
+        }}
+        onCancel={() => setPublishConfirmOpen(false)}
+      />
     </div>
   );
 }
