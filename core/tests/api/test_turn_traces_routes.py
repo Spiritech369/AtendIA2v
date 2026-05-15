@@ -228,3 +228,24 @@ def test_list_turn_traces_cross_conversation_does_not_leak_other_tenants(
             await engine.dispose()
 
         asyncio.run(_do())
+
+
+def test_get_turn_trace_returns_composer_provider_and_cleaned_text(
+    operator_with_traces,
+):
+    """C2 Task 3 — the detail endpoint must expose the new
+    migration-048 fields so the frontend DebugPanel can render the
+    provider badge + side-by-side cleaned text. Legacy rows with
+    NULL still return 200, just with the fields set to null."""
+    _, _, email, plain, tids = operator_with_traces
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/turn-traces/{tids[0]}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # Fields are present in the JSON even when their value is null —
+    # Pydantic serializes Optional fields with key+null rather than
+    # omitting them.
+    assert "composer_provider" in body, "composer_provider key missing from detail response"
+    assert "inbound_text_cleaned" in body, "inbound_text_cleaned key missing from detail response"

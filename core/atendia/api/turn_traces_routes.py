@@ -62,6 +62,11 @@ class ToolCallOut(BaseModel):
 
 class TurnTraceDetail(TurnTraceListItem):
     inbound_text: str | None
+    # Migration 048 — DebugPanel observability. Cleaned/normalized form
+    # of inbound_text after the runner's text-prep step (whitespace
+    # collapse, NFKC, etc.). NULL on legacy rows seeded before the
+    # runner instrumentation landed.
+    inbound_text_cleaned: str | None
     nlu_input: dict | None
     nlu_output: dict | None
     nlu_tokens_in: int | None
@@ -74,6 +79,10 @@ class TurnTraceDetail(TurnTraceListItem):
     composer_tokens_out: int | None
     composer_cost_usd: Decimal | None
     composer_latency_ms: int | None
+    # Migration 048 — DebugPanel observability. Resolved LLM provider
+    # for the composer call (e.g. 'openai', 'anthropic'). NULL on
+    # legacy rows.
+    composer_provider: str | None
     vision_cost_usd: Decimal | None
     vision_latency_ms: int | None
     tool_cost_usd: Decimal | None
@@ -196,6 +205,7 @@ async def get_turn_trace(
         bot_paused=row.bot_paused,
         created_at=row.created_at,
         inbound_text=row.inbound_text,
+        inbound_text_cleaned=row.inbound_text_cleaned,
         nlu_input=row.nlu_input,
         nlu_output=row.nlu_output,
         nlu_tokens_in=row.nlu_tokens_in,
@@ -208,6 +218,7 @@ async def get_turn_trace(
         composer_tokens_out=row.composer_tokens_out,
         composer_cost_usd=row.composer_cost_usd,
         composer_latency_ms=row.composer_latency_ms,
+        composer_provider=row.composer_provider,
         vision_cost_usd=row.vision_cost_usd,
         vision_latency_ms=row.vision_latency_ms,
         tool_cost_usd=row.tool_cost_usd,
