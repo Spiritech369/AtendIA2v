@@ -9,6 +9,7 @@ from typing import Any
 class _CapturedJob:
     def __init__(self, function: str) -> None:
         self.function = function
+        self.job_id = f"captured:{function}"
 
 
 @dataclass
