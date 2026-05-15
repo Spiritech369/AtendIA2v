@@ -258,6 +258,20 @@ function StepComposer({
       }
     >
       <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+        {step.provider && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px]",
+              step.provider === "openai" && "border-blue-500/40 bg-blue-500/10 text-blue-700",
+              step.provider === "canned" && "border-amber-500/40 bg-amber-500/10 text-amber-700",
+              step.provider === "fallback" && "border-rose-500/40 bg-rose-500/10 text-rose-700",
+            )}
+            title={`Composer adapter: ${step.provider}`}
+          >
+            {step.provider}
+          </Badge>
+        )}
         {step.model && <span className="font-mono">{step.model}</span>}
         {step.latencyMs != null && <span>· {step.latencyMs}ms</span>}
         {step.costUsd != null && step.costUsd > 0 && <span>· ${step.costUsd.toFixed(4)}</span>}

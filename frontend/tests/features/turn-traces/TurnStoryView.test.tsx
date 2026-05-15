@@ -91,6 +91,7 @@ describe("TurnStoryView", () => {
         messages: ["Saludo", "¿Apartas?"],
         pendingConfirmation: null,
         rawLlmResponse: null,
+        provider: null,
       },
     ];
     render(<TurnStoryView steps={steps} />);
@@ -110,6 +111,7 @@ describe("TurnStoryView", () => {
         pendingConfirmation: null,
         // Raw differs (extra trailing chunk) — diff toggle should render.
         rawLlmResponse: '{"messages":["Saludo"],"debug":"trailing"}',
+        provider: null,
       },
     ];
     render(<TurnStoryView steps={steps} />);

@@ -45,6 +45,12 @@ export type StoryStep =
       // Migration 045 — raw OpenAI text. When present and different from
       // the parsed messages, the composer step renders a diff toggle.
       rawLlmResponse: string | null;
+      // Migration 047 — which composer adapter produced this turn:
+      // - "openai":  happy path
+      // - "canned":  deterministic dev/test or no API key
+      // - "fallback": OpenAI exhausted retries → canned reply fired
+      // NULL on legacy rows → badge omitted.
+      provider: "openai" | "canned" | "fallback" | null;
     }
   | {
       kind: "transition";
@@ -170,6 +176,7 @@ export function buildTurnStory(
           ? ((trace.composer_output as Record<string, unknown>).pending_confirmation_set as string)
           : null,
       rawLlmResponse: trace.raw_llm_response,
+      provider: trace.composer_provider,
     });
   }
 
