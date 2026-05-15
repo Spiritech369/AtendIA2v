@@ -799,6 +799,8 @@ async def _execute_node(
         if explicit is not None:
             return explicit
         return _next_node(edges, node["id"])
+    elif node_type == "trigger_workflow":
+        await _node_trigger_workflow(session, workflow, execution, node, config)
     return _next_node(edges, node["id"])
 
 
@@ -1199,6 +1201,84 @@ async def _node_delay(
     next_node = _next_node(edges, node["id"])
     execution.current_node_id = next_node
     await _enqueue_workflow_step(execution.id, next_node, defer_seconds=seconds, node_id=node["id"])
+
+
+async def _node_trigger_workflow(
+    session: AsyncSession,
+    workflow: Workflow,
+    execution: WorkflowExecution,
+    node: dict,
+    config: dict,
+) -> None:
+    """W6 — fire-and-forget child workflow.
+
+    Looks up the target workflow (same tenant), enforces recursion
+    guard, creates a new WorkflowExecution with parent_execution_id
+    set, and enqueues its first node on the workflows queue. Parent
+    then continues — no await on child completion.
+    """
+    raw_target = config.get("target_workflow_id")
+    if not raw_target:
+        raise _ExecutionFailure(
+            "trigger_workflow requires target_workflow_id",
+            code="MISSING_TARGET_WORKFLOW",
+        )
+    try:
+        target_uuid = UUID(str(raw_target))
+    except (ValueError, TypeError) as exc:
+        raise _ExecutionFailure(
+            f"trigger_workflow target_workflow_id not a valid UUID: {raw_target!r}",
+            code="MISSING_TARGET_WORKFLOW",
+        ) from exc
+
+    # Recursion guard FIRST — cheap, doesn't touch the workflows table.
+    if await _detects_workflow_recursion(session, execution, target_uuid):
+        raise _ExecutionFailure(
+            f"workflow {target_uuid} already in ancestor chain — refusing to recurse",
+            code="WORKFLOW_RECURSION",
+        )
+    # Same-tenant lookup. Cross-tenant returns None → TARGET_WORKFLOW_NOT_FOUND.
+    target = (
+        await session.execute(
+            select(Workflow).where(
+                Workflow.id == target_uuid,
+                Workflow.tenant_id == workflow.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if target is None:
+        raise _ExecutionFailure(
+            f"target workflow {target_uuid} not found in tenant {workflow.tenant_id}",
+            code="TARGET_WORKFLOW_NOT_FOUND",
+        )
+    # Find the first node id of the target's definition. Falls back to None
+    # if definition has no nodes — child execution is created anyway and
+    # will short-circuit on its own validate path.
+    target_def = target.definition or {}
+    first_node_id: str | None = None
+    nodes = target_def.get("nodes") if isinstance(target_def, dict) else None
+    if isinstance(nodes, list) and nodes:
+        first = nodes[0]
+        if isinstance(first, dict):
+            first_node_id = str(first.get("id") or "")
+    child = WorkflowExecution(
+        workflow_id=target.id,
+        conversation_id=execution.conversation_id,
+        customer_id=execution.customer_id,
+        parent_execution_id=execution.id,
+        status="running",
+        current_node_id=first_node_id,
+    )
+    session.add(child)
+    await session.flush()
+    if first_node_id:
+        await _enqueue_workflow_step(
+            child.id,
+            first_node_id,
+            defer_seconds=0,
+            node_id=first_node_id,
+        )
+    # Parent continues — caller's _execute_node returns to dispatch next.
 
 
 async def _detects_workflow_recursion(
