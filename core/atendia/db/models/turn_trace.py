@@ -16,7 +16,9 @@ class TurnTrace(Base):
     conversation_id: Mapped[UUID] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), index=True
     )
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     turn_number: Mapped[int] = mapped_column(Integer, nullable=False)
 
     inbound_message_id: Mapped[UUID | None] = mapped_column(ForeignKey("messages.id"))
@@ -50,6 +52,12 @@ class TurnTrace(Base):
     flow_mode: Mapped[str | None] = mapped_column(String(20))
     vision_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
     vision_latency_ms: Mapped[int | None] = mapped_column(Integer)
+
+    # Migration 048 — DebugPanel C2 completion. Composer adapter +
+    # cleaned NLU input persisted per row so the panel can render
+    # provider badges + side-by-side text. Nullable on legacy rows.
+    composer_provider: Mapped[str | None] = mapped_column(String(20))
+    inbound_text_cleaned: Mapped[str | None] = mapped_column(Text)
 
     outbound_messages: Mapped[list | None] = mapped_column(JSONB)
 
