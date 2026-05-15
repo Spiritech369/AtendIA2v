@@ -481,3 +481,37 @@ export function outboundPreviews(trace: TurnTraceDetail): string[] {
   if (!Array.isArray(m)) return [];
   return m.map((x) => String(x)).filter((s) => s.length > 0);
 }
+
+// ── Per-step latency breakdown ──────────────────────────────────────
+// Task 10 / item 4: replaces the single-bar LatencyStackedBar with a
+// per-step view (NLU · Vision · Composer · Tools · Overhead). Zero-ms
+// slices are omitted so the panel only shows the components that
+// actually ran on this turn; Overhead is total minus the sum of
+// tracked slices, omitted when there is no leftover time.
+
+export interface StepLatency {
+  label: string;
+  ms: number;
+  pct: number;
+}
+
+export function analyzeLatencyPerStep(trace: TurnTraceDetail): StepLatency[] {
+  const slices: Array<[string, number | null | undefined]> = [
+    ["NLU", trace.nlu_latency_ms],
+    ["Vision", trace.vision_latency_ms],
+    ["Composer", trace.composer_latency_ms],
+    ["Tools", (trace.tool_calls ?? []).reduce<number>((acc, tc) => acc + (tc.latency_ms ?? 0), 0)],
+  ];
+  const total = trace.total_latency_ms ?? 0;
+  const tracked = slices.reduce<number>((acc, [, ms]) => acc + (ms ?? 0), 0);
+  const overhead = Math.max(0, total - tracked);
+  const all: Array<[string, number]> = slices
+    .filter(([, ms]) => (ms ?? 0) > 0)
+    .map(([l, ms]) => [l, ms as number]);
+  if (overhead > 0) all.push(["Overhead", overhead]);
+  return all.map(([label, ms]) => ({
+    label,
+    ms,
+    pct: total > 0 ? Math.round((ms / total) * 100) : 0,
+  }));
+}

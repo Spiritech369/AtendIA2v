@@ -25,6 +25,7 @@ import type { TurnTraceDetail } from "@/features/turn-traces/api";
 import {
   type Anomaly,
   analyzeActions,
+  analyzeLatencyPerStep,
   type ClassifiedEntity,
   type CostSlice,
   classifyEntities,
@@ -33,8 +34,6 @@ import {
   diffState,
   extractKnowledge,
   type KnowledgeHit,
-  type LatencySlice,
-  latencySlices,
   readFactPack,
   type StateChange,
 } from "@/features/turn-traces/lib/turnAnalysis";
@@ -355,46 +354,41 @@ export function StateDiff({ trace }: { trace: TurnTraceDetail }) {
   );
 }
 
-// ── Latency stacked bar + per-stage list ────────────────────────────
+// ── Latency per-step breakdown ──────────────────────────────────────
+// Task 10 / item 4 — replaces the old single-bar LatencyStackedBar
+// with a per-step view (NLU · Vision · Composer · Tools · Overhead).
+// Each row gets its own mini-bar so operators can spot whether the
+// turn was slow because of NLU, composer streaming, a slow tool call,
+// or unaccounted overhead.
 
-export function LatencyStackedBar({ trace }: { trace: TurnTraceDetail }) {
-  const { slices, totalMs } = latencySlices(trace);
-
-  if (slices.length === 0 || totalMs === 0) {
-    return (
-      <div className="space-y-2">
-        <PanelHeader icon={Clock} title="Latencia" />
-        <div className="text-xs text-muted-foreground">Sin datos de latencia.</div>
-      </div>
-    );
-  }
-
+export function LatencyPerStepBar({ trace }: { trace: TurnTraceDetail }) {
+  const slices = analyzeLatencyPerStep(trace);
+  const total = trace.total_latency_ms ?? 0;
+  if (slices.length === 0) return null;
   return (
     <div className="space-y-2">
-      <PanelHeader icon={Clock} title="Latencia" />
-      <div className="flex h-3 w-full overflow-hidden rounded bg-muted">
-        {slices.map((s: LatencySlice) => (
-          <div
-            key={s.label}
-            className={cn(s.classes)}
-            style={{ width: `${(s.ms / totalMs) * 100}%` }}
-            title={`${s.label}: ${s.ms}ms`}
-          />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+      <PanelHeader icon={Clock} title={`Latencia · ${total}ms`} />
+      <div className="space-y-1">
         {slices.map((s) => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <span className={cn("h-2 w-2 rounded-sm", s.classes)} />
-            <span className="text-muted-foreground">{s.label}</span>
-            <span className="ml-auto font-mono text-foreground/80">{s.ms}ms</span>
+          <div key={s.label} className="flex items-center gap-2 text-[11px]">
+            <span className="w-20 text-muted-foreground">{s.label}</span>
+            <div className="relative h-2 flex-1 overflow-hidden rounded bg-muted">
+              <div
+                className="absolute inset-y-0 left-0 bg-primary/60"
+                style={{ width: `${s.pct}%` }}
+              />
+            </div>
+            <span className="w-16 text-right font-mono text-muted-foreground">{s.ms}ms</span>
+            <span className="w-10 text-right font-mono text-muted-foreground">{s.pct}%</span>
           </div>
         ))}
       </div>
-      <div className="text-right text-[10px] text-muted-foreground">Total {totalMs}ms</div>
     </div>
   );
 }
+
+// Backwards-compat alias — DebugPanel still imports the old name.
+export const LatencyStackedBar = LatencyPerStepBar;
 
 // ── Cost breakdown ──────────────────────────────────────────────────
 
