@@ -95,20 +95,38 @@ function StepInbound({
   index: number;
   step: Extract<StoryStep, { kind: "inbound" }>;
 }) {
+  // The body content (text bubble / media note / empty) is preserved as
+  // a separate node so we can put the history-count chip on the right of
+  // the primary header line without crowding the inbound text.
+  const body = step.text ? (
+    <>
+      <span className="text-muted-foreground">Cliente escribió</span>
+      <div className="mt-1 rounded-md bg-muted px-2 py-1.5 text-sm italic">«{step.text}»</div>
+    </>
+  ) : step.hasMedia ? (
+    <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>
+  ) : (
+    <span className="text-muted-foreground">Sin mensaje entrante.</span>
+  );
+
   return (
     <StepShell
       index={index}
       icon={step.hasMedia ? Paperclip : MessageSquareText}
       primary={
-        step.text ? (
-          <>
-            <span className="text-muted-foreground">Cliente escribió</span>
-            <div className="mt-1 rounded-md bg-muted px-2 py-1.5 text-sm italic">«{step.text}»</div>
-          </>
-        ) : step.hasMedia ? (
-          <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>
+        step.totalTurns != null ? (
+          <span className="flex w-full items-start justify-between gap-2">
+            <span className="min-w-0 flex-1">{body}</span>
+            <Badge
+              variant="outline"
+              className="shrink-0 font-mono text-[10px] text-muted-foreground"
+              title={`turno ${step.turnNumber} de ${step.totalTurns}`}
+            >
+              {step.turnNumber} / {step.totalTurns}
+            </Badge>
+          </span>
         ) : (
-          <span className="text-muted-foreground">Sin mensaje entrante.</span>
+          body
         )
       }
     />

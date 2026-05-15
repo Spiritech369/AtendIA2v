@@ -15,7 +15,13 @@ import {
 // and from the tenant's own state keys.
 
 export type StoryStep =
-  | { kind: "inbound"; text: string | null; hasMedia: boolean }
+  | {
+      kind: "inbound";
+      text: string | null;
+      hasMedia: boolean;
+      turnNumber: number;
+      totalTurns: number | null;
+    }
   | {
       kind: "nlu";
       intent: string | null;
@@ -99,13 +105,18 @@ function deriveModeRationale(trace: TurnTraceDetail): string | null {
   return null;
 }
 
-export function buildTurnStory(trace: TurnTraceDetail): StoryStep[] {
+export function buildTurnStory(
+  trace: TurnTraceDetail,
+  opts: { totalTurns?: number | null } = {},
+): StoryStep[] {
   const steps: StoryStep[] = [];
 
   steps.push({
     kind: "inbound",
     text: trace.inbound_text,
     hasMedia: !trace.inbound_text && !!trace.inbound_message_id,
+    turnNumber: trace.turn_number,
+    totalTurns: opts.totalTurns ?? null,
   });
 
   const { intent, confidence } = readIntent(trace);

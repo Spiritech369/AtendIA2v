@@ -120,9 +120,9 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
             <div className="space-y-0.5">
               <div className="font-medium">Fuera de la ventana de 24h de WhatsApp.</div>
               <div className="text-amber-800 dark:text-amber-300">
-                Mensajes en texto libre serán rechazados por Meta hasta que el cliente
-                vuelva a escribir. Para reactivar el contacto se requiere una plantilla
-                pre-aprobada (Phase 3d.2 — pendiente).
+                Mensajes en texto libre serán rechazados por Meta hasta que el cliente vuelva a
+                escribir. Para reactivar el contacto se requiere una plantilla pre-aprobada (Phase
+                3d.2 — pendiente).
               </div>
             </div>
           </div>
@@ -140,6 +140,7 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
       {debugTraceId ? (
         <DebugPanel
           traceId={debugTraceId}
+          conversationId={conversationId}
           onClose={() => {
             setDebugTraceId(null);
             setDebugMessageId(null);

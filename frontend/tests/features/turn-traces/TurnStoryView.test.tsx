@@ -12,14 +12,22 @@ describe("TurnStoryView", () => {
 
   it("renders inbound text", () => {
     const steps: StoryStep[] = [
-      { kind: "inbound", text: "Hola, ¿cuánto cuesta?", hasMedia: false },
+      {
+        kind: "inbound",
+        text: "Hola, ¿cuánto cuesta?",
+        hasMedia: false,
+        turnNumber: 1,
+        totalTurns: null,
+      },
     ];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText(/Hola, ¿cuánto cuesta?/)).toBeInTheDocument();
   });
 
   it("renders inbound media note when text is missing and hasMedia is true", () => {
-    const steps: StoryStep[] = [{ kind: "inbound", text: null, hasMedia: true }];
+    const steps: StoryStep[] = [
+      { kind: "inbound", text: null, hasMedia: true, turnNumber: 1, totalTurns: null },
+    ];
     render(<TurnStoryView steps={steps} />);
     expect(screen.getByText(/adjunto/i)).toBeInTheDocument();
   });

@@ -29,14 +29,29 @@ import { buildTurnStory } from "@/features/turn-traces/lib/turnStory";
 
 interface Props {
   traceId: string;
+  /** Conversation that owns this trace — used to fetch the full turn
+   * list so the StepInbound chip can show "N / M" history context.
+   * Optional so the panel still renders if a caller doesn't have it
+   * (the chip just degrades to hidden). */
+  conversationId?: string;
   onClose: () => void;
 }
 
-export function DebugPanel({ traceId, onClose }: Props) {
+export function DebugPanel({ traceId, conversationId, onClose }: Props) {
   const { data: t, isLoading } = useQuery({
     queryKey: ["turn-trace", traceId],
     queryFn: () => turnTracesApi.getOne(traceId),
   });
+
+  // C2 / Task 5 — total turn count for the history chip in StepInbound.
+  // Reuses the same queryKey ConversationDetail already populates, so
+  // this is a cache hit in the common open-from-chat flow.
+  const list = useQuery({
+    queryKey: ["turn-traces", conversationId],
+    queryFn: () => (conversationId ? turnTracesApi.list(conversationId) : Promise.resolve(null)),
+    enabled: !!conversationId,
+  });
+  const totalTurns = list.data?.items.length ?? null;
 
   if (isLoading || !t) {
     return (
@@ -72,7 +87,7 @@ export function DebugPanel({ traceId, onClose }: Props) {
           <ErrorBanner trace={t} />
 
           {/* The story — the operator-facing narrative. */}
-          <TurnStoryView steps={buildTurnStory(t)} />
+          <TurnStoryView steps={buildTurnStory(t, { totalTurns })} />
 
           <Separator />
           <EntityPills trace={t} />
