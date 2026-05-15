@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from openai import AsyncOpenAI
 
+from atendia.contracts.handoff_summary import HandoffReason
 from atendia.runner._openai_errors import _NON_RETRIABLE, _RETRIABLE
 from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.composer_prompts import build_composer_prompt
@@ -20,7 +21,13 @@ from atendia.runner.nlu.pricing import compute_cost
 
 
 def _composer_schema(max_messages: int) -> dict:
-    """Strict-mode-compliant JSON schema for ComposerOutput."""
+    """Strict-mode-compliant JSON schema for ComposerOutput.
+
+    OpenAI strict mode requires every property in ``required`` even when
+    nullable. ``suggested_handoff`` is declared as a ``["null", "string"]``
+    union with an enum bounded by ``HandoffReason`` values, so gpt-4o either
+    emits one of the documented escalation reasons or explicit ``null``.
+    """
     return {
         "name": "composer_output",
         "strict": True,
@@ -33,8 +40,18 @@ def _composer_schema(max_messages: int) -> dict:
                     "minItems": 1,
                     "maxItems": max_messages,
                 },
+                "suggested_handoff": {
+                    "type": ["null", "string"],
+                    "enum": [None, *(r.value for r in HandoffReason)],
+                    "description": (
+                        "Set to one of the HandoffReason enum values when "
+                        "this turn should escalate to a human agent. Null "
+                        "otherwise. The runner uses this to call "
+                        "persist_handoff with the matching reason."
+                    ),
+                },
             },
-            "required": ["messages"],
+            "required": ["messages", "suggested_handoff"],
             "additionalProperties": False,
         },
     }
