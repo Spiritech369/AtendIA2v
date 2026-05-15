@@ -102,6 +102,9 @@ NODE_TYPES: frozenset[str] = frozenset(
         "jump_to",
         "http_request",
         "branch",
+        # W6/W8 (migration 051).
+        "trigger_workflow",
+        "ask_question",
         # Operations Center visual/editor node aliases. The execution engine
         # treats unknown side-effect aliases as pass-through actions, while the
         # API validation/simulation layer gives operators richer diagnostics.
@@ -1196,6 +1199,38 @@ async def _node_delay(
     next_node = _next_node(edges, node["id"])
     execution.current_node_id = next_node
     await _enqueue_workflow_step(execution.id, next_node, defer_seconds=seconds, node_id=node["id"])
+
+
+async def _detects_workflow_recursion(
+    session: AsyncSession,
+    parent_execution: WorkflowExecution,
+    target_workflow_id: UUID,
+    max_depth: int = 5,
+) -> bool:
+    """W6 — walk parent_execution_id chain. True if target_workflow_id
+    appears as workflow_id of any ancestor (or of the current parent
+    execution itself). Max depth caps the walk so corrupt data can't
+    spin forever."""
+    if parent_execution.workflow_id == target_workflow_id:
+        return True
+    current = parent_execution.parent_execution_id
+    for _ in range(max_depth):
+        if current is None:
+            return False
+        row = (
+            await session.execute(
+                select(
+                    WorkflowExecution.workflow_id,
+                    WorkflowExecution.parent_execution_id,
+                ).where(WorkflowExecution.id == current)
+            )
+        ).first()
+        if row is None:
+            return False
+        if row.workflow_id == target_workflow_id:
+            return True
+        current = row.parent_execution_id
+    return False
 
 
 async def _resolve_branch(
