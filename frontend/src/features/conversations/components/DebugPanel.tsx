@@ -22,6 +22,7 @@ import {
   FactPackCard,
   KnowledgePanel,
   LatencyStackedBar,
+  PromptTemplateBreakdown,
   RawJsonFooter,
   RulesEvaluatedPanel,
   StateDiff,
@@ -120,6 +121,8 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
           <CostBreakdown trace={t} />
           <Separator />
           <FactPackCard trace={t} />
+          <Separator />
+          <PromptTemplateBreakdown trace={t} />
           <RawJsonFooter trace={t} />
         </div>
       </ScrollArea>

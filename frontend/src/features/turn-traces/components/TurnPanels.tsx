@@ -26,6 +26,7 @@ import {
   type Anomaly,
   analyzeActions,
   analyzeLatencyPerStep,
+  analyzePromptTemplate,
   type ClassifiedEntity,
   type CostSlice,
   classifyEntities,
@@ -590,6 +591,46 @@ export function AgentBadge({ trace }: { trace: TurnTraceDetail }) {
         Agente {trace.agent_id.slice(0, 8)}
       </Badge>
     </Link>
+  );
+}
+
+// ── Prompt template breakdown (Task 11 / item 7) ────────────────────
+// Parses the assembled system prompt by `### SECTION` markers and
+// renders one mini-bar per section showing estimated tokens (chars/4)
+// and % of the total prompt. Helps operators spot prompts that are
+// bottom-heavy on knowledge or top-heavy on guardrails — visual cue
+// for where the token budget actually goes.
+
+export function PromptTemplateBreakdown({ trace }: { trace: TurnTraceDetail }) {
+  const sections = analyzePromptTemplate(trace);
+  if (sections.length === 0) {
+    return (
+      <div className="space-y-2">
+        <PanelHeader icon={BookOpen} title="Anatomía del prompt" />
+        <div className="text-xs text-muted-foreground">Sin prompt analizable.</div>
+      </div>
+    );
+  }
+  const totalTokens = sections.reduce((a, s) => a + s.tokens, 0);
+  return (
+    <div className="space-y-2">
+      <PanelHeader icon={BookOpen} title={`Anatomía del prompt · ~${totalTokens} tokens`} />
+      <div className="space-y-1">
+        {sections.map((s) => (
+          <div key={s.title} className="flex items-center gap-2 text-[11px]">
+            <span className="w-32 truncate text-muted-foreground">{s.title}</span>
+            <div className="relative h-2 flex-1 overflow-hidden rounded bg-muted">
+              <div
+                className="absolute inset-y-0 left-0 bg-violet-500/60"
+                style={{ width: `${s.pct}%` }}
+              />
+            </div>
+            <span className="w-12 text-right font-mono text-muted-foreground">{s.tokens}t</span>
+            <span className="w-10 text-right font-mono text-muted-foreground">{s.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

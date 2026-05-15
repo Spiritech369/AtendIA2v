@@ -515,3 +515,57 @@ export function analyzeLatencyPerStep(trace: TurnTraceDetail): StepLatency[] {
     pct: total > 0 ? Math.round((ms / total) * 100) : 0,
   }));
 }
+
+// ── Prompt template breakdown ───────────────────────────────────────
+// Task 11 / item 7: the runner assembles the system prompt with
+// `### SECTION_NAME` headers (IDENTIDAD, REGLAS, CONOCIMIENTO, CONTEXTO,
+// MODO ACTUAL, ACCIÓN A REALIZAR). Operators want to see what fraction
+// of the prompt each section takes — a top-heavy guardrails block or a
+// bottom-heavy knowledge dump tells them where their token budget
+// actually goes.
+
+export interface PromptSection {
+  title: string;
+  chars: number;
+  tokens: number; // estimate: chars / 4
+  pct: number;
+}
+
+const SECTION_RE = /###\s+([^\n]+)/g;
+
+export function analyzePromptTemplate(trace: TurnTraceDetail): PromptSection[] {
+  const ci = trace.composer_input as { messages?: Array<{ role: string; content: string }> } | null;
+  const sys = ci?.messages?.find((m) => m.role === "system")?.content;
+  if (!sys) return [];
+  const markers: Array<{ title: string; start: number }> = [];
+  // Reset state on the shared regex — required because SECTION_RE has the
+  // /g flag.
+  SECTION_RE.lastIndex = 0;
+  let match = SECTION_RE.exec(sys);
+  while (match !== null) {
+    const title = match[1];
+    if (title != null) {
+      markers.push({ title: title.trim(), start: match.index });
+    }
+    match = SECTION_RE.exec(sys);
+  }
+  if (markers.length === 0) return [];
+  const out: PromptSection[] = [];
+  for (let i = 0; i < markers.length; i++) {
+    const cur = markers[i];
+    if (!cur) continue;
+    const next = markers[i + 1]?.start ?? sys.length;
+    const chars = next - cur.start;
+    out.push({
+      title: cur.title,
+      chars,
+      tokens: Math.round(chars / 4),
+      pct: 0,
+    });
+  }
+  const total = out.reduce((acc, s) => acc + s.chars, 0);
+  for (const s of out) {
+    s.pct = total > 0 ? Math.round((s.chars / total) * 100) : 0;
+  }
+  return out;
+}
