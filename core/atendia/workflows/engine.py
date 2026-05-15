@@ -34,7 +34,7 @@ from typing import Any
 from uuid import UUID
 
 from arq.connections import ArqRedis, RedisSettings, create_pool
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -571,6 +571,36 @@ async def evaluate_event(session: AsyncSession, event_id: UUID) -> list[UUID]:
         except IntegrityError:
             continue
         started.append(execution.id)
+
+    # W8 — resume paused executions whose conversation matches this
+    # event. The ask_question node sets status='waiting_for_response'
+    # and awaiting_variable=<name>; on the next inbound from the same
+    # conversation we save the text and advance to the next node.
+    if event.type == "message_received" and event.conversation_id is not None:
+        message_text = (event.payload or {}).get("text", "")
+        if isinstance(message_text, str):
+            paused = (
+                (
+                    await session.execute(
+                        select(WorkflowExecution)
+                        .where(
+                            WorkflowExecution.conversation_id == event.conversation_id,
+                            WorkflowExecution.status == "paused",
+                            # ask_question pauses set awaiting_variable;
+                            # delay pauses leave it NULL. This filter
+                            # avoids accidentally resuming a delay pause
+                            # on an inbound message.
+                            WorkflowExecution.awaiting_variable.is_not(None),
+                        )
+                        .order_by(WorkflowExecution.started_at)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for paused_exec in paused:
+                await _resume_paused_execution(session, paused_exec, message_text)
+
     return started
 
 
@@ -801,6 +831,11 @@ async def _execute_node(
         return _next_node(edges, node["id"])
     elif node_type == "trigger_workflow":
         await _node_trigger_workflow(session, workflow, execution, node, config)
+    elif node_type == "ask_question":
+        # Pauses the execution; returns None to break dispatch. Resume
+        # happens via _resume_paused_execution when MESSAGE_RECEIVED
+        # fires for the conversation.
+        return await _node_ask_question(session, workflow, execution, node, config)
     return _next_node(edges, node["id"])
 
 
@@ -1279,6 +1314,129 @@ async def _node_trigger_workflow(
             node_id=first_node_id,
         )
     # Parent continues — caller's _execute_node returns to dispatch next.
+
+
+async def _node_ask_question(
+    session: AsyncSession,
+    workflow: Workflow,
+    execution: WorkflowExecution,
+    node: dict,
+    config: dict,
+) -> str | None:
+    """W8 — pause the execution awaiting the customer's next message.
+
+    Sends the question text via the standard outbound path (delegating
+    to ``_node_message`` so the 24h-window check, customer-phone
+    lookup, and idempotency record are all shared), then marks the
+    execution ``waiting_for_response`` with ``awaiting_variable`` set
+    to the operator-chosen variable name. Returns ``None`` so the
+    engine breaks the dispatch loop. Resume happens via
+    ``_resume_paused_execution`` when a ``MESSAGE_RECEIVED`` event
+    arrives for this conversation.
+
+    MVP scope (per W8 design doc §5): text type only, no validation,
+    no timeout, no retry.
+    """
+    question = config.get("question")
+    variable = config.get("variable")
+    if (
+        not isinstance(question, str)
+        or not question.strip()
+        or not isinstance(variable, str)
+        or not variable.strip()
+    ):
+        raise _ExecutionFailure(
+            "ask_question requires both 'question' (non-empty str) and "
+            "'variable' (non-empty str) in config",
+            code="MISSING_ASK_QUESTION_FIELDS",
+        )
+    # Reuse the message-node outbound path so 24h window + customer-phone
+    # + idempotency are shared. Build a synthetic node so _node_message
+    # records its own action key against this node's id (still
+    # idempotent on retry).
+    await _node_message(
+        session,
+        workflow,
+        execution,
+        {"id": node["id"], "type": "message", "config": {"text": question}},
+        {"text": question},
+    )
+
+    # Pause + record what variable we're filling on resume.
+    # The CHECK constraint on workflow_executions.status only allows
+    # {running, completed, failed, paused}; we reuse 'paused' here and
+    # discriminate ask_question pauses from delay pauses by the
+    # presence of ``awaiting_variable`` (NULL for delay, set for ask).
+    execution.status = "paused"
+    execution.awaiting_variable = variable
+    execution.current_node_id = node["id"]
+    # Break the dispatch loop; resume re-enters via
+    # _resume_paused_execution.
+    return None
+
+
+async def _resume_paused_execution(
+    session: AsyncSession,
+    execution: WorkflowExecution,
+    customer_message: str,
+) -> None:
+    """W8 — accept the customer's reply, save it as the awaiting
+    variable, clear the waiting flags, and enqueue the next node so
+    the engine continues. MVP: no per-type validation; all input
+    accepted as text and persisted as-is.
+
+    Persists into ``workflow_variables`` keyed on
+    ``(workflow_id, name)`` (its UNIQUE constraint) — that table is
+    the workflow-level variable registry, and ``last_value`` carries
+    the most recently captured input. If no outgoing edge exists from
+    the paused node, the execution is marked completed.
+    """
+    variable_name = execution.awaiting_variable
+    if not variable_name:
+        return  # defensive: nothing to fill
+    # Persist into workflow_variables. Composite unique on
+    # (workflow_id, name) → ON CONFLICT DO UPDATE bumps last_value.
+    await session.execute(
+        text(
+            "INSERT INTO workflow_variables "
+            "(id, workflow_id, name, last_value, status, updated_at) "
+            "VALUES (gen_random_uuid(), :w, :n, :v, 'ok', now()) "
+            "ON CONFLICT (workflow_id, name) DO UPDATE "
+            "SET last_value = EXCLUDED.last_value, "
+            "    status = 'ok', "
+            "    updated_at = now()"
+        ),
+        {"w": execution.workflow_id, "n": variable_name, "v": customer_message},
+    )
+
+    execution.awaiting_variable = None
+    execution.status = "running"
+
+    # Resolve the next node from the workflow definition. Reuse
+    # _next_node for edge traversal — don't reinvent the algorithm.
+    workflow = (
+        await session.execute(select(Workflow).where(Workflow.id == execution.workflow_id))
+    ).scalar_one_or_none()
+    if workflow is None:
+        # Defensive: workflow vanished mid-flight. Mark completed.
+        execution.status = "completed"
+        execution.finished_at = datetime.now(UTC)
+        return
+    definition = workflow.definition or {"nodes": [], "edges": []}
+    edges = definition.get("edges", []) if isinstance(definition, dict) else []
+    target = _next_node(edges, execution.current_node_id or "")
+    if target:
+        execution.current_node_id = target
+        await _enqueue_workflow_step(
+            execution.id,
+            target,
+            defer_seconds=0,
+            node_id=target,
+        )
+    else:
+        # No outgoing edge — the ask_question was the terminal node.
+        execution.status = "completed"
+        execution.finished_at = datetime.now(UTC)
 
 
 async def _detects_workflow_recursion(
