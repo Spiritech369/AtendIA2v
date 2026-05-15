@@ -1,6 +1,5 @@
 import asyncio
 import time
-import unicodedata
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -29,12 +28,13 @@ from atendia.runner.conversation_events import (
     emit_stage_changed,
     emit_system_event,
 )
+from atendia.runner.flow_router import _normalize_for_router
 from atendia.runner.nlu_protocol import NLUProvider
+from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
 from atendia.runner.vision_to_attrs import (
     VisionDocWrite,
     apply_vision_to_attrs,
 )
-from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
 from atendia.state_machine.event_emitter import EventEmitter
 from atendia.state_machine.orchestrator import process_turn
 from atendia.state_machine.pipeline_loader import load_active_pipeline
@@ -67,12 +67,17 @@ def _maybe_uuid(s: str) -> UUID | None:
         return None
 
 
-def _composer_provider_short_name(composer) -> str | None:
+def _composer_provider_short_name(
+    composer: ComposerProvider,
+    *,
+    fallback_used: bool = False,
+) -> str | None:
     """Return short adapter name for the composer instance.
 
     'openai' — OpenAIComposer hitting the API successfully.
-    'fallback' — OpenAIComposer that fell back to canned (its
-      ``_fallback_triggered`` flag is set by the retry loop).
+    'fallback' — OpenAIComposer that fell back to canned for this turn
+      (caller passes ``fallback_used=True`` from the per-call
+      ``UsageMetadata.fallback_used``).
     'canned' — CannedComposer (deterministic dev/test path).
     None — any future class we don't recognize (frontend degrades to
       no badge; the CHECK constraint rejects '' so NEVER return that).
@@ -81,18 +86,8 @@ def _composer_provider_short_name(composer) -> str | None:
     if cls == "CannedComposer":
         return "canned"
     if cls == "OpenAIComposer":
-        return "fallback" if getattr(composer, "_fallback_triggered", False) else "openai"
+        return "fallback" if fallback_used else "openai"
     return None
-
-
-def _clean_inbound_text(raw: str) -> str:
-    """Mirror the cleanup the NLU does on inbound text: NFKD strip of
-    combining marks (diacritics), lowercase, surrounding whitespace
-    trimmed. Persisted alongside the raw inbound so the DebugPanel can
-    show side-by-side."""
-    normalized = unicodedata.normalize("NFKD", raw)
-    stripped = "".join(c for c in normalized if not unicodedata.combining(c))
-    return stripped.lower().strip()
 
 
 # Phase 3c.2 — pending_confirmation handling
@@ -248,7 +243,7 @@ class ConversationRunner:
                 tenant_id=tenant_id,
                 turn_number=turn_number,
                 inbound_text=inbound.text,
-                inbound_text_cleaned=_clean_inbound_text(inbound.text),
+                inbound_text_cleaned=_normalize_for_router(inbound.text),
                 composer_provider=_composer_provider_short_name(self._composer),
                 bot_paused=True,
                 state_before={"current_stage": current_stage},
@@ -1116,8 +1111,11 @@ class ConversationRunner:
             turn_number=turn_number,
             inbound_message_id=None,  # phase 1: messages table not populated yet
             inbound_text=inbound.text,
-            inbound_text_cleaned=_clean_inbound_text(inbound.text),
-            composer_provider=_composer_provider_short_name(self._composer),
+            inbound_text_cleaned=_normalize_for_router(inbound.text),
+            composer_provider=_composer_provider_short_name(
+                self._composer,
+                fallback_used=composer_usage.fallback_used if composer_usage else False,
+            ),
             nlu_input={"text": inbound.text, "history": history},
             nlu_output=_jsonable(nlu.model_dump(mode="json")),
             nlu_model=usage.model if usage else None,

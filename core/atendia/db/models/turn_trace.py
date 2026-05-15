@@ -54,8 +54,10 @@ class TurnTrace(Base):
     vision_latency_ms: Mapped[int | None] = mapped_column(Integer)
 
     # Migration 048 — DebugPanel C2 completion. Composer adapter +
-    # cleaned NLU input persisted per row so the panel can render
-    # provider badges + side-by-side text. Nullable on legacy rows.
+    # text the router actually saw for keyword matching (NFKD diacritic
+    # strip + lowercase; NLU/Composer get the original). Persisted per
+    # row so the panel can render provider badges + side-by-side text.
+    # Nullable on legacy rows.
     composer_provider: Mapped[str | None] = mapped_column(String(20))
     inbound_text_cleaned: Mapped[str | None] = mapped_column(Text)
 

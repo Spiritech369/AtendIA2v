@@ -6,6 +6,7 @@ y devuelve el FlowMode correspondiente. Primer match gana. La regla
 
 NO LLM call — es matching de keywords + state. Costo: $0, latencia: <1ms.
 """
+
 import unicodedata
 from typing import Any, Literal
 
@@ -80,6 +81,7 @@ class FlowDecision(BaseModel):
     the DebugPanel can render "Modo X because rule Y matched" without
     re-deriving the rationale from observable side-effects.
     """
+
     mode: FlowMode
     rule_id: str
     trigger_type: str

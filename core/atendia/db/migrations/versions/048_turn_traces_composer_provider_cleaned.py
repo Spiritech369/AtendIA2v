@@ -9,10 +9,12 @@ Adds two nullable columns to turn_traces for C2 DebugPanel completion:
 * composer_provider — which adapter served this turn ("openai",
   "canned", "fallback"). Helps operators distinguish "the LLM said X"
   from "the LLM was unreachable and the canned reply fired".
-* inbound_text_cleaned — the normalized text the NLU actually saw
-  (after diacritic strip, lowercase, markdown removal). Side-by-side
-  with inbound_text in the story lets operators spot cases where the
-  cleanup itself altered meaning.
+* inbound_text_cleaned — the normalized text the router actually saw
+  for keyword matching (after NFKD diacritic strip + lowercase). The
+  NLU and Composer receive the original text; only the rule-based
+  router sees the cleaned form. Side-by-side with inbound_text in the
+  story lets operators spot cases where the cleanup itself altered
+  meaning.
 
 Both nullable so legacy rows stay valid; runner populates them going
 forward.

@@ -117,7 +117,8 @@ async def test_runner_persists_composer_provider_and_cleaned_text(fresh_tenant):
                     await conn.execute(
                         text(
                             "SELECT composer_provider, inbound_text_cleaned, inbound_text "
-                            "FROM turn_traces WHERE conversation_id = :c"
+                            "FROM turn_traces WHERE conversation_id = :c "
+                            "ORDER BY turn_number ASC LIMIT 1"
                         ),
                         {"c": conv},
                     )
@@ -140,3 +141,40 @@ async def test_runner_persists_composer_provider_and_cleaned_text(fresh_tenant):
         assert row["inbound_text_cleaned"] == row["inbound_text_cleaned"].lower()
     finally:
         await engine.dispose()
+
+
+def test_composer_provider_short_name_classifies_canned():
+    from atendia.runner.composer_canned import CannedComposer
+    from atendia.runner.conversation_runner import _composer_provider_short_name
+
+    assert _composer_provider_short_name(CannedComposer()) == "canned"
+
+
+def test_composer_provider_short_name_classifies_openai_success():
+    from atendia.runner.composer_openai import OpenAIComposer
+    from atendia.runner.conversation_runner import _composer_provider_short_name
+
+    c = OpenAIComposer(api_key="dummy")
+    assert _composer_provider_short_name(c) == "openai"
+    assert _composer_provider_short_name(c, fallback_used=False) == "openai"
+
+
+def test_composer_provider_short_name_classifies_openai_fallback():
+    from atendia.runner.composer_openai import OpenAIComposer
+    from atendia.runner.conversation_runner import _composer_provider_short_name
+
+    c = OpenAIComposer(api_key="dummy")
+    assert _composer_provider_short_name(c, fallback_used=True) == "fallback"
+
+
+def test_composer_provider_short_name_returns_none_for_unknown():
+    """Unknown composer class returns None (never ''). The CHECK
+    constraint on turn_traces.composer_provider rejects ''."""
+    from atendia.runner.conversation_runner import _composer_provider_short_name
+
+    class _MysteryComposer:
+        pass
+
+    result = _composer_provider_short_name(_MysteryComposer())
+    assert result is None
+    assert result != ""  # explicit — CHECK constraint would reject ''
