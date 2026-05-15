@@ -26,6 +26,7 @@ import {
   RawJsonFooter,
   RulesEvaluatedPanel,
   StateDiff,
+  ToolCallsTimeline,
 } from "@/features/turn-traces/components/TurnPanels";
 import { TurnStoryView } from "@/features/turn-traces/components/TurnStoryView";
 import { buildTurnStory } from "@/features/turn-traces/lib/turnStory";
@@ -119,6 +120,8 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
           <Separator />
           <LatencyStackedBar trace={t} />
           <CostBreakdown trace={t} />
+          <Separator />
+          <ToolCallsTimeline trace={t} />
           <Separator />
           <FactPackCard trace={t} />
           <Separator />

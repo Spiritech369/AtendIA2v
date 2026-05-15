@@ -17,6 +17,7 @@ import {
   Gavel,
   Plus,
   Sparkles,
+  Wrench,
   Zap,
 } from "lucide-react";
 
@@ -419,6 +420,68 @@ export function CostBreakdown({ trace }: { trace: TurnTraceDetail }) {
       </div>
       <div className="text-right text-[10px] text-muted-foreground">
         Total ${totalUsd.toFixed(4)}
+      </div>
+    </div>
+  );
+}
+
+// ── Tool calls timeline (Task 12 / item 8) ──────────────────────────
+// Rich list of each tool invocation in the turn: name, latency,
+// success/error badge, and a collapsed input/output JSON detail.
+// Error rows surface the error message inline so operators don't
+// have to expand to see what went wrong. Success rows tuck the
+// payload inside a <details> collapser to keep the panel scannable.
+
+export function ToolCallsTimeline({ trace }: { trace: TurnTraceDetail }) {
+  const calls = trace.tool_calls ?? [];
+  if (calls.length === 0) {
+    return (
+      <div className="space-y-2">
+        <PanelHeader icon={Wrench} title="Herramientas" />
+        <div className="text-xs text-muted-foreground">Sin herramientas llamadas este turno.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <PanelHeader icon={Wrench} title="Herramientas" count={calls.length} />
+      <div className="space-y-1.5">
+        {calls.map((c) => (
+          <div key={c.id} className="rounded-md border bg-card p-2 text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="font-mono font-medium">{c.tool_name}</span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                {c.latency_ms != null && <span>{c.latency_ms}ms</span>}
+                {c.error ? (
+                  <Badge
+                    variant="outline"
+                    className="border-rose-500/40 bg-rose-500/10 text-rose-700"
+                  >
+                    error
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                  >
+                    ok
+                  </Badge>
+                )}
+              </span>
+            </div>
+            {c.error && <div className="mt-1 text-rose-700">{c.error}</div>}
+            {!c.error && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  input / output
+                </summary>
+                <pre className="mt-1 max-h-32 overflow-auto rounded bg-muted/30 p-2 text-[10px]">
+                  {JSON.stringify({ input: c.input_payload, output: c.output_payload }, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
