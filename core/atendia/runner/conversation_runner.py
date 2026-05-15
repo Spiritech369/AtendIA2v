@@ -613,12 +613,16 @@ class ConversationRunner:
             # operator SEES "Conversación movida a X" inline. Looks up
             # stage labels from pipeline.stages; falls back to the raw
             # id when labels aren't defined.
+            # `s.label or s.id`: label is an optional presentation field
+            # (None for programmatic/fixture pipelines). Degrade to the
+            # stage id so a missing label never leaks None into the
+            # persisted STAGE_CHANGED event payload (from_label/to_label).
             from_label = next(
-                (s.label for s in pipeline.stages if s.id == previous_stage),
+                (s.label or s.id for s in pipeline.stages if s.id == previous_stage),
                 None,
             )
             to_label = next(
-                (s.label for s in pipeline.stages if s.id == next_stage_id),
+                (s.label or s.id for s in pipeline.stages if s.id == next_stage_id),
                 None,
             )
             try:

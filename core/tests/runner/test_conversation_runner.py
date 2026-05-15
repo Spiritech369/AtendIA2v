@@ -368,10 +368,14 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
     # Turn-trace columns should reflect the composer's input/output.
     assert trace.composer_input is not None
     # composer_output JSONB carries the full ComposerOutput dump; new optional
-    # fields (Phase 3c.2: pending_confirmation_set) appear here as None.
+    # fields appear here as None: pending_confirmation_set (Phase 3c.2),
+    # raw_llm_response (migration 045 DebugPanel observability),
+    # suggested_handoff (D6 forward-contract wiring, commit cb31dc9).
     assert trace.composer_output == {
         "messages": ["hola desde el composer"],
         "pending_confirmation_set": None,
+        "raw_llm_response": None,
+        "suggested_handoff": None,
     }
     assert trace.outbound_messages == ["hola desde el composer"]
     # The composer received the per-turn extracted_data (from NLU).
