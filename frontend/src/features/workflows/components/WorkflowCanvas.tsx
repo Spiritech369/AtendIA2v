@@ -1,4 +1,13 @@
-import { Lock, Maximize2, Minus, MoreVertical, Plus, Unlock, type Zap } from "lucide-react";
+import {
+  Lock,
+  Maximize2,
+  Minus,
+  MoreVertical,
+  Plus,
+  PowerOff,
+  Unlock,
+  type Zap,
+} from "lucide-react";
 import {
   type MouseEvent,
   type ReactNode,
@@ -411,6 +420,7 @@ export function WorkflowCanvas({
             const metrics = nodeMetrics(ln.node.id);
             const issue = issueForNode(ln.node.id);
             const selected = ln.node.id === selectedNodeId;
+            const nodeDisabled = ln.node.enabled === false;
             const conversion = pct(metrics.conversion_rate, 100);
             const dropoff = pct(metrics.dropoff);
             return (
@@ -428,7 +438,7 @@ export function WorkflowCanvas({
                     : issue
                       ? "border-amber-400/50"
                       : "border-white/10",
-                  ln.node.enabled === false && "opacity-50",
+                  nodeDisabled && "opacity-50",
                 )}
                 style={{
                   left: xFor(ln.col),
@@ -449,6 +459,15 @@ export function WorkflowCanvas({
                       {summaryFor(ln.node)}
                     </span>
                   </span>
+                  {nodeDisabled && (
+                    <span
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-500/40 bg-slate-500/10 px-1.5 py-0.5 text-[9px] font-medium text-slate-300"
+                      title="Este nodo está desactivado y no se ejecuta"
+                    >
+                      <PowerOff className="h-2.5 w-2.5" />
+                      Desactivado
+                    </span>
+                  )}
                   <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/5 text-[9px] text-slate-400">
                     {index + 1}
                   </span>
