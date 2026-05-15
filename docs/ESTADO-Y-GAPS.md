@@ -1,6 +1,6 @@
 # AtendIA v2 — Estado del proyecto y gaps vs respond.io
 
-> **Última revisión:** 2026-05-15 (post Sprint A/B/C + cleanup)
+> **Última revisión:** 2026-05-15 (post Sprint A/B/C + cleanup + Wave 1 partes 1 y 2)
 > **Reemplaza** (todos archivados bajo `docs/_archive/`, ver [`docs/_archive/README.md`](_archive/README.md)):
 > 20 plans en `docs/_archive/plans/`, `docs/_archive/AUDIT-2026-05-13.md`, `docs/_archive/PROJECT_MAP.md`.
 > **Documentos que NO reemplaza (siguen vigentes):** `docs/design/atendia-v2-architecture.md` (visión técnica), `docs/handoffs/2026-05-14-inbound-message-flow.md` (flujo runtime), `docs/runbooks/*` (operación diaria).
@@ -148,13 +148,32 @@ batches shipped in one session.
 | `17be60d` | W15 | Node-disabled visual indicator (PowerOff badge + opacity en canvas) |
 | `60bc725` | P6 | Dependency view dentro del stage editor (reusa `/impacted-references`, read-only) |
 
-Wave 1 restante (próxima sesión): A14, P11, A11, C7, C9, C11, W5, W16, etc.
+Wave 1 restante: **los 8 cerrados en Wave 1 (parte 2)** — ver abajo.
 
 #### Net deltas
 
 * Backend: +3 migrations (049, 050, 051), +2 new node types, +1 helper (recursion detection), +1 hook (MESSAGE_RECEIVED resume), +19 new tests
 * Frontend: +2 inline forms (trigger_workflow, ask_question), +6 tests, typecheck baseline 10 → 2, ruff baseline 1,784 → 232
 * Class of bug fixed: triple-quoted server_default eliminada de las 8 columnas afectadas
+
+### Wave 1 (parte 2) — 8 items, TDD RED→GREEN (2026-05-15) — merge `13e2554`
+
+| Commit | Item | Cambio |
+|---|---|---|
+| `6558919` | C7 | ContactPanel collapse persiste en localStorage (el drawer 12px↔320px ya existía; el estado se reseteaba al desmontar el panel, p.ej. al abrir DebugPanel) |
+| `539724c` | P11 | `stageMatchesQuery` (export, label+stage_id, case-insensitive) + input de filtro en el stage editor, visible cuando hay > 8 stages; skip-render preserva el índice real para move/delete/drag |
+| `1993a2e` | A11 | `PublishConfirmDialog` presentacional; un único `requestPublish` gatea los 3 entry points (command palette, top bar, ops panel) |
+| `7233502` | A14 | `buildMessageTraceMap` atribuye la respuesta del bot a su trace → clic en la burbuja outbound abre el DebugPanel (prompt vía PromptTemplateBreakdown + retrieval vía KnowledgePanel) + link "Ver agente" → `/agents/$id` |
+| `1c3f7e6` | W16 | `GET /api/v1/workflows/{id}/executions.csv` (StreamingResponse, columnas DB factuales, tenant-scoped) + `exportExecutionsCsv` + botón "Exportar CSV" |
+| `6ba76f5` | W5 | `GET /api/v1/agents/{id}/workflows` (scan de definiciones por nodos `assign_agent`) + `AgentWorkflowRefs` en el tab Resumen |
+| `7272c63` | C11 | `useTenantStream` invalida `field-suggestions` en `message_received` (la ruta SUGGEST nace de ese turno) + resync en reconnect; `refetchInterval` de 60s eliminado |
+| `17f2e1d` | C9 | Migración 052 (`messages.edited_at` + `deleted_at`, nullable) + PATCH/DELETE `/conversations/{cid}/messages/{mid}` (tenant-scoped, 404, empty-text 422) + UI inline edit/delete + marca "editado" en `MessageBubble`, cableado en `ChatWindow` |
+
+#### Net deltas Wave 1.2
+
+* Backend: +1 migración (052, aditiva), +3 endpoints nuevos (executions.csv, agents/{id}/workflows, PATCH+DELETE message), +11 tests pytest (DB real)
+* Frontend: +4 helpers/componentes puros con test (stageMatchesQuery, buildMessageTraceMap, affectsFieldSuggestions, PublishConfirmDialog, AgentWorkflowRefs), ~24 tests vitest nuevos; suite 230/230, tsc baseline-only (2)
+* **Scope honesto:** A14 y C9 aterrizan en `ConversationDetail`/`ChatWindow` (ruta `/conversations/:id` que ya tiene el DebugPanel). El inbox principal `ConversationThread` renderiza `MessageBubble` sin wiring de debug/edit — retrofitearlo ahí es integración mayor, fuera del scope cheap-glue (flagged en los commits). C11 reusa el evento `message_received` en vez de un evento backend `field_suggested` dedicado.
 
 ---
 
@@ -212,11 +231,11 @@ Inbox y ContactPanel **cumplen paridad funcional**. La intervención humana, pau
 | C4 | 🟠 | Right-click context menu en lista (assign / close / archive / tag). | 1-1.5d | abierto |
 | C5 | 🟠 | Composer slash-commands + snippet browser + variable picker. | 2-3d | abierto |
 | C6 | 🟠 | AI Assist en composer (botón "sugerir respuesta" que use el agente y traiga draft). Diferenciador clave de respond.io. | 3-4d | abierto |
-| C7 | 🟡 | ContactPanel collapsible drawer (12px ↔ 320px). | 0.5d | abierto |
+| ~~C7~~ | — | ~~ContactPanel collapsible drawer (12px ↔ 320px).~~ | — | ✅ **cerrado Wave 1.2 (`6558919`)** — drawer ya existía; se agregó persistencia localStorage |
 | C8 | 🟡 | WS targeted patches (reemplazar bulk invalidation por per-event mutation). | 1.5d | abierto |
-| C9 | 🟡 | Per-message edit/delete. | 1d | abierto |
+| ~~C9~~ | — | ~~Per-message edit/delete.~~ | — | ✅ **cerrado Wave 1.2 (`17f2e1d`)** — mig 052 + PATCH/DELETE + UI en ChatWindow (inbox ConversationThread pendiente) |
 | ~~C10~~ | ~~🟡~~ | ~~Cross-conversation `/turn-traces` explorer~~ | — | ✅ **cerrado por Sprint C.2 (`0df8182`)** |
-| C11 | 🟡 | Push realtime de field_suggestions (hoy llega por polling de 60s). | 1d | abierto |
+| ~~C11~~ | — | ~~Push realtime de field_suggestions (hoy llega por polling de 60s).~~ | — | ✅ **cerrado Wave 1.2 (`7272c63`)** — WS `message_received` + reconnect resync; poll 60s eliminado |
 
 ### 2.4 No tocar
 
@@ -257,7 +276,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | P8 | 🟡 | Stage templates / clone from another tenant. | ~1w | abierto |
 | P9 | 🟡 | Confirmation dialog al toggle behavior_mode / pause_bot. | 1d | abierto |
 | P10 | 🟡 | Conflict detection entre auto-enter rules. | 1d | abierto |
-| P11 | 🟡 | Search / filter dentro del editor cuando pipeline > 20 stages. | 0.5d | abierto |
+| ~~P11~~ | — | ~~Search / filter dentro del editor cuando pipeline > 20 stages.~~ | — | ✅ **cerrado Wave 1.2 (`539724c`)** — filtro visible > 8 stages |
 | P12 | 🟡 | Invalidación de cache de pipeline al PUT — runner relee cada turno, pero falta evento Redis para alta concurrencia. | 1d | abierto |
 | ~~P13~~ | — | ~~"Cargar más" en kanban~~ | — | ✅ **cerrado por Sprint C.3 (`cddacf1`)** |
 
@@ -295,10 +314,10 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | A8 | 🟠 | Token / cost meter por conversación. | 1-2d | abierto |
 | A9 | 🟠 | Latency budget / SLO alerts. | 1d | abierto |
 | A10 | 🟠 | Audit log de prompt edits con autor + razón. | 2-3d | abierto |
-| A11 | 🟡 | Confirmation dialog antes de publish. | 1d | abierto |
+| ~~A11~~ | — | ~~Confirmation dialog antes de publish.~~ | — | ✅ **cerrado Wave 1.2 (`1993a2e`)** |
 | A12 | 🟡 | Live monitor drill-down (failures, fallbacks, guardrail trips). | 2-3d | abierto |
 | A13 | 🟡 | Error inspector / failure trace. | 1-2d | abierto |
-| A14 | 🟡 | "Why did the agent say X" link desde mensaje outbound → AgentEditor con prompt + retrieval trace. **Cheap glue** post-C2. | 0.5-1d post-C2 | abierto |
+| ~~A14~~ | — | ~~"Why did the agent say X" link desde mensaje outbound → AgentEditor con prompt + retrieval trace.~~ | — | ✅ **cerrado Wave 1.2 (`7233502`)** — en ConversationDetail; inbox ConversationThread pendiente |
 | A15 | 🟡 | Cross-tenant prompt template library. | 4-5d | abierto (post-PMF) |
 
 ---
@@ -325,7 +344,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | W2 | 🔴 | Visual debugger / step-through. | ~1.5w | abierto |
 | W3 | 🟠 | Per-node retry policy. | 2-3d | abierto |
 | W4 | 🟠 | Design-time loop detection. | 1.5d | abierto |
-| W5 | 🟠 | Reverse dependency view: "qué workflows referencian este agent". | 1-1.5d | abierto |
+| ~~W5~~ | — | ~~Reverse dependency view: "qué workflows referencian este agent".~~ | — | ✅ **cerrado Wave 1.2 (`6ba76f5`)** |
 | ~~W6~~ | — | ~~Sub-workflow step ("Trigger Another Workflow")~~ | — | ✅ **cerrado por Tasks 1-3 + 5-6 (commits `13efc53` → `f50dc0c`, MVP fire-and-forget)** |
 | W7 | 🟠 | Update Field / Pause Bot UI forms. | 1d | abierto |
 | ~~W8~~ | — | ~~Ask Question step (espera respuesta cliente, valida tipo, guarda)~~ | — | ✅ **cerrado por Tasks 1-2 + 4-5 + 7 (commits `13efc53` → `e93df51`, MVP solo text)** |
@@ -334,7 +353,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | W13 | 🟡 | Test-mode que no dispare HTTP / sends reales. | 1.5d | abierto |
 | W14 | 🟡 | Inline variable picker / autocomplete. | 1.5d | abierto |
 | ~~W15~~ | — | ~~Node-disabled visual indicator~~ | — | ✅ **cerrado por Wave 1 (`17be60d`)** |
-| W16 | 🟡 | Execution log export. | 1d | abierto |
+| ~~W16~~ | — | ~~Execution log export.~~ | — | ✅ **cerrado Wave 1.2 (`1c3f7e6`)** — CSV streaming |
 | W17 | 🟡 | Performance hints. | 1d | abierto |
 | ~~W18~~ | — | ~~6 NYI restantes en WorkflowsPage~~ | — | ✅ **mitigado por Sprint B.2** (`8577fad` esconde NYIButton por flag); cablearlos sigue abierto si se quiere |
 
