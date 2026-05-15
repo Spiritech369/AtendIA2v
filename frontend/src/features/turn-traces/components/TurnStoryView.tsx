@@ -263,6 +263,16 @@ function StepComposer({
         </span>
       }
     >
+      {step.agentName && (
+        // C2 / Task 8 — agent identity above the tech metadata so the
+        // operator sees WHO answered before scrolling into model/cost.
+        // The AgentBadge in the panel header still owns the deep-link
+        // to /agents/{id}; this is just a readable label.
+        <div className="text-[11px] text-muted-foreground">
+          Agente: <span className="font-medium text-foreground">{step.agentName}</span>
+          {step.agentRole && <span> · {step.agentRole}</span>}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
         {step.provider && (
           <Badge

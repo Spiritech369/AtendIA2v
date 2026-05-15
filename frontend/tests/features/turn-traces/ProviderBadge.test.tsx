@@ -12,6 +12,8 @@ const baseComposer: Extract<StoryStep, { kind: "composer" }> = {
   pendingConfirmation: null,
   rawLlmResponse: null,
   provider: "openai",
+  agentName: null,
+  agentRole: null,
 };
 
 describe("StepComposer provider badge", () => {

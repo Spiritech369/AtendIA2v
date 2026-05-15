@@ -52,6 +52,12 @@ export type StoryStep =
       // - "fallback": OpenAI exhausted retries → canned reply fired
       // NULL on legacy rows → badge omitted.
       provider: "openai" | "canned" | "fallback" | null;
+      // C2 / Task 8 — agent identity surfaced above the tech metadata.
+      // Fetched by DebugPanel via agentsApi.get(trace.agent_id) and
+      // forwarded through buildTurnStory opts. NULL when the trace has
+      // no agent_id (legacy rows) or while the agent query is loading.
+      agentName: string | null;
+      agentRole: string | null;
     }
   | {
       kind: "transition";
@@ -114,7 +120,14 @@ function deriveModeRationale(trace: TurnTraceDetail): string | null {
 
 export function buildTurnStory(
   trace: TurnTraceDetail,
-  opts: { totalTurns?: number | null } = {},
+  opts: {
+    totalTurns?: number | null;
+    // C2 / Task 8 — when the DebugPanel has resolved the agent that
+    // served this turn (via agentsApi.get(trace.agent_id)), it forwards
+    // the name + role so StepComposer can render an "Agente: X · Y"
+    // line above the model/latency/cost row.
+    agent?: { name: string; role?: string | null } | null;
+  } = {},
 ): StoryStep[] {
   const steps: StoryStep[] = [];
 
@@ -179,6 +192,8 @@ export function buildTurnStory(
           : null,
       rawLlmResponse: trace.raw_llm_response,
       provider: trace.composer_provider,
+      agentName: opts.agent?.name ?? null,
+      agentRole: opts.agent?.role ?? null,
     });
   }
 

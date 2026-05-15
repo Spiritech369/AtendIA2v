@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { agentsApi } from "@/features/agents/api";
 import { turnTracesApi } from "@/features/turn-traces/api";
 import { FlowModeBadge } from "@/features/turn-traces/components/FlowModeBadge";
 import {
@@ -53,6 +54,20 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
   });
   const totalTurns = list.data?.items.length ?? null;
 
+  // C2 / Task 8 — fetch the agent identity so StepComposer can label
+  // the turn with "Agente: <name> · <role>". 5min staleTime because
+  // names + roles barely change; opening multiple turns from the same
+  // agent fires the network call once.
+  const agentQuery = useQuery({
+    queryKey: ["agent", t?.agent_id],
+    queryFn: () => agentsApi.get(t?.agent_id as string),
+    enabled: !!t?.agent_id,
+    staleTime: 5 * 60_000,
+  });
+  const agentForStory = agentQuery.data
+    ? { name: agentQuery.data.name, role: agentQuery.data.role ?? null }
+    : null;
+
   if (isLoading || !t) {
     return (
       <PanelShell onClose={onClose} title="Cargando…">
@@ -87,7 +102,7 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
           <ErrorBanner trace={t} />
 
           {/* The story — the operator-facing narrative. */}
-          <TurnStoryView steps={buildTurnStory(t, { totalTurns })} />
+          <TurnStoryView steps={buildTurnStory(t, { totalTurns, agent: agentForStory })} />
 
           <Separator />
           <EntityPills trace={t} />
