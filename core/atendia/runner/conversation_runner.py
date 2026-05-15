@@ -1185,6 +1185,85 @@ class ConversationRunner:
                 extracted_snapshot=merged_extracted,
             )
 
+        # D6 — composer-suggested escalation. When gpt-4o flags the turn
+        # (suggested_handoff set to a HandoffReason value; validated on
+        # ComposerOutput so a hallucinated label can't reach here), the
+        # runner persists a structured handoff and pauses the bot. The
+        # composed holding message ("un momento, te conecto con un
+        # asesor") already went out via enqueue_messages above — going
+        # abruptly silent would be worse UX — so the customer gets the
+        # acknowledgement and a human picks up the next inbound turn.
+        #
+        # NOTE this path differs from STAGE_TRIGGERED_HANDOFF: there the
+        # stage pauses BEFORE compose (auto_handoff_triggered skips
+        # Composer/outbound entirely), so no message goes out. Here
+        # compose already ran, so we send THEN pause.
+        if composer_output is not None and composer_output.suggested_handoff:
+            from atendia.contracts.handoff_summary import HandoffReason
+            from atendia.runner.handoff_helper import (
+                build_handoff_summary,
+                persist_handoff,
+            )
+
+            reason = HandoffReason(composer_output.suggested_handoff)
+            summary = build_handoff_summary(
+                reason=reason,
+                extracted=ext_fields,
+                last_inbound_text=inbound.text,
+                suggested_next_action=(
+                    "Revisar el caso — el bot marcó escalación tras enviar "
+                    "el mensaje de espera al cliente."
+                ),
+                docs_per_plan=pipeline.docs_per_plan,
+            )
+            await persist_handoff(
+                session=self._session,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                summary=summary,
+            )
+
+            # Flip the bot_paused gate so the next inbound turn short-
+            # circuits at the top of run_turn until an operator resumes.
+            # bot_paused lives on conversation_state (the column the
+            # top-of-turn SELECT/JOIN actually reads); the older
+            # STAGE_TRIGGERED_HANDOFF path writes `conversations` instead,
+            # which has no such column — we don't mirror that bug here.
+            await self._session.execute(
+                text(
+                    "UPDATE conversation_state SET bot_paused = true WHERE conversation_id = :cid"
+                ),
+                {"cid": conversation_id},
+            )
+
+            await emit_bot_paused(
+                self._session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                reason=reason.value,
+            )
+
+            # HUMAN_HANDOFF_REQUESTED — both the events table (workflows
+            # listen to it) and a chat bubble so the operator notices.
+            await self._emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+                payload={"reason": reason.value, "source": "composer_suggested"},
+            )
+            await emit_system_event(
+                self._session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                event_type=EventType.HUMAN_HANDOFF_REQUESTED,
+                text=f"Sistema: Handoff humano solicitado — {reason.value}",
+                payload={
+                    "reason": reason.value,
+                    "source": "composer_suggested",
+                    "suggested_next_action": summary.suggested_next_action,
+                },
+            )
+
         return trace
 
     async def _trigger_stage_entry_handoff(
