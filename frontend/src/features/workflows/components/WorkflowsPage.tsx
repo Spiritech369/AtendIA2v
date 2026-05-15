@@ -399,6 +399,23 @@ function ExecutionsPanel({
     toast.success("JSON copiado");
   };
 
+  const exportCsv = async () => {
+    if (!workflow) return;
+    try {
+      const blob = await workflowsApi.exportExecutionsCsv(workflow.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${workflow.name.replace(/[^a-z0-9-_]+/gi, "_")}-ejecuciones.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("No se pudo exportar CSV", {
+        description: (error as Error).message,
+      });
+    }
+  };
+
   const rowActions = (execution: WorkflowExecution): ContextAction[] => [
     { label: "Reproducir ejecución", action: () => onSelectExecution(execution) },
     { label: "Reintentar desde fallo", action: () => retry.mutate(execution) },
@@ -423,14 +440,27 @@ function ExecutionsPanel({
             {workflow ? workflow.name : "Sin workflow seleccionado"}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-slate-400"
-          onClick={() => onSelectExecution(null)}
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-[11px] text-slate-300"
+            disabled={!workflow || executions.length === 0}
+            onClick={() => void exportCsv()}
+            title="Exportar el log de ejecuciones a CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-slate-400"
+            onClick={() => onSelectExecution(null)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       {nodeFilterLabel && (
         <div className="flex items-center gap-1 border-b border-white/10 bg-blue-500/10 px-3 py-1 text-[10px] text-blue-200">
