@@ -57,4 +57,50 @@ jobs:
         env:
           ATENDIA_V2_DATABASE_URL: postgresql+asyncpg://atendia:atendia@localhost:5432/atendia_v2_test
           ATENDIA_V2_REDIS_URL: redis://localhost:6379/0
-        run: uv run pytest -v
+        # `--cov-report=xml` produces coverage.xml for the summary step
+        # below; `--cov-report=term-missing` keeps the human-readable
+        # output in the job log. `fail_under=85` is set in pyproject.toml
+        # so pytest already enforces the gate — this step adds the
+        # PR-visible summary on top.
+        run: >-
+          uv run pytest -v
+          --cov=atendia
+          --cov-report=xml
+          --cov-report=term-missing
+      - name: Publish coverage summary (Sprint C.4)
+        # Always run so a failed test suite still surfaces partial
+        # coverage — operators can see which lines a regression touched.
+        if: always()
+        working-directory: core
+        run: |
+          if [ -f coverage.xml ]; then
+            python - <<'PY'
+          import xml.etree.ElementTree as ET, os, pathlib
+          root = ET.parse("coverage.xml").getroot()
+          line_rate = float(root.get("line-rate", "0")) * 100
+          branch_rate = float(root.get("branch-rate", "0")) * 100
+          covered = root.get("lines-covered", "?")
+          valid = root.get("lines-valid", "?")
+          summary = pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"])
+          lines = [
+              "## Coverage",
+              "",
+              f"- Line coverage: **{line_rate:.2f}%** ({covered} / {valid} lines)",
+              f"- Branch coverage: **{branch_rate:.2f}%**",
+              "",
+              "Gate enforced at 85% via pytest `--cov-fail-under` "
+              "(see pyproject.toml).",
+          ]
+          summary.write_text("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+          else
+            echo "coverage.xml not produced — test step likely failed before pytest ran" >&2
+          fi
+      - name: Upload coverage.xml artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: core/coverage.xml
+          if-no-files-found: ignore
