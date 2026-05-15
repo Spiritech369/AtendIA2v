@@ -1,8 +1,21 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
+import {
+  type DocumentCatalogEntry,
+  DocumentRuleBuilder,
+} from "@/features/pipeline/components/DocumentRuleBuilder";
 import type { AutoEnterRulesDraft } from "@/features/pipeline/components/PipelineEditor";
-import { DocumentRuleBuilder } from "@/features/pipeline/components/DocumentRuleBuilder";
+
+// Shared catalog fixture. Mirrors the labels/keys the existing
+// assertions hard-code so tests behave identically to before the
+// catalog became a required prop.
+const CATALOG_FIXTURE: ReadonlyArray<DocumentCatalogEntry> = [
+  { key: "DOCS_INE", label: "INE" },
+  { key: "DOCS_COMPROBANTE_DOMICILIO", label: "Comprobante de domicilio" },
+  { key: "DOCS_ESTADOS_CUENTA", label: "Estados de cuenta" },
+  { key: "DOCS_RECIBOS_NOMINA", label: "Recibos de nómina" },
+  { key: "DOCS_RESOLUCION_IMSS", label: "Resolución IMSS" },
+];
 
 describe("DocumentRuleBuilder", () => {
   it("renders one button per catalog entry", () => {
@@ -10,6 +23,7 @@ describe("DocumentRuleBuilder", () => {
       <DocumentRuleBuilder
         stageLabel="Papelería completa"
         rules={undefined}
+        catalog={CATALOG_FIXTURE}
         onChange={() => {}}
       />,
     );
@@ -26,6 +40,7 @@ describe("DocumentRuleBuilder", () => {
       <DocumentRuleBuilder
         stageLabel="Papelería completa"
         rules={undefined}
+        catalog={CATALOG_FIXTURE}
         onChange={onChange}
       />,
     );
@@ -50,6 +65,7 @@ describe("DocumentRuleBuilder", () => {
       <DocumentRuleBuilder
         stageLabel="X"
         rules={rules}
+        catalog={CATALOG_FIXTURE}
         onChange={() => {}}
       />,
     );
@@ -70,7 +86,14 @@ describe("DocumentRuleBuilder", () => {
       conditions: [{ field: "DOCS_INE.status", operator: "equals", value: "ok" }],
     };
     const onChange = vi.fn();
-    render(<DocumentRuleBuilder stageLabel="X" rules={rules} onChange={onChange} />);
+    render(
+      <DocumentRuleBuilder
+        stageLabel="X"
+        rules={rules}
+        catalog={CATALOG_FIXTURE}
+        onChange={onChange}
+      />,
+    );
     fireEvent.click(screen.getByText("INE"));
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
@@ -79,12 +102,17 @@ describe("DocumentRuleBuilder", () => {
     const rules: AutoEnterRulesDraft = {
       enabled: true,
       match: "all",
-      conditions: [
-        { field: "DOCS_INE.status", operator: "equals", value: "ok" },
-      ],
+      conditions: [{ field: "DOCS_INE.status", operator: "equals", value: "ok" }],
     };
     const onChange = vi.fn();
-    render(<DocumentRuleBuilder stageLabel="X" rules={rules} onChange={onChange} />);
+    render(
+      <DocumentRuleBuilder
+        stageLabel="X"
+        rules={rules}
+        catalog={CATALOG_FIXTURE}
+        onChange={onChange}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /limpiar/i }));
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
@@ -98,7 +126,14 @@ describe("DocumentRuleBuilder", () => {
         { field: "modelo_interes", operator: "exists" },
       ],
     };
-    render(<DocumentRuleBuilder stageLabel="X" rules={rules} onChange={() => {}} />);
+    render(
+      <DocumentRuleBuilder
+        stageLabel="X"
+        rules={rules}
+        catalog={CATALOG_FIXTURE}
+        onChange={() => {}}
+      />,
+    );
     expect(screen.getByText(/reglas personalizadas activas/i)).toBeInTheDocument();
     // No checklist rendered
     expect(screen.queryByText("INE")).not.toBeInTheDocument();
@@ -112,11 +147,16 @@ describe("DocumentRuleBuilder", () => {
     const rules: AutoEnterRulesDraft = {
       enabled: true,
       match: "all",
-      conditions: [
-        { field: "DOCS_INE.status", operator: "not_equals", value: "missing" },
-      ],
+      conditions: [{ field: "DOCS_INE.status", operator: "not_equals", value: "missing" }],
     };
-    render(<DocumentRuleBuilder stageLabel="X" rules={rules} onChange={() => {}} />);
+    render(
+      <DocumentRuleBuilder
+        stageLabel="X"
+        rules={rules}
+        catalog={CATALOG_FIXTURE}
+        onChange={() => {}}
+      />,
+    );
     expect(screen.getByText(/reglas personalizadas activas/i)).toBeInTheDocument();
   });
 
@@ -125,12 +165,13 @@ describe("DocumentRuleBuilder", () => {
       <DocumentRuleBuilder
         stageLabel="X"
         rules={undefined}
+        catalog={CATALOG_FIXTURE}
         onChange={() => {}}
         disabled
       />,
     );
     const buttons = screen.getAllByRole("button");
     // Every doc card should be disabled
-    buttons.forEach((btn) => expect(btn).toBeDisabled());
+    for (const btn of buttons) expect(btn).toBeDisabled();
   });
 });
