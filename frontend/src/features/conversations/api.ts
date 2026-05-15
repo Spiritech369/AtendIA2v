@@ -63,6 +63,8 @@ export interface MessageItem {
   created_at: string;
   sent_at: string | null;
   delivery_status?: "queued" | "sent" | "delivered" | "read" | "failed" | null;
+  /** C9 — set when an operator edited the text; UI shows "editado". */
+  edited_at?: string | null;
 }
 
 export interface MessageListResponse {
@@ -113,6 +115,21 @@ export const conversationsApi = {
   },
   deleteConversation: async (id: string): Promise<void> => {
     await api.delete(`/conversations/${id}`);
+  },
+  // C9 — per-message edit / soft delete.
+  editMessage: async (
+    conversationId: string,
+    messageId: string,
+    text: string,
+  ): Promise<MessageItem> => {
+    const { data } = await api.patch<MessageItem>(
+      `/conversations/${conversationId}/messages/${messageId}`,
+      { text },
+    );
+    return data;
+  },
+  deleteMessage: async (conversationId: string, messageId: string): Promise<void> => {
+    await api.delete(`/conversations/${conversationId}/messages/${messageId}`);
   },
   markRead: async (id: string): Promise<void> => {
     await api.post(`/conversations/${id}/mark-read`);

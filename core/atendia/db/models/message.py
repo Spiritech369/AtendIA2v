@@ -31,3 +31,6 @@ class MessageRow(Base):
     metadata_json: Mapped[dict] = mapped_column("metadata_json", JSONB, default=dict)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # C9 — per-message edit/delete. NULL = never edited / live.
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

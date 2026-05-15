@@ -133,6 +133,8 @@ class MessageItem(BaseModel):
     created_at: datetime
     sent_at: datetime | None
     delivery_status: str | None = None
+    # C9 — set when an operator edits the text; frontend shows "editado".
+    edited_at: datetime | None = None
 
 
 class MessageListResponse(BaseModel):
@@ -687,8 +689,13 @@ async def list_messages(
             MessageRow.created_at,
             MessageRow.sent_at,
             MessageRow.delivery_status,
+            MessageRow.edited_at,
         )
-        .where(MessageRow.conversation_id == conversation_id)
+        .where(
+            MessageRow.conversation_id == conversation_id,
+            # C9 — soft-deleted messages are kept for audit but hidden.
+            MessageRow.deleted_at.is_(None),
+        )
         .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
         .limit(limit + 1)
     )
@@ -716,6 +723,7 @@ async def list_messages(
             created_at=r.created_at,
             sent_at=r.sent_at,
             delivery_status=r.delivery_status,
+            edited_at=r.edited_at,
         )
         for r in page
     ]
@@ -726,6 +734,99 @@ async def list_messages(
         assert last.sent_at is not None
         next_cursor = _encode_cursor(last.sent_at, last.id)
     return MessageListResponse(items=items, next_cursor=next_cursor)
+
+
+# ---------- C9: per-message edit / soft delete ----------
+
+
+class EditMessageBody(BaseModel):
+    text: str
+
+    @field_validator("text")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("text must not be empty")
+        return v.strip()
+
+
+async def _own_message_or_404(
+    session: AsyncSession,
+    *,
+    conversation_id: UUID,
+    message_id: UUID,
+    tenant_id: UUID,
+) -> MessageRow:
+    row = (
+        await session.execute(
+            select(MessageRow).where(
+                MessageRow.id == message_id,
+                MessageRow.conversation_id == conversation_id,
+                MessageRow.tenant_id == tenant_id,
+                MessageRow.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "message not found")
+    return row
+
+
+@router.patch("/{conversation_id}/messages/{message_id}", response_model=MessageItem)
+async def edit_message(
+    conversation_id: UUID,
+    message_id: UUID,
+    body: EditMessageBody,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> MessageItem:
+    """Edit a message's text in place (e.g. redact PII, fix a typo in
+    an operator reply). Stamps ``edited_at`` so the UI can flag it.
+    Tenant-scoped; 404 if the message isn't in this conversation."""
+    msg = await _own_message_or_404(
+        session,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        tenant_id=tenant_id,
+    )
+    msg.text = body.text
+    msg.edited_at = datetime.now(UTC)
+    session.add(msg)
+    await session.commit()
+    return MessageItem(
+        id=msg.id,
+        conversation_id=msg.conversation_id,
+        direction=msg.direction,
+        text=msg.text,
+        metadata=msg.metadata_json or {},
+        created_at=msg.created_at,
+        sent_at=msg.sent_at,
+        delivery_status=msg.delivery_status,
+        edited_at=msg.edited_at,
+    )
+
+
+@router.delete("/{conversation_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(
+    conversation_id: UUID,
+    message_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Soft-delete a message: the row is kept for audit/forensics but
+    the list endpoint filters it out. Idempotent — re-deleting an
+    already-deleted message just 404s (it's no longer visible)."""
+    msg = await _own_message_or_404(
+        session,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        tenant_id=tenant_id,
+    )
+    msg.deleted_at = datetime.now(UTC)
+    session.add(msg)
+    await session.commit()
 
 
 # ---------- Operator intervention (Phase 4 T22-T23) ----------
