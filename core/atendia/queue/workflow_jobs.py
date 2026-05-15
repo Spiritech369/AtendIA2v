@@ -49,9 +49,7 @@ async def poll_workflow_triggers(ctx: dict) -> dict:
     processed = 0
     try:
         async with session_factory() as session:
-            tenants = (
-                await session.execute(select(EventRow.tenant_id).distinct())
-            ).scalars().all()
+            tenants = (await session.execute(select(EventRow.tenant_id).distinct())).scalars().all()
             for tenant_id in tenants:
                 cursor = (
                     await session.execute(

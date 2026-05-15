@@ -8,9 +8,7 @@ from atendia.channels.meta_signing import verify_meta_signature
 
 SECRET = "test_app_secret"
 BODY = b'{"object":"whatsapp_business_account","entry":[{"id":"123"}]}'
-EXPECTED_SIG = "sha256=" + hmac.new(
-    SECRET.encode("utf-8"), BODY, hashlib.sha256
-).hexdigest()
+EXPECTED_SIG = "sha256=" + hmac.new(SECRET.encode("utf-8"), BODY, hashlib.sha256).hexdigest()
 
 
 def test_valid_signature_returns_true():
@@ -38,5 +36,6 @@ def test_constant_time_comparison_used():
     """Smoke: ensure we use hmac.compare_digest (timing attack protection)."""
     import inspect
     from atendia.channels import meta_signing
+
     src = inspect.getsource(meta_signing)
     assert "compare_digest" in src

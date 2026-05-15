@@ -6,6 +6,7 @@ operators read/write per-customer values.
 Definitions mounted at /api/v1/customer-fields/definitions
 Values mounted at /api/v1/customers/{customer_id}/field-values
 """
+
 from __future__ import annotations
 
 import json
@@ -28,14 +29,16 @@ from atendia.db.session import get_db_session
 definitions_router = APIRouter()
 values_router = APIRouter()
 
-FIELD_TYPES: frozenset[str] = frozenset({
-    "text",
-    "select",
-    "number",
-    "date",
-    "checkbox",
-    "multiselect",
-})
+FIELD_TYPES: frozenset[str] = frozenset(
+    {
+        "text",
+        "select",
+        "number",
+        "date",
+        "checkbox",
+        "multiselect",
+    }
+)
 _FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 
 
@@ -85,7 +88,8 @@ class FieldDefCreate(BaseModel):
             return None
         choices = value.get("choices") or value.get("options")
         if choices is not None and (
-            not isinstance(choices, list) or not all(isinstance(v, str) and v.strip() for v in choices)
+            not isinstance(choices, list)
+            or not all(isinstance(v, str) and v.strip() for v in choices)
         ):
             raise ValueError("field_options choices/options must be a non-empty string list")
         return value
@@ -125,12 +129,16 @@ async def list_definitions(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FieldDefOut]:
     rows = (
-        await session.execute(
-            select(CustomerFieldDefinition)
-            .where(CustomerFieldDefinition.tenant_id == tenant_id)
-            .order_by(CustomerFieldDefinition.ordering)
+        (
+            await session.execute(
+                select(CustomerFieldDefinition)
+                .where(CustomerFieldDefinition.tenant_id == tenant_id)
+                .order_by(CustomerFieldDefinition.ordering)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         FieldDefOut(
             id=d.id,
@@ -146,9 +154,7 @@ async def list_definitions(
     ]
 
 
-@definitions_router.post(
-    "", response_model=FieldDefOut, status_code=status.HTTP_201_CREATED
-)
+@definitions_router.post("", response_model=FieldDefOut, status_code=status.HTTP_201_CREATED)
 async def create_definition(
     body: FieldDefCreate,
     user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
@@ -304,7 +310,9 @@ def _canonicalize_field_value(
         try:
             number = Decimal(str(value).strip())
         except (InvalidOperation, AttributeError):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{defn.key} must be a number") from None
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, f"{defn.key} must be a number"
+            ) from None
         return format(number.normalize(), "f")
 
     if field_type == "date":
@@ -407,13 +415,17 @@ async def put_field_values(
     await _verify_customer_access(customer_id, tenant_id, session)
 
     defs = (
-        await session.execute(
-            select(CustomerFieldDefinition).where(
-                CustomerFieldDefinition.tenant_id == tenant_id,
-                CustomerFieldDefinition.key.in_(list(body.values.keys())),
+        (
+            await session.execute(
+                select(CustomerFieldDefinition).where(
+                    CustomerFieldDefinition.tenant_id == tenant_id,
+                    CustomerFieldDefinition.key.in_(list(body.values.keys())),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     key_to_def = {d.key: d for d in defs}
 
     unknown = set(body.values.keys()) - set(key_to_def.keys())

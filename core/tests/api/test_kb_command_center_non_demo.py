@@ -6,6 +6,7 @@ Prior to this fix, /health, /risks, /items, /unanswered-questions,
 /simulate all returned a hardcoded demo payload regardless of tenant.
 Plus /simulate raised 501 for non-demo.
 """
+
 from __future__ import annotations
 
 

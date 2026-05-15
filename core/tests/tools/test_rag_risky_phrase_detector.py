@@ -25,7 +25,10 @@ def test_no_match_returns_empty() -> None:
 
 def test_custom_overrides_defaults() -> None:
     custom = [{"pattern": r"foo+", "rewrite": "bar"}]
-    assert detect_risky_phrases("foooo", custom) and detect_risky_phrases("foooo", custom)[0].description == "bar"
+    assert (
+        detect_risky_phrases("foooo", custom)
+        and detect_risky_phrases("foooo", custom)[0].description == "bar"
+    )
     # And the default phrases don't fire when a custom list is provided.
     assert detect_risky_phrases("crédito aprobado", custom) == []
 

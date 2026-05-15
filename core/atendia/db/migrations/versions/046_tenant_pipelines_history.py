@@ -17,6 +17,7 @@ Why inline JSONB and not a separate table:
   ~2KB anyway);
 * mirrors the agents pattern (ops_config["versions"][...].snapshot).
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence

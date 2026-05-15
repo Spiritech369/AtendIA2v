@@ -8,6 +8,7 @@ Step 1 backend prep — operator notes per customer. Each note is
 tenant-scoped and attributed to the author (tenant_user). Supports
 pinning and edit tracking via updated_at.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

@@ -4,6 +4,7 @@ Usage:
     PYTHONPATH=. uv run python -m atendia.scripts.seed_dinamo_voice \
         --tenant-id <uuid> [--dry-run]
 """
+
 import argparse
 import asyncio
 import json
@@ -25,12 +26,15 @@ DINAMO_VOICE = {
 
 async def _main(tenant_id: UUID, dry_run: bool) -> int:
     from atendia.db.session import _get_factory
+
     factory = _get_factory()
     async with factory() as session:
-        existing = (await session.execute(
-            text("SELECT 1 FROM tenant_branding WHERE tenant_id = :t"),
-            {"t": tenant_id},
-        )).fetchone()
+        existing = (
+            await session.execute(
+                text("SELECT 1 FROM tenant_branding WHERE tenant_id = :t"),
+                {"t": tenant_id},
+            )
+        ).fetchone()
         if not existing:
             print(f"No tenant_branding row for {tenant_id}", file=sys.stderr)
             return 1

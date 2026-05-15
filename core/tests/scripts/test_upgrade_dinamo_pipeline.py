@@ -7,12 +7,14 @@ from atendia.scripts.upgrade_dinamo_pipeline_to_v4 import (
 def test_upgrade_string_fields_to_objects():
     old = {
         "version": 3,
-        "stages": [{
-            "id": "qualify",
-            "required_fields": ["interes_producto", "ciudad"],
-            "actions_allowed": [],
-            "transitions": [],
-        }],
+        "stages": [
+            {
+                "id": "qualify",
+                "required_fields": ["interes_producto", "ciudad"],
+                "actions_allowed": [],
+                "transitions": [],
+            }
+        ],
         "tone": {},
         "fallback": "x",
     }
@@ -32,12 +34,14 @@ def test_upgrade_idempotent_on_already_v4():
     already = {
         "version": 4,
         "nlu": {"history_turns": 4},
-        "stages": [{
-            "id": "qualify",
-            "required_fields": [{"name": "interes_producto", "description": "..."}],
-            "actions_allowed": [],
-            "transitions": [],
-        }],
+        "stages": [
+            {
+                "id": "qualify",
+                "required_fields": [{"name": "interes_producto", "description": "..."}],
+                "actions_allowed": [],
+                "transitions": [],
+            }
+        ],
         "tone": {},
         "fallback": "x",
     }
@@ -48,12 +52,14 @@ def test_upgrade_unknown_field_uses_empty_description():
     """For a field not in DINAMO_FIELD_DESCRIPTIONS, default to empty description."""
     old = {
         "version": 3,
-        "stages": [{
-            "id": "qualify",
-            "required_fields": ["unknown_field_xyz"],
-            "actions_allowed": [],
-            "transitions": [],
-        }],
+        "stages": [
+            {
+                "id": "qualify",
+                "required_fields": ["unknown_field_xyz"],
+                "actions_allowed": [],
+                "transitions": [],
+            }
+        ],
         "tone": {},
         "fallback": "x",
     }
@@ -68,13 +74,15 @@ def test_upgrade_handles_optional_fields_too():
     """If a stage already has optional_fields (string form), they get coerced too."""
     old = {
         "version": 3,
-        "stages": [{
-            "id": "qualify",
-            "required_fields": ["ciudad"],
-            "optional_fields": ["nombre"],
-            "actions_allowed": [],
-            "transitions": [],
-        }],
+        "stages": [
+            {
+                "id": "qualify",
+                "required_fields": ["ciudad"],
+                "optional_fields": ["nombre"],
+                "actions_allowed": [],
+                "transitions": [],
+            }
+        ],
         "tone": {},
         "fallback": "x",
     }
@@ -91,13 +99,15 @@ def test_upgrade_resulting_pipeline_validates_against_pydantic():
 
     old = {
         "version": 3,
-        "stages": [{
-            "id": "qualify",
-            "required_fields": ["interes_producto", "ciudad"],
-            "optional_fields": ["nombre", "presupuesto_max"],
-            "actions_allowed": ["ask_field"],
-            "transitions": [],
-        }],
+        "stages": [
+            {
+                "id": "qualify",
+                "required_fields": ["interes_producto", "ciudad"],
+                "optional_fields": ["nombre", "presupuesto_max"],
+                "actions_allowed": ["ask_field"],
+                "transitions": [],
+            }
+        ],
         "tone": {},
         "fallback": "escalate_to_human",
     }

@@ -60,16 +60,24 @@ def setup_tenant_with_pipeline():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t25_inb",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T25", "verify_token": "vt"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t25_inb",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T25", "verify_token": "vt"}}
+                        ),
+                    },
+                )
+            ).scalar()
             await conn.execute(
-                text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                     "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+                text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                    "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+                ),
                 {"t": tid, "d": json.dumps(PIPELINE)},
             )
         await engine.dispose()
@@ -89,28 +97,35 @@ def setup_tenant_with_pipeline():
 def _payload(channel_id: str, text_body: str) -> dict:
     return {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T25"},
-                    "messages": [{
-                        "from": "5215555550250",
-                        "id": channel_id,
-                        "timestamp": "1714579200",
-                        "text": {"body": text_body},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T25"},
+                            "messages": [
+                                {
+                                    "from": "5215555550250",
+                                    "id": channel_id,
+                                    "timestamp": "1714579200",
+                                    "text": {"body": text_body},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
 
 async def _redis_clear_dedup(channel_id: str):
     from redis.asyncio import Redis
+
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_id}")
     await r.aclose()
@@ -120,13 +135,18 @@ def _read_traces(tid):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            rows = (await conn.execute(
-                text("SELECT turn_number, state_after FROM turn_traces "
-                     "WHERE tenant_id = :t ORDER BY turn_number"),
-                {"t": tid},
-            )).fetchall()
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT turn_number, state_after FROM turn_traces "
+                        "WHERE tenant_id = :t ORDER BY turn_number"
+                    ),
+                    {"t": tid},
+                )
+            ).fetchall()
         await engine.dispose()
         return rows
+
     return asyncio.run(_do())
 
 
@@ -187,9 +207,16 @@ def test_subsequent_inbound_advances_turn_number(setup_tenant_with_pipeline):
     assert traces[1][1]["current_stage"] == "qualify"
 
 
-def _ok_openai_response(intent="ask_info", entities=None, confidence=0.9,
-                        sentiment="neutral", ambiguities=None,
-                        model="gpt-4o-mini", tokens_in=480, tokens_out=80):
+def _ok_openai_response(
+    intent="ask_info",
+    entities=None,
+    confidence=0.9,
+    sentiment="neutral",
+    ambiguities=None,
+    model="gpt-4o-mini",
+    tokens_in=480,
+    tokens_out=80,
+):
     """Helper: build a canonical OpenAI chat completion response."""
     payload = {
         "intent": intent,
@@ -205,11 +232,13 @@ def _ok_openai_response(intent="ask_info", entities=None, confidence=0.9,
             "object": "chat.completion",
             "created": 0,
             "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": json.dumps(payload)},
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": json.dumps(payload)},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": tokens_in,
                 "completion_tokens": tokens_out,
@@ -223,14 +252,17 @@ def _read_latest_trace(tid):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            row = (await conn.execute(
-                text("""SELECT nlu_model, nlu_cost_usd, nlu_tokens_in, nlu_tokens_out, nlu_output
+            row = (
+                await conn.execute(
+                    text("""SELECT nlu_model, nlu_cost_usd, nlu_tokens_in, nlu_tokens_out, nlu_output
                         FROM turn_traces WHERE tenant_id = :t
                         ORDER BY created_at DESC LIMIT 1"""),
-                {"t": tid},
-            )).fetchone()
+                    {"t": tid},
+                )
+            ).fetchone()
         await engine.dispose()
         return row
+
     return asyncio.run(_do())
 
 
@@ -238,14 +270,17 @@ def _read_latest_error_event(tid):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            row = (await conn.execute(
-                text("""SELECT payload FROM events
+            row = (
+                await conn.execute(
+                    text("""SELECT payload FROM events
                         WHERE tenant_id = :t AND type = 'error_occurred'
                         ORDER BY created_at DESC LIMIT 1"""),
-                {"t": tid},
-            )).fetchone()
+                    {"t": tid},
+                )
+            ).fetchone()
         await engine.dispose()
         return row
+
     return asyncio.run(_do())
 
 
@@ -340,14 +375,16 @@ def _ok_composer_response(messages, model="gpt-4o", tokens_in=450, tokens_out=80
             "object": "chat.completion",
             "created": 0,
             "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": json.dumps({"messages": messages}),
-                },
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": json.dumps({"messages": messages}),
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": tokens_in,
                 "completion_tokens": tokens_out,
@@ -370,12 +407,12 @@ def test_inbound_with_openai_composer_mocked(monkeypatch, setup_tenant_with_pipe
     get_settings.cache_clear()
 
     # Mock both calls — NLU first, then Composer.
-    respx.post("https://api.openai.com/v1/chat/completions").mock(side_effect=[
-        _ok_openai_response(intent="greeting"),
-        _ok_composer_response(
-            messages=["¡Qué onda, Frank!", "¿Te ayudo con tu moto?"]
-        ),
-    ])
+    respx.post("https://api.openai.com/v1/chat/completions").mock(
+        side_effect=[
+            _ok_openai_response(intent="greeting"),
+            _ok_composer_response(messages=["¡Qué onda, Frank!", "¿Te ayudo con tu moto?"]),
+        ]
+    )
 
     tid = setup_tenant_with_pipeline
     asyncio.run(_redis_clear_dedup("wamid.T27_CMP_OK"))
@@ -395,12 +432,14 @@ def test_inbound_with_openai_composer_mocked(monkeypatch, setup_tenant_with_pipe
     async def _check():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            row = (await conn.execute(
-                text("""SELECT composer_model, composer_cost_usd, composer_output
+            row = (
+                await conn.execute(
+                    text("""SELECT composer_model, composer_cost_usd, composer_output
                         FROM turn_traces WHERE tenant_id = :t
                         ORDER BY created_at DESC LIMIT 1"""),
-                {"t": tid},
-            )).fetchone()
+                    {"t": tid},
+                )
+            ).fetchone()
             assert row is not None
             model, cost, composer_output = row
             assert model == "gpt-4o"
@@ -463,20 +502,24 @@ def test_inbound_outside_24h_creates_handoff_no_outbound(setup_tenant_with_pipel
     async def _check():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            handoff = (await conn.execute(
-                text("""SELECT reason FROM human_handoffs
+            handoff = (
+                await conn.execute(
+                    text("""SELECT reason FROM human_handoffs
                         WHERE tenant_id = :t ORDER BY requested_at DESC LIMIT 1"""),
-                {"t": tid},
-            )).fetchone()
+                    {"t": tid},
+                )
+            ).fetchone()
             assert handoff is not None
             assert handoff[0] == "outside_24h_window"
 
-            event = (await conn.execute(
-                text("""SELECT type FROM events
+            event = (
+                await conn.execute(
+                    text("""SELECT type FROM events
                         WHERE tenant_id = :t AND type = 'human_handoff_requested'
                         ORDER BY occurred_at DESC LIMIT 1"""),
-                {"t": tid},
-            )).fetchone()
+                    {"t": tid},
+                )
+            ).fetchone()
             assert event is not None
         await engine.dispose()
 

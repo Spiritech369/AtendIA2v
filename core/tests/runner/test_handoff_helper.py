@@ -1,4 +1,5 @@
 """Tests for handoff_helper (Phase 3c.2 / T24)."""
+
 import json
 
 from atendia.contracts.extracted_fields import (

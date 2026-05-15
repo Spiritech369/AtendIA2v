@@ -1,6 +1,7 @@
 """Phase 3c.2 extension: Message can carry image/PDF attachments
 from Meta Cloud API. The webhook fetches the URL from Meta Graph
 API; the runner passes attachments to Vision."""
+
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -38,11 +39,13 @@ def test_message_with_image_attachment() -> None:
         direction=MessageDirection.INBOUND,
         text="aquí va mi INE",
         sent_at=datetime.now(UTC),
-        attachments=[Attachment(
-            media_id="WAID-456",
-            mime_type="image/jpeg",
-            url="https://...",
-        )],
+        attachments=[
+            Attachment(
+                media_id="WAID-456",
+                mime_type="image/jpeg",
+                url="https://...",
+            )
+        ],
     )
     assert len(m.attachments) == 1
     assert m.attachments[0].media_id == "WAID-456"

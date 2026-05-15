@@ -21,7 +21,9 @@ class MessageRow(Base):
     conversation_id: Mapped[UUID] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), index=True
     )
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     channel_message_id: Mapped[str | None] = mapped_column(String(120), index=True)

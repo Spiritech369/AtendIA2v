@@ -15,9 +15,7 @@ def _get_factory() -> async_sessionmaker[AsyncSession]:
     current_loop_id = id(asyncio.get_running_loop())
     if _engine is None or _engine_loop_id != current_loop_id:
         _engine = create_async_engine(get_settings().database_url)
-        _session_factory = async_sessionmaker(
-            _engine, expire_on_commit=False, class_=AsyncSession
-        )
+        _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
         _engine_loop_id = current_loop_id
     return _session_factory  # type: ignore[return-value]
 

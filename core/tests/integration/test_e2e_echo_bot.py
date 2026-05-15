@@ -9,6 +9,7 @@ Validates:
 6. Worker persists outbound row → row in `messages` (direction=outbound, status=sent)
 7. Both inbound and outbound were published to Pub/Sub (verified via the events table)
 """
+
 import asyncio
 import hashlib
 import hmac
@@ -69,16 +70,24 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t27_e2e",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T27", "verify_token": "vt"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t27_e2e",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T27", "verify_token": "vt"}}
+                        ),
+                    },
+                )
+            ).scalar()
             await conn.execute(
-                text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                     "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+                text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                    "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+                ),
                 {"t": tid, "d": json.dumps(PIPELINE)},
             )
         await engine.dispose()
@@ -98,28 +107,35 @@ def setup_tenant():
 def _payload(channel_id: str, text_body: str) -> dict:
     return {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T27"},
-                    "messages": [{
-                        "from": "5215555550270",
-                        "id": channel_id,
-                        "timestamp": "1714579200",
-                        "text": {"body": text_body},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T27"},
+                            "messages": [
+                                {
+                                    "from": "5215555550270",
+                                    "id": channel_id,
+                                    "timestamp": "1714579200",
+                                    "text": {"body": text_body},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
 
 async def _redis_clear(channel_id: str):
     from redis.asyncio import Redis
+
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_id}")
     await r.aclose()
@@ -129,13 +145,18 @@ def _read_messages(tid):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            rows = (await conn.execute(
-                text("SELECT direction, text, channel_message_id, delivery_status "
-                     "FROM messages WHERE tenant_id = :t ORDER BY sent_at"),
-                {"t": tid},
-            )).fetchall()
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT direction, text, channel_message_id, delivery_status "
+                        "FROM messages WHERE tenant_id = :t ORDER BY sent_at"
+                    ),
+                    {"t": tid},
+                )
+            ).fetchall()
         await engine.dispose()
         return [(r[0], r[1], r[2], r[3]) for r in rows]
+
     return asyncio.run(_do())
 
 
@@ -143,12 +164,15 @@ def _read_event_types(tid):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            rows = (await conn.execute(
-                text("SELECT type FROM events WHERE tenant_id = :t ORDER BY occurred_at"),
-                {"t": tid},
-            )).fetchall()
+            rows = (
+                await conn.execute(
+                    text("SELECT type FROM events WHERE tenant_id = :t ORDER BY occurred_at"),
+                    {"t": tid},
+                )
+            ).fetchall()
         await engine.dispose()
         return [r[0] for r in rows]
+
     return asyncio.run(_do())
 
 
@@ -163,14 +187,16 @@ async def _drain_one_outbound_job(tid: str) -> dict | None:
     engine = create_async_engine(get_settings().database_url)
     try:
         async with engine.connect() as conn:
-            row = (await conn.execute(
-                text(
-                    "SELECT payload FROM outbound_outbox "
-                    "WHERE tenant_id = :t "
-                    "ORDER BY created_at DESC LIMIT 1"
-                ),
-                {"t": tid},
-            )).first()
+            row = (
+                await conn.execute(
+                    text(
+                        "SELECT payload FROM outbound_outbox "
+                        "WHERE tenant_id = :t "
+                        "ORDER BY created_at DESC LIMIT 1"
+                    ),
+                    {"t": tid},
+                )
+            ).first()
             if row is None:
                 return None
             return row[0]
@@ -206,12 +232,15 @@ def test_e2e_echo_bot_flow(setup_tenant):
     async def _count_traces():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            n = (await conn.execute(
-                text("SELECT COUNT(*) FROM turn_traces WHERE tenant_id = :t"),
-                {"t": tid},
-            )).scalar()
+            n = (
+                await conn.execute(
+                    text("SELECT COUNT(*) FROM turn_traces WHERE tenant_id = :t"),
+                    {"t": tid},
+                )
+            ).scalar()
         await engine.dispose()
         return n
+
     assert asyncio.run(_count_traces()) == 1
 
     # ---- Step 4: outbound job was enqueued ----
@@ -225,15 +254,14 @@ def test_e2e_echo_bot_flow(setup_tenant):
     # ---- Step 5+6: invoke worker manually with Meta mocked ----
     async def _run_worker():
         with respx.mock(base_url="https://graph.facebook.com") as r_mock:
-            r_mock.post(
-                "/v21.0/PID_T27/messages"
-            ).mock(
+            r_mock.post("/v21.0/PID_T27/messages").mock(
                 return_value=httpx.Response(
                     200,
                     json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OUT_E2E"}]},
                 )
             )
             return await send_outbound({}, msg_dict)
+
     result = asyncio.run(_run_worker())
     assert result["status"] == "sent"
 

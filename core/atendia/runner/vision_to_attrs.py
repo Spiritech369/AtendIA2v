@@ -19,6 +19,7 @@ the quality assessment, and the rejection_reason is the source of
 truth (no SUGGEST path, no fuzzy confidence). Mixing the two would
 muddle the behaviour the operator can reason about.
 """
+
 from __future__ import annotations
 
 import logging
@@ -44,15 +45,17 @@ _log = logging.getLogger(__name__)
 # Categories that represent actual docs (vs moto / unrelated). The
 # runner skips Vision-to-attrs for non-doc categories — moto = product
 # photo, unrelated = off-topic; neither should ever mutate DOCS_*.
-DOC_CATEGORIES: frozenset[VisionCategory] = frozenset({
-    VisionCategory.INE,
-    VisionCategory.COMPROBANTE,
-    VisionCategory.RECIBO_NOMINA,
-    VisionCategory.ESTADO_CUENTA,
-    VisionCategory.CONSTANCIA_SAT,
-    VisionCategory.FACTURA,
-    VisionCategory.IMSS,
-})
+DOC_CATEGORIES: frozenset[VisionCategory] = frozenset(
+    {
+        VisionCategory.INE,
+        VisionCategory.COMPROBANTE,
+        VisionCategory.RECIBO_NOMINA,
+        VisionCategory.ESTADO_CUENTA,
+        VisionCategory.CONSTANCIA_SAT,
+        VisionCategory.FACTURA,
+        VisionCategory.IMSS,
+    }
+)
 
 # Minimum confidence below which we treat the Vision output as
 # "unsure" and skip the write, even if `valid_for_credit_file=true`.
@@ -70,6 +73,7 @@ class VisionDocWrite:
     DOCUMENT_ACCEPTED / DOCUMENT_REJECTED system event — keeps the
     attrs row and the chat bubble from disagreeing.
     """
+
     doc_key: str
     accepted: bool
     rejection_reason: str | None
@@ -139,8 +143,7 @@ def _decide_doc_keys(
         # Unknown multi-key doc — write the first key as a safe default,
         # log so operators notice the mapping mismatch.
         _log.warning(
-            "vision_doc_mapping for %s has >1 key but no side resolver; "
-            "writing first key only",
+            "vision_doc_mapping for %s has >1 key but no side resolver; writing first key only",
             category.value,
         )
         return [keys[0]]
@@ -214,14 +217,15 @@ async def apply_vision_to_attrs(
         return []
 
     side = (
-        vision_result.quality_check.side.value
-        if vision_result.quality_check is not None
-        else None
+        vision_result.quality_check.side.value if vision_result.quality_check is not None else None
     )
     metadata = vision_result.metadata if isinstance(vision_result.metadata, dict) else {}
 
     doc_keys = _decide_doc_keys(
-        category=category, pipeline=pipeline, metadata=metadata, side=side,
+        category=category,
+        pipeline=pipeline,
+        metadata=metadata,
+        side=side,
     )
     if not doc_keys:
         return []
@@ -229,9 +233,7 @@ async def apply_vision_to_attrs(
     accepted, rejection_reason = _decide_acceptance(vision_result)
 
     customer = (
-        await session.execute(
-            select(Customer).where(Customer.id == customer_id)
-        )
+        await session.execute(select(Customer).where(Customer.id == customer_id))
     ).scalar_one_or_none()
     if customer is None:
         _log.warning("apply_vision_to_attrs: customer %s not found", customer_id)

@@ -4,6 +4,7 @@ Phase 3b adds this Pydantic model so the runner can pass a
 'no catalog connected yet' hint to the Composer for actions like
 quote/lookup_faq/search_catalog. Real tool data lands in Phase 3c.
 """
+
 import pytest
 from pydantic import ValidationError
 

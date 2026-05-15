@@ -22,6 +22,7 @@ Usage:
     cd core
     uv run python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -96,7 +97,10 @@ DEFAULT_RISKY_PHRASES: list[dict[str, str]] = [
     {"pattern": r"sin\s+revisar\s+buró", "rewrite": "Sujeto a evaluación crediticia"},
     {"pattern": r"entrega\s+garantizada", "rewrite": "Sujeto a disponibilidad"},
     {"pattern": r"precio\s+fijo", "rewrite": "Depende del plan y documentación"},
-    {"pattern": r"no\s+necesitas\s+comprobar\s+ingresos", "rewrite": "Un asesor confirma documentación"},
+    {
+        "pattern": r"no\s+necesitas\s+comprobar\s+ingresos",
+        "rewrite": "Un asesor confirma documentación",
+    },
 ]
 
 DEFAULT_PRIORITY_RULES: list[dict[str, Any]] = [
@@ -155,6 +159,7 @@ async def seed_for_tenant(session: AsyncSession, tenant_id: UUID) -> dict[str, i
 
     # 3) Safe-answer settings — tenant_id is PK.
     import json
+
     result = await session.execute(
         text(
             "INSERT INTO kb_safe_answer_settings ("
@@ -212,6 +217,9 @@ async def _main(tenant_id_str: str) -> int:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print(f"Usage: python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>", file=sys.stderr)
+        print(
+            f"Usage: python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>",
+            file=sys.stderr,
+        )
         sys.exit(2)
     sys.exit(asyncio.run(_main(sys.argv[1])))

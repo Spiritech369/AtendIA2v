@@ -7,6 +7,7 @@
   the right ids; the meta-routes wiring is integration-level and tested in
   ``tests/webhooks`` separately).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,8 +46,7 @@ def _audit_events(tenant_id: str, type_prefix: str) -> list[dict[str, Any]]:
                     )
                 ).all()
                 return [
-                    {"type": r.type, "payload": r.payload, "actor": r.actor_user_id}
-                    for r in rows
+                    {"type": r.type, "payload": r.payload, "actor": r.actor_user_id} for r in rows
                 ]
         finally:
             await engine.dispose()
@@ -138,8 +138,7 @@ def test_toggle_emits_audit_and_bumps_version(client_tenant_admin) -> None:
 
     audits = _audit_events(client_tenant_admin.tenant_id, "admin.workflow.toggled")
     assert any(
-        a["payload"]["workflow_id"] == wf_id and a["payload"]["active"] is True
-        for a in audits
+        a["payload"]["workflow_id"] == wf_id and a["payload"]["active"] is True for a in audits
     )
 
 

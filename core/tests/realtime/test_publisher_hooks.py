@@ -41,13 +41,19 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t22_pub",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T22", "verify_token": "vt_t22"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t22_pub",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T22", "verify_token": "vt_t22"}}
+                        ),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 
@@ -64,6 +70,7 @@ def setup_tenant():
 
 async def _redis_clear_dedup(channel_message_id: str):
     from redis.asyncio import Redis
+
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_message_id}")
     await r.aclose()
@@ -76,10 +83,14 @@ def _clear_dedup_sync(channel_message_id):
 async def _find_conversation(tid):
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
-        row = (await conn.execute(
-            text("SELECT id FROM conversations WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 1"),
-            {"t": tid},
-        )).scalar()
+        row = (
+            await conn.execute(
+                text(
+                    "SELECT id FROM conversations WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"t": tid},
+            )
+        ).scalar()
     await engine.dispose()
     return row
 
@@ -89,23 +100,29 @@ async def test_inbound_webhook_publishes_message_received(setup_tenant, redis_cl
     tid = setup_tenant
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T22"},
-                    "messages": [{
-                        "from": "5215555550220",
-                        "id": "wamid.T22_INB_X",
-                        "timestamp": "1714579200",
-                        "text": {"body": "hola pub"},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T22"},
+                            "messages": [
+                                {
+                                    "from": "5215555550220",
+                                    "id": "wamid.T22_INB_X",
+                                    "timestamp": "1714579200",
+                                    "text": {"body": "hola pub"},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
     body = json.dumps(payload).encode()
     sig = _sign(body)
@@ -153,11 +170,11 @@ async def test_inbound_webhook_publishes_message_received(setup_tenant, redis_cl
 @respx.mock
 async def test_outbound_worker_publishes_message_sent(setup_tenant, redis_client):
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T22/messages"
-    ).mock(return_value=httpx.Response(
-        200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.T22_OUT_Y"}]}
-    ))
+    respx.post("https://graph.facebook.com/v21.0/PID_T22/messages").mock(
+        return_value=httpx.Response(
+            200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.T22_OUT_Y"}]}
+        )
+    )
 
     pubsub = redis_client.pubsub()
     pattern = f"tenant:{tid}:conversation:*"

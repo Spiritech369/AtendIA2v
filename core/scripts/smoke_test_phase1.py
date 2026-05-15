@@ -6,6 +6,7 @@ Usage (from `core/`):
 Expected: prints turn-by-turn state transitions and ends with
 "OK — phase 1 smoke test passed".
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -105,24 +106,36 @@ async def main() -> int:
     async with Session() as session:
         # Seed tenant + pipeline + customer + conversation
         tenant_name = f"smoke_phase1_{uuid4().hex[:8]}"
-        tid = (await session.execute(
-            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-            {"n": tenant_name},
-        )).scalar()
+        tid = (
+            await session.execute(
+                text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+                {"n": tenant_name},
+            )
+        ).scalar()
         await session.execute(
-            text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                 "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+            text(
+                "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+            ),
             {"t": tid, "d": json.dumps(PIPELINE_DEF)},
         )
-        cid = (await session.execute(
-            text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550039') RETURNING id"),
-            {"t": tid},
-        )).scalar()
-        conv_id = (await session.execute(
-            text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-                 "VALUES (:t, :c, 'greeting') RETURNING id"),
-            {"t": tid, "c": cid},
-        )).scalar()
+        cid = (
+            await session.execute(
+                text(
+                    "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550039') RETURNING id"
+                ),
+                {"t": tid},
+            )
+        ).scalar()
+        conv_id = (
+            await session.execute(
+                text(
+                    "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                    "VALUES (:t, :c, 'greeting') RETURNING id"
+                ),
+                {"t": tid, "c": cid},
+            )
+        ).scalar()
         await session.execute(
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
             {"c": conv_id},
@@ -132,6 +145,7 @@ async def main() -> int:
         print(f"Tenant {tenant_name} ({tid}) seeded with 4-stage pipeline")
 
         from atendia.runner.composer_canned import CannedComposer
+
         runner = ConversationRunner(session, CannedNLU(fixture_path), CannedComposer())
         for i, text_msg in enumerate(TURN_TEXTS, start=1):
             inbound = Message(
@@ -150,17 +164,18 @@ async def main() -> int:
             )
             await session.commit()
             transition = trace.stage_transition or "(no transition)"
-            print(
-                f"Turn {i}: {text_msg!r} → "
-                f"{trace.state_after['current_stage']} ({transition})"
-            )
+            print(f"Turn {i}: {text_msg!r} → {trace.state_after['current_stage']} ({transition})")
 
         # Print events summary
-        events = (await session.execute(
-            text("SELECT type, payload FROM events WHERE conversation_id = :c "
-                 "ORDER BY occurred_at"),
-            {"c": conv_id},
-        )).fetchall()
+        events = (
+            await session.execute(
+                text(
+                    "SELECT type, payload FROM events WHERE conversation_id = :c "
+                    "ORDER BY occurred_at"
+                ),
+                {"c": conv_id},
+            )
+        ).fetchall()
         print(f"Events emitted: {len(events)}")
         for evt_type, payload in events:
             print(f"  - {evt_type}: {payload}")

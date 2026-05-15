@@ -16,6 +16,7 @@ Distribution targets (per first tenant):
 Idempotency: deletes existing demo rows tagged ``[demo]`` in notes before
 re-seeding so the script can be re-run safely.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -54,8 +55,7 @@ async def main() -> None:
         customers = (
             await conn.execute(
                 text(
-                    "SELECT id FROM customers WHERE tenant_id = :t "
-                    "ORDER BY created_at DESC LIMIT 8"
+                    "SELECT id FROM customers WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 8"
                 ),
                 {"t": tenant_id},
             )

@@ -9,6 +9,7 @@ Composite PK (customer_id, field_definition_id) — one value per
 customer per field. Value stored as text; frontend interprets based
 on the definition's field_type.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

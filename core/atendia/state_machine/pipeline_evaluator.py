@@ -29,6 +29,7 @@ Design choices baked in here:
   iterating until ``moved=False``, capped at ``MAX_CHAIN``, but for now
   one transition per trigger is enough).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -86,7 +87,11 @@ def resolve_field_path(fields: dict[str, Any], path: str) -> Any:
             # ran on extracted_data, the per-key value is itself a dict
             # of {value, confidence, source_turn}. We treat .value as
             # the canonical inner.
-            if "value" in current and seg not in current and not _is_field_payload_segment(seg, current):
+            if (
+                "value" in current
+                and seg not in current
+                and not _is_field_payload_segment(seg, current)
+            ):
                 # Try unwrapping then looking up
                 inner = current.get("value")
                 if isinstance(inner, dict) and seg in inner:
@@ -200,10 +205,7 @@ def evaluate_rule_group(
     """Run every condition under ``rules.match`` semantics."""
     if not rules.enabled or not rules.conditions:
         return False
-    results = (
-        evaluate_condition(c, fields, docs_per_plan=docs_per_plan)
-        for c in rules.conditions
-    )
+    results = (evaluate_condition(c, fields, docs_per_plan=docs_per_plan) for c in rules.conditions)
     if rules.match == "all":
         return all(results)
     return any(results)
@@ -333,17 +335,13 @@ async def evaluate_pipeline_rules(
     runner has it in scope, so we avoid a second round-trip).
     """
     conv = (
-        await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
-        )
+        await session.execute(select(Conversation).where(Conversation.id == conversation_id))
     ).scalar_one_or_none()
     if conv is None:
         return EvaluationResult(moved=False, reason="conversation_not_found")
 
     customer = (
-        await session.execute(
-            select(Customer).where(Customer.id == conv.customer_id)
-        )
+        await session.execute(select(Customer).where(Customer.id == conv.customer_id))
     ).scalar_one_or_none()
 
     state = (

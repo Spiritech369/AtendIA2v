@@ -18,6 +18,7 @@ Lifecycle:
                         the body using LIVE extracted_data, enqueues
                         outbound, marks status=sent.
 """
+
 from datetime import UTC, datetime, timedelta
 from typing import Final
 from uuid import UUID
@@ -123,6 +124,7 @@ def render_followup_body(
     them; falls back to a generic line on unknown kinds so a misconfigured
     cron job degrades gracefully instead of blowing up.
     """
+
     def _val(name: str, default: str) -> str:
         v = extracted_data.get(name)
         if isinstance(v, dict):
@@ -138,9 +140,6 @@ def render_followup_body(
         modelo = _val("modelo_moto", "moto")
         plan = _val("plan_credito", "")
         plan_part = f" Tu plan {plan} sigue activo." if plan else ""
-        return (
-            f"Hola, ¿sigues en pie con tu {modelo}?{plan_part} "
-            "El único paso que falta eres tú."
-        )
+        return f"Hola, ¿sigues en pie con tu {modelo}?{plan_part} El único paso que falta eres tú."
     # Defensive default — a misconfigured kind shouldn't crash the worker.
     return "Hola, ¿seguimos con tu trámite? Aquí estoy si necesitas ayuda."

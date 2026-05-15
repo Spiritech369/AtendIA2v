@@ -9,6 +9,7 @@ This trades immediate cost (operator waits ~seconds for large tenants)
 against immediate complexity. If exports get slow, swap in the arq
 flow described in the plan as Phase 4.5.
 """
+
 from __future__ import annotations
 
 import csv
@@ -94,6 +95,7 @@ async def export_conversations(
     )
     for r in rows:
         ed = r.extracted_data or {}
+
         # extracted_data values are ExtractedField dicts; pluck `.value` if present.
         def _v(k: str) -> str:
             x = ed.get(k)

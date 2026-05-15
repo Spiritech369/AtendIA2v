@@ -5,6 +5,7 @@ me_without_cookie_401, login_unknown_email_constant_time.
 
 Uses the shared `client` and `operator_seed` fixtures from `conftest.py`.
 """
+
 from __future__ import annotations
 
 import time
@@ -47,9 +48,7 @@ def test_login_preserves_tenant_admin_role(client, tenant_admin_seed):
 
 def test_login_with_bad_password_returns_401(client, operator_seed):
     _, _, email, _ = operator_seed
-    resp = client.post(
-        "/api/v1/auth/login", json={"email": email, "password": "wrong-password"}
-    )
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": "wrong-password"})
     assert resp.status_code == 401
     assert SESSION_COOKIE not in resp.cookies
 
@@ -64,9 +63,9 @@ def test_logout_clears_cookie(client, operator_seed):
     assert logout.status_code == 200
     # Starlette emits Max-Age=0 on delete_cookie; assert that specifically.
     set_cookie_headers = logout.headers.get_list("set-cookie")
-    assert any(
-        SESSION_COOKIE in h and "Max-Age=0" in h for h in set_cookie_headers
-    ), set_cookie_headers
+    assert any(SESSION_COOKIE in h and "Max-Age=0" in h for h in set_cookie_headers), (
+        set_cookie_headers
+    )
 
 
 def test_logout_revokes_previous_jwt_server_side(client, operator_seed):
@@ -118,4 +117,4 @@ def test_login_unknown_email_runs_dummy_bcrypt(client):
     assert resp.status_code == 401
     # Should take meaningfully longer than a 5ms NotFound. Cost-12 bcrypt is
     # >100ms on modern CPUs; allow generous lower bound for slow CI.
-    assert elapsed > 0.05, f"login looked too fast for missing user: {elapsed*1000:.1f}ms"
+    assert elapsed > 0.05, f"login looked too fast for missing user: {elapsed * 1000:.1f}ms"

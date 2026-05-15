@@ -5,6 +5,7 @@ new download/retry routes, the reindex cooldown, and the test-endpoint
 rate limit. The Redis-backed limits are flushed between tests so we don't
 poison sibling cases.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -96,6 +97,7 @@ def test_retry_rejects_processing_status(client_tenant_admin) -> None:
 
 def test_retry_after_error_state_works(client_tenant_admin) -> None:
     doc = _upload_pdf(client_tenant_admin)
+
     # Force the row into the 'error' state directly via DB.
     async def _to_error() -> None:
         from sqlalchemy import text
@@ -156,6 +158,9 @@ def test_delete_document_db_first(client_tenant_admin) -> None:
         f"/api/v1/knowledge/documents/{doc['id']}",
     )
     assert resp.status_code == 204
-    assert client_tenant_admin.get(
-        f"/api/v1/knowledge/documents/{doc['id']}",
-    ).status_code == 404
+    assert (
+        client_tenant_admin.get(
+            f"/api/v1/knowledge/documents/{doc['id']}",
+        ).status_code
+        == 404
+    )

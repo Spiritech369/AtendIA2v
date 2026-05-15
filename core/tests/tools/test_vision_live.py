@@ -2,6 +2,7 @@
 
 Costo ~$0.005 por test (3 tests = ~$0.015 por corrida completa).
 """
+
 import os
 
 import pytest
@@ -37,9 +38,11 @@ def _api_key() -> str:
 async def test_live_classify_ine_public_image() -> None:
     """Imagen pública de INE → category=INE con confidence alta."""
     from openai import AsyncOpenAI
+
     client = AsyncOpenAI(api_key=_api_key())
     result, _, _, cost, _ = await classify_image(
-        client=client, image_url=_INE_TEST_URL,
+        client=client,
+        image_url=_INE_TEST_URL,
     )
     assert result.category == VisionCategory.INE
     assert result.confidence > 0.5
@@ -50,9 +53,11 @@ async def test_live_classify_ine_public_image() -> None:
 async def test_live_classify_moto_image() -> None:
     """Foto de moto → category=MOTO."""
     from openai import AsyncOpenAI
+
     client = AsyncOpenAI(api_key=_api_key())
     result, _, _, _, _ = await classify_image(
-        client=client, image_url=_MOTO_TEST_URL,
+        client=client,
+        image_url=_MOTO_TEST_URL,
     )
     assert result.category == VisionCategory.MOTO
 
@@ -61,8 +66,10 @@ async def test_live_classify_moto_image() -> None:
 async def test_live_classify_unrelated_image() -> None:
     """Imagen abstracta/decorativa → category=UNRELATED."""
     from openai import AsyncOpenAI
+
     client = AsyncOpenAI(api_key=_api_key())
     result, _, _, _, _ = await classify_image(
-        client=client, image_url=_UNRELATED_TEST_URL,
+        client=client,
+        image_url=_UNRELATED_TEST_URL,
     )
     assert result.category == VisionCategory.UNRELATED

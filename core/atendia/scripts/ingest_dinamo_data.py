@@ -14,6 +14,7 @@ Usage:
     PYTHONPATH=. uv run python -m atendia.scripts.ingest_dinamo_data \\
         --tenant-id <uuid> --docs-dir ../docs [--dry-run]
 """
+
 import argparse
 import asyncio
 import json
@@ -62,18 +63,20 @@ def _flatten_catalog(catalog_json: dict) -> list[dict[str, Any]]:
         for modelo in cat_block.get("modelos", []):
             sku = _slugify(modelo["modelo"])
             precios = modelo.get("precios") or {}
-            items.append({
-                "sku": sku,
-                "name": modelo["modelo"],
-                "category": category,
-                "attrs": {
-                    "alias": modelo.get("alias", []),
-                    "ficha_tecnica": modelo.get("ficha_tecnica", {}),
-                    "precio_lista": str(precios.get("lista", "0")),
-                    "precio_contado": str(precios.get("contado", "0")),
-                    "planes_credito": modelo.get("planes_credito", {}),
-                },
-            })
+            items.append(
+                {
+                    "sku": sku,
+                    "name": modelo["modelo"],
+                    "category": category,
+                    "attrs": {
+                        "alias": modelo.get("alias", []),
+                        "ficha_tecnica": modelo.get("ficha_tecnica", {}),
+                        "precio_lista": str(precios.get("lista", "0")),
+                        "precio_contado": str(precios.get("contado", "0")),
+                        "planes_credito": modelo.get("planes_credito", {}),
+                    },
+                }
+            )
     return items
 
 
@@ -176,15 +179,9 @@ async def _main(tenant_id: UUID, docs_dir: Path, dry_run: bool) -> int:
         print("ATENDIA_V2_OPENAI_API_KEY not set", file=sys.stderr)
         return 1
 
-    catalog_json = json.loads(
-        (docs_dir / "CATALOGO_MODELOS.json").read_text(encoding="utf-8")
-    )
-    faq_json = json.loads(
-        (docs_dir / "FAQ_CREDITO.json").read_text(encoding="utf-8")
-    )
-    plans_json = json.loads(
-        (docs_dir / "REQUISITOS_PLANES.json").read_text(encoding="utf-8")
-    )
+    catalog_json = json.loads((docs_dir / "CATALOGO_MODELOS.json").read_text(encoding="utf-8"))
+    faq_json = json.loads((docs_dir / "FAQ_CREDITO.json").read_text(encoding="utf-8"))
+    plans_json = json.loads((docs_dir / "REQUISITOS_PLANES.json").read_text(encoding="utf-8"))
 
     catalog_items = _flatten_catalog(catalog_json)
     faqs = faq_json.get("faq", [])
@@ -201,10 +198,12 @@ async def _main(tenant_id: UUID, docs_dir: Path, dry_run: bool) -> int:
     print("Generating embeddings...")
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     cat_embs, cat_tokens, cat_cost = await generate_embeddings_batch(
-        client=client, texts=catalog_texts,
+        client=client,
+        texts=catalog_texts,
     )
     faq_embs, faq_tokens, faq_cost = await generate_embeddings_batch(
-        client=client, texts=faq_texts,
+        client=client,
+        texts=faq_texts,
     )
     total_tokens = cat_tokens + faq_tokens
     total_cost = cat_cost + faq_cost
@@ -217,27 +216,36 @@ async def _main(tenant_id: UUID, docs_dir: Path, dry_run: bool) -> int:
     factory = _get_factory()
     async with factory() as session:
         for item, emb in zip(catalog_items, cat_embs, strict=True):
-            await session.execute(text(_INSERT_CATALOG_SQL), {
-                "t": tenant_id,
-                "sku": item["sku"],
-                "n": item["name"],
-                "cat": item["category"],
-                "a": json.dumps(item["attrs"]),
-                "e": _vec_to_pg_text(emb),
-            })
+            await session.execute(
+                text(_INSERT_CATALOG_SQL),
+                {
+                    "t": tenant_id,
+                    "sku": item["sku"],
+                    "n": item["name"],
+                    "cat": item["category"],
+                    "a": json.dumps(item["attrs"]),
+                    "e": _vec_to_pg_text(emb),
+                },
+            )
         for faq, emb in zip(faqs, faq_embs, strict=True):
             tags = faq.get("documentos") or []
-            await session.execute(text(_INSERT_FAQ_SQL), {
+            await session.execute(
+                text(_INSERT_FAQ_SQL),
+                {
+                    "t": tenant_id,
+                    "q": faq["pregunta"],
+                    "a": faq["respuesta"],
+                    "tags": json.dumps(tags),
+                    "e": _vec_to_pg_text(emb),
+                },
+            )
+        await session.execute(
+            text(_UPDATE_BRANDING_PLANS_SQL),
+            {
                 "t": tenant_id,
-                "q": faq["pregunta"],
-                "a": faq["respuesta"],
-                "tags": json.dumps(tags),
-                "e": _vec_to_pg_text(emb),
-            })
-        await session.execute(text(_UPDATE_BRANDING_PLANS_SQL), {
-            "t": tenant_id,
-            "p": json.dumps(planes),
-        })
+                "p": json.dumps(planes),
+            },
+        )
         await session.commit()
     print(f"Done. Total cost: ${total_cost}")
     return 0
@@ -247,8 +255,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tenant-id", type=UUID, required=True)
     parser.add_argument("--docs-dir", type=Path, required=True)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Generate embeddings + report cost, skip DB writes")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Generate embeddings + report cost, skip DB writes"
+    )
     args = parser.parse_args()
     return asyncio.run(_main(args.tenant_id, args.docs_dir, args.dry_run))
 

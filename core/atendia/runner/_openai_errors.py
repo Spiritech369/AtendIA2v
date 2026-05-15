@@ -12,6 +12,7 @@ Note on order: catch _RETRIABLE FIRST, _NON_RETRIABLE second.
 RateLimitError/InternalServerError are subclasses of APIStatusError;
 listing _NON_RETRIABLE first would route 429/5xx to the fail-fast path.
 """
+
 from openai import (
     APIConnectionError,
     APIStatusError,

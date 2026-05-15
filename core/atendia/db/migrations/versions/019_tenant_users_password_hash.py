@@ -11,6 +11,7 @@ Existing rows: column is NULLABLE — pre-Phase-4 users have no hash yet
 and must go through a one-time setup flow (TBD; for now, a superadmin
 seed script writes hashes directly). Login rejects rows with NULL hash.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

@@ -15,6 +15,7 @@ Resume-bot path flips the flag back to False; next inbound runs normally.
 Existing rows: server_default=false so all current conversations remain
 bot-driven. No backfill required.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

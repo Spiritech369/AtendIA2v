@@ -4,6 +4,7 @@ Revision ID: i6d7e8f9a0b1
 Revises: h5c6d7e8f9a0
 Create Date: 2026-05-13
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -53,12 +54,8 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["customer_id"], ["customers.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["conversation_id"], ["conversations.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["decided_by_user_id"], ["tenant_users.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["decided_by_user_id"], ["tenant_users.id"], ondelete="SET NULL"),
         sa.CheckConstraint(
             "status IN ('pending','accepted','rejected')",
             name="ck_field_suggestions_status",

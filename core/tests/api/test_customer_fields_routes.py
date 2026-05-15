@@ -1,4 +1,5 @@
 """Step 1 — customer field definitions + values: tenant scoping, CSRF, lifecycle."""
+
 from __future__ import annotations
 
 import asyncio

@@ -11,7 +11,9 @@ from atendia.runner.composer_protocol import (
 
 def test_composer_input_minimal():
     inp = ComposerInput(
-        action="greet", current_stage="greeting", tone=Tone(),
+        action="greet",
+        current_stage="greeting",
+        tone=Tone(),
     )
     assert inp.action == "greet"
     assert inp.action_payload == {}
@@ -48,8 +50,12 @@ async def test_protocol_satisfied_by_dummy():
             return ComposerOutput(messages=["x"]), None
 
     composer: ComposerProvider = Dummy()
-    out, usage = await composer.compose(input=ComposerInput(
-        action="x", current_stage="x", tone=Tone(),
-    ))
+    out, usage = await composer.compose(
+        input=ComposerInput(
+            action="x",
+            current_stage="x",
+            tone=Tone(),
+        )
+    )
     assert out.messages == ["x"]
     assert usage is None

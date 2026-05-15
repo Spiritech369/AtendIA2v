@@ -12,6 +12,7 @@ The actual `vector` -> `halfvec` cast for storage happens at the edge
 (model-mapped column `HALFVEC(3072)` does it transparently), so we deal
 in plain `list[float]` here.
 """
+
 from decimal import Decimal
 
 from openai import AsyncOpenAI

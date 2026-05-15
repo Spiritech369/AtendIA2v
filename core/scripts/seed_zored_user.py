@@ -11,6 +11,7 @@ PipelineNotFoundError).
 Run from `core/`:
     uv run python scripts/seed_zored_user.py
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -76,7 +77,11 @@ CREDITO_DINAMO_PIPELINE = {
                 "match": "all",
                 "conditions": [
                     {"field": "DOCS_INE.status", "operator": "equals", "value": "ok"},
-                    {"field": "DOCS_COMPROBANTE_DOMICILIO.status", "operator": "equals", "value": "ok"},
+                    {
+                        "field": "DOCS_COMPROBANTE_DOMICILIO.status",
+                        "operator": "equals",
+                        "value": "ok",
+                    },
                     {"field": "DOCS_ESTADOS_CUENTA.status", "operator": "equals", "value": "ok"},
                     {"field": "DOCS_RECIBOS_NOMINA.status", "operator": "equals", "value": "ok"},
                 ],
@@ -120,10 +125,7 @@ async def main() -> None:
             uid, tid = existing
             # Update password just in case
             await conn.execute(
-                text(
-                    "UPDATE tenant_users SET password_hash = :h, role = :r "
-                    "WHERE id = :u"
-                ),
+                text("UPDATE tenant_users SET password_hash = :h, role = :r WHERE id = :u"),
                 {"h": hash_password(PASSWORD), "r": ROLE, "u": uid},
             )
             # Ensure the starter pipeline exists. Idempotent: if any
@@ -132,9 +134,7 @@ async def main() -> None:
             # when truly empty.
             pipeline_count = (
                 await conn.execute(
-                    text(
-                        "SELECT COUNT(*) FROM tenant_pipelines WHERE tenant_id = :t"
-                    ),
+                    text("SELECT COUNT(*) FROM tenant_pipelines WHERE tenant_id = :t"),
                     {"t": tid},
                 )
             ).scalar_one()
@@ -162,10 +162,7 @@ async def main() -> None:
         # Create a fresh tenant — explicitly NOT a demo so no auto-seeding.
         tenant_id = (
             await conn.execute(
-                text(
-                    "INSERT INTO tenants (name, is_demo) "
-                    "VALUES (:n, false) RETURNING id"
-                ),
+                text("INSERT INTO tenants (name, is_demo) VALUES (:n, false) RETURNING id"),
                 {"n": TENANT_NAME},
             )
         ).scalar()

@@ -16,6 +16,7 @@ def clean_registry():
 def test_register_and_get_tool():
     class FakeTool(Tool):
         name = "fake"
+
         async def run(self, session, **kwargs):
             return {"ok": True}
 

@@ -35,7 +35,8 @@ def test_unknown_agent_still_includes_base_and_safety_blocks():
 def test_chunks_serialized_inside_fuente_envelope():
     cid = uuid4()
     p = build_prompt(
-        "?", "duda_general",
+        "?",
+        "duda_general",
         [_chunk(source_id=cid, score=0.91, collection="requisitos")],
         SafeAnswerSettings(),
     )

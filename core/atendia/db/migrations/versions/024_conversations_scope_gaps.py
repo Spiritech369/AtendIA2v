@@ -7,6 +7,7 @@ Create Date: 2026-05-08
 Adds assigned_user_id, unread_count, tags, deleted_at to conversations
 for v1 parity: agent assignment, unread badges, free-form tags, soft delete.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

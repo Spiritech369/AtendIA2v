@@ -5,6 +5,7 @@ The endpoint exposes legacy fields (`whatsapp_status`, `circuit_breaker_open`,
 (`active_channel`, `channels`) so the badge can render which transport is
 serving the tenant.
 """
+
 from __future__ import annotations
 
 import asyncio

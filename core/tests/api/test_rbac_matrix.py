@@ -11,6 +11,7 @@ refactor that drops `Depends(require_tenant_admin)` from a whole file gets
 caught here. Endpoint-specific RBAC (e.g. users superadmin-only) lives in its
 own file (`test_users_rbac.py`).
 """
+
 from __future__ import annotations
 
 import pytest

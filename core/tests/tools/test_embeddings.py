@@ -4,6 +4,7 @@ The wrapper is the single chokepoint where every text -> vector conversion
 happens, so this is also where cost accounting lives. Tests are mock-only
 (respx) — live calls happen in T15's ingestion run.
 """
+
 from decimal import Decimal
 
 import pytest
@@ -25,8 +26,7 @@ def _ok_embeddings_response(num: int, dim: int = 3072, total_tokens: int = 100) 
         json={
             "object": "list",
             "data": [
-                {"object": "embedding", "index": i, "embedding": [0.1] * dim}
-                for i in range(num)
+                {"object": "embedding", "index": i, "embedding": [0.1] * dim} for i in range(num)
             ],
             "model": "text-embedding-3-large",
             "usage": {"prompt_tokens": total_tokens, "total_tokens": total_tokens},
@@ -56,7 +56,8 @@ async def test_generate_embeddings_batch() -> None:
     )
     client = AsyncOpenAI(api_key="sk-test")
     embs, tokens, cost = await generate_embeddings_batch(
-        client=client, texts=[f"texto {i}" for i in range(50)],
+        client=client,
+        texts=[f"texto {i}" for i in range(50)],
     )
     assert len(embs) == 50
     assert all(len(e) == 3072 for e in embs)

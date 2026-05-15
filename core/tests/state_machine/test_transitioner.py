@@ -24,7 +24,9 @@ def pipeline():
                 required_fields=["interes_producto", "ciudad"],
                 actions_allowed=["ask_field"],
                 transitions=[
-                    Transition(to="quote", when="all_required_fields_present AND intent == ask_price"),
+                    Transition(
+                        to="quote", when="all_required_fields_present AND intent == ask_price"
+                    ),
                     Transition(to="escalate", when="sentiment == negative AND turn_count > 3"),
                 ],
             ),
@@ -37,31 +39,59 @@ def pipeline():
 
 
 def test_no_transition_when_no_condition_met(pipeline):
-    nlu = NLUResult(intent=Intent.GREETING, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.9, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.GREETING,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
     assert next_stage(pipeline, "greeting", nlu, extracted_data={}, turn_count=0) == "greeting"
 
 
 def test_transition_greeting_to_qualify(pipeline):
-    nlu = NLUResult(intent=Intent.ASK_INFO, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.9, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_INFO,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
     assert next_stage(pipeline, "greeting", nlu, extracted_data={}, turn_count=1) == "qualify"
 
 
 def test_transition_qualify_to_quote_when_fields_complete(pipeline):
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.9, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
     extracted = {"interes_producto": "150Z", "ciudad": "CDMX"}
     assert next_stage(pipeline, "qualify", nlu, extracted_data=extracted, turn_count=2) == "quote"
 
 
 def test_no_transition_qualify_when_fields_incomplete(pipeline):
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.9, ambiguities=[])
-    assert next_stage(pipeline, "qualify", nlu, extracted_data={"ciudad": "CDMX"}, turn_count=2) == "qualify"
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
+    assert (
+        next_stage(pipeline, "qualify", nlu, extracted_data={"ciudad": "CDMX"}, turn_count=2)
+        == "qualify"
+    )
 
 
 def test_transition_to_escalate_on_negative_sentiment(pipeline):
-    nlu = NLUResult(intent=Intent.COMPLAIN, entities={}, sentiment=Sentiment.NEGATIVE,
-                    confidence=0.8, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.COMPLAIN,
+        entities={},
+        sentiment=Sentiment.NEGATIVE,
+        confidence=0.8,
+        ambiguities=[],
+    )
     assert next_stage(pipeline, "qualify", nlu, extracted_data={}, turn_count=4) == "escalate"

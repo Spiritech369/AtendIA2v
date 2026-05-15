@@ -10,6 +10,7 @@ inside the note body — a duplicate enqueue against the same conversation
 + same most-recent-message returns ``{"status": "duplicate"}`` without
 inserting a second note. Retry-from-failed uses the same marker.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -56,13 +57,17 @@ async def force_summary(ctx: dict, conversation_id: str) -> dict:
                 return {"status": "missing"}
 
             messages = (
-                await session.execute(
-                    select(MessageRow)
-                    .where(MessageRow.conversation_id == conv.id)
-                    .order_by(MessageRow.sent_at.desc())
-                    .limit(SUMMARY_MAX_MESSAGES)
+                (
+                    await session.execute(
+                        select(MessageRow)
+                        .where(MessageRow.conversation_id == conv.id)
+                        .order_by(MessageRow.sent_at.desc())
+                        .limit(SUMMARY_MAX_MESSAGES)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             high_water = str(messages[0].id) if messages else "empty"
 
             existing = (
@@ -94,8 +99,7 @@ async def force_summary(ctx: dict, conversation_id: str) -> dict:
                     author_user_id=None,
                     source="ai_summary",
                     content=(
-                        f"{header}\n\n{summary[:3500]}\n\n"
-                        f"high_water:{high_water}\nmode:{mode}"
+                        f"{header}\n\n{summary[:3500]}\n\nhigh_water:{high_water}\nmode:{mode}"
                     ),
                     pinned=False,
                 )

@@ -45,9 +45,7 @@ async def test_ws_receives_published_event(redis_client):
 
     def _connect_and_receive():
         client = TestClient(app)
-        with client.websocket_connect(
-            f"/ws/conversations/{conv_id}?token={token}"
-        ) as ws:
+        with client.websocket_connect(f"/ws/conversations/{conv_id}?token={token}") as ws:
             # Wait briefly for the handler to subscribe to Redis
             received.append("ready")
             # Receive one message (will block up to default timeout)

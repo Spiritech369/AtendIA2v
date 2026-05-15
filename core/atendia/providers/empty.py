@@ -7,6 +7,7 @@ the UI shows an empty state instead of a 501 Internal Server Error.
 When a real provider is built (DB-backed advisors, vehicles, WhatsApp
 messaging), `_deps.py` should switch from `EmptyXxxProvider` to it.
 """
+
 from __future__ import annotations
 
 from uuid import UUID

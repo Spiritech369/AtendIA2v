@@ -6,6 +6,7 @@ POST /api/v1/auth/logout   — clears both cookies
 POST /api/v1/auth/refresh  — rotates session cookie if current is valid
 GET  /api/v1/auth/me       — returns current user claims
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -151,6 +152,4 @@ async def refresh(request: Request, response: Response) -> LoginResponse:
 
 @router.get("/me", response_model=UserResponse)
 async def me(user: AuthUser = Depends(get_current_user)) -> UserResponse:
-    return UserResponse(
-        id=user.user_id, tenant_id=user.tenant_id, role=user.role, email=user.email
-    )
+    return UserResponse(id=user.user_id, tenant_id=user.tenant_id, role=user.role, email=user.email)

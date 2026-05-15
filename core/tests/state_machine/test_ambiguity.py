@@ -4,23 +4,35 @@ from atendia.state_machine.ambiguity import is_ambiguous, AMBIGUITY_CONFIDENCE_T
 
 
 def test_high_confidence_no_ambiguities_is_not_ambiguous():
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={},
-                    sentiment=Sentiment.NEUTRAL, confidence=0.92, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.92,
+        ambiguities=[],
+    )
     assert is_ambiguous(nlu) is False
 
 
 def test_low_confidence_is_ambiguous():
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={},
-                    sentiment=Sentiment.NEUTRAL,
-                    confidence=AMBIGUITY_CONFIDENCE_THRESHOLD - 0.05,
-                    ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=AMBIGUITY_CONFIDENCE_THRESHOLD - 0.05,
+        ambiguities=[],
+    )
     assert is_ambiguous(nlu) is True
 
 
 def test_explicit_ambiguity_is_ambiguous():
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={},
-                    sentiment=Sentiment.NEUTRAL, confidence=0.95,
-                    ambiguities=["could be 150Z or 250Z"])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.95,
+        ambiguities=["could be 150Z or 250Z"],
+    )
     assert is_ambiguous(nlu) is True
 
 

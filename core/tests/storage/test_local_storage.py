@@ -9,6 +9,7 @@ Focus: the safety surface that the KB routes rely on.
 - Magic-byte sniffer: the bytes of a file have to agree with its declared
   extension before save() writes anything.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

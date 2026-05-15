@@ -31,6 +31,7 @@ Exit codes:
 This script seeds a temporary tenant tagged ``e2e_meta_<uuid>`` and deletes
 it on the way out (CASCADE handles the rest), so it's safe to run repeatedly.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -106,19 +107,18 @@ async def _seed(engine, tenant_id: UUID) -> tuple[UUID, UUID]:
     """Insert tenant + customer + active workflow. Returns (customer_id, workflow_id)."""
     async with engine.begin() as conn:
         await conn.execute(
-            text(
-                "INSERT INTO tenants (id, name, config) "
-                "VALUES (:id, :n, :cfg)"
-            ),
+            text("INSERT INTO tenants (id, name, config) VALUES (:id, :n, :cfg)"),
             {
                 "id": tenant_id,
                 "n": f"e2e_meta_{uuid4().hex[:8]}",
-                "cfg": json.dumps({
-                    "meta": {
-                        "phone_number_id": PHONE_NUMBER_ID,
-                        "verify_token": "ignored-by-this-test",
+                "cfg": json.dumps(
+                    {
+                        "meta": {
+                            "phone_number_id": PHONE_NUMBER_ID,
+                            "verify_token": "ignored-by-this-test",
+                        }
                     }
-                }),
+                ),
             },
         )
         # The webhook handler also looks up the customer by phone, creates one
@@ -228,8 +228,7 @@ async def main() -> int:
             events = (
                 await session.execute(
                     text(
-                        "SELECT id, type FROM events "
-                        "WHERE tenant_id = :t ORDER BY occurred_at DESC"
+                        "SELECT id, type FROM events WHERE tenant_id = :t ORDER BY occurred_at DESC"
                     ),
                     {"t": tenant_id},
                 )
@@ -269,6 +268,7 @@ async def main() -> int:
         # message-action step itself just enqueues. We exercise the engine
         # directly to surface any internal error.
         from atendia.workflows.engine import execute_workflow
+
         async with factory() as session:
             for e in execs:
                 exec_row = (

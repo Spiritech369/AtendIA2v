@@ -5,6 +5,7 @@ across all four content types. The seed script (Task 10) writes 9
 defaults; this endpoint set lets the operator add/rename/delete
 custom collections beyond the defaults.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -52,8 +53,12 @@ class CollectionPatch(BaseModel):
 
 def _to_item(row: KbCollection) -> CollectionItem:
     return CollectionItem(
-        id=row.id, name=row.name, slug=row.slug,
-        description=row.description, icon=row.icon, color=row.color,
+        id=row.id,
+        name=row.name,
+        slug=row.slug,
+        description=row.description,
+        icon=row.icon,
+        color=row.color,
     )
 
 
@@ -64,12 +69,16 @@ async def list_collections(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CollectionItem]:
     rows = (
-        await session.execute(
-            select(KbCollection)
-            .where(KbCollection.tenant_id == tenant_id)
-            .order_by(KbCollection.name.asc())
+        (
+            await session.execute(
+                select(KbCollection)
+                .where(KbCollection.tenant_id == tenant_id)
+                .order_by(KbCollection.name.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_to_item(r) for r in rows]
 
 
@@ -82,8 +91,11 @@ async def create_collection(
 ) -> CollectionItem:
     row = KbCollection(
         tenant_id=tenant_id,
-        name=body.name, slug=body.slug, description=body.description,
-        icon=body.icon, color=body.color,
+        name=body.name,
+        slug=body.slug,
+        description=body.description,
+        icon=body.icon,
+        color=body.color,
     )
     session.add(row)
     try:
@@ -91,7 +103,9 @@ async def create_collection(
     except IntegrityError:
         raise HTTPException(status.HTTP_409_CONFLICT, "slug ya existe en este tenant")
     await emit_admin_event(
-        session, tenant_id=tenant_id, actor_user_id=user.user_id,
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
         action="kb.collection.created",
         payload={"id": str(row.id), "slug": row.slug, "name": row.name},
     )
@@ -127,7 +141,9 @@ async def update_collection(
         .values(**patch_data)
     )
     await emit_admin_event(
-        session, tenant_id=tenant_id, actor_user_id=user.user_id,
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
         action="kb.collection.updated",
         payload={"id": str(collection_id), "patch": patch_data},
     )
@@ -151,7 +167,9 @@ async def delete_collection(
     if result.scalar_one_or_none() is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "colección no encontrada")
     await emit_admin_event(
-        session, tenant_id=tenant_id, actor_user_id=user.user_id,
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
         action="kb.collection.deleted",
         payload={"id": str(collection_id)},
     )

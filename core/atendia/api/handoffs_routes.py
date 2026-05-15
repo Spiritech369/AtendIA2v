@@ -5,6 +5,7 @@ HandoffSummary (`human_handoffs.payload`, populated by Phase 3c.2
 escalations) so the dashboard can render reason, customer context,
 and suggested-next-action without an extra fetch.
 """
+
 from __future__ import annotations
 
 import base64

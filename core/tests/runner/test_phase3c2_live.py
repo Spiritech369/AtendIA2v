@@ -16,6 +16,7 @@ These tests defend the contracts that respx-mocked tests can't:
 We do NOT exercise the Vision API path here — that's covered by
 tests/tools/test_vision_live.py (separately gated, separate URLs).
 """
+
 import os
 import re
 
@@ -53,6 +54,7 @@ _BRAND = {
 
 def _api_key() -> str:
     from atendia.config import get_settings
+
     api_key = get_settings().openai_api_key
     assert api_key, "set ATENDIA_V2_OPENAI_API_KEY for live tests"
     return api_key
@@ -65,11 +67,17 @@ def _composer() -> OpenAIComposer:
 @pytest.mark.asyncio
 async def test_live_PLAN_first_turn_hook() -> None:  # noqa: N802
     """PLAN MODE turn 1 + empty extracted_data → hook about $3,500 enganche."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="micro_cotizacion", flow_mode=FlowMode.PLAN,
-        current_stage="plan", turn_number=1,
-        extracted_data={}, tone=_DINAMO_TONE, brand_facts=_BRAND,
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="micro_cotizacion",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            turn_number=1,
+            extracted_data={},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        )
+    )
     text = " ".join(out.messages).lower()
     # Step 0 mentions "enganche desde $3,500" or asks about employment.
     assert "enganche" in text or "empleo" in text
@@ -78,48 +86,67 @@ async def test_live_PLAN_first_turn_hook() -> None:  # noqa: N802
 @pytest.mark.asyncio
 async def test_live_SALES_quote_uses_real_price_no_invention() -> None:  # noqa: N802
     """SALES with status=ok must echo the real price, not hallucinate."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="quote", flow_mode=FlowMode.SALES,
-        current_stage="sales", turn_number=5,
-        action_payload={
-            "status": "ok",
-            "name": "Adventure Elite 150 CC",
-            "price_lista_mxn": "31395",
-            "price_contado_mxn": "29900",
-            "planes_credito": {"plan_10": {"enganche": 3140,
-                                            "pago_quincenal": 1247,
-                                            "quincenas": 72}},
-        },
-        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="quote",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            turn_number=5,
+            action_payload={
+                "status": "ok",
+                "name": "Adventure Elite 150 CC",
+                "price_lista_mxn": "31395",
+                "price_contado_mxn": "29900",
+                "planes_credito": {
+                    "plan_10": {"enganche": 3140, "pago_quincenal": 1247, "quincenas": 72}
+                },
+            },
+            extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        )
+    )
     text = " ".join(out.messages)
     # Must reference the real price (allow either form: $29,900 or 29900).
     assert "29,900" in text or "29900" in text or "$29" in text
     # Must NOT invent a different price (no other 5-digit numbers from a
     # plausible price range).
-    other_prices = [m for m in re.findall(r"\$?\d{2},?\d{3}", text)
-                    if "29" not in m and "31" not in m and "3,140" not in m
-                       and "3140" not in m and "1,247" not in m
-                       and "1247" not in m]
+    other_prices = [
+        m
+        for m in re.findall(r"\$?\d{2},?\d{3}", text)
+        if "29" not in m
+        and "31" not in m
+        and "3,140" not in m
+        and "3140" not in m
+        and "1,247" not in m
+        and "1247" not in m
+    ]
     assert not other_prices, f"invented prices: {other_prices}"
 
 
 @pytest.mark.asyncio
 async def test_live_DOC_unrelated_image_refuses_to_mark() -> None:  # noqa: N802
     """DOC with vision_result=moto must NOT claim INE was received."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="reject_unrelated", flow_mode=FlowMode.DOC,
-        current_stage="doc", turn_number=7,
-        action_payload={
-            "vision_result": {"category": "moto", "confidence": 0.92,
-                              "metadata": {"modelo": "Adventure 150"}},
-            "expected_doc": "ine",
-            "pending_after": [],
-        },
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="reject_unrelated",
+            flow_mode=FlowMode.DOC,
+            current_stage="doc",
+            turn_number=7,
+            action_payload={
+                "vision_result": {
+                    "category": "moto",
+                    "confidence": 0.92,
+                    "metadata": {"modelo": "Adventure 150"},
+                },
+                "expected_doc": "ine",
+                "pending_after": [],
+            },
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        )
+    )
     text = " ".join(out.messages).lower()
     # Must NOT have the "INE recibida ✅" pattern.
     assert "ine ✅" not in text
@@ -131,12 +158,17 @@ async def test_live_DOC_unrelated_image_refuses_to_mark() -> None:  # noqa: N802
 @pytest.mark.asyncio
 async def test_live_OBSTACLE_first_turn_disambiguates_blocker() -> None:  # noqa: N802
     """OBSTACLE asks which doc is the blocker (comprobante vs nóminas)."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="address_obstacle", flow_mode=FlowMode.OBSTACLE,
-        current_stage="plan", turn_number=8,
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts={},  # OBSTACLE skips brand_facts
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="address_obstacle",
+            flow_mode=FlowMode.OBSTACLE,
+            current_stage="plan",
+            turn_number=8,
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts={},  # OBSTACLE skips brand_facts
+        )
+    )
     text = " ".join(out.messages).lower()
     # First-turn-in-OBSTACLE template asks about comprobante or nóminas.
     assert "comprobante" in text or "nómina" in text or "nomina" in text
@@ -145,12 +177,17 @@ async def test_live_OBSTACLE_first_turn_disambiguates_blocker() -> None:  # noqa
 @pytest.mark.asyncio
 async def test_live_RETENTION_keeps_canonical_hook() -> None:  # noqa: N802
     """RETENTION must use the 'gracias' rationale, not start a new flow."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="retention_pitch", flow_mode=FlowMode.RETENTION,
-        current_stage="sales", turn_number=6,
-        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
-        tone=_DINAMO_TONE, brand_facts={},
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="retention_pitch",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            turn_number=6,
+            extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+            tone=_DINAMO_TONE,
+            brand_facts={},
+        )
+    )
     text = " ".join(out.messages).lower()
     # The retention prompt's signature: 'gracias' + 'aclarar'/'después'.
     assert "gracias" in text
@@ -160,14 +197,19 @@ async def test_live_RETENTION_keeps_canonical_hook() -> None:  # noqa: N802
 @pytest.mark.asyncio
 async def test_live_SUPPORT_honors_brand_facts_on_no_data() -> None:  # noqa: N802
     """SUPPORT with status=no_data falls back to brand_facts (buró etc.)."""
-    out, _ = await _composer().compose(input=ComposerInput(
-        action="explain_topic", flow_mode=FlowMode.SUPPORT,
-        current_stage="plan", turn_number=2,
-        action_payload={"status": "no_data", "hint": "no FAQ match"},
-        extracted_data={},
-        history=[("inbound", "qué tal con buró?")],
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    ))
+    out, _ = await _composer().compose(
+        input=ComposerInput(
+            action="explain_topic",
+            flow_mode=FlowMode.SUPPORT,
+            current_stage="plan",
+            turn_number=2,
+            action_payload={"status": "no_data", "hint": "no FAQ match"},
+            extracted_data={},
+            history=[("inbound", "qué tal con buró?")],
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        )
+    )
     text = " ".join(out.messages).lower()
     # brand_facts.buro_max_amount is "$50 mil" — must appear or LLM
     # must redirect; check at least one signal.

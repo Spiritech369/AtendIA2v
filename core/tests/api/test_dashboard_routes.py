@@ -4,6 +4,7 @@ The frontend now polls this every 60s and renders 4 stat cards, a 7-day
 inbound/outbound chart, today's appointments and the 10 most-recent
 conversations. We make sure each piece is correct under realistic seed data.
 """
+
 from __future__ import annotations
 
 import asyncio

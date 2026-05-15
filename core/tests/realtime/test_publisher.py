@@ -43,4 +43,7 @@ async def test_publish_event_sends_json_on_correct_channel(redis_client):
 
 def test_channel_for_format():
     assert channel_for(tenant_id="abc", conversation_id="xyz") == "tenant:abc:conversation:xyz"
-    assert channel_for(tenant_id="dinamomotos", conversation_id="conv-uuid") == "tenant:dinamomotos:conversation:conv-uuid"
+    assert (
+        channel_for(tenant_id="dinamomotos", conversation_id="conv-uuid")
+        == "tenant:dinamomotos:conversation:conv-uuid"
+    )

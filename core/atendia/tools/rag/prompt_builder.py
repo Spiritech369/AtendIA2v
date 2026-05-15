@@ -6,6 +6,7 @@ The user message stays as-is; the chunks are serialized into a
 ``<fuente type=… id=… collection=… score=…>`` envelope so the model
 treats them as data, not instructions.
 """
+
 from __future__ import annotations
 
 from atendia.tools.rag.provider import PromptInput
@@ -36,10 +37,7 @@ AGENT_PROMPTS: dict[str, str] = {
         "Responde sobre FAQs, garantía, ubicación y políticas. "
         "Si detectas conflicto entre fuentes, escala al asesor."
     ),
-    "postventa": (
-        "Responde sobre garantía, entrega y servicio. "
-        "NO cotices ventas nuevas."
-    ),
+    "postventa": ("Responde sobre garantía, entrega y servicio. NO cotices ventas nuevas."),
 }
 
 SAFETY_BLOCK = (
@@ -75,9 +73,7 @@ def build_prompt(
     temperature: float = 0.2,
 ) -> PromptInput:
     """Assemble PromptInput for the configured provider."""
-    system = "\n\n".join(
-        [BASE_SYSTEM, AGENT_PROMPTS.get(agent, ""), SAFETY_BLOCK]
-    )
+    system = "\n\n".join([BASE_SYSTEM, AGENT_PROMPTS.get(agent, ""), SAFETY_BLOCK])
     context = "\n".join(
         f"<fuente type={c.source_type} id={c.source_id} "
         f"collection={c.collection or '-'} score={c.score:.3f}>\n"

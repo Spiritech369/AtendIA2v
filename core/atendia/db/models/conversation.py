@@ -13,13 +13,19 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
-    customer_id: Mapped[UUID] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    customer_id: Mapped[UUID] = mapped_column(
+        ForeignKey("customers.id", ondelete="CASCADE"), index=True
+    )
     channel: Mapped[str] = mapped_column(String(40), default="whatsapp_meta")
     status: Mapped[str] = mapped_column(String(20), default="active")
     current_stage: Mapped[str] = mapped_column(String(60), default="greeting")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     assigned_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -30,7 +36,9 @@ class Conversation(Base):
     tags: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    state: Mapped["ConversationStateRow"] = relationship(back_populates="conversation", uselist=False)
+    state: Mapped["ConversationStateRow"] = relationship(
+        back_populates="conversation", uselist=False
+    )
 
 
 class ConversationStateRow(Base):
@@ -42,7 +50,9 @@ class ConversationStateRow(Base):
     extracted_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     pending_confirmation: Mapped[str | None] = mapped_column(String(160))
     last_intent: Mapped[str | None] = mapped_column(String(40))
-    stage_entered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    stage_entered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     followups_sent_count: Mapped[int] = mapped_column(Integer, default=0)
     total_cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=Decimal("0"))
     bot_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

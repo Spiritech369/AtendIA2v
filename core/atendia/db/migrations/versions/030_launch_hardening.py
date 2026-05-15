@@ -4,6 +4,7 @@ Revision ID: a7b8c9d0e1f2
 Revises: f6a7b8c9d0e1
 Create Date: 2026-05-09
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -28,16 +29,27 @@ def upgrade() -> None:
         sa.Column("channel_message_id", sa.String(length=120), nullable=True),
         sa.Column("sent_message_id", sa.UUID(), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column("available_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
+        sa.Column(
+            "available_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
+        ),
         sa.ForeignKeyConstraint(["sent_message_id"], ["messages.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("idempotency_key", name="uq_outbound_outbox_idempotency_key"),
     )
     op.create_index("ix_outbound_outbox_tenant_id", "outbound_outbox", ["tenant_id"])
-    op.create_index("ix_outbound_outbox_status_available", "outbound_outbox", ["status", "available_at"])
+    op.create_index(
+        "ix_outbound_outbox_status_available", "outbound_outbox", ["status", "available_at"]
+    )
 
     op.add_column(
         "workflow_event_cursors",
@@ -61,7 +73,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.get_context().autocommit_block():
-        op.execute("DROP INDEX CONCURRENTLY IF EXISTS uq_appointments_tenant_customer_time_service_active")
+        op.execute(
+            "DROP INDEX CONCURRENTLY IF EXISTS uq_appointments_tenant_customer_time_service_active"
+        )
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS uq_messages_tenant_channel_message_id")
 
     op.drop_column("workflow_event_cursors", "last_created_at")

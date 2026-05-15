@@ -1,4 +1,5 @@
 """Phase 4 T14 — conversations list endpoint."""
+
 from __future__ import annotations
 
 import asyncio
@@ -153,18 +154,14 @@ def test_list_conversations_paginates_via_cursor(operator_with_convs):
     assert len(page1["items"]) == 2
     assert page1["next_cursor"]
 
-    page2 = client.get(
-        f"/api/v1/conversations?limit=2&cursor={page1['next_cursor']}"
-    ).json()
+    page2 = client.get(f"/api/v1/conversations?limit=2&cursor={page1['next_cursor']}").json()
     assert len(page2["items"]) == 2
     # Different rows than page1
     page1_ids = {c["id"] for c in page1["items"]}
     page2_ids = {c["id"] for c in page2["items"]}
     assert not (page1_ids & page2_ids)
 
-    page3 = client.get(
-        f"/api/v1/conversations?limit=2&cursor={page2['next_cursor']}"
-    ).json()
+    page3 = client.get(f"/api/v1/conversations?limit=2&cursor={page2['next_cursor']}").json()
     assert len(page3["items"]) == 1  # 5 total - 4 = 1
     assert page3["next_cursor"] is None
 
@@ -212,6 +209,7 @@ def test_unauthenticated_request_returns_401():
 
 def test_filter_by_status(operator_with_convs):
     tid, _, email, plain, cids = operator_with_convs
+
     # Manually set one conversation to status='closed'
     async def _close_one() -> None:
         engine = create_async_engine(get_settings().database_url)
@@ -329,9 +327,7 @@ def test_filter_by_has_pending_handoff(operator_with_convs):
     client = TestClient(app)
     _login(client, email, plain)
 
-    pending = client.get(
-        "/api/v1/conversations?has_pending_handoff=true"
-    ).json()
+    pending = client.get("/api/v1/conversations?has_pending_handoff=true").json()
     assert len(pending["items"]) == 1
     assert pending["items"][0]["id"] == cids[2]
     assert pending["items"][0]["has_pending_handoff"] is True

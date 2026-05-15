@@ -8,6 +8,7 @@ P0 hardening for conversations:
 - per-user read state
 - indexes for tenant-scoped conversation inbox/board queries
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

@@ -1,4 +1,5 @@
 """OpenAI Composer (gpt-4o) with strict structured outputs and retry."""
+
 import asyncio
 import json
 import time
@@ -57,7 +58,9 @@ class OpenAIComposer:
         self._fallback = fallback or CannedComposer()
 
     async def compose(
-        self, *, input: ComposerInput,
+        self,
+        *,
+        input: ComposerInput,
     ) -> tuple[ComposerOutput, UsageMetadata | None]:
         messages = build_composer_prompt(input)
         json_schema = _composer_schema(input.max_messages)
@@ -85,7 +88,9 @@ class OpenAIComposer:
                     tokens_in=resp.usage.prompt_tokens,
                     tokens_out=resp.usage.completion_tokens,
                     cost_usd=compute_cost(
-                        resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                        resp.model,
+                        resp.usage.prompt_tokens,
+                        resp.usage.completion_tokens,
                     ),
                     latency_ms=int((time.perf_counter() - t0) * 1000),
                     fallback_used=False,

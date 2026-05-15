@@ -1,6 +1,7 @@
 """Create dele.zored@hotmail.com as superadmin. Run from core/:
-    uv run python scripts/create_user.py
+uv run python scripts/create_user.py
 """
+
 import asyncio
 import sys
 from pathlib import Path
@@ -46,9 +47,7 @@ async def main() -> None:
                 print("Created dele.zored@hotmail.com as superadmin")
 
             rows = (
-                await conn.execute(
-                    text("SELECT email, role FROM tenant_users ORDER BY created_at")
-                )
+                await conn.execute(text("SELECT email, role FROM tenant_users ORDER BY created_at"))
             ).fetchall()
             print("\nAll users:")
             for r in rows:

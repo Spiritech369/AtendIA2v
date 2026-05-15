@@ -57,7 +57,9 @@ class DashboardSummary(BaseModel):
     activity_chart: list[DayBucket]
 
 
-async def _tenant_day_bounds(session: AsyncSession, tenant_id: UUID) -> tuple[datetime, datetime, str]:
+async def _tenant_day_bounds(
+    session: AsyncSession, tenant_id: UUID
+) -> tuple[datetime, datetime, str]:
     timezone = (
         await session.execute(select(Tenant.timezone).where(Tenant.id == tenant_id))
     ).scalar_one_or_none() or "America/Mexico_City"
@@ -81,7 +83,9 @@ async def get_dashboard_summary(
     local_day = func.date_trunc("day", func.timezone(_timezone, MessageRow.sent_at))
 
     total_customers = (
-        await session.execute(select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id))
+        await session.execute(
+            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id)
+        )
     ).scalar_one()
     conversations_today = (
         await session.execute(

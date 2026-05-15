@@ -75,18 +75,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="atendia-core", version="0.1.0", lifespan=lifespan)
 install_csrf_middleware(app)
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(
-    conversations_router, prefix="/api/v1/conversations", tags=["conversations"]
-)
+app.include_router(conversations_router, prefix="/api/v1/conversations", tags=["conversations"])
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["appointments"])
 app.include_router(customers_router, prefix="/api/v1/customers", tags=["customers"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(reports_router, prefix="/api/v1/reports", tags=["reports"])
-app.include_router(customer_dashboard_router, prefix="/api/v1/dashboard", tags=["customers-dashboard"])
+app.include_router(
+    customer_dashboard_router, prefix="/api/v1/dashboard", tags=["customers-dashboard"]
+)
 app.include_router(customer_risks_router, prefix="/api/v1/risks", tags=["customer-risks"])
 app.include_router(customer_ai_review_router, prefix="/api/v1/ai/review-queue", tags=["ai-review"])
-app.include_router(customer_documents_router, prefix="/api/v1/documents", tags=["customer-documents"])
+app.include_router(
+    customer_documents_router, prefix="/api/v1/documents", tags=["customer-documents"]
+)
 app.include_router(
     customer_notes_router,
     prefix="/api/v1/customers/{customer_id}/notes",
@@ -112,9 +114,7 @@ app.include_router(
     prefix="/api/v1/integrations/baileys",
     tags=["baileys"],
 )
-app.include_router(
-    baileys_internal_router, prefix="/api/v1/internal/baileys", tags=["baileys"]
-)
+app.include_router(baileys_internal_router, prefix="/api/v1/internal/baileys", tags=["baileys"])
 app.include_router(
     field_suggestions_per_customer_router,
     prefix="/api/v1/customers/{customer_id}/field-suggestions",
@@ -128,9 +128,7 @@ app.include_router(
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(pipeline_router, prefix="/api/v1/pipeline", tags=["pipeline"])
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
-app.include_router(
-    turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"]
-)
+app.include_router(turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(guardrails_router, prefix="/api/v1/guardrails", tags=["guardrails"])
@@ -145,9 +143,7 @@ app.include_router(workflows_router, prefix="/api/v1/workflows", tags=["workflow
 app.include_router(executions_router, prefix="/api/v1/executions", tags=["executions"])
 app.include_router(templates_router, prefix="/api/v1/templates", tags=["templates"])
 app.include_router(audit_log_router, prefix="/api/v1/audit-log", tags=["audit-log"])
-app.include_router(
-    channel_status_router, prefix="/api/v1/channel/status", tags=["channel-status"]
-)
+app.include_router(channel_status_router, prefix="/api/v1/channel/status", tags=["channel-status"])
 app.include_router(runner_router, prefix="/api/v1")
 app.include_router(meta_webhook_router)
 app.include_router(workflow_webhook_router, prefix="/api/v1/webhooks", tags=["webhooks"])
@@ -202,9 +198,7 @@ class _SPAStaticFiles(StaticFiles):
             raise
 
 
-_FRONTEND_DIST = (
-    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-)
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if _FRONTEND_DIST.is_dir():
     app.mount(
         "/",

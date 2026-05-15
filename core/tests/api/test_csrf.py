@@ -1,4 +1,5 @@
 """Phase 4 T4 — CSRF middleware tests (double-submit cookie pattern)."""
+
 from __future__ import annotations
 
 

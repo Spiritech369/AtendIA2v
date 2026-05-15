@@ -3,6 +3,7 @@
 Phase 3a substitutes this with `OpenAINLU` for production. KeywordNLU stays
 available via the `nlu_provider="keyword"` Settings toggle as a kill-switch.
 """
+
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.nlu_protocol import UsageMetadata

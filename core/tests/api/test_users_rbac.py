@@ -1,4 +1,5 @@
 """RBAC tests for tenant user management."""
+
 from __future__ import annotations
 
 import asyncio

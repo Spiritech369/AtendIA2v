@@ -8,6 +8,7 @@ decision logic (no DB round-trip).
 If the canonical attrs shape changes (status / confidence / verified_at
 / rejection_reason / side keys), this file is the canary.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -127,8 +128,10 @@ async def test_skips_non_doc_categories():
     for cat in (VisionCategory.MOTO, VisionCategory.UNRELATED):
         result = VisionResult(category=cat, confidence=0.95, metadata={})
         writes = await apply_vision_to_attrs(
-            session=session, customer_id=session.customer.id,
-            pipeline=pipeline, vision_result=result,
+            session=session,
+            customer_id=session.customer.id,
+            pipeline=pipeline,
+            vision_result=result,
         )
         assert writes == []
     assert session.added == []
@@ -141,11 +144,15 @@ async def test_skips_when_mapping_empty():
     session = _FakeSession()
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
-        confidence=0.9, metadata={}, quality_check=_ok_qc(),
+        confidence=0.9,
+        metadata={},
+        quality_check=_ok_qc(),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes == []
 
@@ -158,13 +165,21 @@ async def test_writes_ok_status_for_accepted_doc():
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
         confidence=0.92,
-        metadata={"legible": True, "ambos_lados": False, "fecha_iso": None,
-                  "institucion": "CFE", "modelo": None, "notas": None},
+        metadata={
+            "legible": True,
+            "ambos_lados": False,
+            "fecha_iso": None,
+            "institucion": "CFE",
+            "modelo": None,
+            "notas": None,
+        },
         quality_check=_ok_qc(side=DocumentSide.UNKNOWN),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert len(writes) == 1
     assert writes[0].doc_key == "DOCS_COMPROBANTE"
@@ -190,8 +205,10 @@ async def test_writes_rejected_with_reason_from_quality_check():
         quality_check=_bad_qc("se ve con reflejo, no se leen los datos"),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert len(writes) == 1
     assert writes[0].accepted is False
@@ -212,11 +229,14 @@ async def test_low_confidence_forces_reject_even_when_qc_says_valid():
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
         confidence=ACCEPT_CONFIDENCE_FLOOR - 0.01,
-        metadata={}, quality_check=_ok_qc(),
+        metadata={},
+        quality_check=_ok_qc(),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes[0].accepted is False
     assert "confianza baja" in writes[0].rejection_reason
@@ -238,8 +258,10 @@ async def test_ine_front_writes_only_front_key():
         quality_check=_ok_qc(side=DocumentSide.FRONT),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert [w.doc_key for w in writes] == ["DOCS_INE_FRENTE"]
     assert "DOCS_INE_FRENTE" in session.customer.attrs
@@ -257,8 +279,10 @@ async def test_ine_back_writes_only_back_key():
         quality_check=_ok_qc(side=DocumentSide.BACK),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert [w.doc_key for w in writes] == ["DOCS_INE_REVERSO"]
 
@@ -274,8 +298,10 @@ async def test_ine_unknown_with_ambos_lados_writes_both_keys():
         quality_check=_ok_qc(side=DocumentSide.UNKNOWN),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert {w.doc_key for w in writes} == {"DOCS_INE_FRENTE", "DOCS_INE_REVERSO"}
     assert "DOCS_INE_FRENTE" in session.customer.attrs
@@ -293,8 +319,10 @@ async def test_ine_unknown_no_ambos_lados_writes_front_only():
         quality_check=_ok_qc(side=DocumentSide.UNKNOWN),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert [w.doc_key for w in writes] == ["DOCS_INE_FRENTE"]
 
@@ -311,22 +339,27 @@ async def test_does_not_downgrade_existing_ok_to_rejected():
     bubble still fires (operator sees the rejection), but the structural
     state stays approved."""
     pipeline = _make_pipeline()
-    session = _FakeSession(customer_attrs={
-        "DOCS_COMPROBANTE": {
-            "status": "ok",
-            "confidence": 0.9,
-            "verified_at": "2026-05-13T22:00:00+00:00",
-            "source": "vision",
-        },
-    })
+    session = _FakeSession(
+        customer_attrs={
+            "DOCS_COMPROBANTE": {
+                "status": "ok",
+                "confidence": 0.9,
+                "verified_at": "2026-05-13T22:00:00+00:00",
+                "source": "vision",
+            },
+        }
+    )
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
         confidence=0.85,
-        metadata={}, quality_check=_bad_qc("borrosa"),
+        metadata={},
+        quality_check=_bad_qc("borrosa"),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes[0].accepted is False  # event still says rejected
     assert session.customer.attrs["DOCS_COMPROBANTE"]["status"] == "ok"
@@ -336,23 +369,28 @@ async def test_does_not_downgrade_existing_ok_to_rejected():
 async def test_accepts_resend_overwrites_previous_rejection():
     """Inverse case: rejected → accepted resend SHOULD overwrite."""
     pipeline = _make_pipeline()
-    session = _FakeSession(customer_attrs={
-        "DOCS_COMPROBANTE": {
-            "status": "rejected",
-            "rejection_reason": "se cortó una esquina",
-            "confidence": 0.4,
-            "verified_at": "2026-05-13T22:00:00+00:00",
-            "source": "vision",
-        },
-    })
+    session = _FakeSession(
+        customer_attrs={
+            "DOCS_COMPROBANTE": {
+                "status": "rejected",
+                "rejection_reason": "se cortó una esquina",
+                "confidence": 0.4,
+                "verified_at": "2026-05-13T22:00:00+00:00",
+                "source": "vision",
+            },
+        }
+    )
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
         confidence=0.93,
-        metadata={}, quality_check=_ok_qc(),
+        metadata={},
+        quality_check=_ok_qc(),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes[0].accepted is True
     final = session.customer.attrs["DOCS_COMPROBANTE"]
@@ -376,8 +414,10 @@ async def test_legacy_vision_without_quality_check_falls_back_to_heuristic():
         quality_check=None,  # legacy / older prompt
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes[0].accepted is True
 
@@ -393,8 +433,10 @@ async def test_legacy_vision_with_illegible_metadata_rejects():
         quality_check=None,
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=result,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
     )
     assert writes[0].accepted is False
     # Either the structured "ilegible" wording or the legacy

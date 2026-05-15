@@ -17,6 +17,7 @@ Closes loopholes the previous sessions documented as TODOs:
 - ``events.actor_user_id`` (UUID NULL) — who took the action. NULL when
   the writer is the system itself (workflow engine, NLU, etc).
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

@@ -5,6 +5,7 @@ scoped to a single tenant via the Meta app secret). The operator session
 is HS256 JWT with `auth_session_secret`, carries role + tenant_id claims,
 and lives in an httpOnly cookie.
 """
+
 from __future__ import annotations
 
 import secrets
@@ -23,9 +24,7 @@ from atendia.config import get_settings
 # to keep timing constant when an email doesn't exist or its hash is NULL —
 # without this, a missing-user 401 returns in <1ms but a real-user 401 takes
 # ~250ms, leaking which emails are registered. See review HIGH-2.
-_DUMMY_HASH: str = bcrypt.hashpw(
-    secrets.token_bytes(32), bcrypt.gensalt(rounds=12)
-).decode("utf-8")
+_DUMMY_HASH: str = bcrypt.hashpw(secrets.token_bytes(32), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 SESSION_COOKIE = "atendia_session"
 CSRF_COOKIE = "atendia_csrf"

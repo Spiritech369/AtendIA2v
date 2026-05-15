@@ -9,6 +9,7 @@ Editas:
 
 Helpers (render_template, _render_history) viven en _template_helpers.
 """
+
 import json
 import re
 
@@ -116,7 +117,6 @@ PROHIBIDO:
   (eso es SALES MODE).
 - NO pidas más de un dato a la vez (un mensaje, una pregunta).
 """,
-
     FlowMode.SALES: """\
 Acción: SALES MODE — cotizar al cliente con datos REALES del catálogo.
 
@@ -154,7 +154,6 @@ PROHIBIDO:
 - NO menciones planes que no estén en planes_credito del payload.
 - Máximo 2 mensajes (max_messages cap).
 """,
-
     FlowMode.DOC: """\
 Acción: DOC MODE — recibir, validar (vía Vision) y avanzar la papelería.
 
@@ -201,7 +200,6 @@ PROHIBIDO:
 - NO inventes que recibiste un doc que no llegó.
 - NO digas "INE recibida" si vision_result.category != "ine".
 """,
-
     FlowMode.OBSTACLE: """\
 Acción: OBSTACLE MODE — el cliente pospuso, identifica el blocker.
 
@@ -231,7 +229,6 @@ Si el cliente dice "tengo SOLO algunos docs":
 PROHIBIDO:
 - NO inventes procesos que no estén en este prompt.
 """,
-
     FlowMode.RETENTION: """\
 Acción: RETENTION MODE — el cliente dijo "gracias" pero no confirmó
 desinterés. Intenta retener.
@@ -245,7 +242,6 @@ Mensaje fijo (parametrizar tono pero NO cambiar la idea):
 Marca extracted_data.retention_attempt = true (el composer lo
 registra en su output).
 """,
-
     FlowMode.SUPPORT: """\
 Acción: SUPPORT MODE — preguntas generales que no son SALES/PLAN/DOC.
 
@@ -309,9 +305,14 @@ Reglas de salida:
 
 # Modes that get the brand_facts block injected at the top of the system prompt.
 # RETENTION + OBSTACLE skip it to keep prompts focused (no token bloat).
-_MODES_WITH_BRAND_FACTS: frozenset[FlowMode] = frozenset({
-    FlowMode.PLAN, FlowMode.SALES, FlowMode.DOC, FlowMode.SUPPORT,
-})
+_MODES_WITH_BRAND_FACTS: frozenset[FlowMode] = frozenset(
+    {
+        FlowMode.PLAN,
+        FlowMode.SALES,
+        FlowMode.DOC,
+        FlowMode.SUPPORT,
+    }
+)
 
 # Matches `{{brand_facts.<key>}}` placeholders inside MODE_PROMPTS strings.
 # render_template's stricter regex (`\w+`) does not match dotted access,
@@ -384,6 +385,7 @@ def _resolve_brand_facts_in_block(block: str, facts: dict) -> str:
                 f"in mode prompt (facts keys: {sorted(facts.keys())})"
             )
         return str(facts[key])
+
     return _BRAND_FACT_REF_RE.sub(_sub, block)
 
 

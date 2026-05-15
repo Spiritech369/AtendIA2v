@@ -10,6 +10,7 @@ from atendia.config import get_settings
 async def test_customers_table_exists():
     engine = create_async_engine(get_settings().database_url)
     async with engine.connect() as conn:
+
         def _check(sync_conn):
             insp = inspect(sync_conn)
             assert "customers" in insp.get_table_names()

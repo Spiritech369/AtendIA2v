@@ -9,6 +9,7 @@ TODO(kb-followup-10): the full design called for an LLM rewrite pass.
 B2 ships regex-only flagging — the rewrite suggestion is the seeded
 canonical phrase, not a per-context LLM completion.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,7 +22,10 @@ DEFAULT_RISKY_PHRASES: list[dict[str, str]] = [
     {"pattern": r"sin\s+revisar\s+buró", "rewrite": "Sujeto a evaluación crediticia"},
     {"pattern": r"entrega\s+garantizada", "rewrite": "Sujeto a disponibilidad"},
     {"pattern": r"precio\s+fijo", "rewrite": "Depende del plan y documentación"},
-    {"pattern": r"no\s+necesitas\s+comprobar\s+ingresos", "rewrite": "Un asesor confirma documentación"},
+    {
+        "pattern": r"no\s+necesitas\s+comprobar\s+ingresos",
+        "rewrite": "Un asesor confirma documentación",
+    },
 ]
 
 
@@ -42,7 +46,7 @@ def detect_risky_phrases(
     customization comes from ``kb_safe_answer_settings.risky_phrases``).
     """
     risks: list[Risk] = []
-    for entry in (custom if custom is not None else DEFAULT_RISKY_PHRASES):
+    for entry in custom if custom is not None else DEFAULT_RISKY_PHRASES:
         if re.search(entry["pattern"], text, re.IGNORECASE):
             risks.append(
                 Risk(

@@ -5,6 +5,7 @@ the router reads it, the composer reads it. Hardcoded structure
 (Phase 3c.2 has only Dinamo as tenant; refactor to JSONB-config when
 a second vertical onboards).
 """
+
 import pytest
 from pydantic import ValidationError
 

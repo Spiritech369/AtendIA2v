@@ -16,6 +16,7 @@ The walk-through uses the seeded motos pipeline + the same helpers
 the runner imports, so any drift in those helpers will be caught
 without requiring a full integration harness.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -99,7 +100,9 @@ async def test_step_1_antiguedad_writes_attr_and_satisfies_calificacion_rule(pip
     session = _FakeSession()
     entities = {
         "labor_seniority": ExtractedField(
-            value=8, confidence=0.92, source_turn=1,
+            value=8,
+            confidence=0.92,
+            source_turn=1,
         ),
     }
     applied = await apply_ai_extractions(
@@ -173,25 +176,39 @@ async def test_step_3_ine_front_image_writes_docs_ine_frente_ok(pipeline):
     customer.attrs['DOCS_INE_FRENTE']={status:'ok', ...} ; the rest
     of the docs untouched, stage stays Papelería Incompleta until
     everything lands."""
-    session = _FakeSession(customer_attrs={
-        "plan_credito": "nomina_tarjeta_10",
-        "cumple_antiguedad": True,
-    })
+    session = _FakeSession(
+        customer_attrs={
+            "plan_credito": "nomina_tarjeta_10",
+            "cumple_antiguedad": True,
+        }
+    )
     vision = VisionResult(
         category=VisionCategory.INE,
         confidence=0.94,
-        metadata={"ambos_lados": False, "legible": True, "fecha_iso": None,
-                  "institucion": None, "modelo": None, "notas": None},
+        metadata={
+            "ambos_lados": False,
+            "legible": True,
+            "fecha_iso": None,
+            "institucion": None,
+            "modelo": None,
+            "notas": None,
+        },
         quality_check=VisionQualityCheck(
-            four_corners_visible=True, legible=True, not_blurry=True,
-            no_flash_glare=True, not_cut=True,
+            four_corners_visible=True,
+            legible=True,
+            not_blurry=True,
+            no_flash_glare=True,
+            not_cut=True,
             side=DocumentSide.FRONT,
-            valid_for_credit_file=True, rejection_reason=None,
+            valid_for_credit_file=True,
+            rejection_reason=None,
         ),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=vision,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=vision,
     )
     assert [w.doc_key for w in writes] == ["DOCS_INE_FRENTE"]
     assert writes[0].accepted is True
@@ -202,35 +219,51 @@ async def test_step_3_ine_front_image_writes_docs_ine_frente_ok(pipeline):
     # Papelería incompleta auto_enter_rule (match='any') should fire on
     # any DOCS_*.status=ok — verify it picks up our new write.
     incompleta = next(s for s in pipeline.stages if s.id == "papeleria_incompleta")
-    assert evaluate_rule_group(
-        incompleta.auto_enter_rules,
-        session.customer.attrs,
-    ) is True
+    assert (
+        evaluate_rule_group(
+            incompleta.auto_enter_rules,
+            session.customer.attrs,
+        )
+        is True
+    )
 
 
 @pytest.mark.asyncio
 async def test_step_3b_rejected_image_writes_rejected_with_reason(pipeline):
     """Vision rejection → customer.attrs DOCS_X.status='rejected' with
     rejection_reason; lookup_requirements surfaces it under .rejected[]."""
-    session = _FakeSession(customer_attrs={
-        "plan_credito": "nomina_tarjeta_10",
-    })
+    session = _FakeSession(
+        customer_attrs={
+            "plan_credito": "nomina_tarjeta_10",
+        }
+    )
     vision = VisionResult(
         category=VisionCategory.COMPROBANTE,
         confidence=0.88,
-        metadata={"ambos_lados": False, "legible": False, "fecha_iso": None,
-                  "institucion": None, "modelo": None, "notas": "reflejo"},
+        metadata={
+            "ambos_lados": False,
+            "legible": False,
+            "fecha_iso": None,
+            "institucion": None,
+            "modelo": None,
+            "notas": "reflejo",
+        },
         quality_check=VisionQualityCheck(
-            four_corners_visible=True, legible=False, not_blurry=True,
-            no_flash_glare=False, not_cut=True,
+            four_corners_visible=True,
+            legible=False,
+            not_blurry=True,
+            no_flash_glare=False,
+            not_cut=True,
             side=DocumentSide.UNKNOWN,
             valid_for_credit_file=False,
             rejection_reason="se ve con reflejo, no se leen los datos",
         ),
     )
     writes = await apply_vision_to_attrs(
-        session=session, customer_id=session.customer.id,
-        pipeline=pipeline, vision_result=vision,
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=vision,
     )
     assert writes[0].accepted is False
     assert session.customer.attrs["DOCS_COMPROBANTE_DOMICILIO"]["status"] == "rejected"
@@ -316,8 +349,11 @@ def test_entity_mapping_covers_motos_seed_keys():
     antiguedad_laboral_meses on customer.attrs; if the NLU mapping
     drifts so those keys can't be reached, the whole flow stalls."""
     for canonical in (
-        "plan_credito", "tipo_credito", "antiguedad_laboral_meses",
-        "modelo_interes", "marca",
+        "plan_credito",
+        "tipo_credito",
+        "antiguedad_laboral_meses",
+        "modelo_interes",
+        "marca",
     ):
         # Map via the entity_key the NLU prompt produces.
         if canonical == "marca":

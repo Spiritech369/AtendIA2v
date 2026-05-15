@@ -4,6 +4,7 @@ Reads the `events` table. Tenant-scoped: operators see their own
 tenant's events; superadmins see any tenant via ?tid=. Optional ?type=
 filter (single event_type) and ?from=/?to= ISO timestamps.
 """
+
 from __future__ import annotations
 
 import base64
@@ -110,7 +111,5 @@ async def list_events(
         )
         for e in page
     ]
-    next_cursor = (
-        _encode_cursor(page[-1].occurred_at, page[-1].id) if has_more and page else None
-    )
+    next_cursor = _encode_cursor(page[-1].occurred_at, page[-1].id) if has_more and page else None
     return AuditListResponse(items=items, next_cursor=next_cursor)

@@ -10,30 +10,38 @@ from atendia.channels.meta_dto import (
 def test_parses_real_meta_text_message_payload():
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {
-                        "display_phone_number": "5215555000000",
-                        "phone_number_id": "PHONE_NUMBER_ID",
-                    },
-                    "contacts": [{
-                        "profile": {"name": "Juan"},
-                        "wa_id": "5215555550001",
-                    }],
-                    "messages": [{
-                        "from": "5215555550001",
-                        "id": "wamid.HBgLNTIxNTU1NTU1NTAwMDEVAgASGBQzQUUz",
-                        "timestamp": "1714579200",
-                        "text": {"body": "hola"},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "5215555000000",
+                                "phone_number_id": "PHONE_NUMBER_ID",
+                            },
+                            "contacts": [
+                                {
+                                    "profile": {"name": "Juan"},
+                                    "wa_id": "5215555550001",
+                                }
+                            ],
+                            "messages": [
+                                {
+                                    "from": "5215555550001",
+                                    "id": "wamid.HBgLNTIxNTU1NTU1NTAwMDEVAgASGBQzQUUz",
+                                    "timestamp": "1714579200",
+                                    "text": {"body": "hola"},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
     parsed = MetaInboundWebhook.model_validate(payload)
     assert parsed.object == "whatsapp_business_account"
@@ -50,25 +58,31 @@ def test_parses_real_meta_text_message_payload():
 def test_parses_status_callback():
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {
-                        "display_phone_number": "5215555000000",
-                        "phone_number_id": "PHONE_NUMBER_ID",
-                    },
-                    "statuses": [{
-                        "id": "wamid.HBgL...",
-                        "status": "delivered",
-                        "timestamp": "1714579260",
-                        "recipient_id": "5215555550001",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "5215555000000",
+                                "phone_number_id": "PHONE_NUMBER_ID",
+                            },
+                            "statuses": [
+                                {
+                                    "id": "wamid.HBgL...",
+                                    "status": "delivered",
+                                    "timestamp": "1714579260",
+                                    "recipient_id": "5215555550001",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
     parsed = MetaInboundWebhook.model_validate(payload)
     statuses = parsed.entry[0].changes[0].value.statuses
@@ -81,16 +95,20 @@ def test_parses_payload_with_neither_messages_nor_statuses():
     """Some webhooks have just system events; `messages` and `statuses` both None."""
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
+                        },
+                    }
+                ],
+            }
+        ],
     }
     parsed = MetaInboundWebhook.model_validate(payload)
     val = parsed.entry[0].changes[0].value
@@ -100,6 +118,7 @@ def test_parses_payload_with_neither_messages_nor_statuses():
 
 def test_invalid_status_value_raises():
     from pydantic import ValidationError
+
     payload = {
         "id": "wamid.x",
         "status": "weird_status_not_supported",

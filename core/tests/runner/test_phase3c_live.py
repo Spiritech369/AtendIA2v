@@ -12,6 +12,7 @@ inventing alternative prices. Phase 3b already had a similar test for the
 no_data case; this is the symmetrical "ok"-case version with real data
 flowing through.
 """
+
 import os
 import re
 from decimal import Decimal
@@ -44,6 +45,7 @@ def _api_key() -> str:
     the runtime app. Plain `os.environ` would miss the key when developers
     keep it in `core/.env` rather than exporting it shell-wide."""
     from atendia.config import get_settings
+
     api_key = get_settings().openai_api_key
     assert api_key, "set ATENDIA_V2_OPENAI_API_KEY for live tests"
     return api_key
@@ -53,32 +55,44 @@ def _api_key() -> str:
 async def test_live_composer_quote_uses_real_price_no_invention() -> None:
     """gpt-4o must use the real $29,900 from action_payload — not invent another."""
     composer = OpenAIComposer(api_key=_api_key())
-    out, usage = await composer.compose(input=ComposerInput(
-        action="quote",
-        action_payload={
-            "status": "ok",
-            "sku": "adventure-150-cc",
-            "name": "Adventure 150 CC",
-            "category": "Motoneta",
-            "price_lista_mxn": "31395",
-            "price_contado_mxn": "29900",
-            "planes_credito": {
-                "plan_10": {"enganche": 3140, "pago_quincenal": 1247, "quincenas": 72},
+    out, usage = await composer.compose(
+        input=ComposerInput(
+            action="quote",
+            action_payload={
+                "status": "ok",
+                "sku": "adventure-150-cc",
+                "name": "Adventure 150 CC",
+                "category": "Motoneta",
+                "price_lista_mxn": "31395",
+                "price_contado_mxn": "29900",
+                "planes_credito": {
+                    "plan_10": {"enganche": 3140, "pago_quincenal": 1247, "quincenas": 72},
+                },
+                "ficha_tecnica": {"motor_cc": 150, "transmision": "Automática"},
             },
-            "ficha_tecnica": {"motor_cc": 150, "transmision": "Automática"},
-        },
-        current_stage="quote",
-        extracted_data={"interes_producto": "Adventure", "ciudad": "CDMX"},
-        tone=_DINAMO_TONE,
-    ))
+            current_stage="quote",
+            extracted_data={"interes_producto": "Adventure", "ciudad": "CDMX"},
+            tone=_DINAMO_TONE,
+        )
+    )
     text_combined = " ".join(out.messages)
     # Composer MUST mention the real $29,900 (or plan enganche $3,140) somewhere.
     assert "29,900" in text_combined or "29900" in text_combined, (
         f"composer didn't surface real price 29,900: {text_combined!r}"
     )
     # No 4-6-digit number that ISN'T one of the real ones in the payload.
-    real_numbers = {"29900", "29,900", "31395", "31,395", "3140", "3,140",
-                    "1247", "1,247", "150", "72"}
+    real_numbers = {
+        "29900",
+        "29,900",
+        "31395",
+        "31,395",
+        "3140",
+        "3,140",
+        "1247",
+        "1,247",
+        "150",
+        "72",
+    }
     invented = []
     for token in re.findall(r"\b\$?\d[\d,]{3,}\b", text_combined):
         normalized = token.replace("$", "").replace(",", "")
@@ -95,27 +109,29 @@ async def test_live_composer_quote_uses_real_price_no_invention() -> None:
 async def test_live_composer_lookup_faq_uses_real_match() -> None:
     """When matches has score-1 entry, composer must surface its respuesta."""
     composer = OpenAIComposer(api_key=_api_key())
-    out, _ = await composer.compose(input=ComposerInput(
-        action="lookup_faq",
-        action_payload={
-            "matches": [
-                {
-                    "pregunta": "¿Cuál es el tiempo de aprobación del crédito?",
-                    "respuesta": "El tiempo de aprobación es de 24 horas una vez "
-                                  "que se entrega la documentación completa.",
-                    "score": 0.93,
-                },
-                {
-                    "pregunta": "¿Puedo adelantar pagos?",
-                    "respuesta": "Sí, sin penalización.",
-                    "score": 0.62,
-                },
-            ],
-        },
-        current_stage="qualify",
-        extracted_data={},
-        tone=_DINAMO_TONE,
-    ))
+    out, _ = await composer.compose(
+        input=ComposerInput(
+            action="lookup_faq",
+            action_payload={
+                "matches": [
+                    {
+                        "pregunta": "¿Cuál es el tiempo de aprobación del crédito?",
+                        "respuesta": "El tiempo de aprobación es de 24 horas una vez "
+                        "que se entrega la documentación completa.",
+                        "score": 0.93,
+                    },
+                    {
+                        "pregunta": "¿Puedo adelantar pagos?",
+                        "respuesta": "Sí, sin penalización.",
+                        "score": 0.62,
+                    },
+                ],
+            },
+            current_stage="qualify",
+            extracted_data={},
+            tone=_DINAMO_TONE,
+        )
+    )
     text_combined = " ".join(out.messages).lower()
     # Should reference the top match's content (24 horas / aprobación / documentación).
     assert any(s in text_combined for s in ["24 horas", "aprob", "document"]), (
@@ -127,20 +143,32 @@ async def test_live_composer_lookup_faq_uses_real_match() -> None:
 async def test_live_composer_search_catalog_lists_real_results() -> None:
     """Composer presents the seeded results without inventing extras."""
     composer = OpenAIComposer(api_key=_api_key())
-    out, _ = await composer.compose(input=ComposerInput(
-        action="search_catalog",
-        action_payload={
-            "results": [
-                {"sku": "adventure-150-cc", "name": "Adventure 150 CC",
-                 "category": "Motoneta", "price_contado_mxn": "29900", "score": 1.0},
-                {"sku": "alien-r-175-cc", "name": "Alien R 175 CC",
-                 "category": "Motoneta", "price_contado_mxn": "30900", "score": 1.0},
-            ],
-        },
-        current_stage="qualify",
-        extracted_data={},
-        tone=_DINAMO_TONE,
-    ))
+    out, _ = await composer.compose(
+        input=ComposerInput(
+            action="search_catalog",
+            action_payload={
+                "results": [
+                    {
+                        "sku": "adventure-150-cc",
+                        "name": "Adventure 150 CC",
+                        "category": "Motoneta",
+                        "price_contado_mxn": "29900",
+                        "score": 1.0,
+                    },
+                    {
+                        "sku": "alien-r-175-cc",
+                        "name": "Alien R 175 CC",
+                        "category": "Motoneta",
+                        "price_contado_mxn": "30900",
+                        "score": 1.0,
+                    },
+                ],
+            },
+            current_stage="qualify",
+            extracted_data={},
+            tone=_DINAMO_TONE,
+        )
+    )
     text_combined = " ".join(out.messages)
     # At least one of the real model names should appear.
     assert "Adventure" in text_combined or "Alien" in text_combined, (

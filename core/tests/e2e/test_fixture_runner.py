@@ -29,13 +29,17 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     spec = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
 
     # Seed tenant + pipeline
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-        {"n": spec["tenant"]["name"]},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+            {"n": spec["tenant"]["name"]},
+        )
+    ).scalar()
     await db_session.execute(
-        text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-             "VALUES (:t, :v, :d\\:\\:jsonb, true)"),
+        text(
+            "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+            "VALUES (:t, :v, :d\\:\\:jsonb, true)"
+        ),
         {
             "t": tid,
             "v": spec["pipeline"]["version"],
@@ -46,8 +50,10 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     # Seed catalog if any
     for item in spec.get("catalog") or []:
         await db_session.execute(
-            text("INSERT INTO tenant_catalogs (tenant_id, sku, name, attrs) "
-                 "VALUES (:t, :s, :n, :a\\:\\:jsonb)"),
+            text(
+                "INSERT INTO tenant_catalogs (tenant_id, sku, name, attrs) "
+                "VALUES (:t, :s, :n, :a\\:\\:jsonb)"
+            ),
             {
                 "t": tid,
                 "s": item["sku"],
@@ -57,16 +63,24 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
         )
 
     # Seed customer + conversation pinned to first stage
-    cid = (await db_session.execute(
-        text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550042') RETURNING id"),
-        {"t": tid},
-    )).scalar()
+    cid = (
+        await db_session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550042') RETURNING id"
+            ),
+            {"t": tid},
+        )
+    ).scalar()
     initial_stage = spec["pipeline"]["stages"][0]["id"]
-    conv_id = (await db_session.execute(
-        text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-             "VALUES (:t, :c, :s) RETURNING id"),
-        {"t": tid, "c": cid, "s": initial_stage},
-    )).scalar()
+    conv_id = (
+        await db_session.execute(
+            text(
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, :s) RETURNING id"
+            ),
+            {"t": tid, "c": cid, "s": initial_stage},
+        )
+    ).scalar()
     await db_session.execute(
         text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
         {"c": conv_id},
@@ -79,6 +93,7 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     inline_path.write_text(yaml.safe_dump(inline_nlu), encoding="utf-8")
 
     from atendia.runner.composer_canned import CannedComposer
+
     runner = ConversationRunner(db_session, CannedNLU(inline_path), CannedComposer())
 
     for i, turn in enumerate(spec["turns"]):

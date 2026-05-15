@@ -12,17 +12,25 @@ class Agent(Base):
     __tablename__ = "agents"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[str] = mapped_column(String(40), default="custom", server_default="custom")
-    status: Mapped[str] = mapped_column(String(20), default="production", server_default="production")
-    behavior_mode: Mapped[str] = mapped_column(String(20), default="normal", server_default="normal")
+    status: Mapped[str] = mapped_column(
+        String(20), default="production", server_default="production"
+    )
+    behavior_mode: Mapped[str] = mapped_column(
+        String(20), default="normal", server_default="normal"
+    )
     version: Mapped[str] = mapped_column(String(20), default="v2.4", server_default="v2.4")
     dealership_id: Mapped[str | None] = mapped_column(String(80))
     branch_id: Mapped[str | None] = mapped_column(String(80))
     goal: Mapped[str | None] = mapped_column(Text)
     style: Mapped[str | None] = mapped_column(String(200))
-    tone: Mapped[str | None] = mapped_column(String(40), default="amigable", server_default="amigable")
+    tone: Mapped[str | None] = mapped_column(
+        String(40), default="amigable", server_default="amigable"
+    )
     language: Mapped[str | None] = mapped_column(String(20), default="es", server_default="es")
     max_sentences: Mapped[int | None] = mapped_column(Integer, default=5, server_default="5")
     no_emoji: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

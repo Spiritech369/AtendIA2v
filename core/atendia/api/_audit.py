@@ -9,6 +9,7 @@ without a parallel table.
 This helper is intentionally minimal — it doesn't go through ``EventEmitter``
 because that path always sets a conversation_id. Admin events do not.
 """
+
 from __future__ import annotations
 
 import json

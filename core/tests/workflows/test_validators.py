@@ -4,6 +4,7 @@ Sync structural checks live in ``validate_definition``; dynamic ref checks
 (agent_id/stage_id/user_id refs against the tenant) live in
 ``validate_references`` and run on toggle/save when ``active=true``.
 """
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4
@@ -29,37 +30,45 @@ def test_definition_must_be_dict() -> None:
 
 def test_unknown_node_type_rejected() -> None:
     with pytest.raises(WorkflowValidationError, match="unknown node type"):
-        validate_definition({
-            "nodes": [{"id": "a", "type": "nope"}],
-            "edges": [],
-        })
+        validate_definition(
+            {
+                "nodes": [{"id": "a", "type": "nope"}],
+                "edges": [],
+            }
+        )
 
 
 def test_duplicate_node_ids_rejected() -> None:
     with pytest.raises(WorkflowValidationError, match="duplicate"):
-        validate_definition({
-            "nodes": [
-                {"id": "a", "type": "trigger"},
-                {"id": "a", "type": "message"},
-            ],
-            "edges": [],
-        })
+        validate_definition(
+            {
+                "nodes": [
+                    {"id": "a", "type": "trigger"},
+                    {"id": "a", "type": "message"},
+                ],
+                "edges": [],
+            }
+        )
 
 
 def test_delay_over_30_days_rejected() -> None:
     with pytest.raises(WorkflowValidationError, match="30 days"):
-        validate_definition({
-            "nodes": [{"id": "d", "type": "delay", "config": {"seconds": 60 * 60 * 24 * 31}}],
-            "edges": [],
-        })
+        validate_definition(
+            {
+                "nodes": [{"id": "d", "type": "delay", "config": {"seconds": 60 * 60 * 24 * 31}}],
+                "edges": [],
+            }
+        )
 
 
 def test_delay_must_be_positive() -> None:
     with pytest.raises(WorkflowValidationError, match="positive"):
-        validate_definition({
-            "nodes": [{"id": "d", "type": "delay", "config": {"seconds": 0}}],
-            "edges": [],
-        })
+        validate_definition(
+            {
+                "nodes": [{"id": "d", "type": "delay", "config": {"seconds": 0}}],
+                "edges": [],
+            }
+        )
 
 
 def test_condition_requires_both_branches() -> None:

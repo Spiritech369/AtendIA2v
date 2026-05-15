@@ -10,6 +10,7 @@ Closes residual Conversations Enhanced loopholes from session 4's runbook:
   basic-info form; v2 dropped it. Adding it as nullable so existing rows
   don't need a backfill.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

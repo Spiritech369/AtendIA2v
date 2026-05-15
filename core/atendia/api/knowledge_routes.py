@@ -162,7 +162,13 @@ def _normalize_tags(tags: list[str]) -> list[str]:
 
 
 def _faq_item(row: TenantFAQ) -> FAQItem:
-    return FAQItem(id=row.id, question=row.question, answer=row.answer, tags=row.tags or [], created_at=row.created_at)
+    return FAQItem(
+        id=row.id,
+        question=row.question,
+        answer=row.answer,
+        tags=row.tags or [],
+        created_at=row.created_at,
+    )
 
 
 def _catalog_item(row: TenantCatalogItem) -> CatalogItem:
@@ -319,10 +325,17 @@ async def list_faqs(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FAQItem]:
     rows = (
-        await session.execute(
-            select(TenantFAQ).where(TenantFAQ.tenant_id == tenant_id).order_by(TenantFAQ.created_at.desc()).limit(limit)
+        (
+            await session.execute(
+                select(TenantFAQ)
+                .where(TenantFAQ.tenant_id == tenant_id)
+                .order_by(TenantFAQ.created_at.desc())
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_faq_item(row) for row in rows]
 
 
@@ -355,7 +368,9 @@ async def patch_faq(
     session: AsyncSession = Depends(get_db_session),
 ) -> FAQItem:
     row = (
-        await session.execute(select(TenantFAQ).where(TenantFAQ.id == faq_id, TenantFAQ.tenant_id == tenant_id))
+        await session.execute(
+            select(TenantFAQ).where(TenantFAQ.id == faq_id, TenantFAQ.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "faq not found")
@@ -378,7 +393,9 @@ async def delete_faq(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    result = await session.execute(delete(TenantFAQ).where(TenantFAQ.id == faq_id, TenantFAQ.tenant_id == tenant_id))
+    result = await session.execute(
+        delete(TenantFAQ).where(TenantFAQ.id == faq_id, TenantFAQ.tenant_id == tenant_id)
+    )
     if result.rowcount == 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "faq not found")
     await session.commit()
@@ -391,7 +408,11 @@ async def list_catalog(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CatalogItem]:
-    stmt = select(TenantCatalogItem).where(TenantCatalogItem.tenant_id == tenant_id).order_by(TenantCatalogItem.name.asc())
+    stmt = (
+        select(TenantCatalogItem)
+        .where(TenantCatalogItem.tenant_id == tenant_id)
+        .order_by(TenantCatalogItem.name.asc())
+    )
     if category:
         stmt = stmt.where(TenantCatalogItem.category == category)
     return [_catalog_item(row) for row in (await session.execute(stmt)).scalars().all()]
@@ -429,7 +450,11 @@ async def patch_catalog_item(
     session: AsyncSession = Depends(get_db_session),
 ) -> CatalogItem:
     row = (
-        await session.execute(select(TenantCatalogItem).where(TenantCatalogItem.id == item_id, TenantCatalogItem.tenant_id == tenant_id))
+        await session.execute(
+            select(TenantCatalogItem).where(
+                TenantCatalogItem.id == item_id, TenantCatalogItem.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "catalog item not found")
@@ -439,7 +464,9 @@ async def patch_catalog_item(
     for key, value in values.items():
         setattr(row, key, value.strip() if isinstance(value, str) else value)
     if "name" in values or "attrs" in values:
-        row.embedding = await _maybe_embed(f"{row.name}\n{json.dumps(row.attrs or {}, ensure_ascii=False)}")
+        row.embedding = await _maybe_embed(
+            f"{row.name}\n{json.dumps(row.attrs or {}, ensure_ascii=False)}"
+        )
     await session.commit()
     await session.refresh(row)
     return _catalog_item(row)
@@ -453,7 +480,9 @@ async def delete_catalog_item(
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
     result = await session.execute(
-        delete(TenantCatalogItem).where(TenantCatalogItem.id == item_id, TenantCatalogItem.tenant_id == tenant_id)
+        delete(TenantCatalogItem).where(
+            TenantCatalogItem.id == item_id, TenantCatalogItem.tenant_id == tenant_id
+        )
     )
     if result.rowcount == 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "catalog item not found")
@@ -467,10 +496,16 @@ async def list_documents(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[DocumentItem]:
     rows = (
-        await session.execute(
-            select(KnowledgeDocument).where(KnowledgeDocument.tenant_id == tenant_id).order_by(KnowledgeDocument.created_at.desc())
+        (
+            await session.execute(
+                select(KnowledgeDocument)
+                .where(KnowledgeDocument.tenant_id == tenant_id)
+                .order_by(KnowledgeDocument.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_doc_item(row) for row in rows]
 
 
@@ -541,7 +576,11 @@ async def get_document(
     session: AsyncSession = Depends(get_db_session),
 ) -> DocumentItem:
     row = (
-        await session.execute(select(KnowledgeDocument).where(KnowledgeDocument.id == document_id, KnowledgeDocument.tenant_id == tenant_id))
+        await session.execute(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.id == document_id, KnowledgeDocument.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
@@ -569,9 +608,7 @@ async def download_document(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
     data = await get_storage_backend().read(str(tenant_id), row.storage_path)
-    media_type = (
-        mimetypes.guess_type(row.filename)[0] or "application/octet-stream"
-    )
+    media_type = mimetypes.guess_type(row.filename)[0] or "application/octet-stream"
     safe_name = row.filename.replace('"', "").replace("\r", "").replace("\n", "")
     await emit_admin_event(
         session,
@@ -708,45 +745,77 @@ async def test_knowledge(
             )
         ).all()
         for row, score in faq_rows:
-            sources.append(SourceItem(type="faq", id=row.id, text=f"{row.question}\n{row.answer}"[:600], score=float(score or 0)))
+            sources.append(
+                SourceItem(
+                    type="faq",
+                    id=row.id,
+                    text=f"{row.question}\n{row.answer}"[:600],
+                    score=float(score or 0),
+                )
+            )
         chunk_rows = (
             await session.execute(
-                select(KnowledgeChunk, KnowledgeChunk.embedding.cosine_distance(embedding).label("score"))
+                select(
+                    KnowledgeChunk,
+                    KnowledgeChunk.embedding.cosine_distance(embedding).label("score"),
+                )
                 .where(KnowledgeChunk.tenant_id == tenant_id, KnowledgeChunk.embedding.is_not(None))
                 .order_by("score")
                 .limit(3)
             )
         ).all()
         for row, score in chunk_rows:
-            sources.append(SourceItem(type="document", id=row.id, text=row.text[:600], score=float(score or 0)))
+            sources.append(
+                SourceItem(type="document", id=row.id, text=row.text[:600], score=float(score or 0))
+            )
     if not sources:
         like = f"%{query}%"
         faq_rows = (
-            await session.execute(
-                select(TenantFAQ)
-                .where(
-                    TenantFAQ.tenant_id == tenant_id,
-                    or_(TenantFAQ.question.ilike(like), TenantFAQ.answer.ilike(like)),
+            (
+                await session.execute(
+                    select(TenantFAQ)
+                    .where(
+                        TenantFAQ.tenant_id == tenant_id,
+                        or_(TenantFAQ.question.ilike(like), TenantFAQ.answer.ilike(like)),
+                    )
+                    .limit(5)
                 )
-                .limit(5)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for row in faq_rows:
-            sources.append(SourceItem(type="faq", id=row.id, text=f"{row.question}\n{row.answer}"[:600], score=0))
-        catalog_rows = (
-            await session.execute(
-                select(TenantCatalogItem)
-                .where(TenantCatalogItem.tenant_id == tenant_id, TenantCatalogItem.name.ilike(like))
-                .limit(5)
+            sources.append(
+                SourceItem(
+                    type="faq", id=row.id, text=f"{row.question}\n{row.answer}"[:600], score=0
+                )
             )
-        ).scalars().all()
+        catalog_rows = (
+            (
+                await session.execute(
+                    select(TenantCatalogItem)
+                    .where(
+                        TenantCatalogItem.tenant_id == tenant_id, TenantCatalogItem.name.ilike(like)
+                    )
+                    .limit(5)
+                )
+            )
+            .scalars()
+            .all()
+        )
         for row in catalog_rows:
-            sources.append(SourceItem(type="catalog", id=row.id, text=f"{row.name}\n{json.dumps(row.attrs or {})}"[:600], score=0))
+            sources.append(
+                SourceItem(
+                    type="catalog",
+                    id=row.id,
+                    text=f"{row.name}\n{json.dumps(row.attrs or {})}"[:600],
+                    score=0,
+                )
+            )
 
     capped_sources = sources[:6]
     sources_text = "\n\n".join(
-        f"<fuente type={s.type} score={s.score:.3f}>\n{s.text}\n</fuente>"
-        for s in capped_sources
+        f"<fuente type={s.type} score={s.score:.3f}>\n{s.text}\n</fuente>" for s in capped_sources
     )
     answer, mode = await _generate_kb_answer(query, sources_text)
     return TestResponse(answer=answer, sources=capped_sources, mode=mode)
@@ -767,12 +836,16 @@ async def reindex_documents(
     """
     await _claim_reindex_cooldown(tenant_id)
     ids = (
-        await session.execute(
-            select(KnowledgeDocument.id).where(
-                KnowledgeDocument.tenant_id == tenant_id,
+        (
+            await session.execute(
+                select(KnowledgeDocument.id).where(
+                    KnowledgeDocument.tenant_id == tenant_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     queued = 0
     if not ids:
         return {"queued": 0}

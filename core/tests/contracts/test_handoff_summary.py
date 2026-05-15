@@ -3,6 +3,7 @@
 Frontend (Phase 4) and human agents read this to understand context
 before responding. Six reasons covering all v1 escalation triggers.
 """
+
 from atendia.contracts.handoff_summary import HandoffReason, HandoffSummary
 
 

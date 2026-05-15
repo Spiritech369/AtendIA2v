@@ -6,6 +6,7 @@ Exercises the four headline cards with synthetic data:
 * handoff rate vs total
 * pipeline funnel cumulative percentages
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,8 +29,7 @@ def _seed_conversations(tenant_id: str, *, ages_hours: list[int]) -> list[str]:
             customer = (
                 await conn.execute(
                     text(
-                        "INSERT INTO customers (tenant_id, phone_e164) "
-                        "VALUES (:t, :p) RETURNING id"
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"
                     ),
                     {"t": UUID(tenant_id), "p": f"+5215555{uuid4().hex[:6]}"},
                 )
@@ -148,9 +148,7 @@ def _move_conversations(*, ids: list[str], to_stage: str) -> None:
         async with engine.begin() as conn:
             for cid in ids:
                 await conn.execute(
-                    text(
-                        "UPDATE conversations SET current_stage = :s WHERE id = :c"
-                    ),
+                    text("UPDATE conversations SET current_stage = :s WHERE id = :c"),
                     {"s": to_stage, "c": UUID(cid)},
                 )
         await engine.dispose()

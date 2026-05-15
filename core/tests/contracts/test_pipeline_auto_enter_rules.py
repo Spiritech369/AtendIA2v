@@ -4,6 +4,7 @@ These pin the schema the evaluator (M3) and the rule builder UI (M2) will
 both rely on. If any of these tests change shape, both sides break and we
 notice in CI instead of in production.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -73,8 +74,15 @@ def test_operators_constant_in_lockstep_with_literal():
     """OPERATORS is exported for the FE to import via codegen later. Pin
     that the runtime constant matches what Condition accepts."""
     assert OPERATORS == {
-        "exists", "not_exists", "equals", "not_equals", "contains",
-        "greater_than", "less_than", "in", "not_in",
+        "exists",
+        "not_exists",
+        "equals",
+        "not_equals",
+        "contains",
+        "greater_than",
+        "less_than",
+        "in",
+        "not_in",
     }
 
 
@@ -166,12 +174,14 @@ def test_stage_definition_allows_extra_presentation_keys():
     """Existing pipelines store color/label in JSONB; the contract must
     not reject them. M1 surfaces is_terminal/allow_auto_backward as
     typed fields but keeps extra='allow' for presentation noise."""
-    s = StageDefinition.model_validate({
-        "id": "nuevo",
-        "color": "#6366f1",
-        "label": "Nuevo lead",
-        "timeout_hours": 24,
-    })
+    s = StageDefinition.model_validate(
+        {
+            "id": "nuevo",
+            "color": "#6366f1",
+            "label": "Nuevo lead",
+            "timeout_hours": 24,
+        }
+    )
     assert s.id == "nuevo"
 
 
@@ -224,9 +234,21 @@ def test_pipeline_papeleria_completa_doc_rules():
                     "match": "all",
                     "conditions": [
                         {"field": "DOCS_INE.status", "operator": "equals", "value": "ok"},
-                        {"field": "DOCS_COMPROBANTE_DOMICILIO.status", "operator": "equals", "value": "ok"},
-                        {"field": "DOCS_ESTADOS_CUENTA.status", "operator": "equals", "value": "ok"},
-                        {"field": "DOCS_RECIBOS_NOMINA.status", "operator": "equals", "value": "ok"},
+                        {
+                            "field": "DOCS_COMPROBANTE_DOMICILIO.status",
+                            "operator": "equals",
+                            "value": "ok",
+                        },
+                        {
+                            "field": "DOCS_ESTADOS_CUENTA.status",
+                            "operator": "equals",
+                            "value": "ok",
+                        },
+                        {
+                            "field": "DOCS_RECIBOS_NOMINA.status",
+                            "operator": "equals",
+                            "value": "ok",
+                        },
                     ],
                 },
                 "transitions": [],

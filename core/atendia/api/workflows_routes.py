@@ -107,7 +107,9 @@ class SafePauseBody(BaseModel):
 
 class SimulationBody(BaseModel):
     sample_lead_id: str | None = None
-    incoming_message: str = Field(default="Quiero una moto, gano por nómina", min_length=1, max_length=1024)
+    incoming_message: str = Field(
+        default="Quiero una moto, gano por nómina", min_length=1, max_length=1024
+    )
     version: str = Field(default="draft")
 
 
@@ -238,7 +240,7 @@ _SAFETY_LABELS = {
     "business_hours": "Respetar horario laboral",
     "max_3_messages_24h": "Máximo 3 mensajes automáticos en 24h",
     "dedupe_template": "No repetir misma plantilla",
-    "stop_on_no": "Detener si el cliente dice \"no\"",
+    "stop_on_no": 'Detener si el cliente dice "no"',
     "stop_on_human": "Detener si pide humano",
     "stop_on_frustration": "Detener si se detecta frustración",
     "pause_on_critical": "Pausar si hay error crítico",
@@ -360,7 +362,9 @@ def _default_dependencies(workflow: Workflow) -> list[dict]:
     linked_workflow. ``definition.ops.dependency_status`` can override status.
     """
     ops = _ops(workflow.definition)
-    dep_status = ops.get("dependency_status") if isinstance(ops.get("dependency_status"), dict) else {}
+    dep_status = (
+        ops.get("dependency_status") if isinstance(ops.get("dependency_status"), dict) else {}
+    )
     nodes = (workflow.definition or {}).get("nodes") or []
     seen: list[tuple[str, str]] = []
     seen_keys: set[tuple[str, str]] = set()
@@ -437,7 +441,9 @@ def _calculate_health(workflow: Workflow) -> dict:
     variables = _default_variables(workflow)
     dependencies = _default_dependencies(workflow)
     missing_variables = sum(1 for item in variables if item["status"] in {"faltante", "error"})
-    invalid_dependencies = sum(1 for item in dependencies if item["status"] in {"error", "deleted", "inactive"})
+    invalid_dependencies = sum(
+        1 for item in dependencies if item["status"] in {"error", "deleted", "inactive"}
+    )
     score = 100
     score -= min(35, float(metrics["failure_rate"]) * 0.9)
     score -= min(18, float(metrics["critical_failures_24h"]) * 5)
@@ -483,8 +489,12 @@ def _calculate_health(workflow: Workflow) -> dict:
     }
 
 
-def _issue(code: str, severity: str, message: str, node_id: str | None = None, area: str = "workflow") -> ValidationIssue:
-    return ValidationIssue(code=code, severity=severity, message=message, node_id=node_id, area=area)
+def _issue(
+    code: str, severity: str, message: str, node_id: str | None = None, area: str = "workflow"
+) -> ValidationIssue:
+    return ValidationIssue(
+        code=code, severity=severity, message=message, node_id=node_id, area=area
+    )
 
 
 def _operational_validate(workflow: Workflow) -> WorkflowValidationResult:
@@ -505,36 +515,98 @@ def _operational_validate(workflow: Workflow) -> WorkflowValidationResult:
         if node_type in {"message", "template_message"}:
             text = str(config.get("text") or config.get("template") or "").strip()
             if not text:
-                issues.append(_issue("MESSAGE_EMPTY", "critical", "Mensaje o plantilla sin configurar", node_id, "nodo"))
+                issues.append(
+                    _issue(
+                        "MESSAGE_EMPTY",
+                        "critical",
+                        "Mensaje o plantilla sin configurar",
+                        node_id,
+                        "nodo",
+                    )
+                )
             template = str(config.get("template") or "")
             if template and template.lower().endswith("_draft"):
-                issues.append(_issue("TEMPLATE_UNAPPROVED", "critical", "Plantilla WhatsApp no aprobada", node_id, "plantillas"))
+                issues.append(
+                    _issue(
+                        "TEMPLATE_UNAPPROVED",
+                        "critical",
+                        "Plantilla WhatsApp no aprobada",
+                        node_id,
+                        "plantillas",
+                    )
+                )
         if node_type == "condition":
             labels = {str(edge.get("label")) for edge in edges if edge.get("from") == node_id}
             if "true" not in labels:
-                issues.append(_issue("MISSING_TRUE_BRANCH", "critical", "Condición sin salida 'Sí'", node_id, "condiciones"))
+                issues.append(
+                    _issue(
+                        "MISSING_TRUE_BRANCH",
+                        "critical",
+                        "Condición sin salida 'Sí'",
+                        node_id,
+                        "condiciones",
+                    )
+                )
             if "false" not in labels:
-                issues.append(_issue("MISSING_FALSE_BRANCH", "critical", "Condición sin salida 'No'", node_id, "condiciones"))
+                issues.append(
+                    _issue(
+                        "MISSING_FALSE_BRANCH",
+                        "critical",
+                        "Condición sin salida 'No'",
+                        node_id,
+                        "condiciones",
+                    )
+                )
         for raw in re.findall(r"{{\s*([a-zA-Z0-9_]+)\s*}}", str(config)):
             if raw not in _VARIABLE_NAMES:
-                issues.append(_issue("INVALID_VARIABLE", "critical", f"Variable {{{{{raw}}}}} no existe", node_id, "variables"))
+                issues.append(
+                    _issue(
+                        "INVALID_VARIABLE",
+                        "critical",
+                        f"Variable {{{{{raw}}}}} no existe",
+                        node_id,
+                        "variables",
+                    )
+                )
 
     if not any(str(node.get("type")) == "end" for node in nodes):
-        issues.append(_issue("MISSING_FINAL_NODE", "critical", "Falta nodo final", area="estructura"))
+        issues.append(
+            _issue("MISSING_FINAL_NODE", "critical", "Falta nodo final", area="estructura")
+        )
     for edge in edges:
         if str(edge.get("from")) not in node_ids or str(edge.get("to")) not in node_ids:
-            issues.append(_issue("BROKEN_EDGE", "critical", "Referencia de workflow rota", area="estructura"))
+            issues.append(
+                _issue("BROKEN_EDGE", "critical", "Referencia de workflow rota", area="estructura")
+            )
 
     for variable in _default_variables(workflow):
         if variable["status"] == "faltante":
-            issues.append(_issue("MISSING_VARIABLE", "warning", f"Variable {variable['name']} no existe", area="variables"))
+            issues.append(
+                _issue(
+                    "MISSING_VARIABLE",
+                    "warning",
+                    f"Variable {variable['name']} no existe",
+                    area="variables",
+                )
+            )
         if variable["status"] == "error":
-            issues.append(_issue("VARIABLE_ERROR", "critical", f"Variable {variable['name']} inválida", area="variables"))
+            issues.append(
+                _issue(
+                    "VARIABLE_ERROR",
+                    "critical",
+                    f"Variable {variable['name']} inválida",
+                    area="variables",
+                )
+            )
 
     for dependency in _default_dependencies(workflow):
         status_value = dependency["status"]
         if status_value in {"deleted", "inactive", "error"}:
-            severity = "critical" if dependency["type"] in {"whatsapp_template", "advisor_pool", "custom_field"} else "warning"
+            severity = (
+                "critical"
+                if dependency["type"] in {"whatsapp_template", "advisor_pool", "custom_field"}
+                else "warning"
+            )
             issues.append(
                 _issue(
                     "DEPENDENCY_INVALID",
@@ -546,21 +618,58 @@ def _operational_validate(workflow: Workflow) -> WorkflowValidationResult:
 
     safety = _default_safety_rules(_ops(definition).get("safety_rules"))
     if not safety["max_3_messages_24h"] or not safety["dedupe_template"]:
-        issues.append(_issue("ANTI_SPAM_DISABLED", "critical", "Reglas anti-spam desactivas", area="seguridad"))
+        issues.append(
+            _issue(
+                "ANTI_SPAM_DISABLED", "critical", "Reglas anti-spam desactivas", area="seguridad"
+            )
+        )
     if not safety["business_hours"]:
-        issues.append(_issue("BUSINESS_HOURS_DISABLED", "warning", "Horario laboral no respetado", area="seguridad"))
+        issues.append(
+            _issue(
+                "BUSINESS_HOURS_DISABLED",
+                "warning",
+                "Horario laboral no respetado",
+                area="seguridad",
+            )
+        )
 
     critical = sum(1 for item in issues if item.severity == "critical")
     warnings = sum(1 for item in issues if item.severity == "warning")
     checks = [
-        {"label": "Configuración completa", "status": "error" if any(i.area == "nodo" for i in issues) else "ok"},
-        {"label": "Variables válidas", "status": "error" if any(i.area == "variables" and i.severity == "critical" for i in issues) else ("warning" if any(i.area == "variables" for i in issues) else "ok")},
-        {"label": "Condiciones con salida Sí/No", "status": "error" if any(i.area == "condiciones" for i in issues) else "ok"},
-        {"label": "Plantillas aprobadas", "status": "error" if any(i.area == "plantillas" for i in issues) else "ok"},
-        {"label": "Agentes disponibles", "status": "error" if any("advisor" in i.message.lower() for i in issues) else "ok"},
-        {"label": "Horario laboral respetado", "status": "warning" if not safety["business_hours"] else "ok"},
-        {"label": "Nodo final presente", "status": "error" if any(i.code == "MISSING_FINAL_NODE" for i in issues) else "ok"},
-        {"label": "Reglas anti-spam activas", "status": "error" if any(i.code == "ANTI_SPAM_DISABLED" for i in issues) else "ok"},
+        {
+            "label": "Configuración completa",
+            "status": "error" if any(i.area == "nodo" for i in issues) else "ok",
+        },
+        {
+            "label": "Variables válidas",
+            "status": "error"
+            if any(i.area == "variables" and i.severity == "critical" for i in issues)
+            else ("warning" if any(i.area == "variables" for i in issues) else "ok"),
+        },
+        {
+            "label": "Condiciones con salida Sí/No",
+            "status": "error" if any(i.area == "condiciones" for i in issues) else "ok",
+        },
+        {
+            "label": "Plantillas aprobadas",
+            "status": "error" if any(i.area == "plantillas" for i in issues) else "ok",
+        },
+        {
+            "label": "Agentes disponibles",
+            "status": "error" if any("advisor" in i.message.lower() for i in issues) else "ok",
+        },
+        {
+            "label": "Horario laboral respetado",
+            "status": "warning" if not safety["business_hours"] else "ok",
+        },
+        {
+            "label": "Nodo final presente",
+            "status": "error" if any(i.code == "MISSING_FINAL_NODE" for i in issues) else "ok",
+        },
+        {
+            "label": "Reglas anti-spam activas",
+            "status": "error" if any(i.code == "ANTI_SPAM_DISABLED" for i in issues) else "ok",
+        },
     ]
     ok_count = sum(1 for check in checks if check["status"] == "ok")
     if critical:
@@ -639,7 +748,9 @@ def _item(row: Workflow) -> WorkflowItem:
 def _execution_replay(row: WorkflowExecution, workflow: Workflow | None = None) -> list[dict]:
     now = row.started_at
     if workflow is not None:
-        nodes = [node for node in (workflow.definition or {}).get("nodes", []) if isinstance(node, dict)]
+        nodes = [
+            node for node in (workflow.definition or {}).get("nodes", []) if isinstance(node, dict)
+        ]
     else:
         nodes = []
     if not nodes:
@@ -654,8 +765,12 @@ def _execution_replay(row: WorkflowExecution, workflow: Workflow | None = None) 
                 "time": (now + timedelta(seconds=idx * 12)).isoformat() if now else None,
                 "node_id": str(node.get("id")),
                 "label": _node_title(node),
-                "status": "error" if row.status == "failed" and node.get("id") == row.current_node_id else "ok",
-                "detail": row.error if row.status == "failed" and node.get("id") == row.current_node_id else "Ejecutado",
+                "status": "error"
+                if row.status == "failed" and node.get("id") == row.current_node_id
+                else "ok",
+                "detail": row.error
+                if row.status == "failed" and node.get("id") == row.current_node_id
+                else "Ejecutado",
             }
         )
     if row.status in {"completed", "failed"}:
@@ -694,17 +809,27 @@ def _execution_item(row: WorkflowExecution, workflow: Workflow | None = None) ->
         lead_name=lead_name,
         lead_phone=lead_phone,
         duration_seconds=duration,
-        result="Fallo" if row.status == "failed" else ("Éxito" if row.status == "completed" else "En proceso"),
+        result="Fallo"
+        if row.status == "failed"
+        else ("Éxito" if row.status == "completed" else "En proceso"),
         failed_node=row.current_node_id if row.status == "failed" else None,
         input_json={"message": "Quiero una moto, gano por nómina", "lead": lead_name},
-        output_json={"status": row.status, "error": row.error, "current_node_id": row.current_node_id},
+        output_json={
+            "status": row.status,
+            "error": row.error,
+            "current_node_id": row.current_node_id,
+        },
         replay=_execution_replay(row, workflow),
     )
 
 
-async def _get_workflow_or_404(session: AsyncSession, workflow_id: UUID, tenant_id: UUID) -> Workflow:
+async def _get_workflow_or_404(
+    session: AsyncSession, workflow_id: UUID, tenant_id: UUID
+) -> Workflow:
     row = (
-        await session.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+        await session.execute(
+            select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "workflow not found")
@@ -732,8 +857,16 @@ async def list_workflows(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[WorkflowItem]:
     rows = (
-        await session.execute(select(Workflow).where(Workflow.tenant_id == tenant_id).order_by(Workflow.created_at.desc()))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(Workflow)
+                .where(Workflow.tenant_id == tenant_id)
+                .order_by(Workflow.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [_item(row) for row in rows]
 
 
@@ -755,6 +888,7 @@ async def create_workflow(
     row = Workflow(tenant_id=tenant_id, **body.model_dump())
     if row.trigger_type == "webhook_received" and not row.webhook_token:
         import secrets
+
         row.webhook_token = secrets.token_urlsafe(24)
     session.add(row)
     await session.flush()
@@ -783,7 +917,9 @@ async def get_workflow(
     session: AsyncSession = Depends(get_db_session),
 ) -> WorkflowItem:
     row = (
-        await session.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+        await session.execute(
+            select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "workflow not found")
@@ -799,7 +935,9 @@ async def patch_workflow(
     session: AsyncSession = Depends(get_db_session),
 ) -> WorkflowItem:
     row = (
-        await session.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+        await session.execute(
+            select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "workflow not found")
@@ -830,6 +968,7 @@ async def patch_workflow(
     # wants them.
     if row.trigger_type == "webhook_received" and not row.webhook_token:
         import secrets
+
         row.webhook_token = secrets.token_urlsafe(24)
     elif row.trigger_type != "webhook_received" and row.webhook_token:
         row.webhook_token = None
@@ -859,7 +998,9 @@ async def delete_workflow(
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
     row = (
-        await session.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+        await session.execute(
+            select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "workflow not found")
@@ -874,7 +1015,9 @@ async def delete_workflow(
     await session.commit()
 
 
-@router.post("/{workflow_id}/duplicate", response_model=WorkflowItem, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{workflow_id}/duplicate", response_model=WorkflowItem, status_code=status.HTTP_201_CREATED
+)
 async def duplicate_workflow(
     workflow_id: UUID,
     user: AuthUser = Depends(require_tenant_admin),
@@ -1038,7 +1181,9 @@ async def toggle_workflow(
     session: AsyncSession = Depends(get_db_session),
 ) -> WorkflowItem:
     row = (
-        await session.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+        await session.execute(
+            select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "workflow not found")
@@ -1199,7 +1344,14 @@ async def compare_workflow_versions(
         "to": to_version,
         "added": [{"node_id": "n9", "title": "Seguimiento automático"}],
         "changed": [
-            {"node_id": str(nodes[1].get("id")) if len(nodes) > 1 and isinstance(nodes[1], dict) else "n1", "field": "template", "before": "bienvenida_v2", "after": "bienvenida_v3"}
+            {
+                "node_id": str(nodes[1].get("id"))
+                if len(nodes) > 1 and isinstance(nodes[1], dict)
+                else "n1",
+                "field": "template",
+                "before": "bienvenida_v2",
+                "after": "bienvenida_v3",
+            }
         ],
         "removed": [],
         "risk": "medium" if _operational_validate(row).warning_count else "low",
@@ -1220,7 +1372,15 @@ async def add_workflow_node(
     edges = definition.setdefault("edges", [])
     node_id = _next_action_id(definition)
     previous = next((node.get("id") for node in reversed(nodes) if isinstance(node, dict)), None)
-    nodes.append({"id": node_id, "type": body.type, "title": body.title, "config": body.config, "enabled": True})
+    nodes.append(
+        {
+            "id": node_id,
+            "type": body.type,
+            "title": body.title,
+            "config": body.config,
+            "enabled": True,
+        }
+    )
     if previous:
         edges.append({"from": previous, "to": node_id})
     _touch_definition(row, definition)
@@ -1270,7 +1430,11 @@ async def delete_workflow_node(
     row = await _get_workflow_or_404(session, workflow_id, tenant_id)
     definition = deepcopy(row.definition or {"nodes": [], "edges": []})
     original = len(definition.get("nodes", []))
-    definition["nodes"] = [node for node in definition.get("nodes", []) if not (isinstance(node, dict) and node.get("id") == node_id)]
+    definition["nodes"] = [
+        node
+        for node in definition.get("nodes", [])
+        if not (isinstance(node, dict) and node.get("id") == node_id)
+    ]
     if len(definition["nodes"]) == original:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "node not found")
     definition["edges"] = [
@@ -1295,7 +1459,14 @@ async def duplicate_workflow_node(
     row = await _get_workflow_or_404(session, workflow_id, tenant_id)
     definition = deepcopy(row.definition or {"nodes": [], "edges": []})
     nodes = definition.setdefault("nodes", [])
-    source_idx = next((idx for idx, node in enumerate(nodes) if isinstance(node, dict) and node.get("id") == node_id), None)
+    source_idx = next(
+        (
+            idx
+            for idx, node in enumerate(nodes)
+            if isinstance(node, dict) and node.get("id") == node_id
+        ),
+        None,
+    )
     if source_idx is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "node not found")
     clone = deepcopy(nodes[source_idx])
@@ -1318,9 +1489,13 @@ async def reorder_workflow_nodes(
 ) -> WorkflowItem:
     row = await _get_workflow_or_404(session, workflow_id, tenant_id)
     definition = deepcopy(row.definition or {"nodes": [], "edges": []})
-    by_id = {str(node.get("id")): node for node in definition.get("nodes", []) if isinstance(node, dict)}
+    by_id = {
+        str(node.get("id")): node for node in definition.get("nodes", []) if isinstance(node, dict)
+    }
     if set(body.node_ids) != set(by_id):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "node_ids must include every node exactly once")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "node_ids must include every node exactly once"
+        )
     definition["nodes"] = [by_id[node_id] for node_id in body.node_ids]
     _touch_definition(row, definition)
     await session.commit()
@@ -1345,6 +1520,7 @@ def _substitute_vars(text: str, variables: dict) -> str:
         if name in variables and variables[name] is not None:
             return str(variables[name])
         return match.group(0)
+
     return re.sub(r"{{\s*([a-zA-Z0-9_]+)\s*}}", replace, text)
 
 
@@ -1519,7 +1695,10 @@ async def refresh_workflow_dependencies(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     row = await _get_workflow_or_404(session, workflow_id, tenant_id)
-    return {"refreshed": len(_default_dependencies(row)), "checked_at": datetime.now(UTC).isoformat()}
+    return {
+        "refreshed": len(_default_dependencies(row)),
+        "checked_at": datetime.now(UTC).isoformat(),
+    }
 
 
 @router.get("/{workflow_id}/variables")
@@ -1542,13 +1721,17 @@ async def list_executions(
 ) -> list[ExecutionItem]:
     workflow = await _get_workflow_or_404(session, workflow_id, tenant_id)
     rows = (
-        await session.execute(
-            select(WorkflowExecution)
-            .where(WorkflowExecution.workflow_id == workflow_id)
-            .order_by(WorkflowExecution.started_at.desc())
-            .limit(100)
+        (
+            await session.execute(
+                select(WorkflowExecution)
+                .where(WorkflowExecution.workflow_id == workflow_id)
+                .order_by(WorkflowExecution.started_at.desc())
+                .limit(100)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_execution_item(row, workflow) for row in rows]
 
 
@@ -1621,7 +1804,9 @@ async def get_execution(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ExecutionItem:
-    execution, workflow = await _get_execution_with_workflow_or_404(session, execution_id, tenant_id)
+    execution, workflow = await _get_execution_with_workflow_or_404(
+        session, execution_id, tenant_id
+    )
     return _execution_item(execution, workflow)
 
 
@@ -1632,7 +1817,9 @@ async def retry_execution_global(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ExecutionItem:
-    execution, workflow = await _get_execution_with_workflow_or_404(session, execution_id, tenant_id)
+    execution, workflow = await _get_execution_with_workflow_or_404(
+        session, execution_id, tenant_id
+    )
     if execution.status != "failed":
         raise HTTPException(status.HTTP_409_CONFLICT, "only failed executions can be retried")
     execution.status = "completed"
@@ -1660,7 +1847,9 @@ async def retry_execution_from_node(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ExecutionItem:
-    execution, workflow = await _get_execution_with_workflow_or_404(session, execution_id, tenant_id)
+    execution, workflow = await _get_execution_with_workflow_or_404(
+        session, execution_id, tenant_id
+    )
     execution.status = "completed"
     execution.error = None
     execution.error_code = None
@@ -1671,7 +1860,11 @@ async def retry_execution_from_node(
         tenant_id=tenant_id,
         actor_user_id=user.user_id,
         action="workflow.execution.retry_from_node",
-        payload={"execution_id": str(execution_id), "workflow_id": str(workflow.id), "node_id": node_id},
+        payload={
+            "execution_id": str(execution_id),
+            "workflow_id": str(workflow.id),
+            "node_id": node_id,
+        },
     )
     await session.commit()
     await session.refresh(execution)
@@ -1685,7 +1878,9 @@ async def get_execution_replay(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
-    execution, workflow = await _get_execution_with_workflow_or_404(session, execution_id, tenant_id)
+    execution, workflow = await _get_execution_with_workflow_or_404(
+        session, execution_id, tenant_id
+    )
     return _execution_replay(execution, workflow)
 
 
@@ -1696,7 +1891,9 @@ async def export_execution_json(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    execution, workflow = await _get_execution_with_workflow_or_404(session, execution_id, tenant_id)
+    execution, workflow = await _get_execution_with_workflow_or_404(
+        session, execution_id, tenant_id
+    )
     return _execution_item(execution, workflow).model_dump(mode="json")
 
 
@@ -1711,12 +1908,16 @@ async def list_templates(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[TemplateItem]:
     rows = (
-        await session.execute(
-            select(WhatsAppTemplate)
-            .where(WhatsAppTemplate.tenant_id == tenant_id)
-            .order_by(WhatsAppTemplate.name.asc())
+        (
+            await session.execute(
+                select(WhatsAppTemplate)
+                .where(WhatsAppTemplate.tenant_id == tenant_id)
+                .order_by(WhatsAppTemplate.name.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_template_item(row) for row in rows]
 
 

@@ -8,6 +8,7 @@ Aquí editas:
 
 Los placeholders entre {{ }} se sustituyen al construir la request.
 """
+
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner._template_helpers import (
     ROLE_LABELS,
@@ -61,10 +62,7 @@ Reglas de salida:
 def _render_fields(fields: list[FieldSpec]) -> str:
     if not fields:
         return "(ninguno)"
-    return "\n".join(
-        f"- {f.name}: {f.description or '(sin descripción)'}"
-        for f in fields
-    )
+    return "\n".join(f"- {f.name}: {f.description or '(sin descripción)'}" for f in fields)
 
 
 def build_prompt(

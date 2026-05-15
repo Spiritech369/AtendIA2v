@@ -5,6 +5,7 @@
   frontend can render the outside-24h banner.
 - C-5: per-tenant rate limit on ``POST /conversations/{id}/force-summary``.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -152,15 +153,15 @@ def test_email_rejects_unknown_fields(client_tenant_admin) -> None:
 
 def test_last_inbound_at_returned_in_detail(client_tenant_admin) -> None:
     _cust, conv_id = _seed_conversation_with_inbound(
-        client_tenant_admin.tenant_id, inbound_age_hours=2.0,
+        client_tenant_admin.tenant_id,
+        inbound_age_hours=2.0,
     )
     resp = client_tenant_admin.get(f"/api/v1/conversations/{conv_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["last_inbound_at"] is not None
     age_hours = (
-        datetime.now(UTC)
-        - datetime.fromisoformat(body["last_inbound_at"].replace("Z", "+00:00"))
+        datetime.now(UTC) - datetime.fromisoformat(body["last_inbound_at"].replace("Z", "+00:00"))
     ).total_seconds() / 3600.0
     assert 1.5 <= age_hours <= 2.5  # tolerance for clock drift
 
@@ -221,7 +222,8 @@ def test_last_inbound_at_null_when_no_inbound(client_tenant_admin) -> None:
 def test_force_summary_rate_limit(client_tenant_admin) -> None:
     """30/min cap. The 31st call within a window must 429."""
     _cust, conv_id = _seed_conversation_with_inbound(
-        client_tenant_admin.tenant_id, inbound_age_hours=1.0,
+        client_tenant_admin.tenant_id,
+        inbound_age_hours=1.0,
     )
     last = None
     for _ in range(31):
@@ -232,7 +234,8 @@ def test_force_summary_rate_limit(client_tenant_admin) -> None:
 
 def test_force_summary_under_limit_succeeds(client_tenant_admin) -> None:
     _cust, conv_id = _seed_conversation_with_inbound(
-        client_tenant_admin.tenant_id, inbound_age_hours=1.0,
+        client_tenant_admin.tenant_id,
+        inbound_age_hours=1.0,
     )
     resp = client_tenant_admin.post(f"/api/v1/conversations/{conv_id}/force-summary")
     assert resp.status_code == 202

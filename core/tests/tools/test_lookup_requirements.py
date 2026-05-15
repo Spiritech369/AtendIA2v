@@ -9,6 +9,7 @@ If you change the RequirementsResult shape (received/rejected/missing
 buckets, complete flag), this file is the canary — the composer prompt
 relies on the same field names.
 """
+
 from __future__ import annotations
 
 from atendia.contracts.pipeline_definition import (
@@ -45,7 +46,9 @@ def test_returns_no_data_when_plan_credito_missing():
         docs_per_plan={"nomina_tarjeta_10": ["DOCS_INE"]},
     )
     result = lookup_requirements(
-        pipeline=pipeline, plan_credito=None, customer_attrs={},
+        pipeline=pipeline,
+        plan_credito=None,
+        customer_attrs={},
     )
     assert isinstance(result, ToolNoDataResult)
     assert "plan_credito" in result.hint
@@ -197,7 +200,9 @@ def test_missing_when_catalog_lacks_entry_falls_back_to_raw_key():
         # Note: no DocumentSpec for DOCS_RECIBO_NOMINA
     )
     result = lookup_requirements(
-        pipeline=pipeline, plan_credito="plan_x", customer_attrs={},
+        pipeline=pipeline,
+        plan_credito="plan_x",
+        customer_attrs={},
     )
     assert isinstance(result, RequirementsResult)
     assert result.missing[0].label == "DOCS_RECIBO_NOMINA"
@@ -231,7 +236,9 @@ def test_required_doc_pydantic_round_trip():
         catalog=[DocumentSpec(key="DOCS_INE", label="INE")],
     )
     result = lookup_requirements(
-        pipeline=pipeline, plan_credito="plan_x", customer_attrs={},
+        pipeline=pipeline,
+        plan_credito="plan_x",
+        customer_attrs={},
     )
     assert isinstance(result, RequirementsResult)
     dumped = result.model_dump(mode="json")

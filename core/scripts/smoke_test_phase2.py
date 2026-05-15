@@ -8,6 +8,7 @@ with Meta mocked, and prints a turn-by-turn summary. Cleanup at the end.
 
 Expected: prints the chain transitions and ends with "OK — phase 2 smoke test passed".
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -70,23 +71,32 @@ PIPELINE = {
 def _payload(channel_id: str, text_body: str, phone_number_id: str) -> dict:
     return {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": phone_number_id},
-                    "messages": [{
-                        "from": "5215555550280",
-                        "id": channel_id,
-                        "timestamp": "1714579200",
-                        "text": {"body": text_body},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "x",
+                                "phone_number_id": phone_number_id,
+                            },
+                            "messages": [
+                                {
+                                    "from": "5215555550280",
+                                    "id": channel_id,
+                                    "timestamp": "1714579200",
+                                    "text": {"body": text_body},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
 
@@ -95,18 +105,27 @@ async def _seed_tenant():
     tenant_name = f"smoke_phase2_{uuid4().hex[:8]}"
     phone_number_id = f"PID_{uuid4().hex[:8].upper()}"
     async with engine.begin() as conn:
-        tid = (await conn.execute(
-            text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-            {
-                "n": tenant_name,
-                "c": json.dumps({
-                    "meta": {"phone_number_id": phone_number_id, "verify_token": "vt_smoke"},
-                }),
-            },
-        )).scalar()
+        tid = (
+            await conn.execute(
+                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
+                {
+                    "n": tenant_name,
+                    "c": json.dumps(
+                        {
+                            "meta": {
+                                "phone_number_id": phone_number_id,
+                                "verify_token": "vt_smoke",
+                            },
+                        }
+                    ),
+                },
+            )
+        ).scalar()
         await conn.execute(
-            text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                 "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+            text(
+                "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+            ),
             {"t": tid, "d": json.dumps(PIPELINE)},
         )
     await engine.dispose()
@@ -115,6 +134,7 @@ async def _seed_tenant():
 
 async def _redis_clear(channel_id: str):
     from redis.asyncio import Redis
+
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_id}")
     await r.aclose()
@@ -124,6 +144,7 @@ async def _drain_one_for_tenant(tenant_id: str) -> dict | None:
     """Drain one outbound job for a specific tenant from arq's queue."""
     from redis.asyncio import Redis
     import arq.jobs
+
     r = Redis.from_url(get_settings().redis_url)
     try:
         for _ in range(40):
@@ -150,20 +171,30 @@ async def _drain_one_for_tenant(tenant_id: str) -> dict | None:
 async def _read_summary(tid):
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
-        msgs = (await conn.execute(
-            text("SELECT direction, text, channel_message_id, delivery_status FROM messages "
-                 "WHERE tenant_id = :t ORDER BY sent_at"),
-            {"t": tid},
-        )).fetchall()
-        traces = (await conn.execute(
-            text("SELECT turn_number, state_after FROM turn_traces "
-                 "WHERE tenant_id = :t ORDER BY turn_number"),
-            {"t": tid},
-        )).fetchall()
-        events = (await conn.execute(
-            text("SELECT type FROM events WHERE tenant_id = :t ORDER BY occurred_at"),
-            {"t": tid},
-        )).fetchall()
+        msgs = (
+            await conn.execute(
+                text(
+                    "SELECT direction, text, channel_message_id, delivery_status FROM messages "
+                    "WHERE tenant_id = :t ORDER BY sent_at"
+                ),
+                {"t": tid},
+            )
+        ).fetchall()
+        traces = (
+            await conn.execute(
+                text(
+                    "SELECT turn_number, state_after FROM turn_traces "
+                    "WHERE tenant_id = :t ORDER BY turn_number"
+                ),
+                {"t": tid},
+            )
+        ).fetchall()
+        events = (
+            await conn.execute(
+                text("SELECT type FROM events WHERE tenant_id = :t ORDER BY occurred_at"),
+                {"t": tid},
+            )
+        ).fetchall()
     await engine.dispose()
     return msgs, traces, events
 
@@ -219,8 +250,10 @@ async def main() -> int:
                     )
                 )
                 result = await send_outbound({}, msg_dict)
-            print(f"Turn {i}: inbound={text_body!r} → outbound action={msg_dict['metadata'].get('action')!r} "
-                  f"text={msg_dict['text']!r:.80} → status={result['status']}")
+            print(
+                f"Turn {i}: inbound={text_body!r} → outbound action={msg_dict['metadata'].get('action')!r} "
+                f"text={msg_dict['text']!r:.80} → status={result['status']}"
+            )
 
         # Print summary
         msgs, traces, events = await _read_summary(tid)

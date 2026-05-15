@@ -8,6 +8,7 @@ Returns retrieved chunks + the assembled prompt + the LLM answer +
 confidence + action + risks + citations + mode, plus auto-logs an
 ``kb_unanswered_questions`` row when the result is escalate/low.
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -153,8 +154,7 @@ async def test_query(
         confidence=answer.confidence,
         action=answer.action,
         risks=[
-            RiskOut(type=r.type, description=r.description, pattern=r.pattern)
-            for r in answer.risks
+            RiskOut(type=r.type, description=r.description, pattern=r.pattern) for r in answer.risks
         ],
         citations=_build_citations(retrieval.chunks),
         mode=answer.mode,

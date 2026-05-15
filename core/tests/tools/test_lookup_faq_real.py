@@ -10,6 +10,7 @@ Tests use SQLAlchemy ORM inserts because raw SQL would require an explicit
 `::halfvec` text cast for each bound parameter; the ORM column-type
 machinery binds `list[float]` to halfvec transparently.
 """
+
 import pytest
 from sqlalchemy import text
 
@@ -30,20 +31,27 @@ def _emb(seed: int, dim: int = 3072) -> list[float]:
 
 async def test_lookup_faq_returns_top_k_matches(db_session) -> None:
     """5 orthogonal FAQs seeded; query == axis 0 → top result is FAQ 0 with score 1.0."""
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES ('test_t11_topk') RETURNING id")
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t11_topk') RETURNING id")
+        )
+    ).scalar()
     for i in range(5):
-        db_session.add(TenantFAQ(
-            tenant_id=tid,
-            question=f"pregunta {i}",
-            answer=f"respuesta {i}",
-            embedding=_emb(i),
-        ))
+        db_session.add(
+            TenantFAQ(
+                tenant_id=tid,
+                question=f"pregunta {i}",
+                answer=f"respuesta {i}",
+                embedding=_emb(i),
+            )
+        )
     await db_session.commit()
     try:
         result = await lookup_faq(
-            session=db_session, tenant_id=tid, embedding=_emb(0), top_k=3,
+            session=db_session,
+            tenant_id=tid,
+            embedding=_emb(0),
+            top_k=3,
         )
         # The seeded FAQs are pairwise orthogonal except for the matching one,
         # so only FAQ 0 clears the default score_threshold=0.5. The others
@@ -61,18 +69,28 @@ async def test_lookup_faq_returns_top_k_matches(db_session) -> None:
 
 async def test_lookup_faq_returns_no_data_when_below_threshold(db_session) -> None:
     """Single FAQ orthogonal to the query → score 0 < threshold → ToolNoDataResult."""
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES ('test_t11_below') RETURNING id")
-    )).scalar()
-    db_session.add(TenantFAQ(
-        tenant_id=tid, question="preg", answer="resp", embedding=_emb(100),
-    ))
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t11_below') RETURNING id")
+        )
+    ).scalar()
+    db_session.add(
+        TenantFAQ(
+            tenant_id=tid,
+            question="preg",
+            answer="resp",
+            embedding=_emb(100),
+        )
+    )
     await db_session.commit()
     try:
         # Query embedding is orthogonal to the seeded FAQ.
         result = await lookup_faq(
-            session=db_session, tenant_id=tid, embedding=_emb(0),
-            top_k=3, score_threshold=0.5,
+            session=db_session,
+            tenant_id=tid,
+            embedding=_emb(0),
+            top_k=3,
+            score_threshold=0.5,
         )
         assert isinstance(result, ToolNoDataResult)
         assert result.status == "no_data"
@@ -89,19 +107,33 @@ async def test_lookup_faq_skips_null_embeddings(db_session) -> None:
     rollout — the tool must gracefully skip un-embedded rows rather than
     crash or rank them badly.
     """
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES ('test_t11_nulls') RETURNING id")
-    )).scalar()
-    db_session.add(TenantFAQ(
-        tenant_id=tid, question="no embedding", answer="x", embedding=None,
-    ))
-    db_session.add(TenantFAQ(
-        tenant_id=tid, question="with embedding", answer="y", embedding=_emb(0),
-    ))
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t11_nulls') RETURNING id")
+        )
+    ).scalar()
+    db_session.add(
+        TenantFAQ(
+            tenant_id=tid,
+            question="no embedding",
+            answer="x",
+            embedding=None,
+        )
+    )
+    db_session.add(
+        TenantFAQ(
+            tenant_id=tid,
+            question="with embedding",
+            answer="y",
+            embedding=_emb(0),
+        )
+    )
     await db_session.commit()
     try:
         result = await lookup_faq(
-            session=db_session, tenant_id=tid, embedding=_emb(0),
+            session=db_session,
+            tenant_id=tid,
+            embedding=_emb(0),
         )
         assert isinstance(result, list)
         # Only the embedded row qualifies; the NULL one must not appear.
@@ -114,23 +146,34 @@ async def test_lookup_faq_skips_null_embeddings(db_session) -> None:
 
 async def test_lookup_faq_respects_tenant_isolation(db_session) -> None:
     """A FAQ from a different tenant must never appear in results."""
-    tid_a = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES ('test_t11_iso_a') RETURNING id")
-    )).scalar()
-    tid_b = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES ('test_t11_iso_b') RETURNING id")
-    )).scalar()
-    db_session.add(TenantFAQ(
-        tenant_id=tid_b, question="other tenant", answer="should not leak",
-        embedding=_emb(0),
-    ))
+    tid_a = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t11_iso_a') RETURNING id")
+        )
+    ).scalar()
+    tid_b = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t11_iso_b') RETURNING id")
+        )
+    ).scalar()
+    db_session.add(
+        TenantFAQ(
+            tenant_id=tid_b,
+            question="other tenant",
+            answer="should not leak",
+            embedding=_emb(0),
+        )
+    )
     await db_session.commit()
     try:
         result = await lookup_faq(
-            session=db_session, tenant_id=tid_a, embedding=_emb(0),
+            session=db_session,
+            tenant_id=tid_a,
+            embedding=_emb(0),
         )
         assert isinstance(result, ToolNoDataResult)
     finally:
-        await db_session.execute(text("DELETE FROM tenants WHERE id IN (:a, :b)"),
-                                 {"a": tid_a, "b": tid_b})
+        await db_session.execute(
+            text("DELETE FROM tenants WHERE id IN (:a, :b)"), {"a": tid_a, "b": tid_b}
+        )
         await db_session.commit()

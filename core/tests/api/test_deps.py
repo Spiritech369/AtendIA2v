@@ -4,6 +4,7 @@ Each test mounts a tiny throwaway router that uses one dep, then drives
 it through the real auth flow via the shared client_operator /
 client_superadmin fixtures.
 """
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4

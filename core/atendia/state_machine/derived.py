@@ -3,6 +3,7 @@
 No DB, no LLM. The runner calls these on every turn to decide what
 the bot should do next.
 """
+
 from atendia.contracts.extracted_fields import ExtractedFields, PlanCredito
 
 

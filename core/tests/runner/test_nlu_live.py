@@ -7,6 +7,7 @@ run them. Run locally before each release with:
     RUN_LIVE_LLM_TESTS=1 ATENDIA_V2_OPENAI_API_KEY=sk-... \\
         uv run pytest tests/runner/test_nlu_live.py
 """
+
 import os
 from decimal import Decimal
 

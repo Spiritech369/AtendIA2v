@@ -10,6 +10,7 @@ Three pairs of endpoints, all tenant-scoped via `current_tenant_id`:
   `default_messages.brand_facts` on tenant_branding.
 * `GET/PUT /api/v1/tenants/:tid/tone` → tenant_branding.voice.
 """
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -59,6 +60,7 @@ async def _broadcast_pipeline_change(
             await redis.aclose()
     except Exception:  # pragma: no cover - WS is fire-and-forget
         pass
+
 
 router = APIRouter()
 
@@ -181,9 +183,7 @@ async def put_pipeline(
         session.add(new_row)
         new_version = 1
     else:
-        existing.history = _push_history(
-            existing.history, definition=body.definition, user=user
-        )
+        existing.history = _push_history(existing.history, definition=body.definition, user=user)
         existing.definition = body.definition
         existing.active = True
         new_row = existing
@@ -214,9 +214,7 @@ async def put_pipeline(
     )
     await session.commit()
     await session.refresh(new_row)
-    await _broadcast_pipeline_change(
-        tenant_id, version=new_row.version, stage_ids=stage_ids
-    )
+    await _broadcast_pipeline_change(tenant_id, version=new_row.version, stage_ids=stage_ids)
     return PipelineResponse(
         version=new_row.version,
         definition=new_row.definition,
@@ -254,9 +252,7 @@ class PipelineRollbackBody(BaseModel):
     index: int = Field(..., ge=1)
 
 
-async def _load_pipeline_row(
-    session: AsyncSession, tenant_id: UUID
-) -> TenantPipeline:
+async def _load_pipeline_row(session: AsyncSession, tenant_id: UUID) -> TenantPipeline:
     row = (
         await session.execute(
             select(TenantPipeline)
@@ -372,9 +368,7 @@ async def rollback_pipeline(
         None,
     )
     if target is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, f"version index {body.index} not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"version index {body.index} not found")
     current_index = max(
         (int(e.get("index", 0)) for e in entries if isinstance(e, dict)),
         default=0,
@@ -386,9 +380,7 @@ async def rollback_pipeline(
         )
 
     restored_definition = target.get("definition") or {}
-    row.history = _push_history(
-        row.history, definition=restored_definition, user=user
-    )
+    row.history = _push_history(row.history, definition=restored_definition, user=user)
     row.definition = restored_definition
     row.active = True
 
@@ -410,9 +402,7 @@ async def rollback_pipeline(
     )
     await session.commit()
     await session.refresh(row)
-    await _broadcast_pipeline_change(
-        tenant_id, version=row.version, stage_ids=stage_ids
-    )
+    await _broadcast_pipeline_change(tenant_id, version=row.version, stage_ids=stage_ids)
     return PipelineResponse(
         version=row.version,
         definition=row.definition,
@@ -473,10 +463,14 @@ async def get_stage_impact(
     ).scalar_one()
 
     workflows = (
-        await session.execute(
-            select(Workflow).where(Workflow.tenant_id == tenant_id),
+        (
+            await session.execute(
+                select(Workflow).where(Workflow.tenant_id == tenant_id),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     refs: list[WorkflowReference] = []
     for wf in workflows:
@@ -658,15 +652,11 @@ class TimezonePutBody(BaseModel):
     timezone: str = Field(min_length=1, max_length=40)
 
 
-async def _ensure_branding(
-    session: AsyncSession, tenant_id: UUID
-) -> TenantBranding:
+async def _ensure_branding(session: AsyncSession, tenant_id: UUID) -> TenantBranding:
     """Fetch the branding row, creating an empty one if missing.
     Idempotent — safe to call from both GET and PUT."""
     row = (
-        await session.execute(
-            select(TenantBranding).where(TenantBranding.tenant_id == tenant_id)
-        )
+        await session.execute(select(TenantBranding).where(TenantBranding.tenant_id == tenant_id))
     ).scalar_one_or_none()
     if row is not None:
         return row
@@ -726,9 +716,7 @@ async def put_tone(
 ) -> ToneResponse:
     await _ensure_branding(session, tenant_id)
     await session.execute(
-        update(TenantBranding)
-        .where(TenantBranding.tenant_id == tenant_id)
-        .values(voice=body.voice)
+        update(TenantBranding).where(TenantBranding.tenant_id == tenant_id).values(voice=body.voice)
     )
     await session.commit()
     return ToneResponse(voice=body.voice)
@@ -775,11 +763,51 @@ DEFAULT_INBOX_CONFIG: dict = {
         "sticky_composer": True,
     },
     "filter_chips": [
-        {"id": "unread",            "label": "Sin leer",             "color": "#4f72f5", "query": "read_at IS NULL",                             "live_count": True,  "visible": True, "order": 0},
-        {"id": "mine",              "label": "Mías",                 "color": "#9b72f5", "query": "assigned_to = current_user",                  "live_count": True,  "visible": True, "order": 1},
-        {"id": "unassigned",        "label": "Sin asignar",          "color": "#f5a623", "query": "assigned_to IS NULL AND status != 'closed'",  "live_count": False, "visible": True, "order": 2},
-        {"id": "awaiting_customer", "label": "En espera de cliente", "color": "#4fa8f5", "query": "stage = 'waiting_customer'",                  "live_count": True,  "visible": True, "order": 3},
-        {"id": "stale",             "label": "Inactivas >24h",       "color": "#f25252", "query": "last_message_at < now() - interval '24h'",   "live_count": True,  "visible": True, "order": 4},
+        {
+            "id": "unread",
+            "label": "Sin leer",
+            "color": "#4f72f5",
+            "query": "read_at IS NULL",
+            "live_count": True,
+            "visible": True,
+            "order": 0,
+        },
+        {
+            "id": "mine",
+            "label": "Mías",
+            "color": "#9b72f5",
+            "query": "assigned_to = current_user",
+            "live_count": True,
+            "visible": True,
+            "order": 1,
+        },
+        {
+            "id": "unassigned",
+            "label": "Sin asignar",
+            "color": "#f5a623",
+            "query": "assigned_to IS NULL AND status != 'closed'",
+            "live_count": False,
+            "visible": True,
+            "order": 2,
+        },
+        {
+            "id": "awaiting_customer",
+            "label": "En espera de cliente",
+            "color": "#4fa8f5",
+            "query": "stage = 'waiting_customer'",
+            "live_count": True,
+            "visible": True,
+            "order": 3,
+        },
+        {
+            "id": "stale",
+            "label": "Inactivas >24h",
+            "color": "#f25252",
+            "query": "last_message_at < now() - interval '24h'",
+            "live_count": True,
+            "visible": True,
+            "order": 4,
+        },
     ],
     # stage_rings start empty. The StageRingsSection UI reads the
     # tenant's live pipeline stages and lets the operator author rings
@@ -790,10 +818,42 @@ DEFAULT_INBOX_CONFIG: dict = {
     # ganado / perdido) — emojis showed up unmoored from real stages.
     "stage_rings": [],
     "handoff_rules": [
-        {"id": "ask_price", "intent": "ASK_PRICE",       "confidence": 82,  "action": "suggest_template",        "template": "precio_hr_v_2025",  "enabled": True,  "order": 0},
-        {"id": "docs_miss", "intent": "DOCS_MISSING",    "confidence": 75,  "action": "send_checklist",          "template": "docs_checklist_v2", "enabled": True,  "order": 1},
-        {"id": "human_req", "intent": "HUMAN_REQUESTED", "confidence": 90,  "action": "assign_to_free_operator", "template": "",                  "enabled": True,  "order": 2},
-        {"id": "stale_24h", "intent": "STALE_24H",       "confidence": 100, "action": "trigger_followup",        "template": "followup_24h",      "enabled": False, "order": 3},
+        {
+            "id": "ask_price",
+            "intent": "ASK_PRICE",
+            "confidence": 82,
+            "action": "suggest_template",
+            "template": "precio_hr_v_2025",
+            "enabled": True,
+            "order": 0,
+        },
+        {
+            "id": "docs_miss",
+            "intent": "DOCS_MISSING",
+            "confidence": 75,
+            "action": "send_checklist",
+            "template": "docs_checklist_v2",
+            "enabled": True,
+            "order": 1,
+        },
+        {
+            "id": "human_req",
+            "intent": "HUMAN_REQUESTED",
+            "confidence": 90,
+            "action": "assign_to_free_operator",
+            "template": "",
+            "enabled": True,
+            "order": 2,
+        },
+        {
+            "id": "stale_24h",
+            "intent": "STALE_24H",
+            "confidence": 100,
+            "action": "trigger_followup",
+            "template": "followup_24h",
+            "enabled": False,
+            "order": 3,
+        },
     ],
 }
 
@@ -836,9 +896,7 @@ async def get_inbox_config(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> InboxConfigResponse:
-    tenant = (
-        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
-    ).scalar_one()
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
     cfg = _normalize_inbox_config((tenant.config or {}).get("inbox_config"))
     return InboxConfigResponse(inbox_config=cfg)
 
@@ -850,15 +908,11 @@ async def put_inbox_config(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> InboxConfigResponse:
-    tenant = (
-        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
-    ).scalar_one()
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
     inbox_config = _normalize_inbox_config(body.inbox_config)
     new_config = dict(tenant.config or {})
     new_config["inbox_config"] = inbox_config
-    await session.execute(
-        update(Tenant).where(Tenant.id == tenant_id).values(config=new_config)
-    )
+    await session.execute(update(Tenant).where(Tenant.id == tenant_id).values(config=new_config))
     await session.commit()
     return InboxConfigResponse(inbox_config=inbox_config)
 

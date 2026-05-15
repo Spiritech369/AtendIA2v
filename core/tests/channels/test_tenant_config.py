@@ -18,10 +18,12 @@ async def test_load_meta_config_returns_struct(db_session):
             "verify_token": "tenant_verify_secret_xyz",
         }
     }
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-        {"n": "test_t6_meta", "c": json.dumps(config)},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
+            {"n": "test_t6_meta", "c": json.dumps(config)},
+        )
+    ).scalar()
     await db_session.commit()
 
     result = await load_meta_config(db_session, tid)
@@ -35,9 +37,13 @@ async def test_load_meta_config_returns_struct(db_session):
 
 @pytest.mark.asyncio
 async def test_load_meta_config_raises_when_no_meta_section(db_session):
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name, config) VALUES ('test_t6_no_meta', '{}'::jsonb) RETURNING id")
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text(
+                "INSERT INTO tenants (name, config) VALUES ('test_t6_no_meta', '{}'::jsonb) RETURNING id"
+            )
+        )
+    ).scalar()
     await db_session.commit()
 
     with pytest.raises(MetaTenantConfigNotFoundError):
@@ -51,10 +57,12 @@ async def test_load_meta_config_raises_when_no_meta_section(db_session):
 async def test_load_meta_config_raises_when_meta_missing_required_keys(db_session):
     """`meta` section exists but doesn't have phone_number_id and verify_token."""
     config = {"meta": {"phone_number_id": "X"}}  # missing verify_token
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-        {"n": "test_t6_partial", "c": json.dumps(config)},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
+            {"n": "test_t6_partial", "c": json.dumps(config)},
+        )
+    ).scalar()
     await db_session.commit()
 
     with pytest.raises(MetaTenantConfigNotFoundError):
@@ -67,6 +75,7 @@ async def test_load_meta_config_raises_when_meta_missing_required_keys(db_sessio
 @pytest.mark.asyncio
 async def test_load_meta_config_raises_when_tenant_not_found(db_session):
     from uuid import uuid4
+
     fake_id = uuid4()
     with pytest.raises(MetaTenantConfigNotFoundError):
         await load_meta_config(db_session, fake_id)

@@ -1,4 +1,5 @@
 """Step 1 — customer notes CRUD: tenant scoping, CSRF, full lifecycle."""
+
 from __future__ import annotations
 
 import asyncio
@@ -130,9 +131,7 @@ def test_update_note(seed):
     csrf = _login(c, email, plain)
     c.headers["X-CSRF-Token"] = csrf
 
-    create = c.post(
-        f"/api/v1/customers/{cust_id}/notes", json={"content": "original"}
-    )
+    create = c.post(f"/api/v1/customers/{cust_id}/notes", json={"content": "original"})
     note_id = create.json()["id"]
 
     resp = c.patch(
@@ -150,9 +149,7 @@ def test_delete_note(seed):
     csrf = _login(c, email, plain)
     c.headers["X-CSRF-Token"] = csrf
 
-    create = c.post(
-        f"/api/v1/customers/{cust_id}/notes", json={"content": "to delete"}
-    )
+    create = c.post(f"/api/v1/customers/{cust_id}/notes", json={"content": "to delete"})
     note_id = create.json()["id"]
 
     resp = c.delete(f"/api/v1/customers/{cust_id}/notes/{note_id}")
@@ -190,9 +187,7 @@ def test_csrf_required_on_post(seed):
     _login(c, email, plain)
     # No CSRF header set
 
-    resp = c.post(
-        f"/api/v1/customers/{cust_id}/notes", json={"content": "should fail"}
-    )
+    resp = c.post(f"/api/v1/customers/{cust_id}/notes", json={"content": "should fail"})
     assert resp.status_code == 403
 
 

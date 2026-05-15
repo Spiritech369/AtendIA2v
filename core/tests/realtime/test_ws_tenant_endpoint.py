@@ -1,4 +1,5 @@
 """Phase 4 T15 — /ws/tenants/:tid endpoint + tenant-channel fan-out."""
+
 from __future__ import annotations
 
 import asyncio

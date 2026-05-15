@@ -23,14 +23,12 @@ class Tenant(Base):
     # Phase 3d — kill-switch for the cron worker. Kept here (not in config
     # JSONB) so the cron query can join+filter cheaply without parsing JSON.
     followups_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true",
+        Boolean,
+        nullable=False,
+        server_default="true",
     )
-    is_demo: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users: Mapped[list["TenantUser"]] = relationship(back_populates="tenant")
 
@@ -43,8 +41,6 @@ class TenantUser(Base):
     email: Mapped[str] = mapped_column(String(160), nullable=False)
     role: Mapped[str] = mapped_column(String(40), default="operator")
     password_hash: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")

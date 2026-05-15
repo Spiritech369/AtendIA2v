@@ -6,8 +6,11 @@ async def _classify(text: str):
     """Helper: KeywordNLU classify with empty stage/fields/history."""
     nlu = KeywordNLU()
     return await nlu.classify(
-        text=text, current_stage="greeting",
-        required_fields=[], optional_fields=[], history=[],
+        text=text,
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
 
 

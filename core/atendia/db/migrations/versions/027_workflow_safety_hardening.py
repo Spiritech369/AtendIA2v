@@ -15,6 +15,7 @@ Adds the columns the workflow engine needs to be safe:
 - ``workflow_executions.error_code`` — structured failure code
   (e.g. ``OUTSIDE_24H_WINDOW``) alongside the freeform ``error`` string.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

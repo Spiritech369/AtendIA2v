@@ -24,6 +24,7 @@ Design notes baked in here:
 - The condition resolver uses an explicit namespace allowlist instead of
   generic dot-notation that could leak fields.
 """
+
 from __future__ import annotations
 
 from contextvars import ContextVar
@@ -60,55 +61,59 @@ from atendia.queue.outbox import stage_outbound
 # without an emitter yet are tolerated (the API rejects unknown values,
 # but a workflow listening to e.g. `conversation_created` is just inert
 # until that signal is wired).
-TRIGGERS: frozenset[str] = frozenset({
-    "message_received",
-    "field_extracted",
-    "field_updated",
-    "stage_entered",
-    "stage_exited",
-    "stage_changed",
-    "conversation_created",
-    "conversation_closed",
-    "appointment_created",
-    "bot_paused",
-    "webhook_received",
-    "tag_updated",
-    # Fase 1+3+4 — emitted by conversation_runner / vision_to_attrs /
-    # stage_entry_handoff. Workflows reacting to these can drive
-    # downstream automations (alerts, assignments, task creation)
-    # without polling.
-    "document_accepted",
-    "document_rejected",
-    "docs_complete_for_plan",
-    "human_handoff_requested",
-})
+TRIGGERS: frozenset[str] = frozenset(
+    {
+        "message_received",
+        "field_extracted",
+        "field_updated",
+        "stage_entered",
+        "stage_exited",
+        "stage_changed",
+        "conversation_created",
+        "conversation_closed",
+        "appointment_created",
+        "bot_paused",
+        "webhook_received",
+        "tag_updated",
+        # Fase 1+3+4 — emitted by conversation_runner / vision_to_attrs /
+        # stage_entry_handoff. Workflows reacting to these can drive
+        # downstream automations (alerts, assignments, task creation)
+        # without polling.
+        "document_accepted",
+        "document_rejected",
+        "docs_complete_for_plan",
+        "human_handoff_requested",
+    }
+)
 
-NODE_TYPES: frozenset[str] = frozenset({
-    "trigger",
-    "message",
-    "template_message",
-    "move_stage",
-    "assign_agent",
-    "advisor_pool",
-    "notify_agent",
-    "update_field",
-    "pause_bot",
-    "delay",
-    "condition",
-    "jump_to",
-    "http_request",
-    "branch",
-    # Operations Center visual/editor node aliases. The execution engine
-    # treats unknown side-effect aliases as pass-through actions, while the
-    # API validation/simulation layer gives operators richer diagnostics.
-    "detect_intent",
-    "classify_credit",
-    "request_documents",
-    "create_task",
-    "followup",
-    "escalate_manager",
-    "end",
-})
+NODE_TYPES: frozenset[str] = frozenset(
+    {
+        "trigger",
+        "message",
+        "template_message",
+        "move_stage",
+        "assign_agent",
+        "advisor_pool",
+        "notify_agent",
+        "update_field",
+        "pause_bot",
+        "delay",
+        "condition",
+        "jump_to",
+        "http_request",
+        "branch",
+        # Operations Center visual/editor node aliases. The execution engine
+        # treats unknown side-effect aliases as pass-through actions, while the
+        # API validation/simulation layer gives operators richer diagnostics.
+        "detect_intent",
+        "classify_credit",
+        "request_documents",
+        "create_task",
+        "followup",
+        "escalate_manager",
+        "end",
+    }
+)
 
 VALID_ROLES: frozenset[str] = frozenset({"operator", "tenant_admin", "superadmin"})
 
@@ -124,13 +129,15 @@ WHATSAPP_WINDOW_SECONDS: int = 60 * 60 * 24
 # Allowlists for the condition resolver. ``extracted.*`` is open by design
 # (operator-defined keys) but the resolver only ever reads from
 # ``conversation_state.extracted_data``.
-_CONVERSATION_FIELDS: frozenset[str] = frozenset({
-    "current_stage",
-    "assigned_user_id",
-    "assigned_agent_id",
-    "status",
-    "channel",
-})
+_CONVERSATION_FIELDS: frozenset[str] = frozenset(
+    {
+        "current_stage",
+        "assigned_user_id",
+        "assigned_agent_id",
+        "status",
+        "channel",
+    }
+)
 _CUSTOMER_FIELDS: frozenset[str] = frozenset({"score", "name", "phone_e164"})
 
 # Workflow jobs run on a dedicated arq queue so a burst of long-running
@@ -228,7 +235,9 @@ def validate_definition(definition: dict) -> None:
                     f"http_request node {node['id']} method must be GET/POST/PUT/PATCH/DELETE",
                 )
             url = config.get("url")
-            if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
+            if not isinstance(url, str) or not (
+                url.startswith("http://") or url.startswith("https://")
+            ):
                 raise WorkflowValidationError(
                     f"http_request node {node['id']} url must start with http:// or https://",
                 )
@@ -271,18 +280,20 @@ def validate_definition(definition: dict) -> None:
 # Operators accepted by the `branch` step's individual rules. Keep this list
 # tight on purpose — anything fancier (regex, "in", date math) belongs in a
 # typed extension, not in a string-soup config.
-_BRANCH_OPERATORS: frozenset[str] = frozenset({
-    "eq",
-    "neq",
-    "exists",
-    "not_exists",
-    "contains",
-    "not_contains",
-    "gt",
-    "gte",
-    "lt",
-    "lte",
-})
+_BRANCH_OPERATORS: frozenset[str] = frozenset(
+    {
+        "eq",
+        "neq",
+        "exists",
+        "not_exists",
+        "contains",
+        "not_contains",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+    }
+)
 
 
 def _validate_branch_group(group: dict, *, where: str, depth: int = 0) -> None:
@@ -422,9 +433,13 @@ async def validate_references(
 
     if agent_ids:
         found = set(
-            (await session.execute(
-                select(Agent.id).where(Agent.tenant_id == tenant_id, Agent.id.in_(agent_ids))
-            )).scalars().all()
+            (
+                await session.execute(
+                    select(Agent.id).where(Agent.tenant_id == tenant_id, Agent.id.in_(agent_ids))
+                )
+            )
+            .scalars()
+            .all()
         )
         missing = agent_ids - found
         if missing:
@@ -434,11 +449,16 @@ async def validate_references(
 
     if user_ids:
         found_u = set(
-            (await session.execute(
-                select(TenantUser.id).where(
-                    TenantUser.tenant_id == tenant_id, TenantUser.id.in_(user_ids),
+            (
+                await session.execute(
+                    select(TenantUser.id).where(
+                        TenantUser.tenant_id == tenant_id,
+                        TenantUser.id.in_(user_ids),
+                    )
                 )
-            )).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         missing_u = user_ids - found_u
         if missing_u:
@@ -512,14 +532,18 @@ async def evaluate_event(session: AsyncSession, event_id: UUID) -> list[UUID]:
         ).scalar_one_or_none()
 
     workflows = (
-        await session.execute(
-            select(Workflow).where(
-                Workflow.tenant_id == event.tenant_id,
-                Workflow.active.is_(True),
-                Workflow.trigger_type == event.type,
+        (
+            await session.execute(
+                select(Workflow).where(
+                    Workflow.tenant_id == event.tenant_id,
+                    Workflow.active.is_(True),
+                    Workflow.trigger_type == event.type,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     started: list[UUID] = []
     for workflow in workflows:
@@ -646,11 +670,13 @@ async def execute_workflow(
                 if failure_branch is not None:
                     output = dict(execution.output_json or {})
                     failures = list(output.get("step_failures") or [])
-                    failures.append({
-                        "node_id": current,
-                        "error_code": exc.code,
-                        "error": str(exc)[:500],
-                    })
+                    failures.append(
+                        {
+                            "node_id": current,
+                            "error_code": exc.code,
+                            "error": str(exc)[:500],
+                        }
+                    )
                     output["step_failures"] = failures
                     execution.output_json = output
                     current = failure_branch
@@ -762,7 +788,9 @@ async def _execute_node(
         if not ok:
             # Routes to the "failure" edge via the universal handler in
             # execute_workflow, or surfaces as a workflow failure if none.
-            raise _ExecutionFailure("http_request returned non-2xx or errored", code="HTTP_REQUEST_FAILED")
+            raise _ExecutionFailure(
+                "http_request returned non-2xx or errored", code="HTTP_REQUEST_FAILED"
+            )
         # Honor explicit "success" branch if the operator wired one.
         explicit = _next_node(edges, node["id"], "success")
         if explicit is not None:
@@ -1017,13 +1045,17 @@ async def _resolve_notify_targets(
                 code="UNKNOWN_ROLE",
             )
         rows = (
-            await session.execute(
-                select(TenantUser.id).where(
-                    TenantUser.tenant_id == workflow.tenant_id,
-                    TenantUser.role == role,
+            (
+                await session.execute(
+                    select(TenantUser.id).where(
+                        TenantUser.tenant_id == workflow.tenant_id,
+                        TenantUser.role == role,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return list(rows)
 
     return []
@@ -1104,11 +1136,14 @@ async def _node_http_request(
     having to design a full variable namespace yet.
     """
     import httpx  # lazy import: only spawned engines need it
+
     method = str(config.get("method", "GET")).upper()
     url = str(config.get("url", ""))
     timeout = max(1, min(60, int(config.get("timeout_seconds", 10) or 10)))
     headers_raw = config.get("headers") or {}
-    headers = {str(k): str(v) for k, v in headers_raw.items()} if isinstance(headers_raw, dict) else {}
+    headers = (
+        {str(k): str(v) for k, v in headers_raw.items()} if isinstance(headers_raw, dict) else {}
+    )
     body = config.get("body")
 
     fresh = await _record_action(session, execution, node["id"])

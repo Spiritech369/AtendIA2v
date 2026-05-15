@@ -26,13 +26,15 @@ async def run_tool(
         raise
     finally:
         latency_ms = int((time.perf_counter() - started) * 1000)
-        session.add(ToolCallRow(
-            id=uuid4(),
-            turn_trace_id=turn_trace_id,
-            tool_name=tool_name,
-            input_payload=inputs,
-            output_payload=output,
-            latency_ms=latency_ms,
-            error=error,
-        ))
+        session.add(
+            ToolCallRow(
+                id=uuid4(),
+                turn_trace_id=turn_trace_id,
+                tool_name=tool_name,
+                input_payload=inputs,
+                output_payload=output,
+                latency_ms=latency_ms,
+                error=error,
+            )
+        )
         await session.flush()

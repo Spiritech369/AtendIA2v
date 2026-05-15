@@ -12,7 +12,9 @@ async def test_emit_persists_event(db_session):
     )
     tenant_id = res.scalar()
     res2 = await db_session.execute(
-        text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:tid, '+5215555555555') RETURNING id"),
+        text(
+            "INSERT INTO customers (tenant_id, phone_e164) VALUES (:tid, '+5215555555555') RETURNING id"
+        ),
         {"tid": tenant_id},
     )
     customer_id = res2.scalar()

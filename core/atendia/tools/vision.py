@@ -6,6 +6,7 @@ end-to-end, structured outputs (JSON schema) para determinismo.
 
 Sin sesgo de `expected_doc`: clasificación absoluta.
 """
+
 import json
 import time
 from decimal import Decimal
@@ -44,8 +45,14 @@ _VISION_JSON_SCHEMA = {
                     "modelo": {"type": ["string", "null"]},
                     "notas": {"type": ["string", "null"]},
                 },
-                "required": ["ambos_lados", "legible", "fecha_iso",
-                             "institucion", "modelo", "notas"],
+                "required": [
+                    "ambos_lados",
+                    "legible",
+                    "fecha_iso",
+                    "institucion",
+                    "modelo",
+                    "notas",
+                ],
             },
             # Fase 3 — structured quality assessment used by the runner
             # to set DOCS_X.status deterministically. Nullable so that
@@ -151,10 +158,13 @@ async def classify_image(
         model=model,
         messages=[
             {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": [
-                {"type": "text", "text": "Clasifica esta imagen."},
-                {"type": "image_url", "image_url": {"url": image_url}},
-            ]},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Clasifica esta imagen."},
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                ],
+            },
         ],
         response_format={"type": "json_schema", "json_schema": _VISION_JSON_SCHEMA},
         temperature=0,

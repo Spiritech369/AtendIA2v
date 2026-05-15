@@ -24,7 +24,13 @@ async def test_protocol_satisfied_by_dummy_class():
 
     class Dummy:
         async def classify(
-            self, *, text, current_stage, required_fields, optional_fields, history,
+            self,
+            *,
+            text,
+            current_stage,
+            required_fields,
+            optional_fields,
+            history,
         ):
             return (
                 NLUResult(
@@ -37,8 +43,11 @@ async def test_protocol_satisfied_by_dummy_class():
 
     nlu: NLUProvider = Dummy()  # static type assignment
     result, usage = await nlu.classify(
-        text="hi", current_stage="greeting", required_fields=[],
-        optional_fields=[], history=[],
+        text="hi",
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert result.intent == Intent.GREETING
     assert usage is None
@@ -46,20 +55,20 @@ async def test_protocol_satisfied_by_dummy_class():
 
 def test_usage_metadata_rejects_negative_tokens():
     with pytest.raises(ValidationError):
-        UsageMetadata(model="x", tokens_in=-1, tokens_out=0,
-                      cost_usd=Decimal("0"), latency_ms=0)
+        UsageMetadata(model="x", tokens_in=-1, tokens_out=0, cost_usd=Decimal("0"), latency_ms=0)
     with pytest.raises(ValidationError):
-        UsageMetadata(model="x", tokens_in=0, tokens_out=-1,
-                      cost_usd=Decimal("0"), latency_ms=0)
+        UsageMetadata(model="x", tokens_in=0, tokens_out=-1, cost_usd=Decimal("0"), latency_ms=0)
     with pytest.raises(ValidationError):
-        UsageMetadata(model="x", tokens_in=0, tokens_out=0,
-                      cost_usd=Decimal("0"), latency_ms=-1)
+        UsageMetadata(model="x", tokens_in=0, tokens_out=0, cost_usd=Decimal("0"), latency_ms=-1)
 
 
 def test_usage_metadata_fallback_used_default_false():
     u = UsageMetadata(
-        model="x", tokens_in=0, tokens_out=0,
-        cost_usd=Decimal("0"), latency_ms=0,
+        model="x",
+        tokens_in=0,
+        tokens_out=0,
+        cost_usd=Decimal("0"),
+        latency_ms=0,
     )
     assert u.fallback_used is False
 
@@ -67,6 +76,9 @@ def test_usage_metadata_fallback_used_default_false():
 def test_usage_metadata_negative_cost_rejected():
     with pytest.raises(ValidationError):
         UsageMetadata(
-            model="x", tokens_in=0, tokens_out=0,
-            cost_usd=Decimal("-0.01"), latency_ms=0,
+            model="x",
+            tokens_in=0,
+            tokens_out=0,
+            cost_usd=Decimal("-0.01"),
+            latency_ms=0,
         )

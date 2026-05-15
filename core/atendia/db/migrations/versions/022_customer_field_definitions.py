@@ -9,6 +9,7 @@ Each tenant can define their own customer fields (text, number, date,
 select, multiselect, checkbox). field_options stores select/multiselect
 choices as JSONB.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -35,9 +36,7 @@ def upgrade() -> None:
         sa.Column("label", sa.String(200), nullable=False),
         sa.Column("field_type", sa.String(40), nullable=False),
         sa.Column("field_options", sa.dialects.postgresql.JSONB(), nullable=True),
-        sa.Column(
-            "ordering", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
+        sa.Column("ordering", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

@@ -11,6 +11,7 @@ inbound_text, bot_paused=True) and returns early.
 
 Existing rows: server_default=false, no backfill needed.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

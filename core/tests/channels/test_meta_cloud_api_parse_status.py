@@ -16,20 +16,34 @@ def adapter():
 def test_parse_status_callback_extracts_receipts(adapter):
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
-                    "statuses": [
-                        {"id": "wamid.X", "status": "delivered", "timestamp": "1", "recipient_id": "5215"},
-                        {"id": "wamid.Y", "status": "read", "timestamp": "2", "recipient_id": "5215"},
-                    ],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
+                            "statuses": [
+                                {
+                                    "id": "wamid.X",
+                                    "status": "delivered",
+                                    "timestamp": "1",
+                                    "recipient_id": "5215",
+                                },
+                                {
+                                    "id": "wamid.Y",
+                                    "status": "read",
+                                    "timestamp": "2",
+                                    "recipient_id": "5215",
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
     receipts = adapter.parse_status_callback(payload)
     assert len(receipts) == 2
@@ -42,17 +56,29 @@ def test_parse_status_callback_extracts_receipts(adapter):
 def test_parse_status_callback_empty_for_message_only_payload(adapter):
     payload = {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
-                    "messages": [{"from": "5215", "id": "wamid.A", "timestamp": "1", "text": {"body": "x"}, "type": "text"}],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "y"},
+                            "messages": [
+                                {
+                                    "from": "5215",
+                                    "id": "wamid.A",
+                                    "timestamp": "1",
+                                    "text": {"body": "x"},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
     receipts = adapter.parse_status_callback(payload)
     assert receipts == []

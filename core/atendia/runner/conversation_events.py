@@ -30,6 +30,7 @@ dispatcher. That's safe today because the dispatcher reads
 by the LLM), never `SELECT FROM messages WHERE direction='outbound'`.
 The CHECK constraint on `direction` prevents schema drift.
 """
+
 from __future__ import annotations
 
 import logging
@@ -51,15 +52,17 @@ _log = logging.getLogger(__name__)
 # list still produces an `events` row (for analytics) but no chat
 # bubble — otherwise low-signal fields (city, marca) would spam the
 # operator's view.
-_TIMELINE_WORTHY_FIELDS: frozenset[str] = frozenset({
-    "tipo_credito",
-    "plan_credito",
-    "antiguedad_laboral_meses",
-    "cumple_antiguedad",
-    "modelo_interes",
-    "estimated_value",
-    "nombre",
-})
+_TIMELINE_WORTHY_FIELDS: frozenset[str] = frozenset(
+    {
+        "tipo_credito",
+        "plan_credito",
+        "antiguedad_laboral_meses",
+        "cumple_antiguedad",
+        "modelo_interes",
+        "estimated_value",
+        "nombre",
+    }
+)
 
 
 # Display labels used in the human-readable `text` of the system message.
@@ -143,7 +146,8 @@ async def emit_system_event(
         # and move on; the workflows engine will just miss this event.
         _log.exception(
             "emit_system_event: events-row insert failed for conv=%s type=%s",
-            conversation_id, event_type.value,
+            conversation_id,
+            event_type.value,
         )
 
 
@@ -227,9 +231,7 @@ async def emit_document_event(
     metadata: dict | None = None,
 ) -> None:
     """Convenience wrapper for DOCUMENT_ACCEPTED / DOCUMENT_REJECTED."""
-    event_type = (
-        EventType.DOCUMENT_ACCEPTED if accepted else EventType.DOCUMENT_REJECTED
-    )
+    event_type = EventType.DOCUMENT_ACCEPTED if accepted else EventType.DOCUMENT_REJECTED
     label = document_type.replace("_", " ").upper()
     if accepted:
         text = f"Sistema: Documento aceptado — {label}"

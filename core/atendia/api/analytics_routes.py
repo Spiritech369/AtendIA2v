@@ -8,6 +8,7 @@ optional `?from=` and `?to=` ISO dates:
 * `GET /cost` — daily aggregates of `turn_traces.{nlu,composer,tool,vision}_cost_usd`.
 * `GET /volume` — message volume by hour-of-day (heatmap data).
 """
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
@@ -64,9 +65,7 @@ async def funnel(
         select(
             func.count(Conversation.id.distinct()).label("total"),
             func.count(case((has_field("modelo_moto"), Conversation.id))).label("quoted"),
-            func.count(case((has_field("plan_credito"), Conversation.id))).label(
-                "plan_assigned"
-            ),
+            func.count(case((has_field("plan_credito"), Conversation.id))).label("plan_assigned"),
             func.count(
                 case(
                     (

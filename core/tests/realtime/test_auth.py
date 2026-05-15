@@ -6,6 +6,7 @@ from atendia.realtime.auth import decode_token, issue_token
 def test_round_trip(monkeypatch):
     monkeypatch.setenv("ATENDIA_V2_META_APP_SECRET", "secret_for_t23_jwt")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
     token = issue_token(tenant_id="dinamomotos", ttl_seconds=600)
@@ -19,6 +20,7 @@ def test_round_trip(monkeypatch):
 def test_decode_rejects_tampered_token(monkeypatch):
     monkeypatch.setenv("ATENDIA_V2_META_APP_SECRET", "secret_for_t23_jwt")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
     token = issue_token(tenant_id="t", ttl_seconds=600)
@@ -31,6 +33,7 @@ def test_decode_rejects_tampered_token(monkeypatch):
 def test_decode_rejects_expired_token(monkeypatch):
     monkeypatch.setenv("ATENDIA_V2_META_APP_SECRET", "secret_for_t23_jwt")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
     # Issue a token that expires immediately

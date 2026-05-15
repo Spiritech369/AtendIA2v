@@ -72,8 +72,15 @@ def test_appointments_dashboard_pipeline_and_notifications(client_tenant_admin):
     appointment_id = body["appointment"]["id"] if "appointment" in body else body["id"]
     assert body.get("conflicts", []) == []
 
-    assert client_tenant_admin.get("/api/v1/appointments").json()["items"][0]["id"] == appointment_id
-    assert client_tenant_admin.patch(f"/api/v1/appointments/{appointment_id}", json={"status": "completed"}).status_code == 200
+    assert (
+        client_tenant_admin.get("/api/v1/appointments").json()["items"][0]["id"] == appointment_id
+    )
+    assert (
+        client_tenant_admin.patch(
+            f"/api/v1/appointments/{appointment_id}", json={"status": "completed"}
+        ).status_code
+        == 200
+    )
     assert client_tenant_admin.get("/api/v1/dashboard/summary").status_code == 200
 
     board = client_tenant_admin.get("/api/v1/pipeline/board")
@@ -85,8 +92,7 @@ def test_appointments_dashboard_pipeline_and_notifications(client_tenant_admin):
         async with engine.begin() as conn:
             await conn.execute(
                 text(
-                    "INSERT INTO notifications (tenant_id, user_id, title) "
-                    "VALUES (:t, :u, 'Aviso')"
+                    "INSERT INTO notifications (tenant_id, user_id, title) VALUES (:t, :u, 'Aviso')"
                 ),
                 {"t": client_tenant_admin.tenant_id, "u": client_tenant_admin.user_id},
             )
@@ -104,17 +110,28 @@ def test_knowledge_agents_and_workflows_smoke(client_tenant_admin):
         json={"question": "Horario?", "answer": "Abrimos de lunes a viernes.", "tags": ["ventas"]},
     )
     assert faq.status_code == 201, faq.text
-    assert client_tenant_admin.post("/api/v1/knowledge/test", json={"query": "Horario"}).status_code == 200
+    assert (
+        client_tenant_admin.post("/api/v1/knowledge/test", json={"query": "Horario"}).status_code
+        == 200
+    )
 
     agent = client_tenant_admin.post(
         "/api/v1/agents",
-        json={"name": "Ventas", "role": "sales", "is_default": True, "active_intents": ["GREETING"]},
+        json={
+            "name": "Ventas",
+            "role": "sales",
+            "is_default": True,
+            "active_intents": ["GREETING"],
+        },
     )
     assert agent.status_code == 201, agent.text
-    assert client_tenant_admin.post(
-        "/api/v1/agents/test",
-        json={"agent_config": agent.json(), "message": "hola"},
-    ).status_code == 200
+    assert (
+        client_tenant_admin.post(
+            "/api/v1/agents/test",
+            json={"agent_config": agent.json(), "message": "hola"},
+        ).status_code
+        == 200
+    )
 
     workflow = client_tenant_admin.post(
         "/api/v1/workflows",
@@ -125,7 +142,11 @@ def test_knowledge_agents_and_workflows_smoke(client_tenant_admin):
             "definition": {
                 "nodes": [
                     {"id": "trigger_1", "type": "trigger", "config": {}},
-                    {"id": "action_1", "type": "notify_agent", "config": {"role": "tenant_admin", "title": "Lead"}},
+                    {
+                        "id": "action_1",
+                        "type": "notify_agent",
+                        "config": {"role": "tenant_admin", "title": "Lead"},
+                    },
                 ],
                 "edges": [{"from": "trigger_1", "to": "action_1"}],
             },
@@ -133,5 +154,7 @@ def test_knowledge_agents_and_workflows_smoke(client_tenant_admin):
     )
     assert workflow.status_code == 201, workflow.text
     workflow_id = workflow.json()["id"]
-    assert client_tenant_admin.post(f"/api/v1/workflows/{workflow_id}/toggle").json()["active"] is True
+    assert (
+        client_tenant_admin.post(f"/api/v1/workflows/{workflow_id}/toggle").json()["active"] is True
+    )
     assert client_tenant_admin.get(f"/api/v1/workflows/{workflow_id}/executions").status_code == 200

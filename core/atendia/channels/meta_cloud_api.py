@@ -125,14 +125,16 @@ class MetaCloudAPIAdapter(ChannelAdapter):
                         metadata = InboundMessageMetadata(
                             attachments=attachments,
                         ).model_dump(mode="json")
-                    result.append(InboundMessage(
-                        tenant_id=tenant_id,
-                        from_phone_e164=f"+{m.from_}",
-                        channel_message_id=m.id,
-                        text=text,
-                        received_at=m.timestamp,
-                        metadata=metadata,
-                    ))
+                    result.append(
+                        InboundMessage(
+                            tenant_id=tenant_id,
+                            from_phone_e164=f"+{m.from_}",
+                            channel_message_id=m.id,
+                            text=text,
+                            received_at=m.timestamp,
+                            metadata=metadata,
+                        )
+                    )
         return result
 
     async def fetch_media_url(
@@ -172,12 +174,14 @@ class MetaCloudAPIAdapter(ChannelAdapter):
             for change in entry.changes:
                 statuses = change.value.statuses or []
                 for s in statuses:
-                    result.append(DeliveryReceipt(
-                        message_id="",  # filled by webhook receiver from messages table lookup
-                        channel_message_id=s.id,
-                        status=s.status,  # type: ignore[arg-type]
-                        error=None,
-                    ))
+                    result.append(
+                        DeliveryReceipt(
+                            message_id="",  # filled by webhook receiver from messages table lookup
+                            channel_message_id=s.id,
+                            status=s.status,  # type: ignore[arg-type]
+                            error=None,
+                        )
+                    )
         return result
 
 
@@ -191,10 +195,12 @@ def _attachments_from_message(m: MetaInboundMessage) -> list[InboundAttachment]:
     for node in (m.image, m.document, m.audio, m.video):
         if node is None:
             continue
-        return [InboundAttachment(
-            media_id=node.id,
-            mime_type=node.mime_type,
-            url="",  # filled in by the webhook handler via fetch_media_url
-            caption=node.caption,
-        )]
+        return [
+            InboundAttachment(
+                media_id=node.id,
+                mime_type=node.mime_type,
+                url="",  # filled in by the webhook handler via fetch_media_url
+                caption=node.caption,
+            )
+        ]
     return []

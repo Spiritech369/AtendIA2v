@@ -5,6 +5,7 @@ between auto-applying, creating a suggestion, or skipping each entity
 NLU produced. Rules are documented in
 `docs/plans/2026-05-13-ai-field-extraction-design.md`.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -35,10 +36,10 @@ ENTITY_TO_ATTR: dict[str, str] = {
 
 
 class Action(str, Enum):
-    AUTO = "auto"      # apply directly to customer.attrs
+    AUTO = "auto"  # apply directly to customer.attrs
     SUGGEST = "suggest"  # create a pending suggestion
-    SKIP = "skip"      # do nothing
-    NOOP = "noop"      # value already present and equal
+    SKIP = "skip"  # do nothing
+    NOOP = "noop"  # value already present and equal
 
 
 def map_entity_to_attr(entity_key: str) -> str | None:

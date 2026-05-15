@@ -9,6 +9,7 @@ FIELD_UPDATED system events (see runner/conversation_events.py). The
 SUGGEST path is intentionally NOT surfaced — those values aren't on
 the customer yet, they're pending operator review.
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +40,7 @@ class AppliedFieldChange:
     customer.attrs key after `map_entity_to_attr`. `old_value` may be
     None when the field was previously empty.
     """
+
     entity_key: str
     attr_key: str
     old_value: Any
@@ -96,13 +98,15 @@ async def apply_ai_extractions(
         if action == Action.AUTO:
             next_attrs[attr_key] = field.value
             dirty = True
-            applied.append(AppliedFieldChange(
-                entity_key=entity_key,
-                attr_key=attr_key,
-                old_value=current,
-                new_value=field.value,
-                confidence=float(field.confidence),
-            ))
+            applied.append(
+                AppliedFieldChange(
+                    entity_key=entity_key,
+                    attr_key=attr_key,
+                    old_value=current,
+                    new_value=field.value,
+                    confidence=float(field.confidence),
+                )
+            )
         elif action == Action.SUGGEST:
             suggestions.append(
                 FieldSuggestion(

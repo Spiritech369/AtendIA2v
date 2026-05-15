@@ -15,6 +15,7 @@ PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT (NULL on legacy rows).
 `vision_cost_usd` is separate from `tool_cost_usd` (which already tracks
 embeddings) so dashboards can distinguish embedding vs vision spend.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

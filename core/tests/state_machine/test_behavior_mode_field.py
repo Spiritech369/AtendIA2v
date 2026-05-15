@@ -4,6 +4,7 @@ These tests cover the contract layer (validation) and the seed
 (motos pipeline pins modes for each stage). The runner-level override
 is exercised in Fase 7's e2e walk-through.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -29,7 +30,9 @@ def test_behavior_mode_defaults_to_none():
 @pytest.mark.parametrize("mode", [m.value for m in FlowMode])
 def test_behavior_mode_accepts_every_flow_mode(mode: str):
     stage = StageDefinition(
-        id="nuevo", actions_allowed=["greet"], behavior_mode=mode,
+        id="nuevo",
+        actions_allowed=["greet"],
+        behavior_mode=mode,
     )
     assert stage.behavior_mode == mode
 
@@ -39,7 +42,9 @@ def test_behavior_mode_rejects_unknown_value():
     them at pipeline load time, not silently fall through to SUPPORT."""
     with pytest.raises(ValidationError) as exc:
         StageDefinition(
-            id="nuevo", actions_allowed=["greet"], behavior_mode="NOPE",
+            id="nuevo",
+            actions_allowed=["greet"],
+            behavior_mode="NOPE",
         )
     assert "behavior_mode" in str(exc.value)
 

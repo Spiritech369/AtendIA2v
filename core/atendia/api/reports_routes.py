@@ -10,6 +10,7 @@ Single endpoint by design: the MVP is "open the page, see four
 numbers". When operators ask for drill-down or filters, we add new
 endpoints rather than parameterize this one.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
@@ -110,15 +111,9 @@ async def _conversation_counts(
             Conversation.deleted_at.is_(None),
         )
     )
-    today = (
-        await session.execute(base.where(Conversation.created_at >= today_start))
-    ).scalar_one()
-    week = (
-        await session.execute(base.where(Conversation.created_at >= week_start))
-    ).scalar_one()
-    month = (
-        await session.execute(base.where(Conversation.created_at >= month_start))
-    ).scalar_one()
+    today = (await session.execute(base.where(Conversation.created_at >= today_start))).scalar_one()
+    week = (await session.execute(base.where(Conversation.created_at >= week_start))).scalar_one()
+    month = (await session.execute(base.where(Conversation.created_at >= month_start))).scalar_one()
     return ConversationsCounts(today=today, this_week=week, this_month=month)
 
 
@@ -156,9 +151,7 @@ async def _first_response(
     stmt = (
         select(
             func.avg(
-                func.extract(
-                    "epoch", first_out_sub.c.first_out_at - first_in_sub.c.first_in_at
-                )
+                func.extract("epoch", first_out_sub.c.first_out_at - first_in_sub.c.first_in_at)
             ).label("avg_seconds"),
             func.count(first_in_sub.c.cid).label("sample"),
         )
@@ -206,9 +199,7 @@ async def _handoff_rate(
     )
 
 
-async def _pipeline_funnel(
-    session: AsyncSession, tenant_id: UUID
-) -> list[FunnelStage]:
+async def _pipeline_funnel(session: AsyncSession, tenant_id: UUID) -> list[FunnelStage]:
     """Project conversation counts onto the tenant's active pipeline stages.
     Builds a cumulative funnel: `reached` at stage N = conversations whose
     current_stage is N or any LATER stage in the pipeline's declared order."""
@@ -299,9 +290,7 @@ async def get_reports_overview(
             week_start=week_start,
             month_start=month_start,
         ),
-        first_response=await _first_response(
-            session, tenant_id, window_start=window_start
-        ),
+        first_response=await _first_response(session, tenant_id, window_start=window_start),
         handoff=await _handoff_rate(session, tenant_id, window_start=window_start),
         pipeline_funnel=await _pipeline_funnel(session, tenant_id),
         tenant_timezone=timezone_str,

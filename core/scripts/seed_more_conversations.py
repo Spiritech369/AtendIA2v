@@ -9,6 +9,7 @@ Distribution targets:
 - 2 of those go stale (entered the stage > timeout_hours ago)
 - 1 ends up in an INVALID stage so the orphan column shows
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,11 +25,26 @@ from atendia.config import get_settings
 
 
 NAMES = [
-    "Carlos Mendoza", "Ana García", "Luis Hernández", "Sofía Ramírez",
-    "Diego Torres", "Valentina Cruz", "Mateo Flores", "Camila Vargas",
-    "Sebastián Rojas", "Renata Silva", "Emilio Castro", "Isabella Núñez",
-    "Joaquín Reyes", "Lucía Ortega", "Andrés Domínguez", "Gabriela Soto",
-    "Tomás Aguilar", "Mariana Cortés", "Bruno Salazar", "Paula Méndez",
+    "Carlos Mendoza",
+    "Ana García",
+    "Luis Hernández",
+    "Sofía Ramírez",
+    "Diego Torres",
+    "Valentina Cruz",
+    "Mateo Flores",
+    "Camila Vargas",
+    "Sebastián Rojas",
+    "Renata Silva",
+    "Emilio Castro",
+    "Isabella Núñez",
+    "Joaquín Reyes",
+    "Lucía Ortega",
+    "Andrés Domínguez",
+    "Gabriela Soto",
+    "Tomás Aguilar",
+    "Mariana Cortés",
+    "Bruno Salazar",
+    "Paula Méndez",
 ]
 
 INBOUND_OPENERS = [
@@ -56,15 +72,11 @@ async def main() -> None:
     e = create_async_engine(get_settings().database_url)
     async with e.begin() as c:
         tid = (
-            await c.execute(
-                text("SELECT id FROM tenants WHERE name='Dinamo Motos NL' LIMIT 1")
-            )
+            await c.execute(text("SELECT id FROM tenants WHERE name='Dinamo Motos NL' LIMIT 1"))
         ).scalar()
         uid = (
             await c.execute(
-                text(
-                    "SELECT id FROM tenant_users WHERE email='admin@dinamomotos.com' LIMIT 1"
-                )
+                text("SELECT id FROM tenant_users WHERE email='admin@dinamomotos.com' LIMIT 1")
             )
         ).scalar()
         if not tid:
@@ -82,6 +94,7 @@ async def main() -> None:
         ]
         rng = random.Random(42)
         name_idx = 0
+
         def next_name() -> str:
             nonlocal name_idx
             name = NAMES[name_idx % len(NAMES)]
@@ -132,7 +145,8 @@ async def main() -> None:
                 for i in range(turns):
                     direction = "inbound" if i % 2 == 0 else "outbound"
                     body = (
-                        rng.choice(INBOUND_OPENERS) if direction == "inbound"
+                        rng.choice(INBOUND_OPENERS)
+                        if direction == "inbound"
                         else rng.choice(OUTBOUND_REPLIES)
                     )
                     await c.execute(

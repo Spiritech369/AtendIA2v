@@ -1,4 +1,5 @@
 """Phase 4 T42-T44 — analytics smokes."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,11 +47,13 @@ def _seed() -> tuple[str, str, str]:
 def operator_seed() -> Iterator[tuple[str, str, str]]:
     seed = _seed()
     yield seed
+
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
             await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": seed[0]})
         await engine.dispose()
+
     asyncio.run(_do())
 
 

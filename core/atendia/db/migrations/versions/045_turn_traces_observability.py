@@ -13,6 +13,7 @@ evaluator.
 All columns nullable; legacy rows stay NULL and the runner populates them
 going forward. Migrating down drops them.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence

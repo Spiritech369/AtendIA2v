@@ -11,6 +11,7 @@ Coverage:
 - ``POST /import/preview`` returns parsed rows + errors without committing.
 - File-size cap and row-count cap return 413.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -90,7 +91,8 @@ def test_import_preview_does_not_commit(client_tenant_admin) -> None:
 
     # Confirm nothing was actually inserted.
     listed = client_tenant_admin.get(
-        "/api/v1/customers", params={"q": "5512345678"},
+        "/api/v1/customers",
+        params={"q": "5512345678"},
     )
     assert listed.status_code == 200
     assert all(c["phone_e164"] != "+525512345678" for c in listed.json()["items"])
@@ -134,7 +136,8 @@ def test_import_reads_email_and_score(client_tenant_admin) -> None:
     assert resp.json()["created"] == 1
 
     listed = client_tenant_admin.get(
-        "/api/v1/customers", params={"q": "5512344321"},
+        "/api/v1/customers",
+        params={"q": "5512344321"},
     )
     items = listed.json()["items"]
     target = next(c for c in items if c["phone_e164"] == "+525512344321")
@@ -179,15 +182,13 @@ def test_import_too_many_rows_413(client_tenant_admin) -> None:
 def test_export_escapes_formula_leading_chars(client_tenant_admin) -> None:
     """Seed a customer whose name starts with ``=`` and verify the export
     prefixes it with `'` so Excel won't evaluate it as a formula."""
+
     async def _seed() -> None:
         engine = create_async_engine(get_settings().database_url)
         try:
             async with engine.begin() as conn:
                 await conn.execute(
-                    text(
-                        "INSERT INTO customers (tenant_id, phone_e164, name) "
-                        "VALUES (:t, :p, :n)"
-                    ),
+                    text("INSERT INTO customers (tenant_id, phone_e164, name) VALUES (:t, :p, :n)"),
                     {
                         "t": client_tenant_admin.tenant_id,
                         "p": f"+5215{uuid4().hex[:9]}",

@@ -27,6 +27,7 @@ Plus:
 Existing rows: kind/enqueued_at/cancelled_at/context = NULL; tenants get
 TRUE by default. No backfill required.
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

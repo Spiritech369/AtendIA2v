@@ -3,6 +3,7 @@
 The decision rules are documented in
 docs/plans/2026-05-13-ai-field-extraction-design.md.
 """
+
 from atendia.runner.field_extraction_mapping import (
     Action,
     decide_action,
@@ -47,11 +48,15 @@ def test_decide_noop_handles_string_number_equality():
 
 def test_decide_suggest_when_existing_differs_high_confidence():
     """Never overwrite an existing value without human approval — even at 0.95."""
-    assert decide_action(current_value="Honda", new_value="Yamaha", confidence=0.95) == Action.SUGGEST
+    assert (
+        decide_action(current_value="Honda", new_value="Yamaha", confidence=0.95) == Action.SUGGEST
+    )
 
 
 def test_decide_suggest_when_existing_differs_medium_confidence():
-    assert decide_action(current_value="Honda", new_value="Yamaha", confidence=0.70) == Action.SUGGEST
+    assert (
+        decide_action(current_value="Honda", new_value="Yamaha", confidence=0.70) == Action.SUGGEST
+    )
 
 
 def test_decide_skip_when_existing_differs_low_confidence():

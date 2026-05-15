@@ -24,6 +24,4 @@ def resolve_action(stage: StageDefinition, intent: Intent) -> str:
     for candidate in preferred:
         if candidate in allowed:
             return candidate
-    raise NoActionAvailableError(
-        f"no action in {sorted(allowed)} matches intent {intent.value}"
-    )
+    raise NoActionAvailableError(f"no action in {sorted(allowed)} matches intent {intent.value}")

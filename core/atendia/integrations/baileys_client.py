@@ -4,6 +4,7 @@ Thin wrapper over httpx. Keeps the auth header + base URL in one place
 and surfaces typed responses to the FastAPI routes. The sidecar protocol
 is documented in `core/baileys-bridge/README.md`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

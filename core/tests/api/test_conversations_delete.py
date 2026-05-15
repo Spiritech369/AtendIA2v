@@ -1,4 +1,5 @@
 """Tests for DELETE /api/v1/conversations/:id — soft delete."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,20 +16,29 @@ def _seed_conversation(tid: str) -> str:
     async def _do() -> str:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            cust_id = (await conn.execute(
-                text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"),
-                {"t": tid, "p": f"+521{uuid4().hex[:10]}"},
-            )).scalar()
-            conv_id = (await conn.execute(
-                text("INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"),
-                {"t": tid, "c": cust_id},
-            )).scalar()
+            cust_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"
+                    ),
+                    {"t": tid, "p": f"+521{uuid4().hex[:10]}"},
+                )
+            ).scalar()
+            conv_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"
+                    ),
+                    {"t": tid, "c": cust_id},
+                )
+            ).scalar()
             await conn.execute(
                 text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
                 {"c": conv_id},
             )
         await engine.dispose()
         return str(conv_id)
+
     return asyncio.run(_do())
 
 

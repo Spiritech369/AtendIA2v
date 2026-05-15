@@ -10,6 +10,7 @@ existing frontend badge. New fields (`active_channel` + `channels`)
 expose per-channel detail so the badge can name which transport is
 serving the tenant right now.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -63,9 +64,7 @@ _BAILEYS_STATUS_MAP = {
 }
 
 
-def _derive_meta_status(
-    cb_open: bool, last_webhook_at: datetime | None, now: datetime
-) -> str:
+def _derive_meta_status(cb_open: bool, last_webhook_at: datetime | None, now: datetime) -> str:
     if cb_open:
         return "paused"
     if last_webhook_at is None:
@@ -143,9 +142,7 @@ async def get_channel_status(
         )
 
     meta_detail = ChannelDetail(status=meta_status, last_seen_at=last_webhook_at)
-    active = _pick_active_channel(
-        bc=bc, meta_status=meta_status, baileys_status=baileys_status
-    )
+    active = _pick_active_channel(bc=bc, meta_status=meta_status, baileys_status=baileys_status)
 
     return ChannelStatusResponse(
         whatsapp_status=_legacy_status(active, meta_status, baileys_status),

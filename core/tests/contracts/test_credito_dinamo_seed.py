@@ -6,6 +6,7 @@ import the constant and round-trip it through PipelineDefinition. If
 this test fails, the seed script would either crash on insert or insert
 data the runner can't load.
 """
+
 from __future__ import annotations
 
 from atendia.contracts.pipeline_definition import (
@@ -18,6 +19,7 @@ def _load_seed() -> dict:
     # Import inline so a syntax error in the script (rare but possible)
     # surfaces as a clear failure rather than a collection error.
     from scripts.seed_zored_user import CREDITO_DINAMO_PIPELINE
+
     return CREDITO_DINAMO_PIPELINE
 
 
@@ -91,11 +93,14 @@ def test_credito_dinamo_evaluator_picks_cliente_potencial_with_full_fields():
         "tipo_enganche": "efectivo",
     }
     matching = [
-        s for s in pipeline.stages
+        s
+        for s in pipeline.stages
         if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)
     ]
     pick = select_best_stage(
-        matching=matching, current_stage_id="nuevo", pipeline=pipeline,
+        matching=matching,
+        current_stage_id="nuevo",
+        pipeline=pipeline,
     )
     assert pick is not None
     assert pick.id == "cliente_potencial"
@@ -120,7 +125,8 @@ def test_credito_dinamo_evaluator_picks_papeleria_when_all_docs_ok():
         "DOCS_RECIBOS_NOMINA": {"status": "ok"},
     }
     matching = [
-        s for s in pipeline.stages
+        s
+        for s in pipeline.stages
         if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)
     ]
     # Both cliente_potencial AND papeleria_completa match — the evaluator

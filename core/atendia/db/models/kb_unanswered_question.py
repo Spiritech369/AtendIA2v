@@ -12,7 +12,9 @@ class KbUnansweredQuestion(Base):
     __tablename__ = "kb_unanswered_questions"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     query: Mapped[str] = mapped_column(Text, nullable=False)
     query_normalized: Mapped[str] = mapped_column(Text, nullable=False)
     agent: Mapped[str | None] = mapped_column(String(40))

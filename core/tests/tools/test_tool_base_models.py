@@ -4,6 +4,7 @@
 hit from `lookup_faq()`. `CatalogResult` is one row of `search_catalog()`'s
 ranked list (lighter than `Quote` — no full ficha técnica).
 """
+
 from decimal import Decimal
 
 import pytest

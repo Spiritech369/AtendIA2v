@@ -12,7 +12,9 @@ class KbVersion(Base):
     __tablename__ = "kb_versions"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
     entity_id: Mapped[UUID] = mapped_column(nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)

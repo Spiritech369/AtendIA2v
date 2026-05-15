@@ -1,4 +1,5 @@
 """Tests for MetaCloudAPIAdapter.fetch_media_url (Phase 3c.2)."""
+
 import respx
 from httpx import Response
 
@@ -17,10 +18,13 @@ def _adapter() -> MetaCloudAPIAdapter:
 @respx.mock
 async def test_fetch_media_url_returns_url_on_200() -> None:
     respx.get("https://graph.facebook.com/v21.0/MEDIA_X").mock(
-        return_value=Response(200, json={
-            "url": "https://lookaside.fbsbx.com/...",
-            "mime_type": "image/jpeg",
-        }),
+        return_value=Response(
+            200,
+            json={
+                "url": "https://lookaside.fbsbx.com/...",
+                "mime_type": "image/jpeg",
+            },
+        ),
     )
     url = await _adapter().fetch_media_url("MEDIA_X")
     assert url == "https://lookaside.fbsbx.com/..."
@@ -40,6 +44,7 @@ async def test_fetch_media_url_returns_empty_on_404() -> None:
 async def test_fetch_media_url_returns_empty_on_transport_error() -> None:
     """Network blip → graceful empty so the webhook never 500s."""
     import httpx
+
     respx.get("https://graph.facebook.com/v21.0/MEDIA_NET").mock(
         side_effect=httpx.ConnectError("kaboom"),
     )

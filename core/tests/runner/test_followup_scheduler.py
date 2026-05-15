@@ -1,4 +1,5 @@
 """Unit tests for the Phase 3d follow-up scheduler primitives."""
+
 import json
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -15,18 +16,24 @@ from atendia.runner.followup_scheduler import (
 
 
 async def _seed_tenant_conv(db_session) -> tuple:
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-        {"n": f"test_3d_{uuid4().hex[:8]}"},
-    )).scalar()
-    cust = (await db_session.execute(
-        text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"),
-        {"t": tid, "p": f"+52155555{uuid4().int % 100000:05d}"},
-    )).scalar()
-    conv = (await db_session.execute(
-        text("INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"),
-        {"t": tid, "c": cust},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+            {"n": f"test_3d_{uuid4().hex[:8]}"},
+        )
+    ).scalar()
+    cust = (
+        await db_session.execute(
+            text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"),
+            {"t": tid, "p": f"+52155555{uuid4().int % 100000:05d}"},
+        )
+    ).scalar()
+    conv = (
+        await db_session.execute(
+            text("INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"),
+            {"t": tid, "c": cust},
+        )
+    ).scalar()
     await db_session.execute(
         text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
         {"c": conv},
@@ -43,6 +50,7 @@ async def _cleanup(db_session, tid):
 # ============================================================================
 # render_followup_body
 # ============================================================================
+
 
 def test_render_3h_silence_is_static_copy() -> None:
     body = render_followup_body(kind="3h_silence", extracted_data={})
@@ -97,20 +105,27 @@ def test_render_accepts_flat_extracted_data_shape() -> None:
 # schedule_followups_after_outbound
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_schedule_creates_two_pending_rows(db_session) -> None:
     tid, conv = await _seed_tenant_conv(db_session)
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={"plan_credito": {"value": "10%"}},
     )
     await db_session.commit()
 
-    rows = (await db_session.execute(
-        text("SELECT kind, status, cancelled_at FROM followups_scheduled "
-             "WHERE conversation_id = :c ORDER BY kind"),
-        {"c": conv},
-    )).fetchall()
+    rows = (
+        await db_session.execute(
+            text(
+                "SELECT kind, status, cancelled_at FROM followups_scheduled "
+                "WHERE conversation_id = :c ORDER BY kind"
+            ),
+            {"c": conv},
+        )
+    ).fetchall()
     kinds = [r[0] for r in rows]
     assert set(kinds) == set(FOLLOWUP_KINDS)
     for r in rows:
@@ -124,20 +139,28 @@ async def test_schedule_is_idempotent(db_session) -> None:
     """Calling schedule twice doesn't create duplicate pending rows."""
     tid, conv = await _seed_tenant_conv(db_session)
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={},
     )
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={},
     )
     await db_session.commit()
 
-    count = (await db_session.execute(
-        text("SELECT COUNT(*) FROM followups_scheduled "
-             "WHERE conversation_id = :c AND status = 'pending'"),
-        {"c": conv},
-    )).scalar()
+    count = (
+        await db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM followups_scheduled "
+                "WHERE conversation_id = :c AND status = 'pending'"
+            ),
+            {"c": conv},
+        )
+    ).scalar()
     assert count == 2  # Still just the 3h + 12h pair, not 4.
     await _cleanup(db_session, tid)
 
@@ -147,26 +170,35 @@ async def test_schedule_respects_cancelled_rows(db_session) -> None:
     """A cancelled row from a previous turn does NOT block re-scheduling."""
     tid, conv = await _seed_tenant_conv(db_session)
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={},
     )
     cancelled = await cancel_pending_followups(
-        session=db_session, conversation_id=conv,
+        session=db_session,
+        conversation_id=conv,
     )
     assert cancelled == 2
 
     # Now schedule again — should arm two new rows since the previous ones
     # are cancelled (not pending).
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={},
     )
     await db_session.commit()
-    pending = (await db_session.execute(
-        text("SELECT COUNT(*) FROM followups_scheduled "
-             "WHERE conversation_id = :c AND status = 'pending'"),
-        {"c": conv},
-    )).scalar()
+    pending = (
+        await db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM followups_scheduled "
+                "WHERE conversation_id = :c AND status = 'pending'"
+            ),
+            {"c": conv},
+        )
+    ).scalar()
     assert pending == 2
     await _cleanup(db_session, tid)
 
@@ -177,14 +209,18 @@ async def test_schedule_persists_extracted_snapshot_as_jsonb(db_session) -> None
     tid, conv = await _seed_tenant_conv(db_session)
     snapshot = {"modelo_moto": {"value": "Adventure"}, "plan_credito": {"value": "10%"}}
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot=snapshot,
     )
     await db_session.commit()
-    ctx_rows = (await db_session.execute(
-        text("SELECT context FROM followups_scheduled WHERE conversation_id = :c"),
-        {"c": conv},
-    )).fetchall()
+    ctx_rows = (
+        await db_session.execute(
+            text("SELECT context FROM followups_scheduled WHERE conversation_id = :c"),
+            {"c": conv},
+        )
+    ).fetchall()
     for row in ctx_rows:
         # JSONB round-trips as Python dict.
         assert isinstance(row[0], dict)
@@ -198,15 +234,18 @@ async def test_schedule_run_at_is_in_the_future(db_session) -> None:
     tid, conv = await _seed_tenant_conv(db_session)
     before = datetime.now(UTC)
     await schedule_followups_after_outbound(
-        session=db_session, conversation_id=conv, tenant_id=tid,
+        session=db_session,
+        conversation_id=conv,
+        tenant_id=tid,
         extracted_snapshot={},
     )
     await db_session.commit()
-    rows = (await db_session.execute(
-        text("SELECT kind, run_at FROM followups_scheduled "
-             "WHERE conversation_id = :c"),
-        {"c": conv},
-    )).fetchall()
+    rows = (
+        await db_session.execute(
+            text("SELECT kind, run_at FROM followups_scheduled WHERE conversation_id = :c"),
+            {"c": conv},
+        )
+    ).fetchall()
     by_kind = {r[0]: r[1] for r in rows}
     delta_3h = by_kind["3h_silence"] - before
     delta_12h = by_kind["12h_silence"] - before
@@ -219,16 +258,19 @@ async def test_schedule_run_at_is_in_the_future(db_session) -> None:
 # cancel_pending_followups
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_cancel_marks_pending_only(db_session) -> None:
     tid, conv = await _seed_tenant_conv(db_session)
     # Insert one pending + one already-sent + one already-cancelled row.
     await db_session.execute(
-        text("INSERT INTO followups_scheduled "
-             "(conversation_id, tenant_id, run_at, status, kind) "
-             "VALUES (:c, :t, NOW() + interval '1 hour', 'pending', '3h_silence'), "
-             "       (:c, :t, NOW() - interval '1 hour', 'sent', '12h_silence'), "
-             "       (:c, :t, NOW() - interval '2 hours', 'cancelled', '3h_silence')"),
+        text(
+            "INSERT INTO followups_scheduled "
+            "(conversation_id, tenant_id, run_at, status, kind) "
+            "VALUES (:c, :t, NOW() + interval '1 hour', 'pending', '3h_silence'), "
+            "       (:c, :t, NOW() - interval '1 hour', 'sent', '12h_silence'), "
+            "       (:c, :t, NOW() - interval '2 hours', 'cancelled', '3h_silence')"
+        ),
         {"c": conv, "t": tid},
     )
     await db_session.commit()
@@ -237,11 +279,15 @@ async def test_cancel_marks_pending_only(db_session) -> None:
     await db_session.commit()
     assert n == 1  # Only the pending row gets flipped.
 
-    statuses = (await db_session.execute(
-        text("SELECT status, cancelled_at FROM followups_scheduled "
-             "WHERE conversation_id = :c ORDER BY status"),
-        {"c": conv},
-    )).fetchall()
+    statuses = (
+        await db_session.execute(
+            text(
+                "SELECT status, cancelled_at FROM followups_scheduled "
+                "WHERE conversation_id = :c ORDER BY status"
+            ),
+            {"c": conv},
+        )
+    ).fetchall()
     # cancelled (twice now: original + new), sent (untouched).
     cancelled_count = sum(1 for s in statuses if s[0] == "cancelled")
     sent_count = sum(1 for s in statuses if s[0] == "sent")
@@ -264,6 +310,7 @@ async def test_cancel_no_op_on_clean_conversation(db_session) -> None:
 # This is an integration-style test against the real runner.
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
     """Smoke: insert pending follow-ups, run a turn, verify they cancel.
@@ -283,22 +330,29 @@ async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
         async def classify(self, **kw):
             return (
                 NLUResult(intent=Intent.GREETING, sentiment=Sentiment.NEUTRAL, confidence=0.9),
-                UsageMetadata(model="x", tokens_in=0, tokens_out=0,
-                              cost_usd=Decimal("0"), latency_ms=1),
+                UsageMetadata(
+                    model="x", tokens_in=0, tokens_out=0, cost_usd=Decimal("0"), latency_ms=1
+                ),
             )
 
     tid, conv = await _seed_tenant_conv(db_session)
     # Need a pipeline for run_turn — minimal one.
     await db_session.execute(
-        text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-             "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+        text(
+            "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+            "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+        ),
         {
             "t": tid,
-            "d": json.dumps({
-                "version": 1,
-                "stages": [{"id": "qualify", "actions_allowed": ["greet", "ask_clarification"]}],
-                "fallback": "ask_clarification",
-            }),
+            "d": json.dumps(
+                {
+                    "version": 1,
+                    "stages": [
+                        {"id": "qualify", "actions_allowed": ["greet", "ask_clarification"]}
+                    ],
+                    "fallback": "ask_clarification",
+                }
+            ),
         },
     )
     await db_session.execute(
@@ -307,29 +361,41 @@ async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
     )
     # Seed two pending follow-ups directly.
     await db_session.execute(
-        text("INSERT INTO followups_scheduled "
-             "(conversation_id, tenant_id, run_at, status, kind) "
-             "VALUES (:c, :t, NOW() + interval '3 hours', 'pending', '3h_silence'), "
-             "       (:c, :t, NOW() + interval '12 hours', 'pending', '12h_silence')"),
+        text(
+            "INSERT INTO followups_scheduled "
+            "(conversation_id, tenant_id, run_at, status, kind) "
+            "VALUES (:c, :t, NOW() + interval '3 hours', 'pending', '3h_silence'), "
+            "       (:c, :t, NOW() + interval '12 hours', 'pending', '12h_silence')"
+        ),
         {"c": conv, "t": tid},
     )
     await db_session.commit()
 
     runner = ConversationRunner(db_session, _StubNLU(), CannedComposer())
     inbound = Message(
-        id=str(uuid4()), conversation_id=str(conv), tenant_id=str(tid),
-        direction=MessageDirection.INBOUND, text="hola",
+        id=str(uuid4()),
+        conversation_id=str(conv),
+        tenant_id=str(tid),
+        direction=MessageDirection.INBOUND,
+        text="hola",
         sent_at=datetime.now(UTC),
     )
     await runner.run_turn(
-        conversation_id=conv, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
-    pending = (await db_session.execute(
-        text("SELECT COUNT(*) FROM followups_scheduled "
-             "WHERE conversation_id = :c AND status = 'pending'"),
-        {"c": conv},
-    )).scalar()
+    pending = (
+        await db_session.execute(
+            text(
+                "SELECT COUNT(*) FROM followups_scheduled "
+                "WHERE conversation_id = :c AND status = 'pending'"
+            ),
+            {"c": conv},
+        )
+    ).scalar()
     assert pending == 0
     await _cleanup(db_session, tid)

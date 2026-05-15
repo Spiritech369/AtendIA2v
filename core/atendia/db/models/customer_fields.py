@@ -13,7 +13,8 @@ class CustomerFieldDefinition(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True,
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        index=True,
     )
     key: Mapped[str] = mapped_column(String(120), nullable=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -21,7 +22,8 @@ class CustomerFieldDefinition(Base):
     field_options: Mapped[dict | None] = mapped_column(JSONB, default=None)
     ordering: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
     )
 
 
@@ -29,7 +31,8 @@ class CustomerFieldValue(Base):
     __tablename__ = "customer_field_values"
 
     customer_id: Mapped[UUID] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), primary_key=True,
+        ForeignKey("customers.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     field_definition_id: Mapped[UUID] = mapped_column(
         ForeignKey("customer_field_definitions.id", ondelete="CASCADE"),
@@ -37,5 +40,7 @@ class CustomerFieldValue(Base):
     )
     value: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(),
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
     )

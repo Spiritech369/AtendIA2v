@@ -3,6 +3,7 @@
 Two routers because list is per-customer and accept/reject are by
 suggestion id. Both are tenant-scoped + operator+.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -63,16 +64,20 @@ async def list_field_suggestions(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FieldSuggestionOut]:
     rows = (
-        await session.execute(
-            select(FieldSuggestion)
-            .where(
-                FieldSuggestion.tenant_id == tenant_id,
-                FieldSuggestion.customer_id == customer_id,
-                FieldSuggestion.status == status_filter,
+        (
+            await session.execute(
+                select(FieldSuggestion)
+                .where(
+                    FieldSuggestion.tenant_id == tenant_id,
+                    FieldSuggestion.customer_id == customer_id,
+                    FieldSuggestion.status == status_filter,
+                )
+                .order_by(FieldSuggestion.created_at.desc())
             )
-            .order_by(FieldSuggestion.created_at.desc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_to_out(r) for r in rows]
 
 
@@ -97,9 +102,7 @@ async def _load_pending(
     return row
 
 
-@actions_router.post(
-    "/{suggestion_id}/accept", response_model=FieldSuggestionOut
-)
+@actions_router.post("/{suggestion_id}/accept", response_model=FieldSuggestionOut)
 async def accept_field_suggestion(
     suggestion_id: UUID,
     user: AuthUser = Depends(current_user),
@@ -108,9 +111,7 @@ async def accept_field_suggestion(
 ) -> FieldSuggestionOut:
     sugg = await _load_pending(session, suggestion_id, tenant_id)
     customer = (
-        await session.execute(
-            select(Customer).where(Customer.id == sugg.customer_id)
-        )
+        await session.execute(select(Customer).where(Customer.id == sugg.customer_id))
     ).scalar_one()
     next_attrs = dict(customer.attrs or {})
     next_attrs[sugg.key] = sugg.suggested_value
@@ -123,9 +124,7 @@ async def accept_field_suggestion(
     return _to_out(sugg)
 
 
-@actions_router.post(
-    "/{suggestion_id}/reject", response_model=FieldSuggestionOut
-)
+@actions_router.post("/{suggestion_id}/reject", response_model=FieldSuggestionOut)
 async def reject_field_suggestion(
     suggestion_id: UUID,
     user: AuthUser = Depends(current_user),

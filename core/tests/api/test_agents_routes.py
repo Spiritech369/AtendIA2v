@@ -9,6 +9,7 @@ sure the backend keeps the contract the UI relies on:
 - /agents/test echoes intent for the simple keywords the UI primes ("hola",
   "precio")
 """
+
 from __future__ import annotations
 
 
@@ -85,9 +86,11 @@ def test_operator_cannot_mutate(client_operator, client_tenant_admin):
     assert client_operator.post(
         "/api/v1/agents", json={"name": "x", "role": "sales"}
     ).status_code in (401, 403)
-    assert client_operator.patch(
-        f"/api/v1/agents/{aid}", json={"name": "x"}
-    ).status_code in (401, 403, 404)
+    assert client_operator.patch(f"/api/v1/agents/{aid}", json={"name": "x"}).status_code in (
+        401,
+        403,
+        404,
+    )
 
 
 def test_test_endpoint_echoes_intent_for_known_keywords(client_tenant_admin):
@@ -234,9 +237,7 @@ def test_rollback_without_version_id_goes_to_previous(client_tenant_admin):
 def test_rollback_to_missing_version_is_404(client_tenant_admin):
     aid = _create_publishable(client_tenant_admin)
     client_tenant_admin.post(f"/api/v1/agents/{aid}/publish")
-    resp = client_tenant_admin.post(
-        f"/api/v1/agents/{aid}/rollback", json={"version_id": "nope"}
-    )
+    resp = client_tenant_admin.post(f"/api/v1/agents/{aid}/rollback", json={"version_id": "nope"})
     assert resp.status_code == 404
 
 

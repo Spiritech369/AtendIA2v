@@ -3,6 +3,7 @@ evaluator: condition operators, field-path resolution, and stage
 selection logic. The async DB-aware wrapper is exercised in the
 integration test at the bottom (skipped when DB is unavailable).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -148,9 +149,7 @@ def test_rule_group_any_match():
         ],
     )
     assert evaluate_rule_group(rules, {"DOCS_INE": {"status": "ok"}}) is True
-    assert evaluate_rule_group(
-        rules, {"DOCS_COMPROBANTE_DOMICILIO": {"status": "ok"}}
-    ) is True
+    assert evaluate_rule_group(rules, {"DOCS_COMPROBANTE_DOMICILIO": {"status": "ok"}}) is True
     # Neither → false
     assert evaluate_rule_group(rules, {}) is False
 
@@ -179,22 +178,23 @@ def _pipeline(stages: list[StageDefinition]) -> PipelineDefinition:
 
 def test_select_best_stage_no_matching_returns_none():
     pipe = _pipeline([_stage(sid="nuevo"), _stage(sid="propuesta")])
-    assert (
-        select_best_stage(matching=[], current_stage_id="nuevo", pipeline=pipe)
-        is None
-    )
+    assert select_best_stage(matching=[], current_stage_id="nuevo", pipeline=pipe) is None
 
 
 def test_select_best_stage_prefers_latest_forward():
-    pipe = _pipeline([
-        _stage(sid="nuevo"),
-        _stage(sid="potencial"),
-        _stage(sid="propuesta"),
-    ])
+    pipe = _pipeline(
+        [
+            _stage(sid="nuevo"),
+            _stage(sid="potencial"),
+            _stage(sid="propuesta"),
+        ]
+    )
     # Both potencial and propuesta match; we should pick propuesta (later)
     matches = [pipe.stages[1], pipe.stages[2]]
     pick = select_best_stage(
-        matching=matches, current_stage_id="nuevo", pipeline=pipe,
+        matching=matches,
+        current_stage_id="nuevo",
+        pipeline=pipe,
     )
     assert pick is not None
     assert pick.id == "propuesta"
@@ -203,17 +203,21 @@ def test_select_best_stage_prefers_latest_forward():
 def test_select_best_stage_skips_current():
     pipe = _pipeline([_stage(sid="nuevo"), _stage(sid="potencial")])
     pick = select_best_stage(
-        matching=[pipe.stages[1]], current_stage_id="potencial", pipeline=pipe,
+        matching=[pipe.stages[1]],
+        current_stage_id="potencial",
+        pipeline=pipe,
     )
     assert pick is None
 
 
 def test_select_best_stage_blocks_backward_without_flag():
-    pipe = _pipeline([
-        _stage(sid="nuevo"),
-        _stage(sid="potencial"),
-        _stage(sid="propuesta"),
-    ])
+    pipe = _pipeline(
+        [
+            _stage(sid="nuevo"),
+            _stage(sid="potencial"),
+            _stage(sid="propuesta"),
+        ]
+    )
     # Currently in propuesta; potencial matches but doesn't allow backward
     pick = select_best_stage(
         matching=[pipe.stages[1]],
@@ -224,11 +228,13 @@ def test_select_best_stage_blocks_backward_without_flag():
 
 
 def test_select_best_stage_allows_backward_when_flagged():
-    pipe = _pipeline([
-        _stage(sid="nuevo"),
-        _stage(sid="potencial", backward=True),
-        _stage(sid="propuesta"),
-    ])
+    pipe = _pipeline(
+        [
+            _stage(sid="nuevo"),
+            _stage(sid="potencial", backward=True),
+            _stage(sid="propuesta"),
+        ]
+    )
     pick = select_best_stage(
         matching=[pipe.stages[1]],
         current_stage_id="propuesta",
@@ -239,11 +245,13 @@ def test_select_best_stage_allows_backward_when_flagged():
 
 
 def test_select_best_stage_terminal_blocks_any_move():
-    pipe = _pipeline([
-        _stage(sid="nuevo"),
-        _stage(sid="cerrado", terminal=True),
-        _stage(sid="reabierto", backward=True),
-    ])
+    pipe = _pipeline(
+        [
+            _stage(sid="nuevo"),
+            _stage(sid="cerrado", terminal=True),
+            _stage(sid="reabierto", backward=True),
+        ]
+    )
     # Currently in cerrado (terminal). Even though reabierto matches and
     # itself allows backward, we never leave a terminal stage.
     pick = select_best_stage(
@@ -289,7 +297,11 @@ def test_cliente_potencial_rule_end_to_end():
         "plan_credito": "36",
         "tipo_enganche": "efectivo",
     }
-    matching = [s for s in pipe.stages if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)]
+    matching = [
+        s
+        for s in pipe.stages
+        if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)
+    ]
     pick = select_best_stage(matching=matching, current_stage_id="nuevo", pipeline=pipe)
     assert pick is not None
     assert pick.id == "cliente_potencial"
@@ -317,8 +329,14 @@ def test_papeleria_completa_rule_end_to_end():
         "DOCS_ESTADOS_CUENTA": {"status": "ok"},
         "DOCS_RECIBOS_NOMINA": {"status": "ok"},
     }
-    matching = [s for s in pipe.stages if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)]
-    pick = select_best_stage(matching=matching, current_stage_id="documentos_pendientes", pipeline=pipe)
+    matching = [
+        s
+        for s in pipe.stages
+        if s.auto_enter_rules and evaluate_rule_group(s.auto_enter_rules, fields)
+    ]
+    pick = select_best_stage(
+        matching=matching, current_stage_id="documentos_pendientes", pipeline=pipe
+    )
     assert pick is not None
     assert pick.id == "papeleria_completa"
 

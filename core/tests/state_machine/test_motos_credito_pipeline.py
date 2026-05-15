@@ -17,6 +17,7 @@ Treat this as a canary: if you rename a plan, change a doc key, or
 drop a catalog entry, this test fails and forces the related code
 paths to be updated together.
 """
+
 from __future__ import annotations
 
 from atendia.contracts.pipeline_definition import (
@@ -96,11 +97,11 @@ def test_lookup_requirements_complete_when_all_docs_ok():
     with the evaluator's notion of 'complete' on the same input."""
     pipeline = PipelineDefinition.model_validate(MOTOS_CREDITO_PIPELINE_DEFINITION)
     plan = "sin_comprobantes_25"
-    attrs = {
-        key: {"status": "ok"} for key in MOTOS_CREDITO_DOCS_PER_PLAN[plan]
-    }
+    attrs = {key: {"status": "ok"} for key in MOTOS_CREDITO_DOCS_PER_PLAN[plan]}
     result = lookup_requirements(
-        pipeline=pipeline, plan_credito=plan, customer_attrs=attrs,
+        pipeline=pipeline,
+        plan_credito=plan,
+        customer_attrs=attrs,
     )
     assert isinstance(result, RequirementsResult)
     assert result.complete is True
@@ -127,8 +128,12 @@ def test_vision_doc_mapping_covers_every_doc_category_seed_uses():
     are documented in the module docstring."""
     pipeline = PipelineDefinition.model_validate(MOTOS_CREDITO_PIPELINE_DEFINITION)
     expected_categories = {
-        "ine", "comprobante", "recibo_nomina", "estado_cuenta",
-        "constancia_sat", "imss",
+        "ine",
+        "comprobante",
+        "recibo_nomina",
+        "estado_cuenta",
+        "constancia_sat",
+        "imss",
     }
     assert expected_categories.issubset(pipeline.vision_doc_mapping.keys())
 

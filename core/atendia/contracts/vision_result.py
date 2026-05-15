@@ -20,6 +20,7 @@ it deterministically to decide:
 (e.g. a tenant with an older prompt or a moto/unrelated category)
 return `None` and the runner falls back to its previous heuristic.
 """
+
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -5,6 +5,7 @@
 empty). Cached per process — call ``get_provider.cache_clear()`` from
 test fixtures that monkeypatch settings.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache

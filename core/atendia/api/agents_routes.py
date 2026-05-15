@@ -576,7 +576,12 @@ def _defaults_for_agent(row: Agent) -> dict:
             "pending_embeddings": 2,
             "unanswered_queries": 18,
             "unanswered_this_week": 18,
-            "weak_topics": ["Buró", "INE de otro estado", "Pagos adelantados", "Cancelación de cita"],
+            "weak_topics": [
+                "Buró",
+                "INE de otro estado",
+                "Pagos adelantados",
+                "Cancelación de cita",
+            ],
         },
         "decision_map": _default_decision_map(),
         "versions": [
@@ -676,7 +681,9 @@ async def _clear_default(session: AsyncSession, tenant_id: UUID) -> None:
 
 async def _get_agent_or_404(session: AsyncSession, agent_id: UUID, tenant_id: UUID) -> Agent:
     row = (
-        await session.execute(select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant_id))
+        await session.execute(
+            select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant_id)
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "agent not found")
@@ -690,8 +697,8 @@ async def _find_agent_by_nested_id(
     item_id: str,
 ) -> tuple[Agent, dict]:
     rows = (
-        await session.execute(select(Agent).where(Agent.tenant_id == tenant_id))
-    ).scalars().all()
+        (await session.execute(select(Agent).where(Agent.tenant_id == tenant_id))).scalars().all()
+    )
     for row in rows:
         ops = _merged_ops(row)
         for item in ops.get(collection, []):
@@ -725,9 +732,13 @@ def _validate_agent_config(row: Agent, draft: dict | None = None) -> dict:
         data.update(draft)
     issues: list[dict] = []
     if not data.get("name"):
-        issues.append({"code": "NAME_REQUIRED", "severity": "critical", "message": "Nombre requerido"})
+        issues.append(
+            {"code": "NAME_REQUIRED", "severity": "critical", "message": "Nombre requerido"}
+        )
     if not data.get("language"):
-        issues.append({"code": "LANGUAGE_REQUIRED", "severity": "critical", "message": "Idioma requerido"})
+        issues.append(
+            {"code": "LANGUAGE_REQUIRED", "severity": "critical", "message": "Idioma requerido"}
+        )
     if not data.get("goal"):
         issues.append(
             {
@@ -748,14 +759,22 @@ def _validate_agent_config(row: Agent, draft: dict | None = None) -> dict:
     if data.get("behavior_mode") not in BEHAVIOR_MODES:
         issues.append({"code": "MODE_INVALID", "severity": "critical", "message": "Modo inválido"})
     if data.get("status") not in AGENT_STATUSES:
-        issues.append({"code": "STATUS_INVALID", "severity": "critical", "message": "Estado inválido"})
+        issues.append(
+            {"code": "STATUS_INVALID", "severity": "critical", "message": "Estado inválido"}
+        )
     guardrails = data.get("guardrails") or []
     fields = data.get("extraction_fields") or []
     if not guardrails:
-        issues.append({"code": "GUARDRAILS_EMPTY", "severity": "critical", "message": "Faltan guardrails"})
+        issues.append(
+            {"code": "GUARDRAILS_EMPTY", "severity": "critical", "message": "Faltan guardrails"}
+        )
     if not fields:
         issues.append(
-            {"code": "EXTRACTION_EMPTY", "severity": "warning", "message": "No hay campos de extracción"}
+            {
+                "code": "EXTRACTION_EMPTY",
+                "severity": "warning",
+                "message": "No hay campos de extracción",
+            }
         )
     critical = sum(1 for item in issues if item["severity"] == "critical")
     warning = sum(1 for item in issues if item["severity"] == "warning")
@@ -809,9 +828,7 @@ def _build_preview_system_prompt(
     if goal:
         parts.append(f"Objetivo operativo: {goal}")
     if max_sentences:
-        parts.append(
-            f"Limita tu respuesta a un máximo de {max_sentences} oraciones."
-        )
+        parts.append(f"Limita tu respuesta a un máximo de {max_sentences} oraciones.")
     if no_emoji:
         parts.append("No uses emojis.")
     if system_prompt and system_prompt.strip():
@@ -819,9 +836,7 @@ def _build_preview_system_prompt(
     return "\n".join(parts)
 
 
-async def _preview_response(
-    row: Agent, message: str, draft_config: dict | None = None
-) -> dict:
+async def _preview_response(row: Agent, message: str, draft_config: dict | None = None) -> dict:
     """Honest preview: send the agent's identity + the operator's test
     message to the configured LLM and return what it actually answers.
 
@@ -841,9 +856,7 @@ async def _preview_response(
     style = cfg.get("style") or row.style
     goal = cfg.get("goal") or row.goal
     max_sentences = cfg.get("max_sentences") or row.max_sentences
-    no_emoji = (
-        cfg.get("no_emoji") if cfg.get("no_emoji") is not None else row.no_emoji
-    )
+    no_emoji = cfg.get("no_emoji") if cfg.get("no_emoji") is not None else row.no_emoji
     language = cfg.get("language") or row.language
     system_prompt = cfg.get("system_prompt") or row.system_prompt
 
@@ -942,12 +955,16 @@ async def list_agents(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[AgentItem]:
     rows = (
-        await session.execute(
-            select(Agent)
-            .where(Agent.tenant_id == tenant_id)
-            .order_by(Agent.is_default.desc(), Agent.name.asc())
+        (
+            await session.execute(
+                select(Agent)
+                .where(Agent.tenant_id == tenant_id)
+                .order_by(Agent.is_default.desc(), Agent.name.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_item(row) for row in rows]
 
 
@@ -987,10 +1004,14 @@ async def compare_agents(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     rows = (
-        await session.execute(
-            select(Agent).where(Agent.tenant_id == tenant_id, Agent.id.in_(body.agent_ids))
+        (
+            await session.execute(
+                select(Agent).where(Agent.tenant_id == tenant_id, Agent.id.in_(body.agent_ids))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if len(rows) < 2:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "agents not found")
     items = [_item(row) for row in rows]
@@ -1024,7 +1045,11 @@ async def compare_agents(
             "b": second.metrics["risk_score"],
         },
     ]
-    return {"agents": [item.model_dump(mode="json") for item in items], "differences": differences, "performance": performance}
+    return {
+        "agents": [item.model_dump(mode="json") for item in items],
+        "differences": differences,
+        "performance": performance,
+    }
 
 
 @router.get("/{agent_id}", response_model=AgentItem)
@@ -1081,7 +1106,9 @@ async def delete_agent(
     row = await _get_agent_or_404(session, agent_id, tenant_id)
     if row.is_default:
         count = (
-            await session.execute(select(func.count()).select_from(Agent).where(Agent.tenant_id == tenant_id))
+            await session.execute(
+                select(func.count()).select_from(Agent).where(Agent.tenant_id == tenant_id)
+            )
         ).scalar_one()
         if count <= 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "cannot delete the only default agent")
@@ -1221,7 +1248,9 @@ async def get_agent_config(
         "dealership_id": item.dealership_id,
         "branch_id": item.branch_id,
         "linked_knowledge_bases": item.knowledge_config.get("linked_sources", []),
-        "linked_whatsapp_inboxes": item.knowledge_config.get("linked_inboxes", ["whatsapp_monterrey"]),
+        "linked_whatsapp_inboxes": item.knowledge_config.get(
+            "linked_inboxes", ["whatsapp_monterrey"]
+        ),
     }
 
 
@@ -1323,8 +1352,7 @@ async def agent_monitor(
     # Active conversations
     active_convs = (
         await session.execute(
-            select(func.count(func.distinct(Conversation.id)))
-            .where(
+            select(func.count(func.distinct(Conversation.id))).where(
                 Conversation.tenant_id == tenant_id,
                 conv_filter,
                 Conversation.deleted_at.is_(None),
@@ -1492,8 +1520,16 @@ async def get_failed_queries(
 ) -> list[dict]:
     await _get_agent_or_404(session, agent_id, tenant_id)
     return [
-        {"query": "¿Aplica con INE vencida?", "count": 6, "last_seen": datetime.now(UTC).isoformat()},
-        {"query": "Pago adelantado parcial", "count": 4, "last_seen": datetime.now(UTC).isoformat()},
+        {
+            "query": "¿Aplica con INE vencida?",
+            "count": 6,
+            "last_seen": datetime.now(UTC).isoformat(),
+        },
+        {
+            "query": "Pago adelantado parcial",
+            "count": 4,
+            "last_seen": datetime.now(UTC).isoformat(),
+        },
     ]
 
 
@@ -1553,7 +1589,9 @@ async def validate_decision_map(
     edges = decision_map.get("edges", [])
     return {
         "status": "ready" if nodes and edges else "blocked",
-        "issues": [] if nodes and edges else [{"severity": "critical", "message": "Decision map incompleto"}],
+        "issues": []
+        if nodes and edges
+        else [{"severity": "critical", "message": "Decision map incompleto"}],
     }
 
 
@@ -1887,7 +1925,12 @@ async def patch_guardrail(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     row, current = await _find_agent_by_nested_id(session, tenant_id, "guardrails", guardrail_id)
-    updated = {**current, **body.model_dump(), "updated_by": user.email, "updated_at": datetime.now(UTC).isoformat()}
+    updated = {
+        **current,
+        **body.model_dump(),
+        "updated_by": user.email,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
     _replace_nested_item(row, "guardrails", guardrail_id, updated)
     await session.commit()
     return updated
@@ -1938,7 +1981,11 @@ async def test_guardrail(
     _row, current = await _find_agent_by_nested_id(session, tenant_id, "guardrails", guardrail_id)
     text = (message or {}).get("text", "Ya estás aprobado por $80,000")
     violated = "aprob" in str(text).lower() and current["id"] == "gr_no_approval"
-    return {"guardrail_id": guardrail_id, "violated": violated, "action": current["enforcement_mode"]}
+    return {
+        "guardrail_id": guardrail_id,
+        "violated": violated,
+        "action": current["enforcement_mode"],
+    }
 
 
 @guardrails_router.get("/{guardrail_id}/violations")
@@ -1983,7 +2030,9 @@ async def delete_extraction_field(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    row, _current = await _find_agent_by_nested_id(session, tenant_id, "extraction_fields", field_id)
+    row, _current = await _find_agent_by_nested_id(
+        session, tenant_id, "extraction_fields", field_id
+    )
     _replace_nested_item(row, "extraction_fields", field_id, None)
     await session.commit()
 
@@ -1996,7 +2045,9 @@ async def test_extraction_field(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    _row, current = await _find_agent_by_nested_id(session, tenant_id, "extraction_fields", field_id)
+    _row, current = await _find_agent_by_nested_id(
+        session, tenant_id, "extraction_fields", field_id
+    )
     text = str((message or {}).get("text", "Me llamo Juan Pérez y gano por nómina"))
     value = "Juan Pérez" if "nombre" in current["field_key"] else "nómina"
     return {
@@ -2015,7 +2066,9 @@ async def get_extraction_examples(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
-    _row, current = await _find_agent_by_nested_id(session, tenant_id, "extraction_fields", field_id)
+    _row, current = await _find_agent_by_nested_id(
+        session, tenant_id, "extraction_fields", field_id
+    )
     return [
         {"message": "Mi nombre es Juan Pérez", "value": "Juan Pérez", "field": current["label"]},
         {"message": "Trabajo por nómina", "value": "nómina", "field": current["label"]},

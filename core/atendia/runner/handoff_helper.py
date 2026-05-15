@@ -11,6 +11,7 @@ matrix into a HandoffSummary. `persist_handoff` is a single chokepoint
 the runner uses so we don't drift between sites — every escalation
 goes through this function or it's a bug.
 """
+
 from uuid import UUID
 
 from sqlalchemy import text

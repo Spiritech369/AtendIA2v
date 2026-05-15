@@ -18,6 +18,7 @@ A legacy `LookupFAQTool(Tool)` wrapper is preserved at the bottom for
 fly using the user's question text — useful for callers that don't have
 an embedding pipeline yet, but the runner path (T18) doesn't take it.
 """
+
 from typing import Any
 from uuid import UUID
 
@@ -78,9 +79,7 @@ async def lookup_faq(
         if float(score) >= score_threshold
     ]
     if not matches:
-        return ToolNoDataResult(
-            hint=f"no FAQ above similarity threshold {score_threshold}"
-        )
+        return ToolNoDataResult(hint=f"no FAQ above similarity threshold {score_threshold}")
     return matches
 
 

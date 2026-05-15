@@ -9,6 +9,7 @@ refreshes mock rows tagged/prefixed with ``mock-full``. It intentionally covers
 all operator-facing features with enough volume to exercise filters, counters,
 lists, detail pages and command centers.
 """
+
 # ruff: noqa: E501, PLR0912, PLR0915
 from __future__ import annotations
 
@@ -59,15 +60,78 @@ def money(amount: int) -> str:
 PIPELINE_DEFINITION = {
     "version": "mock-full-20260511",
     "stages": [
-        {"id": "nuevo_lead", "label": "Nuevo lead", "timeout_hours": 2, "color": "#0ea5e9", "icon": "inbox", "allowed_transitions": ["calificacion", "cierre_perdido"]},
-        {"id": "calificacion", "label": "Calificacion", "timeout_hours": 4, "color": "#22c55e", "icon": "list_checks", "allowed_transitions": ["documentacion", "propuesta", "cierre_perdido"]},
-        {"id": "documentacion", "label": "Documentacion", "timeout_hours": 12, "color": "#8b5cf6", "icon": "file_text", "allowed_transitions": ["validacion", "calificacion"]},
-        {"id": "validacion", "label": "Validacion", "timeout_hours": 18, "color": "#f59e0b", "icon": "clipboard_check", "allowed_transitions": ["propuesta", "documentacion"]},
-        {"id": "propuesta", "label": "Propuesta", "timeout_hours": 24, "color": "#6366f1", "icon": "send", "allowed_transitions": ["negociacion", "cita_agendada", "cierre_perdido"]},
-        {"id": "negociacion", "label": "Negociacion", "timeout_hours": 24, "color": "#a855f7", "icon": "handshake", "allowed_transitions": ["cita_agendada", "cierre_ganado", "cierre_perdido"]},
-        {"id": "cita_agendada", "label": "Cita agendada", "timeout_hours": 10, "color": "#06b6d4", "icon": "calendar", "allowed_transitions": ["cierre_ganado", "cierre_perdido", "negociacion"]},
-        {"id": "cierre_ganado", "label": "Cierre ganado", "timeout_hours": 72, "color": "#10b981", "icon": "check_circle", "is_terminal": True},
-        {"id": "cierre_perdido", "label": "Cierre perdido", "timeout_hours": 72, "color": "#ef4444", "icon": "x_circle", "is_terminal": True},
+        {
+            "id": "nuevo_lead",
+            "label": "Nuevo lead",
+            "timeout_hours": 2,
+            "color": "#0ea5e9",
+            "icon": "inbox",
+            "allowed_transitions": ["calificacion", "cierre_perdido"],
+        },
+        {
+            "id": "calificacion",
+            "label": "Calificacion",
+            "timeout_hours": 4,
+            "color": "#22c55e",
+            "icon": "list_checks",
+            "allowed_transitions": ["documentacion", "propuesta", "cierre_perdido"],
+        },
+        {
+            "id": "documentacion",
+            "label": "Documentacion",
+            "timeout_hours": 12,
+            "color": "#8b5cf6",
+            "icon": "file_text",
+            "allowed_transitions": ["validacion", "calificacion"],
+        },
+        {
+            "id": "validacion",
+            "label": "Validacion",
+            "timeout_hours": 18,
+            "color": "#f59e0b",
+            "icon": "clipboard_check",
+            "allowed_transitions": ["propuesta", "documentacion"],
+        },
+        {
+            "id": "propuesta",
+            "label": "Propuesta",
+            "timeout_hours": 24,
+            "color": "#6366f1",
+            "icon": "send",
+            "allowed_transitions": ["negociacion", "cita_agendada", "cierre_perdido"],
+        },
+        {
+            "id": "negociacion",
+            "label": "Negociacion",
+            "timeout_hours": 24,
+            "color": "#a855f7",
+            "icon": "handshake",
+            "allowed_transitions": ["cita_agendada", "cierre_ganado", "cierre_perdido"],
+        },
+        {
+            "id": "cita_agendada",
+            "label": "Cita agendada",
+            "timeout_hours": 10,
+            "color": "#06b6d4",
+            "icon": "calendar",
+            "allowed_transitions": ["cierre_ganado", "cierre_perdido", "negociacion"],
+        },
+        {
+            "id": "cierre_ganado",
+            "label": "Cierre ganado",
+            "timeout_hours": 72,
+            "color": "#10b981",
+            "icon": "check_circle",
+            "is_terminal": True,
+        },
+        {
+            "id": "cierre_perdido",
+            "label": "Cierre perdido",
+            "timeout_hours": 72,
+            "color": "#ef4444",
+            "icon": "x_circle",
+            "is_terminal": True,
+        },
     ],
     "flow_mode_rules": {
         "PLAN": ["nuevo_lead", "calificacion"],
@@ -110,11 +174,51 @@ INBOX_CONFIG = {
         "sticky_composer": True,
     },
     "filter_chips": [
-        {"id": "unread", "label": "Sin leer", "color": "#4f72f5", "query": "read_at IS NULL", "live_count": True, "visible": True, "order": 0},
-        {"id": "mine", "label": "Mias", "color": "#9b72f5", "query": "assigned_to = current_user", "live_count": True, "visible": True, "order": 1},
-        {"id": "unassigned", "label": "Sin asignar", "color": "#f5a623", "query": "assigned_to IS NULL AND status != 'closed'", "live_count": False, "visible": True, "order": 2},
-        {"id": "risk", "label": "Riesgo alto", "color": "#f25252", "query": "risk_level IN ('high','critical')", "live_count": True, "visible": True, "order": 3},
-        {"id": "sla", "label": "SLA vencido", "color": "#f59e0b", "query": "sla_status = 'breached'", "live_count": True, "visible": True, "order": 4},
+        {
+            "id": "unread",
+            "label": "Sin leer",
+            "color": "#4f72f5",
+            "query": "read_at IS NULL",
+            "live_count": True,
+            "visible": True,
+            "order": 0,
+        },
+        {
+            "id": "mine",
+            "label": "Mias",
+            "color": "#9b72f5",
+            "query": "assigned_to = current_user",
+            "live_count": True,
+            "visible": True,
+            "order": 1,
+        },
+        {
+            "id": "unassigned",
+            "label": "Sin asignar",
+            "color": "#f5a623",
+            "query": "assigned_to IS NULL AND status != 'closed'",
+            "live_count": False,
+            "visible": True,
+            "order": 2,
+        },
+        {
+            "id": "risk",
+            "label": "Riesgo alto",
+            "color": "#f25252",
+            "query": "risk_level IN ('high','critical')",
+            "live_count": True,
+            "visible": True,
+            "order": 3,
+        },
+        {
+            "id": "sla",
+            "label": "SLA vencido",
+            "color": "#f59e0b",
+            "query": "sla_status = 'breached'",
+            "live_count": True,
+            "visible": True,
+            "order": 4,
+        },
     ],
     "stage_rings": [
         {
@@ -126,10 +230,42 @@ INBOX_CONFIG = {
         for stage in PIPELINE_DEFINITION["stages"]
     ],
     "handoff_rules": [
-        {"id": "human_req", "intent": "HUMAN_REQUESTED", "confidence": 90, "action": "assign_to_free_operator", "template": "", "enabled": True, "order": 0},
-        {"id": "credit_docs", "intent": "CREDIT_APPLICATION", "confidence": 82, "action": "send_checklist", "template": "mock_docs_faltantes", "enabled": True, "order": 1},
-        {"id": "ask_price", "intent": "ASK_PRICE", "confidence": 78, "action": "suggest_template", "template": "mock_cotizacion", "enabled": True, "order": 2},
-        {"id": "stale_sla", "intent": "STALE_SLA", "confidence": 100, "action": "trigger_followup", "template": "mock_reactivacion", "enabled": False, "order": 3},
+        {
+            "id": "human_req",
+            "intent": "HUMAN_REQUESTED",
+            "confidence": 90,
+            "action": "assign_to_free_operator",
+            "template": "",
+            "enabled": True,
+            "order": 0,
+        },
+        {
+            "id": "credit_docs",
+            "intent": "CREDIT_APPLICATION",
+            "confidence": 82,
+            "action": "send_checklist",
+            "template": "mock_docs_faltantes",
+            "enabled": True,
+            "order": 1,
+        },
+        {
+            "id": "ask_price",
+            "intent": "ASK_PRICE",
+            "confidence": 78,
+            "action": "suggest_template",
+            "template": "mock_cotizacion",
+            "enabled": True,
+            "order": 2,
+        },
+        {
+            "id": "stale_sla",
+            "intent": "STALE_SLA",
+            "confidence": 100,
+            "action": "trigger_followup",
+            "template": "mock_reactivacion",
+            "enabled": False,
+            "order": 3,
+        },
     ],
 }
 
@@ -154,13 +290,33 @@ ADVISOR_EMAILS = [
 FIELD_DEFINITIONS = [
     ("modelo_interes", "Modelo de interes", "text", None),
     ("presupuesto", "Presupuesto", "number", None),
-    ("plan_credito", "Plan de credito", "select", {"choices": ["Plan 10%", "48 meses + 15% enganche", "Contado", "Leasing pyme"]}),
-    ("tipo_credito", "Tipo de credito", "select", {"choices": ["Bancario", "Nomina", "Contado", "Pyme"]}),
+    (
+        "plan_credito",
+        "Plan de credito",
+        "select",
+        {"choices": ["Plan 10%", "48 meses + 15% enganche", "Contado", "Leasing pyme"]},
+    ),
+    (
+        "tipo_credito",
+        "Tipo de credito",
+        "select",
+        {"choices": ["Bancario", "Nomina", "Contado", "Pyme"]},
+    ),
     ("ingreso_mensual", "Ingreso mensual", "number", None),
     ("antiguedad_laboral", "Antiguedad laboral", "text", None),
     ("ciudad", "Ciudad", "text", None),
-    ("preferencia_contacto", "Preferencia de contacto", "select", {"choices": ["WhatsApp", "Llamada", "Email"]}),
-    ("objecion_principal", "Objecion principal", "select", {"choices": ["Precio", "Enganche", "Tiempo", "Inventario", "Credito"]}),
+    (
+        "preferencia_contacto",
+        "Preferencia de contacto",
+        "select",
+        {"choices": ["WhatsApp", "Llamada", "Email"]},
+    ),
+    (
+        "objecion_principal",
+        "Objecion principal",
+        "select",
+        {"choices": ["Precio", "Enganche", "Tiempo", "Inventario", "Credito"]},
+    ),
     ("fecha_cita_objetivo", "Fecha objetivo de cita", "date", None),
     ("docs_ine", "INE", "checkbox", None),
     ("docs_comprobante", "Comprobante de domicilio", "checkbox", None),
@@ -180,32 +336,159 @@ MODELS = [
 ]
 
 PLANS = ["Plan 10%", "48 meses + 15% enganche", "Contado", "Leasing pyme"]
-SOURCES = ["Meta Ads", "Google Search", "WhatsApp Click", "Referido", "Landing Page", "Expo Auto", "Marketplace"]
-CITIES = ["CDMX", "Guadalajara", "Monterrey", "Puebla", "Queretaro", "Toluca", "Leon", "Merida", "Tijuana", "Cancun"]
-STAGES = ["nuevo_lead", "calificacion", "documentacion", "validacion", "propuesta", "negociacion", "cita_agendada", "cierre_ganado", "cierre_perdido"]
+SOURCES = [
+    "Meta Ads",
+    "Google Search",
+    "WhatsApp Click",
+    "Referido",
+    "Landing Page",
+    "Expo Auto",
+    "Marketplace",
+]
+CITIES = [
+    "CDMX",
+    "Guadalajara",
+    "Monterrey",
+    "Puebla",
+    "Queretaro",
+    "Toluca",
+    "Leon",
+    "Merida",
+    "Tijuana",
+    "Cancun",
+]
+STAGES = [
+    "nuevo_lead",
+    "calificacion",
+    "documentacion",
+    "validacion",
+    "propuesta",
+    "negociacion",
+    "cita_agendada",
+    "cierre_ganado",
+    "cierre_perdido",
+]
 CONV_STATUSES = ["active", "active", "active", "paused", "closed"]
 RISK_LEVELS = ["low", "medium", "high", "critical"]
 SLA_STATUSES = ["on_track", "at_risk", "breached"]
 DOC_STATUSES = ["missing", "partial", "complete", "rejected"]
-INTENTS = ["ASK_INFO", "ASK_PRICE", "SCHEDULE", "CREDIT_APPLICATION", "HUMAN_REQUESTED", "SERVICE_REQUEST", "POSTSALE"]
+INTENTS = [
+    "ASK_INFO",
+    "ASK_PRICE",
+    "SCHEDULE",
+    "CREDIT_APPLICATION",
+    "HUMAN_REQUESTED",
+    "SERVICE_REQUEST",
+    "POSTSALE",
+]
 FIRST_NAMES = [
-    "Diego", "Karla", "Mariana", "Jose", "Sofia", "Roberto", "Valeria", "Miguel", "Fernanda", "Adrian", "Patricia", "Andres",
-    "Camila", "Hector", "Gabriela", "Ricardo", "Natalia", "Emilio", "Monica", "Jorge", "Daniela", "Ivan", "Lucia", "Rafael",
-    "Paola", "Santiago", "Claudia", "Tomas", "Beatriz", "Oscar", "Regina", "Arturo", "Elena", "Samuel", "Isabel", "Bruno",
-    "Renata", "Mario", "Alicia", "Nicolas", "Teresa", "Victor",
+    "Diego",
+    "Karla",
+    "Mariana",
+    "Jose",
+    "Sofia",
+    "Roberto",
+    "Valeria",
+    "Miguel",
+    "Fernanda",
+    "Adrian",
+    "Patricia",
+    "Andres",
+    "Camila",
+    "Hector",
+    "Gabriela",
+    "Ricardo",
+    "Natalia",
+    "Emilio",
+    "Monica",
+    "Jorge",
+    "Daniela",
+    "Ivan",
+    "Lucia",
+    "Rafael",
+    "Paola",
+    "Santiago",
+    "Claudia",
+    "Tomas",
+    "Beatriz",
+    "Oscar",
+    "Regina",
+    "Arturo",
+    "Elena",
+    "Samuel",
+    "Isabel",
+    "Bruno",
+    "Renata",
+    "Mario",
+    "Alicia",
+    "Nicolas",
+    "Teresa",
+    "Victor",
 ]
 LAST_NAMES = [
-    "Lopez", "Mendez", "Perez", "Hernandez", "Aguilar", "Salas", "Rojas", "Vega", "Cano", "Torres", "Nava", "Ruiz",
-    "Flores", "Castro", "Ortega", "Santos", "Mora", "Serrano", "Navarro", "Campos", "Pineda", "Mejia", "Cortes", "Luna",
+    "Lopez",
+    "Mendez",
+    "Perez",
+    "Hernandez",
+    "Aguilar",
+    "Salas",
+    "Rojas",
+    "Vega",
+    "Cano",
+    "Torres",
+    "Nava",
+    "Ruiz",
+    "Flores",
+    "Castro",
+    "Ortega",
+    "Santos",
+    "Mora",
+    "Serrano",
+    "Navarro",
+    "Campos",
+    "Pineda",
+    "Mejia",
+    "Cortes",
+    "Luna",
 ]
 
 AGENT_SPECS = [
-    ("[Mock] Recepcionista IA", "reception", "Capturar intencion inicial, datos minimos y enrutar al flujo correcto.", ["GREETING", "ASK_INFO", "SCHEDULE", "HUMAN_REQUESTED"]),
-    ("[Mock] Sales Agent", "sales", "Calificar lead, explicar modelos, precios publicados y planes permitidos.", ["ASK_PRICE", "BUY", "CREDIT_APPLICATION", "SCHEDULE"]),
-    ("[Mock] Duda General", "duda_general", "Responder preguntas frecuentes solo con fuentes publicadas de KB.", ["ASK_INFO", "OFF_TOPIC", "UNCLEAR"]),
-    ("[Mock] Documentacion", "documentation", "Solicitar y validar documentos por plan de credito.", ["CREDIT_APPLICATION", "UNCLEAR", "HUMAN_REQUESTED"]),
-    ("[Mock] Postventa", "postventa", "Agendar servicio, garantias y dudas posteriores a venta.", ["SERVICE_REQUEST", "POSTSALE", "COMPLAIN"]),
-    ("[Mock] Supervisor IA", "custom", "Monitorear riesgos, low confidence y derivaciones humanas.", ["HUMAN_REQUESTED", "COMPLAIN", "UNCLEAR"]),
+    (
+        "[Mock] Recepcionista IA",
+        "reception",
+        "Capturar intencion inicial, datos minimos y enrutar al flujo correcto.",
+        ["GREETING", "ASK_INFO", "SCHEDULE", "HUMAN_REQUESTED"],
+    ),
+    (
+        "[Mock] Sales Agent",
+        "sales",
+        "Calificar lead, explicar modelos, precios publicados y planes permitidos.",
+        ["ASK_PRICE", "BUY", "CREDIT_APPLICATION", "SCHEDULE"],
+    ),
+    (
+        "[Mock] Duda General",
+        "duda_general",
+        "Responder preguntas frecuentes solo con fuentes publicadas de KB.",
+        ["ASK_INFO", "OFF_TOPIC", "UNCLEAR"],
+    ),
+    (
+        "[Mock] Documentacion",
+        "documentation",
+        "Solicitar y validar documentos por plan de credito.",
+        ["CREDIT_APPLICATION", "UNCLEAR", "HUMAN_REQUESTED"],
+    ),
+    (
+        "[Mock] Postventa",
+        "postventa",
+        "Agendar servicio, garantias y dudas posteriores a venta.",
+        ["SERVICE_REQUEST", "POSTSALE", "COMPLAIN"],
+    ),
+    (
+        "[Mock] Supervisor IA",
+        "custom",
+        "Monitorear riesgos, low confidence y derivaciones humanas.",
+        ["HUMAN_REQUESTED", "COMPLAIN", "UNCLEAR"],
+    ),
 ]
 
 
@@ -215,8 +498,15 @@ def build_agent_ops(name: str, role: str, idx: int) -> dict[str, Any]:
         "health": {
             "score": 95 - idx * 4,
             "status": "healthy" if idx < 3 else "warning",
-            "reasons": ["Cobertura mock suficiente", "Guardrails activos", "Escalacion humana disponible"],
-            "suggested_actions": ["Revisar escenarios fallidos", "Publicar cambios despues de validacion"],
+            "reasons": [
+                "Cobertura mock suficiente",
+                "Guardrails activos",
+                "Escalacion humana disponible",
+            ],
+            "suggested_actions": [
+                "Revisar escenarios fallidos",
+                "Publicar cambios despues de validacion",
+            ],
         },
         "metrics": {
             "active_conversations": 18 + idx * 7,
@@ -232,14 +522,93 @@ def build_agent_ops(name: str, role: str, idx: int) -> dict[str, Any]:
             "trend": [82 + ((idx + step) % 12) for step in range(7)],
         },
         "guardrails": [
-            {"id": "mock_no_approval", "severity": "critical", "name": "No prometer aprobacion", "rule_text": "No confirmar aprobaciones, tasas ni montos sin validacion humana.", "allowed_examples": ["Lo validamos con el asesor."], "forbidden_examples": ["Ya estas aprobado."], "active": True, "violation_count": idx + 1, "enforcement_mode": "block", "updated_by": "Mock seed", "updated_at": NOW.isoformat()},
-            {"id": "mock_no_invented_stock", "severity": "high", "name": "No inventar inventario", "rule_text": "Usar solo catalogo publicado o escalar.", "allowed_examples": ["Tengo esta disponibilidad publicada."], "forbidden_examples": ["Seguro hay cualquier color."], "active": True, "violation_count": idx, "enforcement_mode": "rewrite", "updated_by": "Mock seed", "updated_at": NOW.isoformat()},
-            {"id": "mock_handoff", "severity": "medium", "name": "Escalar si pide humano", "rule_text": "Crear handoff inmediato ante solicitud explicita.", "allowed_examples": ["Te conecto con un asesor."], "forbidden_examples": ["No necesitas hablar con nadie."], "active": True, "violation_count": 0, "enforcement_mode": "handoff", "updated_by": "Mock seed", "updated_at": NOW.isoformat()},
+            {
+                "id": "mock_no_approval",
+                "severity": "critical",
+                "name": "No prometer aprobacion",
+                "rule_text": "No confirmar aprobaciones, tasas ni montos sin validacion humana.",
+                "allowed_examples": ["Lo validamos con el asesor."],
+                "forbidden_examples": ["Ya estas aprobado."],
+                "active": True,
+                "violation_count": idx + 1,
+                "enforcement_mode": "block",
+                "updated_by": "Mock seed",
+                "updated_at": NOW.isoformat(),
+            },
+            {
+                "id": "mock_no_invented_stock",
+                "severity": "high",
+                "name": "No inventar inventario",
+                "rule_text": "Usar solo catalogo publicado o escalar.",
+                "allowed_examples": ["Tengo esta disponibilidad publicada."],
+                "forbidden_examples": ["Seguro hay cualquier color."],
+                "active": True,
+                "violation_count": idx,
+                "enforcement_mode": "rewrite",
+                "updated_by": "Mock seed",
+                "updated_at": NOW.isoformat(),
+            },
+            {
+                "id": "mock_handoff",
+                "severity": "medium",
+                "name": "Escalar si pide humano",
+                "rule_text": "Crear handoff inmediato ante solicitud explicita.",
+                "allowed_examples": ["Te conecto con un asesor."],
+                "forbidden_examples": ["No necesitas hablar con nadie."],
+                "active": True,
+                "violation_count": 0,
+                "enforcement_mode": "handoff",
+                "updated_by": "Mock seed",
+                "updated_at": NOW.isoformat(),
+            },
         ],
         "extraction_fields": [
-            {"id": "field_modelo_interes", "field_key": "modelo_interes", "label": "Modelo de interes", "type": "text", "required": True, "confidence_threshold": 0.88, "auto_save": True, "requires_confirmation": False, "source_message_tracking": True, "confidence": 0.93, "source": "mock", "last_value": MODELS[idx % len(MODELS)][1], "status": "confirmed"},
-            {"id": "field_plan_credito", "field_key": "plan_credito", "label": "Plan de credito", "type": "enum", "required": True, "confidence_threshold": 0.9, "auto_save": True, "requires_confirmation": True, "source_message_tracking": True, "enum_options": PLANS, "confidence": 0.91, "source": "mock", "last_value": PLANS[idx % len(PLANS)], "status": "pending"},
-            {"id": "field_fecha_cita", "field_key": "fecha_cita_objetivo", "label": "Fecha objetivo de cita", "type": "date", "required": False, "confidence_threshold": 0.84, "auto_save": True, "requires_confirmation": True, "source_message_tracking": True, "confidence": 0.86, "source": "mock", "last_value": dt(days=idx + 1).date().isoformat(), "status": "pending"},
+            {
+                "id": "field_modelo_interes",
+                "field_key": "modelo_interes",
+                "label": "Modelo de interes",
+                "type": "text",
+                "required": True,
+                "confidence_threshold": 0.88,
+                "auto_save": True,
+                "requires_confirmation": False,
+                "source_message_tracking": True,
+                "confidence": 0.93,
+                "source": "mock",
+                "last_value": MODELS[idx % len(MODELS)][1],
+                "status": "confirmed",
+            },
+            {
+                "id": "field_plan_credito",
+                "field_key": "plan_credito",
+                "label": "Plan de credito",
+                "type": "enum",
+                "required": True,
+                "confidence_threshold": 0.9,
+                "auto_save": True,
+                "requires_confirmation": True,
+                "source_message_tracking": True,
+                "enum_options": PLANS,
+                "confidence": 0.91,
+                "source": "mock",
+                "last_value": PLANS[idx % len(PLANS)],
+                "status": "pending",
+            },
+            {
+                "id": "field_fecha_cita",
+                "field_key": "fecha_cita_objetivo",
+                "label": "Fecha objetivo de cita",
+                "type": "date",
+                "required": False,
+                "confidence_threshold": 0.84,
+                "auto_save": True,
+                "requires_confirmation": True,
+                "source_message_tracking": True,
+                "confidence": 0.86,
+                "source": "mock",
+                "last_value": dt(days=idx + 1).date().isoformat(),
+                "status": "pending",
+            },
         ],
         "live_monitor": {
             "status": "online",
@@ -262,11 +631,46 @@ def build_agent_ops(name: str, role: str, idx: int) -> dict[str, Any]:
         },
         "decision_map": {
             "nodes": [
-                {"id": "incoming", "label": "Incoming", "type": "agent_step", "position": {"x": 40, "y": 120}, "enabled": True, "config": {}},
-                {"id": "intent", "label": "Intent detection", "type": "agent_step", "position": {"x": 230, "y": 120}, "enabled": True, "config": {}},
-                {"id": "kb", "label": "KB retrieval", "type": "agent_step", "position": {"x": 420, "y": 80}, "enabled": True, "config": {}},
-                {"id": "compose", "label": "Composer", "type": "agent_step", "position": {"x": 620, "y": 120}, "enabled": True, "config": {}},
-                {"id": "handoff", "label": "Handoff", "type": "agent_step", "position": {"x": 820, "y": 180}, "enabled": True, "config": {}},
+                {
+                    "id": "incoming",
+                    "label": "Incoming",
+                    "type": "agent_step",
+                    "position": {"x": 40, "y": 120},
+                    "enabled": True,
+                    "config": {},
+                },
+                {
+                    "id": "intent",
+                    "label": "Intent detection",
+                    "type": "agent_step",
+                    "position": {"x": 230, "y": 120},
+                    "enabled": True,
+                    "config": {},
+                },
+                {
+                    "id": "kb",
+                    "label": "KB retrieval",
+                    "type": "agent_step",
+                    "position": {"x": 420, "y": 80},
+                    "enabled": True,
+                    "config": {},
+                },
+                {
+                    "id": "compose",
+                    "label": "Composer",
+                    "type": "agent_step",
+                    "position": {"x": 620, "y": 120},
+                    "enabled": True,
+                    "config": {},
+                },
+                {
+                    "id": "handoff",
+                    "label": "Handoff",
+                    "type": "agent_step",
+                    "position": {"x": 820, "y": 180},
+                    "enabled": True,
+                    "config": {},
+                },
             ],
             "edges": [
                 {"id": "e1", "source": "incoming", "target": "intent"},
@@ -276,14 +680,50 @@ def build_agent_ops(name: str, role: str, idx: int) -> dict[str, Any]:
             ],
         },
         "versions": [
-            {"version": "v2.8", "status": "production", "editor": "Mock seed", "published_at": dt(days=-1).isoformat(), "change_summary": f"{name} operativo para pruebas"},
-            {"version": "v2.7", "status": "archived", "editor": "Mock seed", "published_at": dt(days=-8).isoformat(), "change_summary": "Baseline de guardrails"},
+            {
+                "version": "v2.8",
+                "status": "production",
+                "editor": "Mock seed",
+                "published_at": dt(days=-1).isoformat(),
+                "change_summary": f"{name} operativo para pruebas",
+            },
+            {
+                "version": "v2.7",
+                "status": "archived",
+                "editor": "Mock seed",
+                "published_at": dt(days=-8).isoformat(),
+                "change_summary": "Baseline de guardrails",
+            },
         ],
         "scenarios": [
-            {"id": "precio_sin_plan", "name": "Pide precio antes de plan", "status": "passed", "score": 94 - idx, "last_run_at": dt(minutes=-35).isoformat()},
-            {"id": "buro_malo", "name": "Pregunta por buro", "status": "warning" if idx % 2 else "passed", "score": 82 - idx, "last_run_at": dt(minutes=-58).isoformat()},
-            {"id": "pide_humano", "name": "Pide humano", "status": "passed", "score": 96, "last_run_at": dt(minutes=-12).isoformat()},
-            {"id": "documentos_incompletos", "name": "Documentos incompletos", "status": "risky" if role == "documentation" else "passed", "score": 78, "last_run_at": dt(minutes=-93).isoformat()},
+            {
+                "id": "precio_sin_plan",
+                "name": "Pide precio antes de plan",
+                "status": "passed",
+                "score": 94 - idx,
+                "last_run_at": dt(minutes=-35).isoformat(),
+            },
+            {
+                "id": "buro_malo",
+                "name": "Pregunta por buro",
+                "status": "warning" if idx % 2 else "passed",
+                "score": 82 - idx,
+                "last_run_at": dt(minutes=-58).isoformat(),
+            },
+            {
+                "id": "pide_humano",
+                "name": "Pide humano",
+                "status": "passed",
+                "score": 96,
+                "last_run_at": dt(minutes=-12).isoformat(),
+            },
+            {
+                "id": "documentos_incompletos",
+                "name": "Documentos incompletos",
+                "status": "risky" if role == "documentation" else "passed",
+                "score": 78,
+                "last_run_at": dt(minutes=-93).isoformat(),
+            },
         ],
     }
 
@@ -300,20 +740,32 @@ def build_leads() -> list[dict[str, Any]]:
         plan = PLANS[(i + 1) % len(PLANS)]
         source = SOURCES[(i * 2) % len(SOURCES)]
         city = CITIES[(i * 3) % len(CITIES)]
-        risk = RISK_LEVELS[(i + (1 if stage in {"documentacion", "validacion"} else 0)) % len(RISK_LEVELS)]
+        risk = RISK_LEVELS[
+            (i + (1 if stage in {"documentacion", "validacion"} else 0)) % len(RISK_LEVELS)
+        ]
         docs_status = DOC_STATUSES[(i + 2) % len(DOC_STATUSES)]
         assigned_email = ADVISOR_EMAILS[i % len(ADVISOR_EMAILS)] if i % 5 != 2 else None
         status = CONV_STATUSES[i % len(CONV_STATUSES)]
         if stage in {"cierre_ganado", "cierre_perdido"}:
             status = "closed"
-        score = max(18, min(99, 46 + (i * 7) % 54 + (8 if stage in {"propuesta", "negociacion", "cita_agendada"} else 0)))
+        score = max(
+            18,
+            min(
+                99,
+                46
+                + (i * 7) % 54
+                + (8 if stage in {"propuesta", "negociacion", "cita_agendada"} else 0),
+            ),
+        )
         health = max(15, min(99, 52 + (i * 5) % 45 - (12 if risk == "critical" else 0)))
         unread = 0 if status == "closed" else (i * 3) % 7
         minutes_ago = 8 + (i * 19) % 780
         intent = INTENTS[i % len(INTENTS)]
         has_handoff = i % 6 in {1, 4} or risk == "critical"
         has_followup = i % 3 != 0
-        should_appoint = stage in {"cita_agendada", "negociacion", "propuesta", "validacion"} or i % 4 == 0
+        should_appoint = (
+            stage in {"cita_agendada", "negociacion", "propuesta", "validacion"} or i % 4 == 0
+        )
         tags = [MOCK_TAG, f"mock-lead-{i + 1:02d}", stage, source.lower().replace(" ", "_"), risk]
         if has_handoff:
             tags.append("handoff")
@@ -375,7 +827,9 @@ async def scalar_one(conn: AsyncConnection, sql: str, params: dict[str, Any] | N
 
 
 async def ensure_tenant(conn: AsyncConnection) -> UUID:
-    tenant_id = await scalar(conn, "SELECT id FROM tenants WHERE name = :name", {"name": DEMO_TENANT_NAME})
+    tenant_id = await scalar(
+        conn, "SELECT id FROM tenants WHERE name = :name", {"name": DEMO_TENANT_NAME}
+    )
     tenant_config = {
         "mock_seed": MOCK_SEED,
         "demo": True,
@@ -427,33 +881,143 @@ async def ensure_tenant(conn: AsyncConnection) -> UUID:
 
 
 async def cleanup_mock(conn: AsyncConnection, tenant_id: UUID) -> None:
-    await conn.execute(text("DELETE FROM notifications WHERE tenant_id = :tenant_id AND source_type = 'mock_full_demo'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM outbound_outbox WHERE tenant_id = :tenant_id AND idempotency_key LIKE 'mock-full:%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM events WHERE tenant_id = :tenant_id AND payload->>'mock_seed' = :seed"), {"tenant_id": tenant_id, "seed": MOCK_SEED})
-    await conn.execute(text("DELETE FROM followups_scheduled WHERE tenant_id = :tenant_id AND context->>'mock_seed' = :seed"), {"tenant_id": tenant_id, "seed": MOCK_SEED})
-    await conn.execute(text("DELETE FROM human_handoffs WHERE tenant_id = :tenant_id AND reason LIKE 'MOCK-FULL:%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM appointments WHERE tenant_id = :tenant_id AND notes LIKE '[mock-full]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM conversations WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"), {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])})
-    await conn.execute(text("DELETE FROM customers WHERE tenant_id = :tenant_id AND (tags @> CAST(:tag AS jsonb) OR attrs->>'mock_seed' = :seed)"), {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG]), "seed": MOCK_SEED})
+    await conn.execute(
+        text(
+            "DELETE FROM notifications WHERE tenant_id = :tenant_id AND source_type = 'mock_full_demo'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM outbound_outbox WHERE tenant_id = :tenant_id AND idempotency_key LIKE 'mock-full:%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM events WHERE tenant_id = :tenant_id AND payload->>'mock_seed' = :seed"),
+        {"tenant_id": tenant_id, "seed": MOCK_SEED},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM followups_scheduled WHERE tenant_id = :tenant_id AND context->>'mock_seed' = :seed"
+        ),
+        {"tenant_id": tenant_id, "seed": MOCK_SEED},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM human_handoffs WHERE tenant_id = :tenant_id AND reason LIKE 'MOCK-FULL:%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM appointments WHERE tenant_id = :tenant_id AND notes LIKE '[mock-full]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM conversations WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"
+        ),
+        {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM customers WHERE tenant_id = :tenant_id AND (tags @> CAST(:tag AS jsonb) OR attrs->>'mock_seed' = :seed)"
+        ),
+        {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG]), "seed": MOCK_SEED},
+    )
 
-    await conn.execute(text("DELETE FROM kb_versions WHERE tenant_id = :tenant_id AND change_summary LIKE '[mock-full]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM kb_conflicts WHERE tenant_id = :tenant_id AND title LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM kb_unanswered_questions WHERE tenant_id = :tenant_id AND query_normalized LIKE 'mock-full:%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM kb_test_cases WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM kb_health_snapshots WHERE tenant_id = :tenant_id AND score_components->>'mock_seed' = :seed"), {"tenant_id": tenant_id, "seed": MOCK_SEED})
-    await conn.execute(text("DELETE FROM kb_source_priority_rules WHERE tenant_id = :tenant_id AND agent LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM kb_agent_permissions WHERE tenant_id = :tenant_id AND agent LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM knowledge_documents WHERE tenant_id = :tenant_id AND filename LIKE 'mock-full-%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM knowledge_base_sources WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM tenant_faqs WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"), {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])})
-    await conn.execute(text("DELETE FROM tenant_catalogs WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"), {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])})
-    await conn.execute(text("DELETE FROM whatsapp_templates WHERE tenant_id = :tenant_id AND name LIKE 'mock_%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM ai_agents WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM advisor_pools WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM business_hours_rules WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM safety_rules WHERE tenant_id = :tenant_id AND key LIKE 'mock_%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM workflows WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
-    await conn.execute(text("DELETE FROM agents WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"), {"tenant_id": tenant_id})
+    await conn.execute(
+        text(
+            "DELETE FROM kb_versions WHERE tenant_id = :tenant_id AND change_summary LIKE '[mock-full]%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM kb_conflicts WHERE tenant_id = :tenant_id AND title LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM kb_unanswered_questions WHERE tenant_id = :tenant_id AND query_normalized LIKE 'mock-full:%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM kb_test_cases WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM kb_health_snapshots WHERE tenant_id = :tenant_id AND score_components->>'mock_seed' = :seed"
+        ),
+        {"tenant_id": tenant_id, "seed": MOCK_SEED},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM kb_source_priority_rules WHERE tenant_id = :tenant_id AND agent LIKE '[Mock]%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM kb_agent_permissions WHERE tenant_id = :tenant_id AND agent LIKE '[Mock]%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM knowledge_documents WHERE tenant_id = :tenant_id AND filename LIKE 'mock-full-%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM knowledge_base_sources WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM tenant_faqs WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"
+        ),
+        {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM tenant_catalogs WHERE tenant_id = :tenant_id AND tags @> CAST(:tag AS jsonb)"
+        ),
+        {"tenant_id": tenant_id, "tag": dumps([MOCK_TAG])},
+    )
+    await conn.execute(
+        text("DELETE FROM whatsapp_templates WHERE tenant_id = :tenant_id AND name LIKE 'mock_%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM ai_agents WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM advisor_pools WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text(
+            "DELETE FROM business_hours_rules WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"
+        ),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM safety_rules WHERE tenant_id = :tenant_id AND key LIKE 'mock_%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM workflows WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
+    await conn.execute(
+        text("DELETE FROM agents WHERE tenant_id = :tenant_id AND name LIKE '[Mock]%'"),
+        {"tenant_id": tenant_id},
+    )
     print("[OK] Removed previous mock-full rows")
 
 
@@ -474,11 +1038,18 @@ async def ensure_users(conn: AsyncConnection, tenant_id: UUID) -> dict[str, UUID
                 VALUES (:tenant_id, :email, :role, :password_hash)
                 RETURNING id
                 """,
-                {"tenant_id": tenant_id, "email": email, "role": role, "password_hash": password_hash},
+                {
+                    "tenant_id": tenant_id,
+                    "email": email,
+                    "role": role,
+                    "password_hash": password_hash,
+                },
             )
         else:
             await conn.execute(
-                text("UPDATE tenant_users SET role = :role, password_hash = :password_hash WHERE id = :user_id"),
+                text(
+                    "UPDATE tenant_users SET role = :role, password_hash = :password_hash WHERE id = :user_id"
+                ),
                 {"user_id": user_id, "role": role, "password_hash": password_hash},
             )
         result[email] = user_id
@@ -486,8 +1057,13 @@ async def ensure_users(conn: AsyncConnection, tenant_id: UUID) -> dict[str, UUID
     return result
 
 
-async def ensure_pipeline_branding_and_tools(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID]) -> None:
-    await conn.execute(text("UPDATE tenant_pipelines SET active = false WHERE tenant_id = :tenant_id"), {"tenant_id": tenant_id})
+async def ensure_pipeline_branding_and_tools(
+    conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID]
+) -> None:
+    await conn.execute(
+        text("UPDATE tenant_pipelines SET active = false WHERE tenant_id = :tenant_id"),
+        {"tenant_id": tenant_id},
+    )
     await conn.execute(
         text(
             """
@@ -508,8 +1084,21 @@ async def ensure_pipeline_branding_and_tools(conn: AsyncConnection, tenant_id: U
         ),
         {
             "tenant_id": tenant_id,
-            "voice": dumps({"tone": "claro", "style": "asesor comercial", "locale": "es-MX", "mock_seed": MOCK_SEED}),
-            "messages": dumps({"fallback": "Te conecto con un asesor para validarlo.", "handoff": "Ya avise al equipo humano.", "mock_seed": MOCK_SEED}),
+            "voice": dumps(
+                {
+                    "tone": "claro",
+                    "style": "asesor comercial",
+                    "locale": "es-MX",
+                    "mock_seed": MOCK_SEED,
+                }
+            ),
+            "messages": dumps(
+                {
+                    "fallback": "Te conecto con un asesor para validarlo.",
+                    "handoff": "Ya avise al equipo humano.",
+                    "mock_seed": MOCK_SEED,
+                }
+            ),
         },
     )
     for tool_name, enabled, config in [
@@ -519,7 +1108,11 @@ async def ensure_pipeline_branding_and_tools(conn: AsyncConnection, tenant_id: U
         ("book_appointment", True, {"default_duration_minutes": 60, "mock_seed": MOCK_SEED}),
         ("escalate", True, {"sla_minutes": 20, "mock_seed": MOCK_SEED}),
         ("followup", True, {"quiet_hours": ["21:00", "09:00"], "mock_seed": MOCK_SEED}),
-        ("vision", True, {"allowed_documents": ["ine", "comprobante", "nomina"], "mock_seed": MOCK_SEED}),
+        (
+            "vision",
+            True,
+            {"allowed_documents": ["ine", "comprobante", "nomina"], "mock_seed": MOCK_SEED},
+        ),
     ]:
         await conn.execute(
             text(
@@ -529,7 +1122,12 @@ async def ensure_pipeline_branding_and_tools(conn: AsyncConnection, tenant_id: U
                 ON CONFLICT (tenant_id, tool_name) DO UPDATE SET enabled = EXCLUDED.enabled, config = EXCLUDED.config
                 """
             ),
-            {"tenant_id": tenant_id, "tool_name": tool_name, "enabled": enabled, "config": dumps(config)},
+            {
+                "tenant_id": tenant_id,
+                "tool_name": tool_name,
+                "enabled": enabled,
+                "config": dumps(config),
+            },
         )
     print("[OK] Pipeline, branding and tool config ready")
 
@@ -597,10 +1195,33 @@ async def ensure_agents(conn: AsyncConnection, tenant_id: UUID) -> dict[str, UUI
                 "is_default": False,
                 "system_prompt": f"Eres {name}. Usa solo datos publicados y respeta los guardrails mock.",
                 "intents": dumps(intents),
-                "extraction": dumps({"required_fields": ["modelo_interes", "plan_credito", "ciudad"], "mock_seed": MOCK_SEED}),
-                "auto_actions": dumps({"schedule_followup": True, "create_handoff_on_risk": True, "mock_seed": MOCK_SEED}),
-                "knowledge": dumps({"collections": ["credito", "catalogo", "inventario"], "min_score": 0.72, "mock_seed": MOCK_SEED}),
-                "flow_rules": dumps({"fallback_mode": "SUPPORT", "handoff_on_confidence_below": 0.62, "mock_seed": MOCK_SEED}),
+                "extraction": dumps(
+                    {
+                        "required_fields": ["modelo_interes", "plan_credito", "ciudad"],
+                        "mock_seed": MOCK_SEED,
+                    }
+                ),
+                "auto_actions": dumps(
+                    {
+                        "schedule_followup": True,
+                        "create_handoff_on_risk": True,
+                        "mock_seed": MOCK_SEED,
+                    }
+                ),
+                "knowledge": dumps(
+                    {
+                        "collections": ["credito", "catalogo", "inventario"],
+                        "min_score": 0.72,
+                        "mock_seed": MOCK_SEED,
+                    }
+                ),
+                "flow_rules": dumps(
+                    {
+                        "fallback_mode": "SUPPORT",
+                        "handoff_on_confidence_below": 0.62,
+                        "mock_seed": MOCK_SEED,
+                    }
+                ),
                 "ops_config": dumps(build_agent_ops(name, role, idx)),
             },
         )
@@ -611,12 +1232,48 @@ async def ensure_agents(conn: AsyncConnection, tenant_id: UUID) -> dict[str, UUI
 
 async def seed_kb_collections(conn: AsyncConnection, tenant_id: UUID) -> dict[str, UUID]:
     specs = [
-        ("credito", "Credito y financiamiento", "Reglas de credito, enganche y documentos.", "landmark", "#22c55e"),
-        ("catalogo", "Catalogo vehicular", "Modelos, versiones, precios y stock mock.", "car", "#0ea5e9"),
-        ("inventario", "Inventario por sucursal", "Disponibilidad, colores y tiempos estimados.", "warehouse", "#f59e0b"),
-        ("postventa", "Postventa y servicio", "Garantias, servicios y agenda de taller.", "wrench", "#8b5cf6"),
-        ("policies", "Politicas comerciales", "Reglas de privacidad, consentimiento y seguridad.", "shield", "#ef4444"),
-        ("scripts", "Scripts de ventas", "Mensajes aprobados por etapa del embudo.", "message_square", "#14b8a6"),
+        (
+            "credito",
+            "Credito y financiamiento",
+            "Reglas de credito, enganche y documentos.",
+            "landmark",
+            "#22c55e",
+        ),
+        (
+            "catalogo",
+            "Catalogo vehicular",
+            "Modelos, versiones, precios y stock mock.",
+            "car",
+            "#0ea5e9",
+        ),
+        (
+            "inventario",
+            "Inventario por sucursal",
+            "Disponibilidad, colores y tiempos estimados.",
+            "warehouse",
+            "#f59e0b",
+        ),
+        (
+            "postventa",
+            "Postventa y servicio",
+            "Garantias, servicios y agenda de taller.",
+            "wrench",
+            "#8b5cf6",
+        ),
+        (
+            "policies",
+            "Politicas comerciales",
+            "Reglas de privacidad, consentimiento y seguridad.",
+            "shield",
+            "#ef4444",
+        ),
+        (
+            "scripts",
+            "Scripts de ventas",
+            "Mensajes aprobados por etapa del embudo.",
+            "message_square",
+            "#14b8a6",
+        ),
     ]
     ids: dict[str, UUID] = {}
     for slug, name, desc, icon, color in specs:
@@ -628,40 +1285,121 @@ async def seed_kb_collections(conn: AsyncConnection, tenant_id: UUID) -> dict[st
             ON CONFLICT (tenant_id, slug) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, icon = EXCLUDED.icon, color = EXCLUDED.color
             RETURNING id
             """,
-            {"tenant_id": tenant_id, "slug": slug, "name": name, "description": desc, "icon": icon, "color": color},
+            {
+                "tenant_id": tenant_id,
+                "slug": slug,
+                "name": name,
+                "description": desc,
+                "icon": icon,
+                "color": color,
+            },
         )
         ids[slug] = collection_id
     return ids
 
 
-async def seed_faqs_and_catalog(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], collections: dict[str, UUID]) -> tuple[list[UUID], list[UUID]]:
+async def seed_faqs_and_catalog(
+    conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], collections: dict[str, UUID]
+) -> tuple[list[UUID], list[UUID]]:
     admin_id = user_ids["admin@demo.com"]
     faq_ids: list[UUID] = []
     faq_templates = [
-        ("Que documentos necesito para Plan 10%?", "Para Plan 10% se solicita INE, comprobante de domicilio y recibo de nomina reciente."),
-        ("Puedo apartar una unidad por WhatsApp?", "Si, se puede registrar interes y un asesor confirma condiciones de apartado antes de cualquier pago."),
-        ("Que pasa si tengo buro negativo?", "No prometemos aprobacion. Podemos revisar alternativas y un asesor valida el caso con documentacion."),
-        ("Cuanto dura una prueba de manejo?", "La prueba de manejo mock dura 45 a 60 minutos y requiere cita confirmada."),
-        ("Puedo hacer todo el proceso en linea?", "La pre-calificacion y envio de documentos puede iniciar en linea; firma y entrega dependen del asesor."),
-        ("Tienen garantia?", "Los vehiculos nuevos incluyen garantia de fabrica segun manual y poliza vigente."),
-        ("Aceptan auto a cuenta?", "El asesor puede iniciar una valuacion, pero el monto final se confirma en sucursal."),
-        ("Que horarios tienen?", "Horario demo: lunes a viernes 9:00 a 19:00 y sabado 10:00 a 16:00."),
-        ("Pueden cotizar mensualidad?", "Solo se comparte estimado con plan y enganche capturados; la oferta final la valida el asesor."),
-        ("Que pasa si me faltan documentos?", "Se mantiene el lead en documentacion y se agenda seguimiento automatico."),
-        ("Como actualizo mi cita?", "Un asesor puede confirmar, reprogramar o cancelar la cita desde el command center."),
-        ("Que sucursales participan?", "CDMX, Guadalajara, Monterrey, Puebla y Queretaro estan habilitadas en el demo."),
-        ("Se puede reservar color?", "La reserva de color depende del inventario publicado y confirmacion humana."),
-        ("Que modelos tienen entrega inmediata?", "City Sport, HR-V EXL, CR-V Turbo y BR-V Prime tienen unidades mock en stock."),
-        ("Como se maneja privacidad?", "Solo se usan datos necesarios para atencion comercial y seguimiento, con consentimiento del cliente."),
-        ("Que hago si la IA no sabe responder?", "El bot debe escalar a humano y no inventar precios, stock o aprobaciones."),
-        ("Hay promociones por nomina?", "Hay rutas de credito por nomina, pero requisitos y elegibilidad se validan con el asesor."),
-        ("Que es un handoff?", "Es una derivacion a operador humano cuando hay riesgo, baja confianza o solicitud explicita."),
-        ("Cuantos mensajes de seguimiento se envian?", "El demo respeta maximo tres seguimientos automaticos en 24 horas."),
-        ("Puedo comprar de contado?", "Si, el flujo de contado requiere INE, comprobante y validacion de disponibilidad."),
-        ("Que pasa con citas no show?", "Se marca no show, se registra riesgo y se agenda reactivacion si aplica."),
-        ("Como se validan documentos?", "El demo marca documentos como recibidos, revisados, rechazados o faltantes."),
-        ("Hay leasing para empresas?", "Leasing pyme existe como plan mock y requiere datos fiscales adicionales."),
-        ("El precio incluye placas?", "No se debe afirmar. El asesor confirma cargos, placas y seguros segun entidad."),
+        (
+            "Que documentos necesito para Plan 10%?",
+            "Para Plan 10% se solicita INE, comprobante de domicilio y recibo de nomina reciente.",
+        ),
+        (
+            "Puedo apartar una unidad por WhatsApp?",
+            "Si, se puede registrar interes y un asesor confirma condiciones de apartado antes de cualquier pago.",
+        ),
+        (
+            "Que pasa si tengo buro negativo?",
+            "No prometemos aprobacion. Podemos revisar alternativas y un asesor valida el caso con documentacion.",
+        ),
+        (
+            "Cuanto dura una prueba de manejo?",
+            "La prueba de manejo mock dura 45 a 60 minutos y requiere cita confirmada.",
+        ),
+        (
+            "Puedo hacer todo el proceso en linea?",
+            "La pre-calificacion y envio de documentos puede iniciar en linea; firma y entrega dependen del asesor.",
+        ),
+        (
+            "Tienen garantia?",
+            "Los vehiculos nuevos incluyen garantia de fabrica segun manual y poliza vigente.",
+        ),
+        (
+            "Aceptan auto a cuenta?",
+            "El asesor puede iniciar una valuacion, pero el monto final se confirma en sucursal.",
+        ),
+        (
+            "Que horarios tienen?",
+            "Horario demo: lunes a viernes 9:00 a 19:00 y sabado 10:00 a 16:00.",
+        ),
+        (
+            "Pueden cotizar mensualidad?",
+            "Solo se comparte estimado con plan y enganche capturados; la oferta final la valida el asesor.",
+        ),
+        (
+            "Que pasa si me faltan documentos?",
+            "Se mantiene el lead en documentacion y se agenda seguimiento automatico.",
+        ),
+        (
+            "Como actualizo mi cita?",
+            "Un asesor puede confirmar, reprogramar o cancelar la cita desde el command center.",
+        ),
+        (
+            "Que sucursales participan?",
+            "CDMX, Guadalajara, Monterrey, Puebla y Queretaro estan habilitadas en el demo.",
+        ),
+        (
+            "Se puede reservar color?",
+            "La reserva de color depende del inventario publicado y confirmacion humana.",
+        ),
+        (
+            "Que modelos tienen entrega inmediata?",
+            "City Sport, HR-V EXL, CR-V Turbo y BR-V Prime tienen unidades mock en stock.",
+        ),
+        (
+            "Como se maneja privacidad?",
+            "Solo se usan datos necesarios para atencion comercial y seguimiento, con consentimiento del cliente.",
+        ),
+        (
+            "Que hago si la IA no sabe responder?",
+            "El bot debe escalar a humano y no inventar precios, stock o aprobaciones.",
+        ),
+        (
+            "Hay promociones por nomina?",
+            "Hay rutas de credito por nomina, pero requisitos y elegibilidad se validan con el asesor.",
+        ),
+        (
+            "Que es un handoff?",
+            "Es una derivacion a operador humano cuando hay riesgo, baja confianza o solicitud explicita.",
+        ),
+        (
+            "Cuantos mensajes de seguimiento se envian?",
+            "El demo respeta maximo tres seguimientos automaticos en 24 horas.",
+        ),
+        (
+            "Puedo comprar de contado?",
+            "Si, el flujo de contado requiere INE, comprobante y validacion de disponibilidad.",
+        ),
+        (
+            "Que pasa con citas no show?",
+            "Se marca no show, se registra riesgo y se agenda reactivacion si aplica.",
+        ),
+        (
+            "Como se validan documentos?",
+            "El demo marca documentos como recibidos, revisados, rechazados o faltantes.",
+        ),
+        (
+            "Hay leasing para empresas?",
+            "Leasing pyme existe como plan mock y requiere datos fiscales adicionales.",
+        ),
+        (
+            "El precio incluye placas?",
+            "No se debe afirmar. El asesor confirma cargos, placas y seguros segun entidad.",
+        ),
     ]
     for idx, (question, answer) in enumerate(faq_templates, start=1):
         collection_slug = ["credito", "catalogo", "postventa", "policies", "scripts"][idx % 5]
@@ -737,7 +1475,16 @@ async def seed_faqs_and_catalog(conn: AsyncConnection, tenant_id: UUID, user_ids
                     "tenant_id": tenant_id,
                     "sku": item_sku,
                     "name": f"[Mock] {name} {branch}",
-                    "attrs": dumps({"model": name, "color": color, "year": 2026, "mock_seed": MOCK_SEED, "price_mxn": price, "stock_units": 1 + idx % 5}),
+                    "attrs": dumps(
+                        {
+                            "model": name,
+                            "color": color,
+                            "year": 2026,
+                            "mock_seed": MOCK_SEED,
+                            "price_mxn": price,
+                            "stock_units": 1 + idx % 5,
+                        }
+                    ),
                     "tags": dumps([MOCK_TAG, "catalog", category.lower(), branch.lower()]),
                     "category": category,
                     "priority": 90 - idx,
@@ -747,7 +1494,12 @@ async def seed_faqs_and_catalog(conn: AsyncConnection, tenant_id: UUID, user_ids
                     "price_cents": price * 100,
                     "stock_status": stock_status,
                     "branch": branch,
-                    "plans": dumps([{"name": plan, "down_payment_percent": [10, 15, 100, 12][pidx]} for pidx, plan in enumerate(PLANS)]),
+                    "plans": dumps(
+                        [
+                            {"name": plan, "down_payment_percent": [10, 15, 100, 12][pidx]}
+                            for pidx, plan in enumerate(PLANS)
+                        ]
+                    ),
                 },
             )
             catalog_ids.append(catalog_id)
@@ -755,7 +1507,9 @@ async def seed_faqs_and_catalog(conn: AsyncConnection, tenant_id: UUID, user_ids
     return faq_ids, catalog_ids
 
 
-async def seed_knowledge_documents(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], collections: dict[str, UUID]) -> list[UUID]:
+async def seed_knowledge_documents(
+    conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], collections: dict[str, UUID]
+) -> list[UUID]:
     admin_id = user_ids["admin@demo.com"]
     docs = [
         ("credito-plan-10", "credito", "Politica Plan 10% y requisitos minimos", 6),
@@ -763,7 +1517,12 @@ async def seed_knowledge_documents(conn: AsyncConnection, tenant_id: UUID, user_
         ("inventario-sucursales", "inventario", "Inventario disponible por sucursal mock", 8),
         ("precios-promos", "catalogo", "Precios publicados y promociones vigentes", 6),
         ("postventa-garantia", "postventa", "Garantia y servicio postventa", 5),
-        ("privacidad-consentimiento", "policies", "Politica de privacidad y consentimiento WhatsApp", 5),
+        (
+            "privacidad-consentimiento",
+            "policies",
+            "Politica de privacidad y consentimiento WhatsApp",
+            5,
+        ),
         ("scripts-reactivacion", "scripts", "Scripts aprobados para reactivacion", 6),
         ("scripts-handoff", "scripts", "Scripts de handoff y baja confianza", 5),
         ("leasing-pyme", "credito", "Leasing pyme y documentos fiscales", 5),
@@ -795,7 +1554,9 @@ async def seed_knowledge_documents(conn: AsyncConnection, tenant_id: UUID, user_
                 "fragment_count": chunk_count,
                 "priority": 80 - idx,
                 "user_id": admin_id,
-                "agent_permissions": dumps(["[Mock] Sales Agent", "[Mock] Duda General", "[Mock] Supervisor IA"]),
+                "agent_permissions": dumps(
+                    ["[Mock] Sales Agent", "[Mock] Duda General", "[Mock] Supervisor IA"]
+                ),
                 "collection_id": collections[collection_slug],
                 "progress": 100 if idx % 6 else 67,
                 "embedded_count": chunk_count if idx % 6 else chunk_count - 2,
@@ -848,7 +1609,11 @@ async def seed_kb_ops(
 ) -> None:
     admin_id = user_ids["admin@demo.com"]
     reviewer_id = user_ids["marta.nunez@demo.com"]
-    for entity_type, ids in [("faq", faq_ids[:8]), ("catalog", catalog_ids[:6]), ("document", doc_ids[:6])]:
+    for entity_type, ids in [
+        ("faq", faq_ids[:8]),
+        ("catalog", catalog_ids[:6]),
+        ("document", doc_ids[:6]),
+    ]:
         for idx, entity_id in enumerate(ids, start=1):
             await conn.execute(
                 text(
@@ -864,7 +1629,9 @@ async def seed_kb_ops(
                     "version_number": idx,
                     "changed_by": admin_id,
                     "summary": f"[mock-full] Version seeded for {entity_type} {idx}",
-                    "diff": dumps({"mock_seed": MOCK_SEED, "fields": ["status", "priority", "content"]}),
+                    "diff": dumps(
+                        {"mock_seed": MOCK_SEED, "fields": ["status", "priority", "content"]}
+                    ),
                 },
             )
 
@@ -974,7 +1741,13 @@ async def seed_kb_ops(
                 {
                     "tenant_id": tenant_id,
                     "name": f"[Mock] KB regression {idx + 1:02d}",
-                    "query": ["Que documentos necesito?", "Cotiza mensualidad HR-V", "Hay stock en CDMX?", "Tengo buro malo", "Reagenda mi cita"][idx % 5],
+                    "query": [
+                        "Que documentos necesito?",
+                        "Cotiza mensualidad HR-V",
+                        "Hay stock en CDMX?",
+                        "Tengo buro malo",
+                        "Reagenda mi cita",
+                    ][idx % 5],
                     "sources": dumps(["faq", "catalog", "document"]),
                     "keywords": ["documentos", "credito"] if idx % 2 else ["precio", "stock"],
                     "forbidden": ["aprobado", "garantizado", "seguro hay stock"],
@@ -996,9 +1769,21 @@ async def seed_kb_ops(
                     "test_case_id": case_id,
                     "run_id": uuid4(),
                     "status": status,
-                    "sources": dumps([{"id": str(doc_ids[(idx + run_idx) % len(doc_ids)]), "score": 0.78 + run_idx * 0.04}]),
+                    "sources": dumps(
+                        [
+                            {
+                                "id": str(doc_ids[(idx + run_idx) % len(doc_ids)]),
+                                "score": 0.78 + run_idx * 0.04,
+                            }
+                        ]
+                    ),
                     "answer": "Respuesta mock generada con fuentes publicadas y sin prometer aprobacion.",
-                    "diff": dumps({"mock_seed": MOCK_SEED, "missing_keywords": [] if status == "passed" else ["stock"]}),
+                    "diff": dumps(
+                        {
+                            "mock_seed": MOCK_SEED,
+                            "missing_keywords": [] if status == "passed" else ["stock"],
+                        }
+                    ),
                     "duration_ms": 420 + idx * 31 + run_idx * 22,
                     "failure_reasons": [] if status == "passed" else ["Falto keyword esperada"],
                 },
@@ -1016,10 +1801,25 @@ async def seed_kb_ops(
                 "tenant_id": tenant_id,
                 "snapshot_at": dt(days=-(9 - idx)),
                 "score": 78 + idx * 2,
-                "components": dumps({"mock_seed": MOCK_SEED, "retrieval": 80 + idx, "freshness": 72 + idx, "conflicts": 64 + idx}),
-                "risks": dumps(["conflictos abiertos", "stock desactualizado"] if idx < 4 else ["sin bloqueos criticos"]),
-                "actions": dumps(["resolver conflictos", "actualizar catalogo", "reindexar documentos"]),
-                "per_collection": dumps({slug: 70 + ((idx + pos) % 20) for pos, slug in enumerate(collections)}),
+                "components": dumps(
+                    {
+                        "mock_seed": MOCK_SEED,
+                        "retrieval": 80 + idx,
+                        "freshness": 72 + idx,
+                        "conflicts": 64 + idx,
+                    }
+                ),
+                "risks": dumps(
+                    ["conflictos abiertos", "stock desactualizado"]
+                    if idx < 4
+                    else ["sin bloqueos criticos"]
+                ),
+                "actions": dumps(
+                    ["resolver conflictos", "actualizar catalogo", "reindexar documentos"]
+                ),
+                "per_collection": dumps(
+                    {slug: 70 + ((idx + pos) % 20) for pos, slug in enumerate(collections)}
+                ),
             },
         )
 
@@ -1051,10 +1851,38 @@ async def seed_kb_ops(
         bindparam("required_fields", type_=arr_text),
     )
     for name, source_types, slugs, can_price, can_stock, required in [
-        ("[Mock] Sales Agent", ["faq", "catalog", "document"], ["credito", "catalogo", "inventario", "scripts"], True, True, ["modelo_interes", "plan_credito"]),
-        ("[Mock] Duda General", ["faq", "document"], ["policies", "postventa", "scripts"], False, False, []),
-        ("[Mock] Postventa", ["faq", "document"], ["postventa", "policies"], False, False, ["telefono"]),
-        ("[Mock] Supervisor IA", ["faq", "catalog", "document"], list(collections.keys()), True, True, []),
+        (
+            "[Mock] Sales Agent",
+            ["faq", "catalog", "document"],
+            ["credito", "catalogo", "inventario", "scripts"],
+            True,
+            True,
+            ["modelo_interes", "plan_credito"],
+        ),
+        (
+            "[Mock] Duda General",
+            ["faq", "document"],
+            ["policies", "postventa", "scripts"],
+            False,
+            False,
+            [],
+        ),
+        (
+            "[Mock] Postventa",
+            ["faq", "document"],
+            ["postventa", "policies"],
+            False,
+            False,
+            ["telefono"],
+        ),
+        (
+            "[Mock] Supervisor IA",
+            ["faq", "catalog", "document"],
+            list(collections.keys()),
+            True,
+            True,
+            [],
+        ),
     ]:
         await conn.execute(
             permission_sql,
@@ -1084,7 +1912,14 @@ async def seed_kb_ops(
                     VALUES (:tenant_id, :agent, :source_type, :priority, :minimum_score, true, :direct, true)
                     """
                 ),
-                {"tenant_id": tenant_id, "agent": agent, "source_type": source_type, "priority": 100 - idx * 15, "minimum_score": 0.7 + idx * 0.03, "direct": idx != 0},
+                {
+                    "tenant_id": tenant_id,
+                    "agent": agent,
+                    "source_type": source_type,
+                    "priority": 100 - idx * 15,
+                    "minimum_score": 0.7 + idx * 0.03,
+                    "direct": idx != 0,
+                },
             )
 
     await conn.execute(
@@ -1107,7 +1942,9 @@ async def seed_kb_ops(
         ),
         {
             "tenant_id": tenant_id,
-            "phrases": dumps(["ya estas aprobado", "te garantizo", "seguro hay stock", "tasa fija confirmada"]),
+            "phrases": dumps(
+                ["ya estas aprobado", "te garantizo", "seguro hay stock", "tasa fija confirmada"]
+            ),
             "fallback": "No tengo una fuente suficiente. Te conecto con un asesor para confirmarlo.",
             "updated_by": admin_id,
         },
@@ -1124,7 +1961,11 @@ async def seed_customer_and_conversation(
     lead: dict[str, Any],
 ) -> tuple[UUID, UUID, list[UUID]]:
     assigned_user_id = user_ids.get(lead["assigned_email"]) if lead["assigned_email"] else None
-    assigned_agent_id = agent_ids.get("[Mock] Sales Agent") if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"} else agent_ids.get("[Mock] Recepcionista IA")
+    assigned_agent_id = (
+        agent_ids.get("[Mock] Sales Agent")
+        if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"}
+        else agent_ids.get("[Mock] Recepcionista IA")
+    )
     last_activity_at = dt(minutes=-lead["minutes_ago"])
     next_action = {
         "nuevo_lead": "calificar",
@@ -1182,8 +2023,19 @@ async def seed_customer_and_conversation(
             "name": lead["name"],
             "email": lead["email"],
             "score": lead["score"],
-            "attrs": dumps({"mock_seed": MOCK_SEED, "slug": lead["slug"], "model_sku": lead["model_sku"], "estimated_value": lead["price"], "campaign": f"{lead['source']} {lead['model_name']}", "city": lead["city"]}),
-            "status": "won" if lead["stage"] == "cierre_ganado" else ("lost" if lead["stage"] == "cierre_perdido" else "active"),
+            "attrs": dumps(
+                {
+                    "mock_seed": MOCK_SEED,
+                    "slug": lead["slug"],
+                    "model_sku": lead["model_sku"],
+                    "estimated_value": lead["price"],
+                    "campaign": f"{lead['source']} {lead['model_name']}",
+                    "city": lead["city"],
+                }
+            ),
+            "status": "won"
+            if lead["stage"] == "cierre_ganado"
+            else ("lost" if lead["stage"] == "cierre_perdido" else "active"),
             "stage": lead["stage"],
             "source": lead["source"],
             "tags": dumps(lead["tags"]),
@@ -1202,8 +2054,19 @@ async def seed_customer_and_conversation(
         },
     )
 
-    for table in ["customer_scores", "customer_risks", "customer_next_best_actions", "customer_timeline_events", "customer_documents", "customer_ai_review_items", "customer_notes"]:
-        await conn.execute(text(f"DELETE FROM {table} WHERE customer_id = :customer_id"), {"customer_id": customer_id})
+    for table in [
+        "customer_scores",
+        "customer_risks",
+        "customer_next_best_actions",
+        "customer_timeline_events",
+        "customer_documents",
+        "customer_ai_review_items",
+        "customer_notes",
+    ]:
+        await conn.execute(
+            text(f"DELETE FROM {table} WHERE customer_id = :customer_id"),
+            {"customer_id": customer_id},
+        )
 
     values = {
         "modelo_interes": lead["model_name"],
@@ -1218,8 +2081,12 @@ async def seed_customer_and_conversation(
         "fecha_cita_objetivo": dt(days=lead["index"] % 14 + 1).date().isoformat(),
         "docs_ine": "true" if lead["docs_status"] in {"partial", "complete"} else "false",
         "docs_comprobante": "true" if lead["docs_status"] == "complete" else "false",
-        "docs_nomina": "true" if lead["tipo_credito"] == "Nomina" and lead["docs_status"] != "missing" else "false",
-        "docs_estados_cuenta": "true" if lead["plan"] == "48 meses + 15% enganche" and lead["docs_status"] == "complete" else "false",
+        "docs_nomina": "true"
+        if lead["tipo_credito"] == "Nomina" and lead["docs_status"] != "missing"
+        else "false",
+        "docs_estados_cuenta": "true"
+        if lead["plan"] == "48 meses + 15% enganche" and lead["docs_status"] == "complete"
+        else "false",
     }
     for key, value in values.items():
         await conn.execute(
@@ -1253,16 +2120,28 @@ async def seed_customer_and_conversation(
             "total": lead["score"],
             "intent": min(99, 55 + lead["index"] % 41),
             "activity": min(99, 40 + (lead["index"] * 3) % 58),
-            "docs": {"missing": 20, "partial": 55, "complete": 92, "rejected": 35}[lead["docs_status"]],
+            "docs": {"missing": 20, "partial": 55, "complete": 92, "rejected": 35}[
+                lead["docs_status"]
+            ],
             "quality": min(99, 65 + lead["index"] % 25),
             "engagement": min(99, 50 + lead["unread"] * 6 + lead["index"] % 20),
             "stage_score": 30 + STAGES.index(lead["stage"]) * 8,
-            "abandonment": 80 if lead["sla"] == "breached" else (55 if lead["sla"] == "at_risk" else 20),
-            "explanation": dumps({"mock_seed": MOCK_SEED, "drivers": ["intent", "documents", "sla"], "source": lead["source"]}),
+            "abandonment": 80
+            if lead["sla"] == "breached"
+            else (55 if lead["sla"] == "at_risk" else 20),
+            "explanation": dumps(
+                {
+                    "mock_seed": MOCK_SEED,
+                    "drivers": ["intent", "documents", "sla"],
+                    "source": lead["source"],
+                }
+            ),
             "calculated_at": last_activity_at,
         },
     )
-    for r_idx, risk_type in enumerate(["sla", "documents"] if lead["risk"] in {"high", "critical"} else ["followup"]):
+    for r_idx, risk_type in enumerate(
+        ["sla", "documents"] if lead["risk"] in {"high", "critical"} else ["followup"]
+    ):
         await conn.execute(
             text(
                 """
@@ -1277,9 +2156,13 @@ async def seed_customer_and_conversation(
                 "severity": lead["risk"] if r_idx == 0 else "medium",
                 "reason": f"Mock: {risk_type} requiere revision en etapa {lead['stage']}.",
                 "recommended_action": f"Ejecutar accion {next_action} con prioridad.",
-                "status": "resolved" if lead["stage"] in {"cierre_ganado", "cierre_perdido"} else "open",
+                "status": "resolved"
+                if lead["stage"] in {"cierre_ganado", "cierre_perdido"}
+                else "open",
                 "created_at": last_activity_at - timedelta(hours=2 + r_idx),
-                "resolved_at": last_activity_at if lead["stage"] in {"cierre_ganado", "cierre_perdido"} else None,
+                "resolved_at": last_activity_at
+                if lead["stage"] in {"cierre_ganado", "cierre_perdido"}
+                else None,
             },
         )
     for action_idx, action_type in enumerate([next_action, "enviar_mensaje", "crear_tarea"]):
@@ -1304,10 +2187,14 @@ async def seed_customer_and_conversation(
                 "reason": f"Mock: accion sugerida por etapa {lead['stage']} y riesgo {lead['risk']}.",
                 "confidence": round(0.74 + action_idx * 0.04, 2),
                 "message": f"Hola {lead['name'].split()[0]}, te ayudo con {lead['model_name']} y el siguiente paso.",
-                "status": "executed" if action_idx == 0 and lead["stage"] in {"cierre_ganado", "cierre_perdido"} else "active",
+                "status": "executed"
+                if action_idx == 0 and lead["stage"] in {"cierre_ganado", "cierre_perdido"}
+                else "active",
                 "expires_at": dt(days=2),
                 "created_at": last_activity_at - timedelta(minutes=45 + action_idx * 8),
-                "executed_at": last_activity_at if action_idx == 0 and lead["stage"] in {"cierre_ganado", "cierre_perdido"} else None,
+                "executed_at": last_activity_at
+                if action_idx == 0 and lead["stage"] in {"cierre_ganado", "cierre_perdido"}
+                else None,
             },
         )
 
@@ -1315,7 +2202,12 @@ async def seed_customer_and_conversation(
         ("lead.created", "Lead creado", f"Origen {lead['source']}", "system"),
         ("message.received", "Mensaje recibido", f"Interes en {lead['model_name']}", "customer"),
         ("stage.changed", "Cambio de etapa", f"Ahora en {stage_label(lead['stage'])}", "system"),
-        ("ai.summary", "Resumen IA generado", f"Riesgo {lead['risk']} y accion {next_action}", "ai"),
+        (
+            "ai.summary",
+            "Resumen IA generado",
+            f"Riesgo {lead['risk']} y accion {next_action}",
+            "ai",
+        ),
     ]
     for pos, (event_type, title, description, actor_type) in enumerate(timeline):
         await conn.execute(
@@ -1340,7 +2232,12 @@ async def seed_customer_and_conversation(
             },
         )
 
-    document_types = [("ine", "INE"), ("comprobante", "Comprobante de domicilio"), ("nomina", "Recibo de nomina"), ("estado_cuenta", "Estado de cuenta")]
+    document_types = [
+        ("ine", "INE"),
+        ("comprobante", "Comprobante de domicilio"),
+        ("nomina", "Recibo de nomina"),
+        ("estado_cuenta", "Estado de cuenta"),
+    ]
     for doc_idx, (doc_type, label) in enumerate(document_types):
         if lead["docs_status"] == "complete":
             status = "approved"
@@ -1369,9 +2266,15 @@ async def seed_customer_and_conversation(
                 "doc_type": doc_type,
                 "label": label,
                 "status": status,
-                "file_url": f"mock://documents/{lead['slug']}/{doc_type}.jpg" if status != "missing" else None,
-                "uploaded_at": last_activity_at - timedelta(hours=1, minutes=doc_idx * 7) if status != "missing" else None,
-                "reviewed_at": last_activity_at - timedelta(minutes=doc_idx * 9) if status in {"approved", "rejected"} else None,
+                "file_url": f"mock://documents/{lead['slug']}/{doc_type}.jpg"
+                if status != "missing"
+                else None,
+                "uploaded_at": last_activity_at - timedelta(hours=1, minutes=doc_idx * 7)
+                if status != "missing"
+                else None,
+                "reviewed_at": last_activity_at - timedelta(minutes=doc_idx * 9)
+                if status in {"approved", "rejected"}
+                else None,
                 "rejection_reason": "Imagen borrosa en seed mock" if status == "rejected" else None,
                 "created_at": last_activity_at - timedelta(hours=2),
             },
@@ -1453,7 +2356,9 @@ async def seed_customer_and_conversation(
         {
             "conversation_id": conv_id,
             "extracted": dumps(extracted),
-            "pending_confirmation": "fecha_cita_objetivo" if lead["should_appoint"] and lead["stage"] != "cita_agendada" else None,
+            "pending_confirmation": "fecha_cita_objetivo"
+            if lead["should_appoint"] and lead["stage"] != "cita_agendada"
+            else None,
             "intent": lead["last_intent"],
             "stage_entered_at": last_activity_at - timedelta(hours=1 + lead["index"] % 8),
             "followups_sent": lead["index"] % 3,
@@ -1465,17 +2370,31 @@ async def seed_customer_and_conversation(
     message_ids: list[UUID] = []
     messages = [
         ("inbound", f"Hola, me interesa {lead['model_name']} en {lead['color']}.", 120),
-        ("outbound", f"Hola {lead['name'].split()[0]}, claro. Tengo informacion publicada de {lead['model_name']}.", 116),
+        (
+            "outbound",
+            f"Hola {lead['name'].split()[0]}, claro. Tengo informacion publicada de {lead['model_name']}.",
+            116,
+        ),
         ("inbound", f"Quiero revisar {lead['plan']} y saber cuanto seria el enganche.", 95),
-        ("outbound", f"Con {lead['plan']} puedo darte un estimado; el asesor confirma montos finales. Precio publicado: {money(lead['price'])}.", 88),
+        (
+            "outbound",
+            f"Con {lead['plan']} puedo darte un estimado; el asesor confirma montos finales. Precio publicado: {money(lead['price'])}.",
+            88,
+        ),
         ("system", f"[mock-full] Stage set to {lead['stage']}.", 70),
-        ("inbound", f"Mi ciudad es {lead['city']} y prefiero contacto por {lead['preference']}.", 52),
+        (
+            "inbound",
+            f"Mi ciudad es {lead['city']} y prefiero contacto por {lead['preference']}.",
+            52,
+        ),
         ("outbound", f"Perfecto. El siguiente paso es {next_action.replace('_', ' ')}.", 45),
     ]
     if lead["has_handoff"]:
         messages.append(("inbound", "Quiero que me atienda una persona, por favor.", 20))
     if lead["should_appoint"]:
-        messages.append(("outbound", "Puedo ayudarte a dejar una cita tentativa y el asesor la confirma.", 12))
+        messages.append(
+            ("outbound", "Puedo ayudarte a dejar una cita tentativa y el asesor la confirma.", 12)
+        )
     for msg_idx, (direction, body, minutes_ago) in enumerate(messages, start=1):
         msg_id = await scalar_one(
             conn,
@@ -1497,7 +2416,14 @@ async def seed_customer_and_conversation(
                 "body": body,
                 "channel_message_id": f"mock-full:{lead['slug']}:{msg_idx}",
                 "status": "read" if direction == "outbound" else "received",
-                "metadata": dumps({"mock_seed": MOCK_SEED, "intent": lead["last_intent"], "stage": lead["stage"], "message_index": msg_idx}),
+                "metadata": dumps(
+                    {
+                        "mock_seed": MOCK_SEED,
+                        "intent": lead["last_intent"],
+                        "stage": lead["stage"],
+                        "message_index": msg_idx,
+                    }
+                ),
                 "sent_at": last_activity_at - timedelta(minutes=max(0, minutes_ago - 120)),
             },
         )
@@ -1505,11 +2431,19 @@ async def seed_customer_and_conversation(
 
     await seed_traces_for_conversation(conn, tenant_id, conv_id, message_ids, lead)
     await seed_events_for_conversation(conn, tenant_id, user_ids, conv_id, lead, last_activity_at)
-    await seed_handoff_followup_outbox(conn, tenant_id, user_ids, conv_id, message_ids, lead, assigned_user_id, last_activity_at)
+    await seed_handoff_followup_outbox(
+        conn, tenant_id, user_ids, conv_id, message_ids, lead, assigned_user_id, last_activity_at
+    )
     return customer_id, conv_id, message_ids
 
 
-async def seed_traces_for_conversation(conn: AsyncConnection, tenant_id: UUID, conv_id: UUID, message_ids: list[UUID], lead: dict[str, Any]) -> None:
+async def seed_traces_for_conversation(
+    conn: AsyncConnection,
+    tenant_id: UUID,
+    conv_id: UUID,
+    message_ids: list[UUID],
+    lead: dict[str, Any],
+) -> None:
     for turn_idx in range(1, 4):
         trace_id = await scalar_one(
             conn,
@@ -1539,7 +2473,13 @@ async def seed_traces_for_conversation(conn: AsyncConnection, tenant_id: UUID, c
                 "inbound_message_id": message_ids[min(turn_idx * 2 - 2, len(message_ids) - 1)],
                 "inbound_text": f"Mock turn {turn_idx}: {lead['last_intent']}",
                 "nlu_input": dumps({"text": "mock inbound", "stage": lead["stage"]}),
-                "nlu_output": dumps({"intent": lead["last_intent"], "confidence": round(0.72 + turn_idx * 0.05, 2), "entities": {"modelo_interes": lead["model_name"]}}),
+                "nlu_output": dumps(
+                    {
+                        "intent": lead["last_intent"],
+                        "confidence": round(0.72 + turn_idx * 0.05, 2),
+                        "entities": {"modelo_interes": lead["model_name"]},
+                    }
+                ),
                 "nlu_model": "keyword-mock",
                 "nlu_tokens_in": 90 + turn_idx * 13,
                 "nlu_tokens_out": 28 + turn_idx * 4,
@@ -1547,27 +2487,53 @@ async def seed_traces_for_conversation(conn: AsyncConnection, tenant_id: UUID, c
                 "nlu_latency": 110 + turn_idx * 18,
                 "state_before": dumps({"stage": STAGES[max(0, STAGES.index(lead["stage"]) - 1)]}),
                 "state_after": dumps({"stage": lead["stage"], "mock_seed": MOCK_SEED}),
-                "stage_transition": f"{STAGES[max(0, STAGES.index(lead['stage']) - 1)]}->{lead['stage']}" if turn_idx == 2 else None,
-                "composer_input": dumps({"flow_mode": "SALES" if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"} else "PLAN"}),
-                "composer_output": dumps({"text": "Respuesta mock con fuentes y guardrails.", "confidence": 0.83}),
+                "stage_transition": f"{STAGES[max(0, STAGES.index(lead['stage']) - 1)]}->{lead['stage']}"
+                if turn_idx == 2
+                else None,
+                "composer_input": dumps(
+                    {
+                        "flow_mode": "SALES"
+                        if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"}
+                        else "PLAN"
+                    }
+                ),
+                "composer_output": dumps(
+                    {"text": "Respuesta mock con fuentes y guardrails.", "confidence": 0.83}
+                ),
                 "composer_model": "canned-mock",
                 "composer_tokens_in": 180 + turn_idx * 21,
                 "composer_tokens_out": 54 + turn_idx * 9,
                 "composer_cost": Decimal("0.00090") + Decimal(turn_idx) / Decimal("100000"),
                 "composer_latency": 170 + turn_idx * 31,
                 "tool_cost": Decimal("0.00020"),
-                "flow_mode": "DOC" if lead["stage"] in {"documentacion", "validacion"} else ("SALES" if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"} else "PLAN"),
-                "vision_cost": Decimal("0.00000") if lead["docs_status"] == "missing" else Decimal("0.00050"),
+                "flow_mode": "DOC"
+                if lead["stage"] in {"documentacion", "validacion"}
+                else (
+                    "SALES"
+                    if lead["stage"] in {"propuesta", "negociacion", "cita_agendada"}
+                    else "PLAN"
+                ),
+                "vision_cost": Decimal("0.00000")
+                if lead["docs_status"] == "missing"
+                else Decimal("0.00050"),
                 "vision_latency": None if lead["docs_status"] == "missing" else 220,
                 "outbound_messages": dumps([{"text": "mock outbound", "status": "queued"}]),
                 "total_cost": Decimal("0.00190") + Decimal(turn_idx) / Decimal("10000"),
                 "total_latency": 420 + turn_idx * 55,
-                "errors": dumps([] if lead["risk"] != "critical" else [{"code": "LOW_CONFIDENCE", "message": "Mock critical risk"}]),
+                "errors": dumps(
+                    []
+                    if lead["risk"] != "critical"
+                    else [{"code": "LOW_CONFIDENCE", "message": "Mock critical risk"}]
+                ),
                 "bot_paused": lead["bot_paused"],
                 "created_at": dt(minutes=-(lead["minutes_ago"] + 6 - turn_idx)),
             },
         )
-        for tool_idx, tool_name in enumerate(["lookup_faq", "search_catalog"] if turn_idx != 3 else ["book_appointment" if lead["should_appoint"] else "escalate"]):
+        for tool_idx, tool_name in enumerate(
+            ["lookup_faq", "search_catalog"]
+            if turn_idx != 3
+            else ["book_appointment" if lead["should_appoint"] else "escalate"]
+        ):
             await conn.execute(
                 text(
                     """
@@ -1578,8 +2544,12 @@ async def seed_traces_for_conversation(conn: AsyncConnection, tenant_id: UUID, c
                 {
                     "turn_trace_id": trace_id,
                     "tool_name": tool_name,
-                    "input_payload": dumps({"mock_seed": MOCK_SEED, "lead": lead["slug"], "model": lead["model_name"]}),
-                    "output_payload": dumps({"ok": True, "source": "mock", "score": 0.81 + tool_idx * 0.05}),
+                    "input_payload": dumps(
+                        {"mock_seed": MOCK_SEED, "lead": lead["slug"], "model": lead["model_name"]}
+                    ),
+                    "output_payload": dumps(
+                        {"ok": True, "source": "mock", "score": 0.81 + tool_idx * 0.05}
+                    ),
                     "latency": 95 + tool_idx * 45 + turn_idx * 15,
                     "error": None,
                     "called_at": dt(minutes=-(lead["minutes_ago"] + 4 - turn_idx)),
@@ -1587,14 +2557,30 @@ async def seed_traces_for_conversation(conn: AsyncConnection, tenant_id: UUID, c
             )
 
 
-async def seed_events_for_conversation(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], conv_id: UUID, lead: dict[str, Any], last_activity_at: datetime) -> None:
+async def seed_events_for_conversation(
+    conn: AsyncConnection,
+    tenant_id: UUID,
+    user_ids: dict[str, UUID],
+    conv_id: UUID,
+    lead: dict[str, Any],
+    last_activity_at: datetime,
+) -> None:
     events = [
         ("conversation.created", {"label": "Lead mock creado"}),
         ("message.received", {"label": "Inbound recibido", "intent": lead["last_intent"]}),
         ("ai.intent.detected", {"intent": lead["last_intent"], "confidence": 0.84}),
-        ("conversation.stage.updated", {"stage": lead["stage"], "previous_stage": STAGES[max(0, STAGES.index(lead["stage"]) - 1)]}),
+        (
+            "conversation.stage.updated",
+            {
+                "stage": lead["stage"],
+                "previous_stage": STAGES[max(0, STAGES.index(lead["stage"]) - 1)],
+            },
+        ),
         ("customer.score.updated", {"score": lead["score"], "risk": lead["risk"]}),
-        ("workflow.evaluated", {"workflow": "[Mock] Reactivacion inteligente", "result": "matched"}),
+        (
+            "workflow.evaluated",
+            {"workflow": "[Mock] Reactivacion inteligente", "result": "matched"},
+        ),
     ]
     for idx, (event_type, payload) in enumerate(events):
         payload = {"mock_seed": MOCK_SEED, "lead": lead["slug"], **payload}
@@ -1614,7 +2600,9 @@ async def seed_events_for_conversation(conn: AsyncConnection, tenant_id: UUID, u
                 "payload": dumps(payload),
                 "occurred_at": last_activity_at - timedelta(minutes=55 - idx * 8),
                 "trace_id": f"mock-full-{lead['slug']}-{idx}",
-                "actor_id": user_ids.get(lead["assigned_email"]) if idx == 3 and lead["assigned_email"] else None,
+                "actor_id": user_ids.get(lead["assigned_email"])
+                if idx == 3 and lead["assigned_email"]
+                else None,
             },
         )
 
@@ -1646,14 +2634,16 @@ async def seed_handoff_followup_outbox(
                 "tenant_id": tenant_id,
                 "conversation_id": conv_id,
                 "reason": f"MOCK-FULL: {lead['risk']} risk or human request in {lead['stage']}",
-                "payload": dumps({
-                    "mock_seed": MOCK_SEED,
-                    "summary": f"{lead['name']} pide apoyo humano sobre {lead['model_name']}.",
-                    "last_inbound_text": "Quiero hablar con una persona.",
-                    "suggested_next_action": "Tomar control y confirmar siguiente paso.",
-                    "priority": lead["risk"],
-                    "sla_minutes": 15 if lead["risk"] == "critical" else 45,
-                }),
+                "payload": dumps(
+                    {
+                        "mock_seed": MOCK_SEED,
+                        "summary": f"{lead['name']} pide apoyo humano sobre {lead['model_name']}.",
+                        "last_inbound_text": "Quiero hablar con una persona.",
+                        "suggested_next_action": "Tomar control y confirmar siguiente paso.",
+                        "priority": lead["risk"],
+                        "sla_minutes": 15 if lead["risk"] == "critical" else 45,
+                    }
+                ),
                 "assigned_user_id": assigned_user_id or user_ids["paola.soto@demo.com"],
                 "status": status,
                 "requested_at": last_activity_at - timedelta(minutes=18),
@@ -1684,7 +2674,9 @@ async def seed_handoff_followup_outbox(
                 "kind": ["docs_missing", "appointment_confirm", "reactivation"][lead["index"] % 3],
                 "enqueued_at": last_activity_at if lead["index"] % 3 == 1 else None,
                 "cancelled_at": last_activity_at if lead["index"] % 3 == 2 else None,
-                "context": dumps({"mock_seed": MOCK_SEED, "lead": lead["slug"], "stage": lead["stage"]}),
+                "context": dumps(
+                    {"mock_seed": MOCK_SEED, "lead": lead["slug"], "stage": lead["stage"]}
+                ),
             },
         )
     if lead["index"] % 2 == 0:
@@ -1704,19 +2696,37 @@ async def seed_handoff_followup_outbox(
             {
                 "tenant_id": tenant_id,
                 "key": f"mock-full:{lead['slug']}:outbound",
-                "payload": dumps({"mock_seed": MOCK_SEED, "to": lead["phone"], "text": f"Seguimiento para {lead['model_name']}"}),
+                "payload": dumps(
+                    {
+                        "mock_seed": MOCK_SEED,
+                        "to": lead["phone"],
+                        "text": f"Seguimiento para {lead['model_name']}",
+                    }
+                ),
                 "status": ["pending", "sent", "failed"][lead["index"] % 3],
                 "attempts": lead["index"] % 4,
-                "channel_message_id": f"wamid.mock.{lead['slug']}" if lead["index"] % 3 == 1 else None,
+                "channel_message_id": f"wamid.mock.{lead['slug']}"
+                if lead["index"] % 3 == 1
+                else None,
                 "sent_message_id": message_ids[-1] if lead["index"] % 3 == 1 else None,
-                "last_error": "mock WhatsApp provider unavailable" if lead["index"] % 3 == 2 else None,
+                "last_error": "mock WhatsApp provider unavailable"
+                if lead["index"] % 3 == 2
+                else None,
                 "available_at": dt(minutes=lead["index"] * 2),
             },
         )
 
 
-async def seed_customer_ai_reviews(conn: AsyncConnection, tenant_id: UUID, customer_ids: list[UUID], conv_ids: list[UUID], leads: list[dict[str, Any]]) -> None:
-    for idx, (customer_id, conv_id, lead) in enumerate(zip(customer_ids, conv_ids, leads, strict=True), start=1):
+async def seed_customer_ai_reviews(
+    conn: AsyncConnection,
+    tenant_id: UUID,
+    customer_ids: list[UUID],
+    conv_ids: list[UUID],
+    leads: list[dict[str, Any]],
+) -> None:
+    for idx, (customer_id, conv_id, lead) in enumerate(
+        zip(customer_ids, conv_ids, leads, strict=True), start=1
+    ):
         if idx % 3 != 0 and lead["risk"] not in {"high", "critical"}:
             continue
         await conn.execute(
@@ -1738,7 +2748,12 @@ async def seed_customer_ai_reviews(conn: AsyncConnection, tenant_id: UUID, custo
                 "tenant_id": tenant_id,
                 "customer_id": customer_id,
                 "conversation_id": conv_id,
-                "issue_type": ["low_confidence", "price_risk", "handoff_quality", "document_review"][idx % 4],
+                "issue_type": [
+                    "low_confidence",
+                    "price_risk",
+                    "handoff_quality",
+                    "document_review",
+                ][idx % 4],
                 "severity": lead["risk"] if lead["risk"] in {"high", "critical"} else "medium",
                 "title": f"[mock-full] Revisar respuesta IA para {lead['name']}",
                 "description": "Item mock para probar bandeja de revision IA y feedback.",
@@ -1754,8 +2769,23 @@ async def seed_customer_ai_reviews(conn: AsyncConnection, tenant_id: UUID, custo
         )
 
 
-async def seed_appointments(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], customer_ids: list[UUID], conv_ids: list[UUID], leads: list[dict[str, Any]]) -> None:
-    statuses = ["scheduled", "confirmed", "arrived", "completed", "cancelled", "no_show", "rescheduled"]
+async def seed_appointments(
+    conn: AsyncConnection,
+    tenant_id: UUID,
+    user_ids: dict[str, UUID],
+    customer_ids: list[UUID],
+    conv_ids: list[UUID],
+    leads: list[dict[str, Any]],
+) -> None:
+    statuses = [
+        "scheduled",
+        "confirmed",
+        "arrived",
+        "completed",
+        "cancelled",
+        "no_show",
+        "rescheduled",
+    ]
     advisors = [
         ("adv-ana", "Ana Garcia"),
         ("adv-luis", "Luis Ramirez"),
@@ -1770,7 +2800,9 @@ async def seed_appointments(conn: AsyncConnection, tenant_id: UUID, user_ids: di
         customer_id = customer_ids[lead_idx]
         conv_id = conv_ids[lead_idx]
         status = statuses[order % len(statuses)]
-        start = (NOW + timedelta(days=(order % 15) - 5)).replace(hour=9 + order % 9, minute=0 if order % 2 else 30, second=0, microsecond=0)
+        start = (NOW + timedelta(days=(order % 15) - 5)).replace(
+            hour=9 + order % 9, minute=0 if order % 2 else 30, second=0, microsecond=0
+        )
         advisor_id, advisor_name = advisors[order % len(advisors)]
         if order % 11 == 0:
             start = start.replace(hour=11, minute=0)
@@ -1802,7 +2834,9 @@ async def seed_appointments(conn: AsyncConnection, tenant_id: UUID, user_ids: di
                 "conversation_id": conv_id,
                 "scheduled_at": start,
                 "ends_at": start + timedelta(minutes=60 if order % 3 else 90),
-                "appointment_type": ["test_drive", "credit_review", "delivery", "follow_up"][order % 4],
+                "appointment_type": ["test_drive", "credit_review", "delivery", "follow_up"][
+                    order % 4
+                ],
                 "service": f"[Mock] {lead['model_name']} - {['Prueba de manejo', 'Revision de credito', 'Entrega', 'Seguimiento'][order % 4]}",
                 "status": status,
                 "source": ["manual", "ai", "whatsapp", "workflow"][order % 4],
@@ -1813,25 +2847,50 @@ async def seed_appointments(conn: AsyncConnection, tenant_id: UUID, user_ids: di
                 "ai_confidence": round(0.62 + (order % 35) / 100, 2),
                 "risk_score": 20 + (order * 7) % 80,
                 "risk_level": lead["risk"],
-                "risk_reasons": dumps([lead["sla"], lead["docs_status"], "mock_conflict" if order % 11 == 0 else "no_conflict"]),
-                "recommended_actions": dumps(["confirmar_asistencia", "enviar_recordatorio", "preparar_unidad"]),
+                "risk_reasons": dumps(
+                    [
+                        lead["sla"],
+                        lead["docs_status"],
+                        "mock_conflict" if order % 11 == 0 else "no_conflict",
+                    ]
+                ),
+                "recommended_actions": dumps(
+                    ["confirmar_asistencia", "enviar_recordatorio", "preparar_unidad"]
+                ),
                 "credit_plan": lead["plan"],
                 "down_payment": int(lead["price"] * (0.10 if lead["plan"] == "Plan 10%" else 0.15)),
                 "down_confirmed": status in {"confirmed", "arrived", "completed"},
                 "docs_complete": lead["docs_status"] == "complete",
                 "last_reply": dt(minutes=-(order * 23)),
-                "confirmed_at": start - timedelta(days=1) if status in {"confirmed", "arrived", "completed"} else None,
-                "arrived_at": start + timedelta(minutes=5) if status in {"arrived", "completed"} else None,
+                "confirmed_at": start - timedelta(days=1)
+                if status in {"confirmed", "arrived", "completed"}
+                else None,
+                "arrived_at": start + timedelta(minutes=5)
+                if status in {"arrived", "completed"}
+                else None,
                 "completed_at": start + timedelta(minutes=72) if status == "completed" else None,
                 "cancelled_at": start - timedelta(hours=3) if status == "cancelled" else None,
                 "no_show_at": start + timedelta(minutes=20) if status == "no_show" else None,
                 "reminder_status": ["pending", "sent", "failed", "cancelled"][order % 4],
                 "reminder_sent": start - timedelta(hours=4) if order % 4 == 1 else None,
-                "action_log": dumps([
-                    {"at": dt(days=-1).isoformat(), "actor": "mock_seed", "action": "created"},
-                    {"at": dt(hours=-2).isoformat(), "actor": advisor_name, "action": "reviewed"},
-                ]),
-                "ops_config": dumps({"mock_seed": MOCK_SEED, "conflict_slot": order % 11 == 0, "branch": lead["city"], "checklist": ["unidad", "asesor", "documentos"]}),
+                "action_log": dumps(
+                    [
+                        {"at": dt(days=-1).isoformat(), "actor": "mock_seed", "action": "created"},
+                        {
+                            "at": dt(hours=-2).isoformat(),
+                            "actor": advisor_name,
+                            "action": "reviewed",
+                        },
+                    ]
+                ),
+                "ops_config": dumps(
+                    {
+                        "mock_seed": MOCK_SEED,
+                        "conflict_slot": order % 11 == 0,
+                        "branch": lead["city"],
+                        "checklist": ["unidad", "asesor", "documentos"],
+                    }
+                ),
                 "notes": f"[mock-full] Cita mock para probar status {status}, conflictos, acciones y recordatorios.",
                 "created_by_id": user_ids["admin@demo.com"],
                 "created_by_type": "ai" if order % 3 == 0 else "user",
@@ -1842,11 +2901,39 @@ async def seed_appointments(conn: AsyncConnection, tenant_id: UUID, user_ids: di
 
 def workflow_definition(idx: int, label: str) -> dict[str, Any]:
     nodes = [
-        {"id": "trigger", "type": "trigger", "title": "Nuevo evento", "config": {"event": "message_received"}},
-        {"id": "detect", "type": "detect_intent", "title": "Detectar intencion", "config": {"store_as": "intent"}},
-        {"id": "condition", "type": "condition", "title": "Requiere humano?", "config": {"field": "extracted.requires_human", "operator": "equals", "value": True}},
-        {"id": "handoff", "type": "escalate_manager", "title": "Escalar", "config": {"reason": "Mock risk"}},
-        {"id": "message", "type": "template_message", "title": "Enviar plantilla", "config": {"template": "mock_recordatorio_cita", "text": "Hola {{nombre}}, te damos seguimiento."}},
+        {
+            "id": "trigger",
+            "type": "trigger",
+            "title": "Nuevo evento",
+            "config": {"event": "message_received"},
+        },
+        {
+            "id": "detect",
+            "type": "detect_intent",
+            "title": "Detectar intencion",
+            "config": {"store_as": "intent"},
+        },
+        {
+            "id": "condition",
+            "type": "condition",
+            "title": "Requiere humano?",
+            "config": {"field": "extracted.requires_human", "operator": "equals", "value": True},
+        },
+        {
+            "id": "handoff",
+            "type": "escalate_manager",
+            "title": "Escalar",
+            "config": {"reason": "Mock risk"},
+        },
+        {
+            "id": "message",
+            "type": "template_message",
+            "title": "Enviar plantilla",
+            "config": {
+                "template": "mock_recordatorio_cita",
+                "text": "Hola {{nombre}}, te damos seguimiento.",
+            },
+        },
         {"id": "end", "type": "end", "title": "Final", "config": {}},
     ]
     edges = [
@@ -1883,19 +2970,53 @@ def workflow_definition(idx: int, label: str) -> dict[str, Any]:
                 "pause_on_critical": True,
             },
             "variable_status": {"documentos_faltantes": "faltante" if idx % 4 == 0 else "ok"},
-            "dependency_status": {"bienvenida_v3": "ok", "Ventas Monterrey": "warning" if idx % 3 == 0 else "ok"},
+            "dependency_status": {
+                "bienvenida_v3": "ok",
+                "Ventas Monterrey": "warning" if idx % 3 == 0 else "ok",
+            },
             "label": label,
         },
     }
 
 
-async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], customer_ids: list[UUID], conv_ids: list[UUID]) -> None:
+async def seed_workflows(
+    conn: AsyncConnection,
+    tenant_id: UUID,
+    user_ids: dict[str, UUID],
+    customer_ids: list[UUID],
+    conv_ids: list[UUID],
+) -> None:
     templates = [
-        ("mock_bienvenida_operativa", "marketing", "approved", "Hola {{nombre}}, soy el asistente de AtendIA Demo Motors. Te ayudo con {{modelo_interes}}."),
-        ("mock_recordatorio_cita", "utility", "approved", "Hola {{nombre}}, te recordamos tu cita de {{servicio}} a las {{hora}}."),
-        ("mock_docs_faltantes", "utility", "approved", "Para avanzar faltan {{documentos_faltantes}}. Los puedes enviar por este chat."),
-        ("mock_reactivacion", "marketing", "paused", "Hola {{nombre}}, seguimos disponibles para ayudarte con tu cotizacion."),
-        ("mock_no_show", "utility", "approved", "Vimos que no pudiste asistir. Te ayudo a reagendar."),
+        (
+            "mock_bienvenida_operativa",
+            "marketing",
+            "approved",
+            "Hola {{nombre}}, soy el asistente de AtendIA Demo Motors. Te ayudo con {{modelo_interes}}.",
+        ),
+        (
+            "mock_recordatorio_cita",
+            "utility",
+            "approved",
+            "Hola {{nombre}}, te recordamos tu cita de {{servicio}} a las {{hora}}.",
+        ),
+        (
+            "mock_docs_faltantes",
+            "utility",
+            "approved",
+            "Para avanzar faltan {{documentos_faltantes}}. Los puedes enviar por este chat.",
+        ),
+        (
+            "mock_reactivacion",
+            "marketing",
+            "paused",
+            "Hola {{nombre}}, seguimos disponibles para ayudarte con tu cotizacion.",
+        ),
+        (
+            "mock_no_show",
+            "utility",
+            "approved",
+            "Vimos que no pudiste asistir. Te ayudo a reagendar.",
+        ),
     ]
     for name, category, status, body in templates:
         await conn.execute(
@@ -1906,9 +3027,22 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                 ON CONFLICT (tenant_id, name) DO UPDATE SET category = EXCLUDED.category, status = EXCLUDED.status, body = EXCLUDED.body, variables = EXCLUDED.variables
                 """
             ),
-            {"tenant_id": tenant_id, "name": name, "category": category, "status": status, "body": body, "vars": dumps(["nombre", "modelo_interes", "servicio", "hora", "documentos_faltantes"])},
+            {
+                "tenant_id": tenant_id,
+                "name": name,
+                "category": category,
+                "status": status,
+                "body": body,
+                "vars": dumps(
+                    ["nombre", "modelo_interes", "servicio", "hora", "documentos_faltantes"]
+                ),
+            },
         )
-    for name, role in [("[Mock] Recepcionista IA", "reception"), ("[Mock] Sales Agent", "sales"), ("[Mock] Supervisor IA", "supervisor")]:
+    for name, role in [
+        ("[Mock] Recepcionista IA", "reception"),
+        ("[Mock] Sales Agent", "sales"),
+        ("[Mock] Supervisor IA", "supervisor"),
+    ]:
         await conn.execute(
             text(
                 """
@@ -1917,9 +3051,18 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                 ON CONFLICT (tenant_id, name) DO UPDATE SET role = EXCLUDED.role, status = EXCLUDED.status, config = EXCLUDED.config
                 """
             ),
-            {"tenant_id": tenant_id, "name": name, "role": role, "config": dumps({"mock_seed": MOCK_SEED, "max_parallel_sessions": 50})},
+            {
+                "tenant_id": tenant_id,
+                "name": name,
+                "role": role,
+                "config": dumps({"mock_seed": MOCK_SEED, "max_parallel_sessions": 50}),
+            },
         )
-    for source_name, source_type in [("[Mock] Catalogo publicado", "catalog"), ("[Mock] FAQ credito", "faq"), ("[Mock] Manual operativo", "document")]:
+    for source_name, source_type in [
+        ("[Mock] Catalogo publicado", "catalog"),
+        ("[Mock] FAQ credito", "faq"),
+        ("[Mock] Manual operativo", "document"),
+    ]:
         await conn.execute(
             text(
                 """
@@ -1927,7 +3070,12 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                 VALUES (:tenant_id, :name, :source_type, 'indexed', CAST(:metadata AS jsonb))
                 """
             ),
-            {"tenant_id": tenant_id, "name": source_name, "source_type": source_type, "metadata": dumps({"mock_seed": MOCK_SEED, "last_indexed": NOW.isoformat()})},
+            {
+                "tenant_id": tenant_id,
+                "name": source_name,
+                "source_type": source_type,
+                "metadata": dumps({"mock_seed": MOCK_SEED, "last_indexed": NOW.isoformat()}),
+            },
         )
     await conn.execute(
         text(
@@ -1936,7 +3084,10 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
             VALUES (:tenant_id, '[Mock] Ventas nacional', 'round_robin', CAST(:advisor_ids AS jsonb), true)
             """
         ),
-        {"tenant_id": tenant_id, "advisor_ids": dumps([str(user_ids[email]) for email in ADVISOR_EMAILS])},
+        {
+            "tenant_id": tenant_id,
+            "advisor_ids": dumps([str(user_ids[email]) for email in ADVISOR_EMAILS]),
+        },
     )
     await conn.execute(
         text(
@@ -1945,13 +3096,30 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
             VALUES (:tenant_id, '[Mock] Horario comercial MX', 'America/Mexico_City', CAST(:schedule AS jsonb), true)
             """
         ),
-        {"tenant_id": tenant_id, "schedule": dumps({"mon_fri": ["09:00", "19:00"], "sat": ["10:00", "16:00"], "sun": []})},
+        {
+            "tenant_id": tenant_id,
+            "schedule": dumps(
+                {"mon_fri": ["09:00", "19:00"], "sat": ["10:00", "16:00"], "sun": []}
+            ),
+        },
     )
 
     workflow_specs = [
-        ("[Mock] Calificacion de nuevo lead", "message_received", "Captura datos minimos y asigna asesor."),
-        ("[Mock] Documentos faltantes", "field_updated", "Detecta documentos incompletos y programa seguimiento."),
-        ("[Mock] Confirmacion de cita", "appointment_created", "Confirma y recuerda citas con riesgo."),
+        (
+            "[Mock] Calificacion de nuevo lead",
+            "message_received",
+            "Captura datos minimos y asigna asesor.",
+        ),
+        (
+            "[Mock] Documentos faltantes",
+            "field_updated",
+            "Detecta documentos incompletos y programa seguimiento.",
+        ),
+        (
+            "[Mock] Confirmacion de cita",
+            "appointment_created",
+            "Confirma y recuerda citas con riesgo.",
+        ),
         ("[Mock] Reactivacion inteligente", "stage_changed", "Recupera leads estancados por SLA."),
         ("[Mock] Escalacion critica", "bot_paused", "Pausa bot y crea handoff para supervisor."),
         ("[Mock] Postventa no show", "stage_entered", "Reagenda clientes no show o cancela flujo."),
@@ -1969,7 +3137,9 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                 "name": name,
                 "description": desc,
                 "trigger_type": trigger,
-                "trigger_config": dumps({"mock_seed": MOCK_SEED, "stage": STAGES[idx % len(STAGES)]}),
+                "trigger_config": dumps(
+                    {"mock_seed": MOCK_SEED, "stage": STAGES[idx % len(STAGES)]}
+                ),
                 "definition": dumps(workflow_definition(idx, name)),
                 "active": idx != 6,
                 "version": idx + 2,
@@ -1993,7 +3163,15 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                     "published_at": dt(days=-(idx + version)),
                 },
             )
-        for var_name in ["nombre", "telefono", "plan_credito", "modelo_moto", "documentos_faltantes", "asesor_asignado", "lifecycle_stage"]:
+        for var_name in [
+            "nombre",
+            "telefono",
+            "plan_credito",
+            "modelo_moto",
+            "documentos_faltantes",
+            "asesor_asignado",
+            "lifecycle_stage",
+        ]:
             await conn.execute(
                 text(
                     """
@@ -2002,7 +3180,15 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                     ON CONFLICT (workflow_id, name) DO UPDATE SET used_in_nodes = EXCLUDED.used_in_nodes, last_value = EXCLUDED.last_value, status = EXCLUDED.status
                     """
                 ),
-                {"workflow_id": wf_id, "name": var_name, "used": dumps(["message", "condition"]), "last_value": f"mock_{var_name}", "status": "faltante" if var_name == "documentos_faltantes" and idx % 4 == 0 else "ok"},
+                {
+                    "workflow_id": wf_id,
+                    "name": var_name,
+                    "used": dumps(["message", "condition"]),
+                    "last_value": f"mock_{var_name}",
+                    "status": "faltante"
+                    if var_name == "documentos_faltantes" and idx % 4 == 0
+                    else "ok",
+                },
             )
         for dep_type, dep_name, dep_status in [
             ("whatsapp_template", "mock_recordatorio_cita", "ok"),
@@ -2017,9 +3203,19 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                     VALUES (:workflow_id, :dependency_type, :name, :status, CAST(:details AS jsonb))
                     """
                 ),
-                {"workflow_id": wf_id, "dependency_type": dep_type, "name": dep_name, "status": dep_status, "details": dumps({"mock_seed": MOCK_SEED, "checked_at": NOW.isoformat()})},
+                {
+                    "workflow_id": wf_id,
+                    "dependency_type": dep_type,
+                    "name": dep_name,
+                    "status": dep_status,
+                    "details": dumps({"mock_seed": MOCK_SEED, "checked_at": NOW.isoformat()}),
+                },
             )
-        for key, label in [("mock_business_hours", "Respetar horario"), ("mock_dedupe_template", "No repetir plantilla"), ("mock_stop_on_human", "Parar si pide humano")]:
+        for key, label in [
+            ("mock_business_hours", "Respetar horario"),
+            ("mock_dedupe_template", "No repetir plantilla"),
+            ("mock_stop_on_human", "Parar si pide humano"),
+        ]:
             await conn.execute(
                 text(
                     """
@@ -2027,7 +3223,13 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                     VALUES (:tenant_id, :workflow_id, :key, :label, true, CAST(:config AS jsonb))
                     """
                 ),
-                {"tenant_id": tenant_id, "workflow_id": wf_id, "key": key, "label": label, "config": dumps({"mock_seed": MOCK_SEED})},
+                {
+                    "tenant_id": tenant_id,
+                    "workflow_id": wf_id,
+                    "key": key,
+                    "label": label,
+                    "config": dumps({"mock_seed": MOCK_SEED}),
+                },
             )
         for exec_idx in range(4):
             customer_id = customer_ids[(idx * 3 + exec_idx) % len(customer_ids)]
@@ -2055,14 +3257,22 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                     "status": status,
                     "current_node_id": "end" if status == "completed" else "condition",
                     "started_at": started,
-                    "finished_at": started + timedelta(seconds=35 + exec_idx * 8) if status in {"completed", "failed", "paused"} else None,
+                    "finished_at": started + timedelta(seconds=35 + exec_idx * 8)
+                    if status in {"completed", "failed", "paused"}
+                    else None,
                     "error": "mock dependency warning" if status == "failed" else None,
                     "error_code": "MOCK_DEPENDENCY" if status == "failed" else None,
                     "steps_completed": 3 + exec_idx,
                 },
             )
-            for step_idx, node_id in enumerate(["trigger", "detect", "condition", "message", "end"]):
-                step_status = "completed" if step_idx <= exec_idx + 1 and status != "failed" else ("failed" if status == "failed" and step_idx == 2 else "pending")
+            for step_idx, node_id in enumerate(
+                ["trigger", "detect", "condition", "message", "end"]
+            ):
+                step_status = (
+                    "completed"
+                    if step_idx <= exec_idx + 1 and status != "failed"
+                    else ("failed" if status == "failed" and step_idx == 2 else "pending")
+                )
                 await conn.execute(
                     text(
                         """
@@ -2086,7 +3296,9 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
                         "output_payload": dumps({"ok": step_status != "failed"}),
                         "error": "mock failed condition" if step_status == "failed" else None,
                         "started_at": started + timedelta(seconds=step_idx * 4),
-                        "finished_at": started + timedelta(seconds=step_idx * 4 + 3) if step_status in {"completed", "failed"} else None,
+                        "finished_at": started + timedelta(seconds=step_idx * 4 + 3)
+                        if step_status in {"completed", "failed"}
+                        else None,
                         "duration_ms": 300 + step_idx * 70,
                     },
                 )
@@ -2102,7 +3314,9 @@ async def seed_workflows(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[
     print(f"[OK] Workflows ready: {len(workflow_specs)}")
 
 
-async def seed_notifications(conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], conv_ids: list[UUID]) -> None:
+async def seed_notifications(
+    conn: AsyncConnection, tenant_id: UUID, user_ids: dict[str, UUID], conv_ids: list[UUID]
+) -> None:
     users = list(user_ids.values())
     titles = [
         "Handoff critico asignado",

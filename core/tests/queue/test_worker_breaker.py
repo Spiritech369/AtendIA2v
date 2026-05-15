@@ -35,13 +35,19 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t20_breaker",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T20", "verify_token": "vt_t20"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t20_breaker",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T20", "verify_token": "vt_t20"}}
+                        ),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 
@@ -86,9 +92,11 @@ async def test_open_circuit_raises_retry_without_calling_meta(setup_tenant, redi
     assert await is_open(redis_client, tid) is True
 
     # Set up a route — but expect it NOT to be called
-    route = respx.post(
-        "https://graph.facebook.com/v21.0/PID_T20/messages"
-    ).mock(return_value=httpx.Response(200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.x"}]}))
+    route = respx.post("https://graph.facebook.com/v21.0/PID_T20/messages").mock(
+        return_value=httpx.Response(
+            200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.x"}]}
+        )
+    )
 
     with pytest.raises(Retry):
         await send_outbound(
@@ -109,11 +117,11 @@ async def test_successful_send_records_success_clears_failures(setup_tenant, red
     await record_failure(redis_client, tid)
     assert await redis_client.get(f"breaker:fail:{tid}") == b"2"
 
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T20/messages"
-    ).mock(return_value=httpx.Response(
-        200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OK"}]}
-    ))
+    respx.post("https://graph.facebook.com/v21.0/PID_T20/messages").mock(
+        return_value=httpx.Response(
+            200, json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OK"}]}
+        )
+    )
 
     result = await send_outbound(
         {"redis": redis_client, "job_try": 1},
@@ -130,11 +138,11 @@ async def test_successful_send_records_success_clears_failures(setup_tenant, red
 async def test_permanent_failure_records_failure(setup_tenant, redis_client):
     """A permanent (4xx) failure increments the breaker counter."""
     tid = str(setup_tenant)
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T20/messages"
-    ).mock(return_value=httpx.Response(
-        400, json={"error": {"code": 131000, "message": "Recipient not on WhatsApp"}}
-    ))
+    respx.post("https://graph.facebook.com/v21.0/PID_T20/messages").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"code": 131000, "message": "Recipient not on WhatsApp"}}
+        )
+    )
 
     result = await send_outbound(
         {"redis": redis_client, "job_try": 1},

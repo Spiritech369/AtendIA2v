@@ -10,6 +10,7 @@ Domicilio" instead of the raw identifier.
 
 No hardcoded label lookup table. Each tenant owns their own.
 """
+
 from __future__ import annotations
 
 
@@ -27,5 +28,5 @@ def humanize_doc_key(key: str) -> str:
     contact panel renders *something* readable instead of `DOCS_INE`.
     """
     if key.startswith("DOCS_"):
-        return key[len("DOCS_"):].replace("_", " ").title()
+        return key[len("DOCS_") :].replace("_", " ").title()
     return key.replace("_", " ").title()

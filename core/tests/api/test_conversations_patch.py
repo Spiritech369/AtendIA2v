@@ -1,4 +1,5 @@
 """Tests for PATCH /api/v1/conversations/:id — partial update."""
+
 from __future__ import annotations
 
 import asyncio
@@ -17,13 +18,15 @@ def _ensure_pipeline(tid: str, stages: list[str] | None = None) -> None:
     async def _do() -> None:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            version = (await conn.execute(
-                text(
-                    "SELECT COALESCE(MAX(version), 0) + 1 "
-                    "FROM tenant_pipelines WHERE tenant_id = :t"
-                ),
-                {"t": tid},
-            )).scalar()
+            version = (
+                await conn.execute(
+                    text(
+                        "SELECT COALESCE(MAX(version), 0) + 1 "
+                        "FROM tenant_pipelines WHERE tenant_id = :t"
+                    ),
+                    {"t": tid},
+                )
+            ).scalar()
             await conn.execute(
                 text("UPDATE tenant_pipelines SET active = false WHERE tenant_id = :t"),
                 {"t": tid},
@@ -46,31 +49,40 @@ def _ensure_pipeline(tid: str, stages: list[str] | None = None) -> None:
                 },
             )
         await engine.dispose()
+
     asyncio.run(_do())
 
 
 def _seed_conversation(tid: str) -> str:
     """Create a customer + conversation, return conversation_id."""
+
     async def _do() -> str:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            cust_id = (await conn.execute(
-                text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"),
-                {"t": tid, "p": f"+521{uuid4().hex[:10]}"},
-            )).scalar()
-            conv_id = (await conn.execute(
-                text(
-                    "INSERT INTO conversations (tenant_id, customer_id) "
-                    "VALUES (:t, :c) RETURNING id"
-                ),
-                {"t": tid, "c": cust_id},
-            )).scalar()
+            cust_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"
+                    ),
+                    {"t": tid, "p": f"+521{uuid4().hex[:10]}"},
+                )
+            ).scalar()
+            conv_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations (tenant_id, customer_id) "
+                        "VALUES (:t, :c) RETURNING id"
+                    ),
+                    {"t": tid, "c": cust_id},
+                )
+            ).scalar()
             await conn.execute(
                 text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
                 {"c": conv_id},
             )
         await engine.dispose()
         return str(conv_id)
+
     return asyncio.run(_do())
 
 
@@ -78,20 +90,23 @@ def _seed_user(tid: str, role: str = "operator") -> str:
     async def _do() -> str:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            uid = (await conn.execute(
-                text(
-                    "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
-                    "VALUES (:t, :e, :r, :h) RETURNING id"
-                ),
-                {
-                    "t": tid,
-                    "e": f"patch_assignee_{uuid4().hex[:8]}@dinamo.com",
-                    "r": role,
-                    "h": hash_password("test-password-123"),
-                },
-            )).scalar()
+            uid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
+                        "VALUES (:t, :e, :r, :h) RETURNING id"
+                    ),
+                    {
+                        "t": tid,
+                        "e": f"patch_assignee_{uuid4().hex[:8]}@dinamo.com",
+                        "r": role,
+                        "h": hash_password("test-password-123"),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return str(uid)
+
     return asyncio.run(_do())
 
 
@@ -101,6 +116,7 @@ def _cleanup_tenant(tid: str) -> None:
         async with engine.begin() as conn:
             await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": tid})
         await engine.dispose()
+
     asyncio.run(_do())
 
 
@@ -108,23 +124,28 @@ def _seed_other_tenant_user() -> tuple[str, str]:
     async def _do() -> tuple[str, str]:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-                {"n": f"other_patch_{uuid4().hex[:8]}"},
-            )).scalar()
-            uid = (await conn.execute(
-                text(
-                    "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
-                    "VALUES (:t, :e, 'operator', :h) RETURNING id"
-                ),
-                {
-                    "t": tid,
-                    "e": f"other_patch_{uuid4().hex[:8]}@dinamo.com",
-                    "h": hash_password("test-password-123"),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+                    {"n": f"other_patch_{uuid4().hex[:8]}"},
+                )
+            ).scalar()
+            uid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
+                        "VALUES (:t, :e, 'operator', :h) RETURNING id"
+                    ),
+                    {
+                        "t": tid,
+                        "e": f"other_patch_{uuid4().hex[:8]}@dinamo.com",
+                        "h": hash_password("test-password-123"),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return str(tid), str(uid)
+
     return asyncio.run(_do())
 
 
@@ -132,15 +153,17 @@ def _stage_entered_at(conv_id: str) -> str:
     async def _do() -> str:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            value = (await conn.execute(
-                text(
-                    "SELECT stage_entered_at FROM conversation_state "
-                    "WHERE conversation_id = :c"
-                ),
-                {"c": conv_id},
-            )).scalar()
+            value = (
+                await conn.execute(
+                    text(
+                        "SELECT stage_entered_at FROM conversation_state WHERE conversation_id = :c"
+                    ),
+                    {"c": conv_id},
+                )
+            ).scalar()
         await engine.dispose()
         return value.isoformat()
+
     return asyncio.run(_do())
 
 
@@ -150,12 +173,12 @@ def _set_stage_entered_at(conv_id: str, value: datetime) -> None:
         async with engine.begin() as conn:
             await conn.execute(
                 text(
-                    "UPDATE conversation_state SET stage_entered_at = :v "
-                    "WHERE conversation_id = :c"
+                    "UPDATE conversation_state SET stage_entered_at = :v WHERE conversation_id = :c"
                 ),
                 {"c": conv_id, "v": value},
             )
         await engine.dispose()
+
     asyncio.run(_do())
 
 

@@ -4,6 +4,7 @@ Idempotent-ish — uses ON CONFLICT DO NOTHING for FAQs / catalog / field
 definitions. Re-running won't duplicate those, but it WILL add more
 messages / notes / appointments each time.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,16 +21,11 @@ async def main() -> None:
     e = create_async_engine(get_settings().database_url)
     async with e.begin() as c:
         tid = (
-            await c.execute(
-                text("SELECT id FROM tenants WHERE name='Dinamo Motos NL' LIMIT 1")
-            )
+            await c.execute(text("SELECT id FROM tenants WHERE name='Dinamo Motos NL' LIMIT 1"))
         ).scalar()
         uid = (
             await c.execute(
-                text(
-                    "SELECT id FROM tenant_users "
-                    "WHERE email='admin@dinamomotos.com' LIMIT 1"
-                )
+                text("SELECT id FROM tenant_users WHERE email='admin@dinamomotos.com' LIMIT 1")
             )
         ).scalar()
         if not tid:
@@ -65,10 +61,26 @@ async def main() -> None:
 
         # ── Catalog ──────────────────────────────────────────────────
         for sku, name, attrs in [
-            ("GALGO150", "Galgo 150", {"cilindrada": "150cc", "precio_contado": 38900, "mensualidad_36m": 1450}),
-            ("GALGO250", "Galgo 250", {"cilindrada": "250cc", "precio_contado": 52400, "mensualidad_36m": 1980}),
-            ("RAYO180", "Rayo 180", {"cilindrada": "180cc", "precio_contado": 41200, "mensualidad_36m": 1560}),
-            ("TURBO400", "Turbo 400", {"cilindrada": "400cc", "precio_contado": 78900, "mensualidad_36m": 2980}),
+            (
+                "GALGO150",
+                "Galgo 150",
+                {"cilindrada": "150cc", "precio_contado": 38900, "mensualidad_36m": 1450},
+            ),
+            (
+                "GALGO250",
+                "Galgo 250",
+                {"cilindrada": "250cc", "precio_contado": 52400, "mensualidad_36m": 1980},
+            ),
+            (
+                "RAYO180",
+                "Rayo 180",
+                {"cilindrada": "180cc", "precio_contado": 41200, "mensualidad_36m": 1560},
+            ),
+            (
+                "TURBO400",
+                "Turbo 400",
+                {"cilindrada": "400cc", "precio_contado": 78900, "mensualidad_36m": 2980},
+            ),
         ]:
             await c.execute(
                 text(
@@ -81,7 +93,12 @@ async def main() -> None:
 
         # ── Custom field definitions ─────────────────────────────────
         defs = [
-            ("plan_credito", "Plan de crédito", "select", {"choices": ["12m", "24m", "36m", "48m"]}),
+            (
+                "plan_credito",
+                "Plan de crédito",
+                "select",
+                {"choices": ["12m", "24m", "36m", "48m"]},
+            ),
             ("antiguedad_meses", "Antigüedad laboral (meses)", "number", None),
             ("docs_ine", "Tiene INE", "checkbox", None),
             ("docs_comprobante", "Tiene comprobante de domicilio", "checkbox", None),
@@ -158,29 +175,43 @@ async def main() -> None:
             ).scalar()
             await c.execute(
                 text(
-                    "UPDATE conversation_state SET extracted_data = :d "
-                    "WHERE conversation_id = :c"
+                    "UPDATE conversation_state SET extracted_data = :d WHERE conversation_id = :c"
                 ),
                 {
                     "c": conv1,
                     "d": json.dumps(
                         {
                             "plan_credito": {"value": "36m", "confidence": 0.95, "source_turn": 2},
-                            "modelo_moto": {"value": "Galgo 150", "confidence": 0.9, "source_turn": 1},
+                            "modelo_moto": {
+                                "value": "Galgo 150",
+                                "confidence": 0.9,
+                                "source_turn": 1,
+                            },
                             "docs_ine": True,
                             "docs_comprobante": False,
                         }
                     ),
                 },
             )
-            for i, (direction, txt) in enumerate([
-                ("outbound", "Tenemos Galgo 150 a $38,900 al contado o $1,450 al mes a 36 meses. ¿Te interesa?"),
-                ("inbound", "Sí, ¿qué necesito para sacarlo a crédito?"),
-                ("outbound", "INE, comprobante de domicilio reciente y comprobante de ingresos. ¿Los tienes a la mano?"),
-                ("inbound", "INE sí. Comprobante reciente no, el último es de hace 4 meses."),
-                ("outbound", "Necesitamos uno de los últimos 3 meses. ¿Puedes pasar a la sucursal con un recibo de luz/agua nuevo?"),
-                ("inbound", "Va, paso este sábado. ¿Necesito cita?"),
-            ]):
+            for i, (direction, txt) in enumerate(
+                [
+                    (
+                        "outbound",
+                        "Tenemos Galgo 150 a $38,900 al contado o $1,450 al mes a 36 meses. ¿Te interesa?",
+                    ),
+                    ("inbound", "Sí, ¿qué necesito para sacarlo a crédito?"),
+                    (
+                        "outbound",
+                        "INE, comprobante de domicilio reciente y comprobante de ingresos. ¿Los tienes a la mano?",
+                    ),
+                    ("inbound", "INE sí. Comprobante reciente no, el último es de hace 4 meses."),
+                    (
+                        "outbound",
+                        "Necesitamos uno de los últimos 3 meses. ¿Puedes pasar a la sucursal con un recibo de luz/agua nuevo?",
+                    ),
+                    ("inbound", "Va, paso este sábado. ¿Necesito cita?"),
+                ]
+            ):
                 await c.execute(
                     text(
                         "INSERT INTO messages "

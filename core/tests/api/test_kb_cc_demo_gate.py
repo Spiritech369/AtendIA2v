@@ -9,8 +9,7 @@ def test_kb_simulate_gates_on_is_demo():
     import pathlib
 
     src = (
-        pathlib.Path(__file__).parent.parent.parent
-        / "atendia/api/_kb/command_center.py"
+        pathlib.Path(__file__).parent.parent.parent / "atendia/api/_kb/command_center.py"
     ).read_text()
     assert "is_demo" in src or "demo_tenant" in src, (
         "command_center.py simulate endpoint does not gate on is_demo."

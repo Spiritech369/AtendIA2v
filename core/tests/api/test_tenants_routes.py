@@ -1,4 +1,5 @@
 """Phase 4 T28-T30 — tenant config GET/PUT (pipeline, brand_facts, tone)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -167,11 +168,7 @@ def test_pipeline_versions_list_endpoint(operator_seed_local):
     assert versions[0]["stage_count"] == 3
     assert versions[1]["stage_count"] == 2
     assert versions[2]["stage_count"] == 1
-    assert (
-        versions[0]["index"]
-        > versions[1]["index"]
-        > versions[2]["index"]
-    )
+    assert versions[0]["index"] > versions[1]["index"] > versions[2]["index"]
 
 
 def test_pipeline_version_detail_endpoint(operator_seed_local):

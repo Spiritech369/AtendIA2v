@@ -5,6 +5,7 @@ router and composer read. Hardcoded shape — Dinamo es el único tenant
 en 3c.2; cuando se onboarde un segundo vertical, refactorizar a
 JSONB-config (decisión #9 del design doc).
 """
+
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict

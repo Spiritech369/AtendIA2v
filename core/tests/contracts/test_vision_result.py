@@ -4,6 +4,7 @@ Sin sesgo: el clasificador NO recibe `expected_doc`; solo categoriza
 en términos absolutos. La decisión "matchea lo que esperabamos" es
 del runner.
 """
+
 import pytest
 from pydantic import ValidationError
 
@@ -13,9 +14,15 @@ from atendia.contracts.vision_result import VisionCategory, VisionResult
 def test_vision_categories_cover_v1_doc_types() -> None:
     """Categorías esperadas cubren los 7 docs del v1 + moto + unrelated."""
     expected = {
-        "ine", "comprobante", "recibo_nomina", "estado_cuenta",
-        "constancia_sat", "factura", "imss",
-        "moto", "unrelated",
+        "ine",
+        "comprobante",
+        "recibo_nomina",
+        "estado_cuenta",
+        "constancia_sat",
+        "factura",
+        "imss",
+        "moto",
+        "unrelated",
     }
     actual = {c.value for c in VisionCategory}
     assert expected == actual

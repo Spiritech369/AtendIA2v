@@ -4,6 +4,7 @@ Seeds a tenant + customer with known attrs, calls the service with a
 synthetic NLU output, and verifies the resulting customer.attrs and
 field_suggestions rows.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -234,9 +235,9 @@ def test_returns_applied_changes_for_auto_writes(fresh_seed):
     landed on customer.attrs."""
     tid, cid, conv = fresh_seed
     entities = {
-        "brand": ExtractedField(value="Honda", confidence=0.95, source_turn=1),    # AUTO
-        "model": ExtractedField(value="Civic", confidence=0.70, source_turn=1),    # SUGGEST
-        "city": ExtractedField(value="GDL", confidence=0.30, source_turn=1),       # SKIP
+        "brand": ExtractedField(value="Honda", confidence=0.95, source_turn=1),  # AUTO
+        "model": ExtractedField(value="Civic", confidence=0.70, source_turn=1),  # SUGGEST
+        "city": ExtractedField(value="GDL", confidence=0.30, source_turn=1),  # SKIP
     }
     applied = asyncio.run(_run(tid, cid, conv, entities))
 

@@ -10,6 +10,7 @@ flow through ``update_field`` nodes into message substitution, conditions
 prefer the ``true`` branch with a warning, and the simulator stops at
 ``end`` nodes or dead-ends without faking downstream actions.
 """
+
 from __future__ import annotations
 
 from atendia.api.workflows_routes import _dry_run_workflow
@@ -80,7 +81,11 @@ def test_condition_prefers_true_branch_and_warns():
     definition = {
         "nodes": [
             _trigger_node(),
-            {"id": "c1", "type": "condition", "config": {"field": "extracted.x", "operator": "exists"}},
+            {
+                "id": "c1",
+                "type": "condition",
+                "config": {"field": "extracted.x", "operator": "exists"},
+            },
             {"id": "m_yes", "type": "message", "config": {"text": "Sí"}},
             {"id": "m_no", "type": "message", "config": {"text": "No"}},
         ],

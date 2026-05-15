@@ -10,6 +10,7 @@ the top 6, and runs the regex conflict detector over the result.
 Returns a ``RetrievalResult`` shape that the prompt builder + answer
 synthesizer in Tasks 14-15 consume directly.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -70,7 +71,9 @@ class SafeAnswerSettings(BaseModel):
     block_invented_prices: bool = True
     block_invented_stock: bool = True
     risky_phrases: list[dict] = []
-    default_fallback_message: str = "Déjame validarlo con un asesor para darte la información correcta."
+    default_fallback_message: str = (
+        "Déjame validarlo con un asesor para darte la información correcta."
+    )
 
 
 class RetrievedChunk(BaseModel):
@@ -139,16 +142,20 @@ async def load_source_priority_rules(
 ) -> list[SourcePriorityRule]:
     """Tenant rules for ``agent``, falling back to the agent=NULL defaults."""
     rows = (
-        await session.execute(
-            select(KbSourcePriorityRule).where(
-                KbSourcePriorityRule.tenant_id == tenant_id,
-                or_(
-                    KbSourcePriorityRule.agent == agent,
-                    KbSourcePriorityRule.agent.is_(None),
-                ),
+        (
+            await session.execute(
+                select(KbSourcePriorityRule).where(
+                    KbSourcePriorityRule.tenant_id == tenant_id,
+                    or_(
+                        KbSourcePriorityRule.agent == agent,
+                        KbSourcePriorityRule.agent.is_(None),
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out = [
         SourcePriorityRule(
             agent=r.agent,
@@ -167,14 +174,10 @@ async def load_source_priority_rules(
     return out
 
 
-async def load_safe_answer_settings(
-    session: AsyncSession, tenant_id: UUID
-) -> SafeAnswerSettings:
+async def load_safe_answer_settings(session: AsyncSession, tenant_id: UUID) -> SafeAnswerSettings:
     row = (
         await session.execute(
-            select(KbSafeAnswerSetting).where(
-                KbSafeAnswerSetting.tenant_id == tenant_id
-            )
+            select(KbSafeAnswerSetting).where(KbSafeAnswerSetting.tenant_id == tenant_id)
         )
     ).scalar_one_or_none()
     if row is None:
@@ -218,9 +221,7 @@ async def _fetch_faq_candidates(
     )
     if not include_drafts:
         stmt = stmt.where(TenantFAQ.status == "published")
-    stmt = stmt.where(
-        or_(TenantFAQ.expires_at.is_(None), TenantFAQ.expires_at > datetime.now(UTC))
-    )
+    stmt = stmt.where(or_(TenantFAQ.expires_at.is_(None), TenantFAQ.expires_at > datetime.now(UTC)))
     if allowed_collection_ids is not None:
         # Empty list = no collection restriction; non-empty = whitelist.
         stmt = stmt.where(TenantFAQ.collection_id.in_(allowed_collection_ids))
@@ -348,13 +349,17 @@ async def _resolve_collection_ids(
     if not slugs:
         return []
     rows = (
-        await session.execute(
-            select(KbCollection.id).where(
-                KbCollection.tenant_id == tenant_id,
-                KbCollection.slug.in_(slugs),
+        (
+            await session.execute(
+                select(KbCollection.id).where(
+                    KbCollection.tenant_id == tenant_id,
+                    KbCollection.slug.in_(slugs),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -376,7 +381,9 @@ async def retrieve(
 
     # Source-type filter: per-request override beats agent permission.
     sources = selected_sources or perms.allowed_source_types or list(_DEFAULT_PRIORITY_BY_SOURCE)
-    sources = [s for s in sources if s in perms.allowed_source_types or not perms.allowed_source_types]
+    sources = [
+        s for s in sources if s in perms.allowed_source_types or not perms.allowed_source_types
+    ]
 
     # Score floor: per-request override beats agent permission beats global default.
     floor = minimum_score if minimum_score is not None else perms.min_score
@@ -410,7 +417,9 @@ async def retrieve(
     if "faq" in sources:
         candidates.extend(
             await _fetch_faq_candidates(
-                session, tenant_id, embedding,
+                session,
+                tenant_id,
+                embedding,
                 allowed_collection_ids=allowed_ids,
                 include_drafts=include_drafts,
                 limit=fetch_limit,
@@ -419,7 +428,9 @@ async def retrieve(
     if "catalog" in sources:
         candidates.extend(
             await _fetch_catalog_candidates(
-                session, tenant_id, embedding,
+                session,
+                tenant_id,
+                embedding,
                 allowed_collection_ids=allowed_ids,
                 include_drafts=include_drafts,
                 limit=fetch_limit,
@@ -428,7 +439,9 @@ async def retrieve(
     if "document" in sources:
         candidates.extend(
             await _fetch_document_chunk_candidates(
-                session, tenant_id, embedding,
+                session,
+                tenant_id,
+                embedding,
                 allowed_collection_ids=allowed_ids,
                 include_drafts=include_drafts,
                 limit=fetch_limit,
@@ -442,16 +455,13 @@ async def retrieve(
 
     # Sort by (priority DESC, score DESC); priority falls back to 0 for
     # any unexpected source_type.
-    candidates.sort(
-        key=lambda c: (-priority_by_source.get(c.source_type, 0), -c.score)
-    )
+    candidates.sort(key=lambda c: (-priority_by_source.get(c.source_type, 0), -c.score))
 
     top = candidates[:top_k]
 
     # Run regex conflict detector over the top-K result.
     chunk_likes = [
-        ChunkLike(text=c.text, source_type=c.source_type, source_id=str(c.source_id))
-        for c in top
+        ChunkLike(text=c.text, source_type=c.source_type, source_id=str(c.source_id)) for c in top
     ]
     conflicts: list[DetectedConflict] = detect_conflicts_in_results(chunk_likes)
 

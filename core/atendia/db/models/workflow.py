@@ -12,12 +12,16 @@ class Workflow(Base):
     __tablename__ = "workflows"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     trigger_type: Mapped[str] = mapped_column(String(60), nullable=False)
     trigger_config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
-    definition: Mapped[dict] = mapped_column(JSONB, default=dict, server_default='{"nodes":[],"edges":[]}')
+    definition: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default='{"nodes":[],"edges":[]}'
+    )
     active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Public token used to identify this workflow on POST /webhooks/workflow/{token}.
     # NULL unless the operator selected the "webhook_received" trigger.
@@ -25,9 +29,7 @@ class Workflow(Base):
     # Optimistic-locking counter (migration 028). PATCH/toggle increments this
     # only when the client's expected version matches the row — two concurrent
     # admin edits result in 409 instead of last-write-wins.
-    version: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, server_default="1"
-    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -38,9 +40,15 @@ class WorkflowExecution(Base):
     __tablename__ = "workflow_executions"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    workflow_id: Mapped[UUID] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
-    conversation_id: Mapped[UUID | None] = mapped_column(ForeignKey("conversations.id", ondelete="SET NULL"))
-    customer_id: Mapped[UUID | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"))
+    workflow_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="SET NULL")
+    )
+    customer_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("customers.id", ondelete="SET NULL")
+    )
     trigger_event_id: Mapped[UUID | None] = mapped_column()
     status: Mapped[str] = mapped_column(String(20), default="running", server_default="running")
     current_node_id: Mapped[str | None] = mapped_column(String(100))
@@ -59,7 +67,9 @@ class WorkflowActionRun(Base):
     __tablename__ = "workflow_action_runs"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    execution_id: Mapped[UUID] = mapped_column(ForeignKey("workflow_executions.id", ondelete="CASCADE"))
+    execution_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workflow_executions.id", ondelete="CASCADE")
+    )
     node_id: Mapped[str] = mapped_column(String(100), nullable=False)
     action_key: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -68,7 +78,9 @@ class WorkflowActionRun(Base):
 class WorkflowEventCursor(Base):
     __tablename__ = "workflow_event_cursors"
 
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True
+    )
     last_event_id: Mapped[UUID | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"))
     last_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -81,7 +93,9 @@ class WorkflowVersion(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    workflow_id: Mapped[UUID] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
+    workflow_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
     definition: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
@@ -112,12 +126,12 @@ class WorkflowExecutionStep(Base):
 
 class WorkflowVariable(Base):
     __tablename__ = "workflow_variables"
-    __table_args__ = (
-        UniqueConstraint("workflow_id", "name", name="uq_workflow_variables_name"),
-    )
+    __table_args__ = (UniqueConstraint("workflow_id", "name", name="uq_workflow_variables_name"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    workflow_id: Mapped[UUID] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
+    workflow_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     created_in_node_id: Mapped[str | None] = mapped_column(String(100))
     used_in_nodes: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
@@ -130,7 +144,9 @@ class WorkflowDependency(Base):
     __tablename__ = "workflow_dependencies"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    workflow_id: Mapped[UUID] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
+    workflow_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
     dependency_type: Mapped[str] = mapped_column(String(40), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="ok", server_default="ok")
@@ -140,12 +156,12 @@ class WorkflowDependency(Base):
 
 class WhatsAppTemplate(Base):
     __tablename__ = "whatsapp_templates"
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "name", name="uq_whatsapp_templates_name"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_whatsapp_templates_name"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(40), default="utility", server_default="utility")
     status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
@@ -158,12 +174,12 @@ class WhatsAppTemplate(Base):
 
 class AIAgent(Base):
     __tablename__ = "ai_agents"
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "name", name="uq_ai_agents_name"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_ai_agents_name"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[str] = mapped_column(String(40), default="sales", server_default="sales")
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
@@ -175,9 +191,13 @@ class KnowledgeBaseSource(Base):
     __tablename__ = "knowledge_base_sources"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    source_type: Mapped[str] = mapped_column(String(40), default="document", server_default="document")
+    source_type: Mapped[str] = mapped_column(
+        String(40), default="document", server_default="document"
+    )
     status: Mapped[str] = mapped_column(String(20), default="indexed", server_default="indexed")
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -187,9 +207,13 @@ class AdvisorPool(Base):
     __tablename__ = "advisor_pools"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
-    strategy: Mapped[str] = mapped_column(String(40), default="round_robin", server_default="round_robin")
+    strategy: Mapped[str] = mapped_column(
+        String(40), default="round_robin", server_default="round_robin"
+    )
     advisor_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -199,7 +223,9 @@ class BusinessHoursRule(Base):
     __tablename__ = "business_hours_rules"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     timezone: Mapped[str] = mapped_column(String(40), default="America/Mexico_City")
     schedule: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
@@ -211,8 +237,12 @@ class SafetyRule(Base):
     __tablename__ = "safety_rules"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
-    workflow_id: Mapped[UUID | None] = mapped_column(ForeignKey("workflows.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    workflow_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workflows.id", ondelete="CASCADE"), index=True
+    )
     key: Mapped[str] = mapped_column(String(80), nullable=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

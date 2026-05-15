@@ -2,6 +2,7 @@
 
 Seeds controlled volume per tenant + user, verifies each count individually.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,8 +26,7 @@ def _seed_data(tenant_id: str, user_id: str) -> None:
             cust_id = (
                 await conn.execute(
                     text(
-                        "INSERT INTO customers (tenant_id, phone_e164) "
-                        "VALUES (:t, :p) RETURNING id"
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) RETURNING id"
                     ),
                     {"t": tenant_id, "p": f"+521555{uuid4().hex[:8]}"},
                 )

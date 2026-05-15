@@ -9,6 +9,7 @@ pipeline, custom fields, catalog rows, customers, conversations, messages,
 notes, appointments, handoffs and event rows. Conversation rows are identified
 by tags like ``demo:diego-lopez`` and refreshed instead of duplicated.
 """
+
 # ruff: noqa: E501
 from __future__ import annotations
 
@@ -32,15 +33,78 @@ DEMO_PASSWORD = "admin123"
 
 PIPELINE_DEFINITION = {
     "stages": [
-        {"id": "nuevo_lead", "label": "Nuevo lead", "timeout_hours": 2, "color": "#22c55e", "icon": "inbox", "allowed_transitions": ["en_conversacion"]},
-        {"id": "en_conversacion", "label": "En conversacion", "timeout_hours": 4, "color": "#3b82f6", "icon": "message_circle", "allowed_transitions": ["documentacion", "propuesta", "negociacion"]},
-        {"id": "documentacion", "label": "Documentacion", "timeout_hours": 12, "color": "#8b5cf6", "icon": "file_text", "allowed_transitions": ["validacion", "en_conversacion"]},
-        {"id": "validacion", "label": "Validacion", "timeout_hours": 24, "color": "#f59e0b", "icon": "clipboard_check", "allowed_transitions": ["propuesta", "documentacion"]},
-        {"id": "propuesta", "label": "Propuesta", "timeout_hours": 24, "color": "#6366f1", "icon": "send", "allowed_transitions": ["negociacion", "cita_agendada", "cierre_perdido"]},
-        {"id": "negociacion", "label": "Negociacion", "timeout_hours": 24, "color": "#a855f7", "icon": "handshake", "allowed_transitions": ["cita_agendada", "cierre_ganado", "cierre_perdido"]},
-        {"id": "cita_agendada", "label": "Cita agendada", "timeout_hours": 12, "color": "#06b6d4", "icon": "calendar", "allowed_transitions": ["cierre_ganado", "cierre_perdido", "negociacion"]},
-        {"id": "cierre_ganado", "label": "Cierre ganado", "timeout_hours": 72, "color": "#10b981", "icon": "check_circle", "is_terminal": True},
-        {"id": "cierre_perdido", "label": "Cierre perdido", "timeout_hours": 72, "color": "#ef4444", "icon": "x_circle", "is_terminal": True},
+        {
+            "id": "nuevo_lead",
+            "label": "Nuevo lead",
+            "timeout_hours": 2,
+            "color": "#22c55e",
+            "icon": "inbox",
+            "allowed_transitions": ["en_conversacion"],
+        },
+        {
+            "id": "en_conversacion",
+            "label": "En conversacion",
+            "timeout_hours": 4,
+            "color": "#3b82f6",
+            "icon": "message_circle",
+            "allowed_transitions": ["documentacion", "propuesta", "negociacion"],
+        },
+        {
+            "id": "documentacion",
+            "label": "Documentacion",
+            "timeout_hours": 12,
+            "color": "#8b5cf6",
+            "icon": "file_text",
+            "allowed_transitions": ["validacion", "en_conversacion"],
+        },
+        {
+            "id": "validacion",
+            "label": "Validacion",
+            "timeout_hours": 24,
+            "color": "#f59e0b",
+            "icon": "clipboard_check",
+            "allowed_transitions": ["propuesta", "documentacion"],
+        },
+        {
+            "id": "propuesta",
+            "label": "Propuesta",
+            "timeout_hours": 24,
+            "color": "#6366f1",
+            "icon": "send",
+            "allowed_transitions": ["negociacion", "cita_agendada", "cierre_perdido"],
+        },
+        {
+            "id": "negociacion",
+            "label": "Negociacion",
+            "timeout_hours": 24,
+            "color": "#a855f7",
+            "icon": "handshake",
+            "allowed_transitions": ["cita_agendada", "cierre_ganado", "cierre_perdido"],
+        },
+        {
+            "id": "cita_agendada",
+            "label": "Cita agendada",
+            "timeout_hours": 12,
+            "color": "#06b6d4",
+            "icon": "calendar",
+            "allowed_transitions": ["cierre_ganado", "cierre_perdido", "negociacion"],
+        },
+        {
+            "id": "cierre_ganado",
+            "label": "Cierre ganado",
+            "timeout_hours": 72,
+            "color": "#10b981",
+            "icon": "check_circle",
+            "is_terminal": True,
+        },
+        {
+            "id": "cierre_perdido",
+            "label": "Cierre perdido",
+            "timeout_hours": 72,
+            "color": "#ef4444",
+            "icon": "x_circle",
+            "is_terminal": True,
+        },
     ],
     "docs_per_plan": {
         "48 meses + 15% enganche": [
@@ -62,7 +126,12 @@ PIPELINE_DEFINITION = {
 
 FIELD_DEFINITIONS = [
     ("tipo_credito", "Tipo de credito", "select", {"choices": ["Bancario", "Nomina", "Contado"]}),
-    ("plan_credito", "Plan de credito", "select", {"choices": ["PLAN 10%", "48 meses + 15% enganche", "Contado"]}),
+    (
+        "plan_credito",
+        "Plan de credito",
+        "select",
+        {"choices": ["PLAN 10%", "48 meses + 15% enganche", "Contado"]},
+    ),
     ("modelo_interes", "Modelo de interes", "text", None),
     ("ingreso_estimado", "Ingreso estimado", "number", None),
     ("antiguedad_laboral", "Antiguedad laboral", "text", None),
@@ -172,9 +241,21 @@ DEMO_CONVERSATIONS: list[dict[str, Any]] = [
         "messages": [
             ("inbound", "Hola, buenas tardes", 22),
             ("inbound", "Me pueden compartir informacion de la HR-V EXL 2025 en plata?", 21),
-            ("outbound", "Hola Diego. Con gusto te comparto la informacion de la HR-V EXL 2025.", 19),
-            ("outbound", "HR-V EXL 2025 en plata: transmision CVT, motor 1.5L, precio $489,900 MXN.", 17),
-            ("outbound", "Tambien te puedo compartir el plan de financiamiento a 48 meses con 15% de enganche.", 15),
+            (
+                "outbound",
+                "Hola Diego. Con gusto te comparto la informacion de la HR-V EXL 2025.",
+                19,
+            ),
+            (
+                "outbound",
+                "HR-V EXL 2025 en plata: transmision CVT, motor 1.5L, precio $489,900 MXN.",
+                17,
+            ),
+            (
+                "outbound",
+                "Tambien te puedo compartir el plan de financiamiento a 48 meses con 15% de enganche.",
+                15,
+            ),
             ("inbound", "Perfecto, me interesa agendar una prueba de manejo.", 8),
         ],
         "note": "Lead caliente. Quiere prueba de manejo de HR-V EXL 2025; faltan comprobante e INE reverso.",
@@ -228,8 +309,16 @@ DEMO_CONVERSATIONS: list[dict[str, Any]] = [
         },
         "messages": [
             ("inbound", "Hola, vi el anuncio del plan 10%. Me interesa la HR-V.", 43),
-            ("outbound", "Claro Karla, para PLAN 10% necesitamos INE, comprobante y recibos de nomina.", 39),
-            ("inbound", "Ya tengo INE y recibos. El comprobante de domicilio lo puedo mandar mas tarde?", 12),
+            (
+                "outbound",
+                "Claro Karla, para PLAN 10% necesitamos INE, comprobante y recibos de nomina.",
+                39,
+            ),
+            (
+                "inbound",
+                "Ya tengo INE y recibos. El comprobante de domicilio lo puedo mandar mas tarde?",
+                12,
+            ),
         ],
         "note": "Falta comprobante de domicilio. Buen potencial si se solicita hoy por WhatsApp.",
     },
@@ -381,7 +470,11 @@ DEMO_CONVERSATIONS: list[dict[str, Any]] = [
         "messages": [
             ("inbound", "Ya envie mis documentos. Quedo pendiente de la cotizacion final.", 260),
             ("outbound", "Gracias Sofia, estamos validando y te actualizamos hoy.", 245),
-            ("outbound", "Sofia, ya tengo el plan actualizado. Me confirmas si lo revisamos por llamada?", 180),
+            (
+                "outbound",
+                "Sofia, ya tengo el plan actualizado. Me confirmas si lo revisamos por llamada?",
+                180,
+            ),
         ],
         "note": "Documentacion completa. Hace falta reactivar con llamada o cierre de cotizacion.",
     },
@@ -394,7 +487,9 @@ def dumps(value: Any) -> str:
 
 async def ensure_tenant(conn: AsyncConnection) -> Any:
     tenant_id = (
-        await conn.execute(text("SELECT id FROM tenants WHERE name = :name"), {"name": DEMO_TENANT_NAME})
+        await conn.execute(
+            text("SELECT id FROM tenants WHERE name = :name"), {"name": DEMO_TENANT_NAME}
+        )
     ).scalar()
     if tenant_id is None:
         tenant_id = (
@@ -694,7 +789,9 @@ async def refresh_messages(
     conv_id: Any,
     spec: dict[str, Any],
 ) -> None:
-    await conn.execute(text("DELETE FROM messages WHERE conversation_id = :conv_id"), {"conv_id": conv_id})
+    await conn.execute(
+        text("DELETE FROM messages WHERE conversation_id = :conv_id"), {"conv_id": conv_id}
+    )
     for index, (direction, body, minutes_ago) in enumerate(spec["messages"], start=1):
         await conn.execute(
             text(
@@ -764,13 +861,27 @@ async def refresh_events(
     last_activity_at: datetime,
 ) -> None:
     await conn.execute(
-        text("DELETE FROM events WHERE conversation_id = :conv_id AND payload->>'demo_seed' = 'true'"),
+        text(
+            "DELETE FROM events WHERE conversation_id = :conv_id AND payload->>'demo_seed' = 'true'"
+        ),
         {"conv_id": conv_id},
     )
     events = [
-        ("conversation.created", "Conversacion demo iniciada", last_activity_at - timedelta(hours=2)),
-        ("ai.intent.detected", f"Intencion {spec['last_intent']} detectada", last_activity_at - timedelta(minutes=50)),
-        ("conversation.stage.updated", f"Etapa actual: {spec['stage']}", last_activity_at - timedelta(minutes=30)),
+        (
+            "conversation.created",
+            "Conversacion demo iniciada",
+            last_activity_at - timedelta(hours=2),
+        ),
+        (
+            "ai.intent.detected",
+            f"Intencion {spec['last_intent']} detectada",
+            last_activity_at - timedelta(minutes=50),
+        ),
+        (
+            "conversation.stage.updated",
+            f"Etapa actual: {spec['stage']}",
+            last_activity_at - timedelta(minutes=30),
+        ),
         ("message.received", "Ultimo mensaje del cliente", last_activity_at),
     ]
     for event_type, label, occurred_at in events:
@@ -797,7 +908,9 @@ async def refresh_handoff(
     assigned_user_id: Any,
 ) -> None:
     await conn.execute(
-        text("DELETE FROM human_handoffs WHERE conversation_id = :conv_id AND reason LIKE 'DEMO:%'"),
+        text(
+            "DELETE FROM human_handoffs WHERE conversation_id = :conv_id AND reason LIKE 'DEMO:%'"
+        ),
         {"conv_id": conv_id},
     )
     if not spec.get("handoff"):
@@ -875,7 +988,9 @@ async def seed() -> None:
         for spec in DEMO_CONVERSATIONS:
             customer_id = await upsert_customer(conn, tenant_id, spec)
             await upsert_field_values(conn, customer_id, field_ids, spec["field_values"])
-            conv_id = await upsert_conversation(conn, tenant_id, customer_id, user_ids, agent_ids, spec)
+            conv_id = await upsert_conversation(
+                conn, tenant_id, customer_id, user_ids, agent_ids, spec
+            )
             print(f"[OK] Demo conversation {spec['name']} ({conv_id})")
 
         total = (

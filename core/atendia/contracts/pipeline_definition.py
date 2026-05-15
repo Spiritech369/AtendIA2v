@@ -30,13 +30,19 @@ _RULE_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*
 # `plan_credito`), and the evaluator looks up the docs that plan requires
 # in `pipeline.docs_per_plan[plan]` and checks every `.status == "ok"`.
 # Like the presence operators it takes no `value`.
-_PRESENCE_OPERATORS: frozenset[str] = frozenset(
-    {"exists", "not_exists", "docs_complete_for_plan"}
-)
+_PRESENCE_OPERATORS: frozenset[str] = frozenset({"exists", "not_exists", "docs_complete_for_plan"})
 _LIST_OPERATORS: frozenset[str] = frozenset({"in", "not_in"})
-_VALUE_OPERATORS: frozenset[str] = frozenset({
-    "equals", "not_equals", "contains", "greater_than", "less_than", "in", "not_in",
-})
+_VALUE_OPERATORS: frozenset[str] = frozenset(
+    {
+        "equals",
+        "not_equals",
+        "contains",
+        "greater_than",
+        "less_than",
+        "in",
+        "not_in",
+    }
+)
 OPERATORS: frozenset[str] = _PRESENCE_OPERATORS | _VALUE_OPERATORS
 
 
@@ -61,9 +67,7 @@ class FieldSpec(BaseModel):
     @classmethod
     def _name_pattern(cls, v: str) -> str:
         if not _FIELD_NAME_RE.fullmatch(v):
-            raise ValueError(
-                f"invalid field name {v!r} — must match {_FIELD_NAME_RE.pattern}"
-            )
+            raise ValueError(f"invalid field name {v!r} — must match {_FIELD_NAME_RE.pattern}")
         return v
 
     @model_validator(mode="before")
@@ -131,9 +135,7 @@ class Condition(BaseModel):
             # Presence checks ignore value; reject if one was sent to
             # surface authoring mistakes early.
             if self.value is not None:
-                raise ValueError(
-                    f"operator {self.operator!r} does not accept a value"
-                )
+                raise ValueError(f"operator {self.operator!r} does not accept a value")
             return self
         if self.value is None:
             raise ValueError(f"operator {self.operator!r} requires a value")
@@ -164,9 +166,7 @@ class AutoEnterRules(BaseModel):
     @model_validator(mode="after")
     def _enabled_requires_conditions(self) -> "AutoEnterRules":
         if self.enabled and not self.conditions:
-            raise ValueError(
-                "auto_enter_rules.enabled=true requires at least one condition"
-            )
+            raise ValueError("auto_enter_rules.enabled=true requires at least one condition")
         return self
 
 
@@ -223,9 +223,7 @@ class StageDefinition(BaseModel):
         if v is None:
             return None
         if v not in _FLOW_MODE_VALUES:
-            raise ValueError(
-                f"behavior_mode {v!r} must be one of {sorted(_FLOW_MODE_VALUES)}"
-            )
+            raise ValueError(f"behavior_mode {v!r} must be one of {sorted(_FLOW_MODE_VALUES)}")
         return v
 
     @model_validator(mode="after")
@@ -234,9 +232,7 @@ class StageDefinition(BaseModel):
         opt = {f.name for f in self.optional_fields}
         overlap = req & opt
         if overlap:
-            raise ValueError(
-                f"fields appear in both required and optional: {sorted(overlap)}"
-            )
+            raise ValueError(f"fields appear in both required and optional: {sorted(overlap)}")
         return self
 
     @model_validator(mode="after")

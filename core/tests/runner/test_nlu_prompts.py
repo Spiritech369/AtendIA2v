@@ -4,8 +4,12 @@ import pytest
 
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.nlu_prompts import (
-    HISTORY_FORMAT, OUTPUT_INSTRUCTIONS, ROLE_LABELS,
-    SYSTEM_PROMPT_TEMPLATE, build_prompt, render_template,
+    HISTORY_FORMAT,
+    OUTPUT_INSTRUCTIONS,
+    ROLE_LABELS,
+    SYSTEM_PROMPT_TEMPLATE,
+    build_prompt,
+    render_template,
 )
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "nlu"
@@ -79,8 +83,10 @@ def test_build_prompt_basic_structure():
 
 def test_build_prompt_history_role_mapping():
     messages = build_prompt(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
         history=[("inbound", "from-client"), ("outbound", "from-bot")],
     )
     # inbound → role "user", outbound → role "assistant"
@@ -92,16 +98,22 @@ def test_build_prompt_history_role_mapping():
 
 def test_build_prompt_empty_required_renders_ninguno():
     messages = build_prompt(
-        text="hola", current_stage="greeting",
-        required_fields=[], optional_fields=[], history=[],
+        text="hola",
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert "(ninguno)" in messages[0]["content"]
 
 
 def test_build_prompt_empty_history_two_messages_total():
     messages = build_prompt(
-        text="hola", current_stage="greeting",
-        required_fields=[], optional_fields=[], history=[],
+        text="hola",
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     # Just system + final user
     assert len(messages) == 2
@@ -111,9 +123,11 @@ def test_build_prompt_empty_history_two_messages_total():
 
 def test_build_prompt_field_with_empty_description_renders_placeholder():
     messages = build_prompt(
-        text="x", current_stage="qualify",
+        text="x",
+        current_stage="qualify",
         required_fields=[FieldSpec(name="ciudad", description="")],
-        optional_fields=[], history=[],
+        optional_fields=[],
+        history=[],
     )
     assert "ciudad: (sin descripción)" in messages[0]["content"]
 

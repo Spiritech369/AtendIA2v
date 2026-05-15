@@ -28,13 +28,19 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t17_worker",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T17", "verify_token": "vt_t17"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t17_worker",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T17", "verify_token": "vt_t17"}}
+                        ),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 
@@ -52,11 +58,15 @@ def setup_tenant():
 async def _read_messages(tid):
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
-        rows = (await conn.execute(
-            text("SELECT direction, text, channel_message_id, delivery_status "
-                 "FROM messages WHERE tenant_id = :t ORDER BY sent_at"),
-            {"t": tid},
-        )).fetchall()
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT direction, text, channel_message_id, delivery_status "
+                    "FROM messages WHERE tenant_id = :t ORDER BY sent_at"
+                ),
+                {"t": tid},
+            )
+        ).fetchall()
     await engine.dispose()
     return rows
 
@@ -65,9 +75,7 @@ async def _read_messages(tid):
 @respx.mock
 async def test_send_outbound_persists_outbound_row_on_success(setup_tenant):
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T17/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PID_T17/messages").mock(
         return_value=httpx.Response(
             200,
             json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OUT_T17_A"}]},
@@ -101,9 +109,7 @@ async def test_send_outbound_persists_outbound_row_on_success(setup_tenant):
 @respx.mock
 async def test_send_outbound_idempotency_key_does_not_resend(setup_tenant):
     tid = setup_tenant
-    route = respx.post(
-        "https://graph.facebook.com/v21.0/PID_T17/messages"
-    ).mock(
+    route = respx.post("https://graph.facebook.com/v21.0/PID_T17/messages").mock(
         return_value=httpx.Response(
             200,
             json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.OUT_T17_IDEM"}]},
@@ -130,9 +136,7 @@ async def test_send_outbound_idempotency_key_does_not_resend(setup_tenant):
 @respx.mock
 async def test_send_outbound_persists_failed_row_when_meta_returns_error(setup_tenant):
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T17/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PID_T17/messages").mock(
         return_value=httpx.Response(
             400,
             json={"error": {"code": 131000, "message": "Recipient not on WhatsApp"}},

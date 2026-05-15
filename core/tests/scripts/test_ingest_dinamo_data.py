@@ -10,6 +10,7 @@
 Tests are pure functions on dicts/strings, no DB, no API. T14 adds the
 async `_main` and T15 runs it for real.
 """
+
 from atendia.scripts.ingest_dinamo_data import (
     _embedding_text_for_catalog_item,
     _flatten_catalog,
@@ -41,24 +42,30 @@ def test_flatten_catalog_two_categories() -> None:
     """Each model in the tree becomes a flat row with `category` set."""
     sample = {
         "catalogo": [
-            {"categoria": "Motoneta", "modelos": [
-                {
-                    "modelo": "X 100 CC",
-                    "alias": ["x"],
-                    "ficha_tecnica": {"motor_cc": 100},
-                    "precios": {"lista": 20000, "contado": 19000},
-                    "planes_credito": {"plan_10": {"enganche": 2000}},
-                },
-            ]},
-            {"categoria": "Chopper", "modelos": [
-                {
-                    "modelo": "Y 200 CC",
-                    "alias": ["y"],
-                    "ficha_tecnica": {"motor_cc": 200},
-                    "precios": {"lista": 30000, "contado": 28000},
-                    "planes_credito": {},
-                },
-            ]},
+            {
+                "categoria": "Motoneta",
+                "modelos": [
+                    {
+                        "modelo": "X 100 CC",
+                        "alias": ["x"],
+                        "ficha_tecnica": {"motor_cc": 100},
+                        "precios": {"lista": 20000, "contado": 19000},
+                        "planes_credito": {"plan_10": {"enganche": 2000}},
+                    },
+                ],
+            },
+            {
+                "categoria": "Chopper",
+                "modelos": [
+                    {
+                        "modelo": "Y 200 CC",
+                        "alias": ["y"],
+                        "ficha_tecnica": {"motor_cc": 200},
+                        "precios": {"lista": 30000, "contado": 28000},
+                        "planes_credito": {},
+                    },
+                ],
+            },
         ],
     }
     items = _flatten_catalog(sample)
@@ -82,9 +89,12 @@ def test_flatten_catalog_handles_missing_optional_keys() -> None:
     """Models with no `precios`/`planes_credito` get string '0' / empty defaults."""
     sample = {
         "catalogo": [
-            {"categoria": "Otro", "modelos": [
-                {"modelo": "Bare Model", "ficha_tecnica": {}, "alias": []},
-            ]},
+            {
+                "categoria": "Otro",
+                "modelos": [
+                    {"modelo": "Bare Model", "ficha_tecnica": {}, "alias": []},
+                ],
+            },
         ],
     }
     items = _flatten_catalog(sample)
@@ -142,32 +152,38 @@ from atendia.scripts.ingest_dinamo_data import (
 
 def test_embedding_text_for_faq_concatenates_q_and_a() -> None:
     """The text we embed must include both question and answer."""
-    text = _embedding_text_for_faq({
-        "pregunta": "¿Cuánto es el enganche?",
-        "respuesta": "Depende del plan.",
-    })
+    text = _embedding_text_for_faq(
+        {
+            "pregunta": "¿Cuánto es el enganche?",
+            "respuesta": "Depende del plan.",
+        }
+    )
     assert "¿Cuánto es el enganche?" in text
     assert "Depende del plan." in text
 
 
 def test_embedding_text_for_faq_includes_detalle_per_plan() -> None:
     """`detalle_por_plan` keys/values are flattened into the embedded text."""
-    text = _embedding_text_for_faq({
-        "pregunta": "¿Cuánto es el enganche?",
-        "respuesta": "Depende del plan.",
-        "detalle_por_plan": {"nomina_tarjeta": "10%", "sin_comprobar": "20%"},
-    })
+    text = _embedding_text_for_faq(
+        {
+            "pregunta": "¿Cuánto es el enganche?",
+            "respuesta": "Depende del plan.",
+            "detalle_por_plan": {"nomina_tarjeta": "10%", "sin_comprobar": "20%"},
+        }
+    )
     assert "nomina_tarjeta: 10%" in text
     assert "sin_comprobar: 20%" in text
 
 
 def test_embedding_text_for_faq_includes_documentos_list() -> None:
     """`documentos` list members are appended (one keyword per item)."""
-    text = _embedding_text_for_faq({
-        "pregunta": "¿Qué requisitos?",
-        "respuesta": "Estos:",
-        "documentos": ["INE vigente", "Comprobante de domicilio"],
-    })
+    text = _embedding_text_for_faq(
+        {
+            "pregunta": "¿Qué requisitos?",
+            "respuesta": "Estos:",
+            "documentos": ["INE vigente", "Comprobante de domicilio"],
+        }
+    )
     assert "INE vigente" in text
     assert "Comprobante de domicilio" in text
 

@@ -7,6 +7,7 @@ Three implementations live in this package:
 
 All return (NLUResult, UsageMetadata | None). Mocks/fakes return None.
 """
+
 from decimal import Decimal
 from typing import Protocol
 

@@ -36,9 +36,13 @@ async def index_document(ctx: dict, document_id: str) -> dict:
                 embeddings: list[list[float] | None] = [None] * len(chunks)
                 if settings.openai_api_key and chunks:
                     client = AsyncOpenAI(api_key=settings.openai_api_key)
-                    embedded, _tokens, _cost = await generate_embeddings_batch(client=client, texts=chunks)
+                    embedded, _tokens, _cost = await generate_embeddings_batch(
+                        client=client, texts=chunks
+                    )
                     embeddings = embedded
-                await session.execute(delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id))
+                await session.execute(
+                    delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
+                )
                 for i, chunk in enumerate(chunks):
                     session.add(
                         KnowledgeChunk(
@@ -72,7 +76,9 @@ def _parse_document(filename: str, data: bytes) -> str:
 
         with fitz.open(stream=data, filetype="pdf") as pdf:
             if pdf.page_count > MAX_PDF_PAGES:
-                raise ValueError(f"PDF has {pdf.page_count} pages; max supported is {MAX_PDF_PAGES}")
+                raise ValueError(
+                    f"PDF has {pdf.page_count} pages; max supported is {MAX_PDF_PAGES}"
+                )
             texts = [page.get_text("text") for page in pdf]
         return "\n".join(texts)
     if suffix == "docx":
@@ -94,7 +100,9 @@ def _parse_document(filename: str, data: bytes) -> str:
     text = data.decode("utf-8", errors="ignore")
     if suffix == "csv":
         rows = csv.reader(StringIO(text))
-        return "\n".join(", ".join(cell for cell in row) for _, row in zip(range(1000), rows, strict=False))
+        return "\n".join(
+            ", ".join(cell for cell in row) for _, row in zip(range(1000), rows, strict=False)
+        )
     return text
 
 

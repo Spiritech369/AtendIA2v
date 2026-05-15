@@ -1,5 +1,6 @@
 """Smoke test that every KB model is wired into atendia.db.models and
 exposes the columns Phase 1 migrations 031-036 created."""
+
 from __future__ import annotations
 
 
@@ -23,23 +24,42 @@ def test_kb_models_importable() -> None:
 
     # New columns on extended tables (032).
     for attr in (
-        "status", "visibility", "priority", "expires_at",
-        "agent_permissions", "collection_id", "language", "updated_at",
+        "status",
+        "visibility",
+        "priority",
+        "expires_at",
+        "agent_permissions",
+        "collection_id",
+        "language",
+        "updated_at",
     ):
         assert hasattr(TenantFAQ, attr), f"TenantFAQ missing {attr}"
         assert hasattr(TenantCatalogItem, attr), f"TenantCatalogItem missing {attr}"
 
     for attr in (
-        "visibility", "priority", "expires_at", "agent_permissions",
-        "collection_id", "language", "progress_percentage",
-        "embedded_chunk_count", "error_count",
+        "visibility",
+        "priority",
+        "expires_at",
+        "agent_permissions",
+        "collection_id",
+        "language",
+        "progress_percentage",
+        "embedded_chunk_count",
+        "error_count",
     ):
         assert hasattr(KnowledgeDocument, attr), f"KnowledgeDocument missing {attr}"
 
     for attr in (
-        "chunk_status", "marked_critical", "error_message",
-        "token_count", "page", "heading", "section",
-        "last_retrieved_at", "retrieval_count", "average_score",
+        "chunk_status",
+        "marked_critical",
+        "error_message",
+        "token_count",
+        "page",
+        "heading",
+        "section",
+        "last_retrieved_at",
+        "retrieval_count",
+        "average_score",
     ):
         assert hasattr(KnowledgeChunk, attr), f"KnowledgeChunk missing {attr}"
 

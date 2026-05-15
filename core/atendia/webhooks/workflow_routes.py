@@ -16,6 +16,7 @@ Design notes:
 - We deliberately don't enroll a specific contact yet — that requires a
   ``contact_id``/``email``/``phone`` mapper which is its own feature.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, status

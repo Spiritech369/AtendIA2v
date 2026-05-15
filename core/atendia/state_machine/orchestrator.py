@@ -30,7 +30,8 @@ def process_turn(
         action = (
             "ask_clarification"
             if "ask_clarification" in current_stage.actions_allowed
-            else current_stage.actions_allowed[0] if current_stage.actions_allowed
+            else current_stage.actions_allowed[0]
+            if current_stage.actions_allowed
             else pipeline.fallback
         )
         return OrchestratorDecision(
@@ -40,9 +41,7 @@ def process_turn(
         )
 
     flat_extracted = {k: v.value for k, v in state.extracted_data.items()}
-    target_stage_id = next_stage(
-        pipeline, state.current_stage, nlu, flat_extracted, turn_count
-    )
+    target_stage_id = next_stage(pipeline, state.current_stage, nlu, flat_extracted, turn_count)
 
     target_stage = _stage_by_id(pipeline, target_stage_id)
     action = resolve_action(target_stage, nlu.intent)

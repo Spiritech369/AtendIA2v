@@ -30,6 +30,7 @@ the server default). Production data is expected to be clean —
 the UPDATE is a defensive no-op. The DEFAULT fix matters going
 forward.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -63,13 +64,8 @@ def upgrade() -> None:
         # quote, closing quote.
         bad_literal_sql = f"'''{value}'''"
         # Defensive UPDATE — normalize any rows that carry the bad value.
-        op.execute(
-            f"UPDATE {table} SET {column} = '{value}' "
-            f"WHERE {column} = {bad_literal_sql}"
-        )
-        op.execute(
-            f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{value}'"
-        )
+        op.execute(f"UPDATE {table} SET {column} = '{value}' WHERE {column} = {bad_literal_sql}")
+        op.execute(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{value}'")
 
 
 def downgrade() -> None:

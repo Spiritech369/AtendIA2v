@@ -12,6 +12,7 @@ No LLM calls. Designed to run synchronously over the top-K retrieval
 result on every /test-query, plus periodically (worker job) to surface
 conflicts the operator hasn't seen yet.
 """
+
 from __future__ import annotations
 
 import re

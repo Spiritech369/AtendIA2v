@@ -9,6 +9,7 @@ Both fixtures (``db_session`` for ORM access, ``seed_tenant_factory`` for raw
 inserts) yield async objects so the test body never has to spin up its own
 event loop alongside pytest-asyncio's.
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -65,12 +66,14 @@ def stub_step_enqueue(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
         defer_seconds: int,
         node_id: str,
     ) -> None:
-        captured.append({
-            "execution_id": execution_id,
-            "next_node": next_node,
-            "defer_seconds": defer_seconds,
-            "node_id": node_id,
-        })
+        captured.append(
+            {
+                "execution_id": execution_id,
+                "next_node": next_node,
+                "defer_seconds": defer_seconds,
+                "node_id": node_id,
+            }
+        )
 
     monkeypatch.setattr(engine_mod, "_enqueue_workflow_step", _capture)
     return captured
@@ -144,7 +147,8 @@ async def seed_tenant_factory() -> AsyncIterator[Callable[..., Awaitable[dict]]]
                             for sid in pipeline_stages
                         ]
                         definition_json = (
-                            '{"stages":[' + ",".join(stage_objs)
+                            '{"stages":['
+                            + ",".join(stage_objs)
                             + '],"docs_per_plan":{"default":["docs_ine"]}}'
                         )
                         pipeline_id = (
@@ -219,6 +223,7 @@ def insert_workflow(db_session: AsyncSession):
 
     Tests that need a row to call ``execute_workflow`` against use this.
     """
+
     async def _do(
         *,
         tenant_id: str,

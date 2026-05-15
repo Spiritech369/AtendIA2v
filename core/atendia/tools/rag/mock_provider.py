@@ -6,6 +6,7 @@ sanely against real chunks stored as halfvec(3072). The chat-completion
 stand-in echoes the first ~120 chars of the context so tests can assert
 that citations propagated end-to-end.
 """
+
 from __future__ import annotations
 
 import hashlib

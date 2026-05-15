@@ -3,6 +3,7 @@
 Phase 3b: dispatcher no longer holds canned text. The Composer (canned or
 OpenAI) produces the messages; the dispatcher just enqueues them.
 """
+
 from uuid import UUID
 
 from arq.connections import ArqRedis
@@ -13,12 +14,20 @@ from atendia.queue.enqueue import enqueue_outbound
 from atendia.queue.outbox import stage_outbound
 
 COMPOSED_ACTIONS: set[str] = {
-    "greet", "ask_field", "lookup_faq", "ask_clarification",
-    "quote", "explain_payment_options", "close",
+    "greet",
+    "ask_field",
+    "lookup_faq",
+    "ask_clarification",
+    "quote",
+    "explain_payment_options",
+    "close",
 }
 
 SKIP_ACTIONS: set[str] = {
-    "escalate_to_human", "schedule_followup", "book_appointment", "search_catalog",
+    "escalate_to_human",
+    "schedule_followup",
+    "book_appointment",
+    "search_catalog",
 }
 
 

@@ -12,6 +12,7 @@ Phase 3c.2 — T24:
 Existing rows get NULL — the dashboard already tolerates that path
 (legacy handoffs were reason-only).
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

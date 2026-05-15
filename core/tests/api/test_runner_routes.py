@@ -46,23 +46,35 @@ def setup_tenant_and_pipeline():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name) VALUES ('test_t38_api') RETURNING id")
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text("INSERT INTO tenants (name) VALUES ('test_t38_api') RETURNING id")
+                )
+            ).scalar()
             await conn.execute(
-                text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                     "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+                text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                    "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+                ),
                 {"t": tid, "d": json.dumps(pipeline_def)},
             )
-            cid = (await conn.execute(
-                text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550038') RETURNING id"),
-                {"t": tid},
-            )).scalar()
-            conv_id = (await conn.execute(
-                text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-                     "VALUES (:t, :c, 'qualify') RETURNING id"),
-                {"t": tid, "c": cid},
-            )).scalar()
+            cid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550038') RETURNING id"
+                    ),
+                    {"t": tid},
+                )
+            ).scalar()
+            conv_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                        "VALUES (:t, :c, 'qualify') RETURNING id"
+                    ),
+                    {"t": tid, "c": cid},
+                )
+            ).scalar()
             await conn.execute(
                 text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
                 {"c": conv_id},

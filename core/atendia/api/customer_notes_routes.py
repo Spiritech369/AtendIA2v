@@ -3,6 +3,7 @@
 Operator notes attached to a customer. Tenant-scoped, author-tracked.
 Mounted at /api/v1/customers/{customer_id}/notes in main.py.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

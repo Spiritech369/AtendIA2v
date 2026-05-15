@@ -6,6 +6,7 @@
 * `client_operator` / `client_superadmin` — TestClient already logged in as
   the corresponding role; cookies are populated after the login() call.
 """
+
 from __future__ import annotations
 
 import asyncio

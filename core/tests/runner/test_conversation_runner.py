@@ -45,24 +45,36 @@ PIPELINE_QUALIFY_QUOTE = {
 
 
 async def _seed_tenant_with_pipeline(db_session, tenant_name: str) -> tuple:
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-        {"n": tenant_name},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+            {"n": tenant_name},
+        )
+    ).scalar()
     await db_session.execute(
-        text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-             "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+        text(
+            "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+            "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+        ),
         {"t": tid, "d": json.dumps(PIPELINE_QUALIFY_QUOTE)},
     )
-    cid = (await db_session.execute(
-        text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550037') RETURNING id"),
-        {"t": tid},
-    )).scalar()
-    conv_id = (await db_session.execute(
-        text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-             "VALUES (:t, :c, 'qualify') RETURNING id"),
-        {"t": tid, "c": cid},
-    )).scalar()
+    cid = (
+        await db_session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550037') RETURNING id"
+            ),
+            {"t": tid},
+        )
+    ).scalar()
+    conv_id = (
+        await db_session.execute(
+            text(
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, 'qualify') RETURNING id"
+            ),
+            {"t": tid, "c": cid},
+        )
+    ).scalar()
     await db_session.execute(
         text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
         {"c": conv_id},
@@ -92,7 +104,10 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     # Turn 1: client gives info → fields extracted, stays in qualify
     inbound1 = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     trace1 = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound1, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound1,
+        turn_number=1,
     )
     await db_session.commit()
     assert trace1.state_after["current_stage"] == "qualify"
@@ -101,33 +116,42 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     # Turn 2: client asks price → fields complete + intent ask_price → transitions to quote
     inbound2 = _make_inbound(conv_id, tid, "cuánto cuesta?")
     trace2 = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound2, turn_number=2,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound2,
+        turn_number=2,
     )
     await db_session.commit()
     assert trace2.state_after["current_stage"] == "quote"
     assert trace2.stage_transition == "qualify->quote"
 
     # Verify events table has stage_exited + stage_entered
-    rows = (await db_session.execute(
-        text("SELECT type FROM events WHERE conversation_id = :c ORDER BY occurred_at"),
-        {"c": conv_id},
-    )).fetchall()
+    rows = (
+        await db_session.execute(
+            text("SELECT type FROM events WHERE conversation_id = :c ORDER BY occurred_at"),
+            {"c": conv_id},
+        )
+    ).fetchall()
     types = [r[0] for r in rows]
     assert "stage_exited" in types
     assert "stage_entered" in types
 
     # Verify conversation_state row reflects the final stage
-    final_stage = (await db_session.execute(
-        text("SELECT current_stage FROM conversations WHERE id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    final_stage = (
+        await db_session.execute(
+            text("SELECT current_stage FROM conversations WHERE id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert final_stage == "quote"
 
     # Verify turn_traces has 2 rows
-    trace_count = (await db_session.execute(
-        text("SELECT COUNT(*) FROM turn_traces WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    trace_count = (
+        await db_session.execute(
+            text("SELECT COUNT(*) FROM turn_traces WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert trace_count == 2
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -188,7 +212,9 @@ class _RecordingComposer:
         self.call_count: int = 0
 
     async def compose(
-        self, *, input: ComposerInput,
+        self,
+        *,
+        input: ComposerInput,
     ) -> tuple[ComposerOutput, UsageMetadata | None]:
         self.last_input = input
         self.call_count += 1
@@ -210,21 +236,29 @@ async def test_total_cost_accumulates_across_turns(db_session):
     # Turn 1
     inbound1 = _make_inbound(conv_id, tid, "hola")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound1, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound1,
+        turn_number=1,
     )
     await db_session.commit()
 
     # Turn 2
     inbound2 = _make_inbound(conv_id, tid, "qué tal")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound2, turn_number=2,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound2,
+        turn_number=2,
     )
     await db_session.commit()
 
-    total = (await db_session.execute(
-        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    total = (
+        await db_session.execute(
+            text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert total == Decimal("0.000100")
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -241,14 +275,19 @@ async def test_total_cost_not_modified_when_usage_is_none(db_session):
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
-    total = (await db_session.execute(
-        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    total = (
+        await db_session.execute(
+            text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert total == Decimal("0")
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -283,7 +322,10 @@ async def test_runner_loads_tone_from_tenant_branding(db_session):
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
@@ -315,7 +357,10 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     trace = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
@@ -334,10 +379,12 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
     assert "interes_producto" in composer.last_input.extracted_data
 
     # No human handoff was created.
-    handoff_count = (await db_session.execute(
-        text("SELECT COUNT(*) FROM human_handoffs WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    handoff_count = (
+        await db_session.execute(
+            text("SELECT COUNT(*) FROM human_handoffs WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert handoff_count == 0
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -366,7 +413,10 @@ async def test_runner_24h_handoff_creates_row_no_compose(db_session):
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     trace = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
@@ -378,25 +428,26 @@ async def test_runner_24h_handoff_creates_row_no_compose(db_session):
     assert trace.outbound_messages is None
 
     # human_handoffs row created with reason='outside_24h_window'.
-    rows = (await db_session.execute(
-        text(
-            "SELECT reason, status FROM human_handoffs "
-            "WHERE conversation_id = :c"
-        ),
-        {"c": conv_id},
-    )).fetchall()
+    rows = (
+        await db_session.execute(
+            text("SELECT reason, status FROM human_handoffs WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == "outside_24h_window"
     assert rows[0][1] == "pending"
 
     # HUMAN_HANDOFF_REQUESTED event emitted.
-    event_payload = (await db_session.execute(
-        text(
-            "SELECT payload FROM events "
-            "WHERE conversation_id = :c AND type = 'human_handoff_requested'"
-        ),
-        {"c": conv_id},
-    )).scalar()
+    event_payload = (
+        await db_session.execute(
+            text(
+                "SELECT payload FROM events "
+                "WHERE conversation_id = :c AND type = 'human_handoff_requested'"
+            ),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert event_payload is not None
     assert event_payload["reason"] == "outside_24h_window"
 
@@ -426,30 +477,34 @@ async def test_runner_composer_fallback_creates_handoff(db_session):
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
-    rows = (await db_session.execute(
-        text(
-            "SELECT reason, status FROM human_handoffs "
-            "WHERE conversation_id = :c"
-        ),
-        {"c": conv_id},
-    )).fetchall()
+    rows = (
+        await db_session.execute(
+            text("SELECT reason, status FROM human_handoffs WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == "composer_failed"
     assert rows[0][1] == "pending"
 
     # ERROR_OCCURRED event should have payload {"where":"composer", "fallback":"canned"}.
-    event_payload = (await db_session.execute(
-        text(
-            "SELECT payload FROM events "
-            "WHERE conversation_id = :c AND type = 'error_occurred' "
-            "ORDER BY occurred_at DESC LIMIT 1"
-        ),
-        {"c": conv_id},
-    )).scalar()
+    event_payload = (
+        await db_session.execute(
+            text(
+                "SELECT payload FROM events "
+                "WHERE conversation_id = :c AND type = 'error_occurred' "
+                "ORDER BY occurred_at DESC LIMIT 1"
+            ),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert event_payload is not None
     assert event_payload["where"] == "composer"
     assert event_payload["fallback"] == "canned"
@@ -479,14 +534,19 @@ async def test_runner_total_cost_includes_composer(db_session):
 
     inbound = _make_inbound(conv_id, tid, "hola")
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
-    total = (await db_session.execute(
-        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    total = (
+        await db_session.execute(
+            text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     # 0.000050 (nlu) + 0.000300 (composer) = 0.000350
     assert total == Decimal("0.000350")
 
@@ -498,9 +558,11 @@ async def test_runner_total_cost_includes_composer(db_session):
 # Phase 3c.2 — Parallel NLU + Vision integration (T20)
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_runner_runs_vision_in_parallel_when_image_attached(
-    db_session, monkeypatch,
+    db_session,
+    monkeypatch,
 ):
     """Image attachment with resolved URL + openai_api_key → Vision fires.
 
@@ -517,45 +579,64 @@ async def test_runner_runs_vision_in_parallel_when_image_attached(
     from atendia.contracts.message import Attachment
 
     tid, cid, conv_id = await _seed_tenant_with_pipeline(
-        db_session, "test_t20_vision_parallel",
+        db_session,
+        "test_t20_vision_parallel",
     )
     monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-vision")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
-    vision_payload = _json.dumps({
-        "category": "ine",
-        "confidence": 0.92,
-        "metadata": {
-            "ambos_lados": True, "legible": True,
-            "fecha_iso": None, "institucion": None,
-            "modelo": None, "notas": None,
-        },
-    })
+    vision_payload = _json.dumps(
+        {
+            "category": "ine",
+            "confidence": 0.92,
+            "metadata": {
+                "ambos_lados": True,
+                "legible": True,
+                "fecha_iso": None,
+                "institucion": None,
+                "modelo": None,
+                "notas": None,
+            },
+        }
+    )
     with respx.mock(assert_all_called=True) as router:
         router.post("https://api.openai.com/v1/chat/completions").mock(
-            return_value=Response(200, json={
-                "id": "chatcmpl-vision",
-                "choices": [{
-                    "message": {"role": "assistant", "content": vision_payload},
-                    "finish_reason": "stop",
-                }],
-                "usage": {"prompt_tokens": 1500, "completion_tokens": 80,
-                          "total_tokens": 1580},
-            }),
+            return_value=Response(
+                200,
+                json={
+                    "id": "chatcmpl-vision",
+                    "choices": [
+                        {
+                            "message": {"role": "assistant", "content": vision_payload},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 1500, "completion_tokens": 80, "total_tokens": 1580},
+                },
+            ),
         )
 
         runner = ConversationRunner(
-            db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+            db_session,
+            _FakeNLUWithCost(Decimal("0.000050")),
+            CannedComposer(),
         )
 
         inbound = _make_inbound(conv_id, tid, "aquí va mi INE")
-        inbound.attachments = [Attachment(
-            media_id="MEDIA_X", mime_type="image/jpeg",
-            url="https://lookaside.fbsbx.com/test_ine",
-        )]
+        inbound.attachments = [
+            Attachment(
+                media_id="MEDIA_X",
+                mime_type="image/jpeg",
+                url="https://lookaside.fbsbx.com/test_ine",
+            )
+        ]
         trace = await runner.run_turn(
-            conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+            conversation_id=conv_id,
+            tenant_id=tid,
+            inbound=inbound,
+            turn_number=1,
         )
         await db_session.commit()
 
@@ -564,10 +645,12 @@ async def test_runner_runs_vision_in_parallel_when_image_attached(
     assert trace.vision_latency_ms is not None
     assert trace.vision_latency_ms >= 0
 
-    total = (await db_session.execute(
-        text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    total = (
+        await db_session.execute(
+            text("SELECT total_cost_usd FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert total > Decimal("0.000050")  # NLU 0.000050 + non-zero Vision
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -579,18 +662,25 @@ async def test_runner_runs_vision_in_parallel_when_image_attached(
 async def test_runner_skips_vision_when_no_image_attachment(db_session, monkeypatch):
     """Text-only inbound: NLU runs, Vision does NOT — trace has no vision data."""
     tid, cid, conv_id = await _seed_tenant_with_pipeline(
-        db_session, "test_t20_no_vision",
+        db_session,
+        "test_t20_no_vision",
     )
     monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-no-vision")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
     )
     inbound = _make_inbound(conv_id, tid, "hola")
     trace = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
@@ -604,7 +694,8 @@ async def test_runner_skips_vision_when_no_image_attachment(db_session, monkeypa
 
 @pytest.mark.asyncio
 async def test_runner_persists_flow_mode_and_loads_brand_facts(
-    db_session, monkeypatch,
+    db_session,
+    monkeypatch,
 ):
     """T21 — flow_mode lands on TurnTrace, brand_facts reaches ComposerInput.
 
@@ -613,30 +704,42 @@ async def test_runner_persists_flow_mode_and_loads_brand_facts(
     from tenant_branding.default_messages JSONB.
     """
     tid, cid, conv_id = await _seed_tenant_with_pipeline(
-        db_session, "test_t21_flow_mode_persist",
+        db_session,
+        "test_t21_flow_mode_persist",
     )
     # Seed brand_facts the way T23 will eventually populate them.
     await db_session.execute(
-        text("INSERT INTO tenant_branding (tenant_id, bot_name, voice, default_messages) "
-             "VALUES (:t, 'Dinamo', :v\\:\\:jsonb, :d\\:\\:jsonb)"),
+        text(
+            "INSERT INTO tenant_branding (tenant_id, bot_name, voice, default_messages) "
+            "VALUES (:t, 'Dinamo', :v\\:\\:jsonb, :d\\:\\:jsonb)"
+        ),
         {
             "t": tid,
             "v": json.dumps({"register": "informal_mexicano"}),
-            "d": json.dumps({"brand_facts": {
-                "address": "Benito Juárez 801",
-                "human_agent_name": "Francisco",
-            }}),
+            "d": json.dumps(
+                {
+                    "brand_facts": {
+                        "address": "Benito Juárez 801",
+                        "human_agent_name": "Francisco",
+                    }
+                }
+            ),
         },
     )
     await db_session.commit()
 
     composer = _RecordingComposer()
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), composer,
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        composer,
     )
     inbound = _make_inbound(conv_id, tid, "hola")
     trace = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
     )
     await db_session.commit()
 
@@ -666,31 +769,45 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
     pipeline_with_rules = {
         **PIPELINE_QUALIFY_QUOTE,
         "flow_mode_rules": [
-            {"id": "retain_on_gracias", "trigger": {
-                "type": "keyword_in_text", "list": ["gracias"]},
-                "mode": "RETENTION"},
+            {
+                "id": "retain_on_gracias",
+                "trigger": {"type": "keyword_in_text", "list": ["gracias"]},
+                "mode": "RETENTION",
+            },
             {"id": "always_support", "trigger": {"type": "always"}, "mode": "SUPPORT"},
         ],
     }
-    tid = (await db_session.execute(
-        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
-        {"n": "test_t21_authored_rules"},
-    )).scalar()
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+            {"n": "test_t21_authored_rules"},
+        )
+    ).scalar()
     await db_session.execute(
-        text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-             "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+        text(
+            "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+            "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+        ),
         {"t": tid, "d": json.dumps(pipeline_with_rules)},
     )
-    cid = (await db_session.execute(
-        text("INSERT INTO customers (tenant_id, phone_e164) "
-             "VALUES (:t, '+5215555550037') RETURNING id"),
-        {"t": tid},
-    )).scalar()
-    conv_id = (await db_session.execute(
-        text("INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-             "VALUES (:t, :c, 'qualify') RETURNING id"),
-        {"t": tid, "c": cid},
-    )).scalar()
+    cid = (
+        await db_session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) "
+                "VALUES (:t, '+5215555550037') RETURNING id"
+            ),
+            {"t": tid},
+        )
+    ).scalar()
+    conv_id = (
+        await db_session.execute(
+            text(
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, 'qualify') RETURNING id"
+            ),
+            {"t": tid, "c": cid},
+        )
+    ).scalar()
     await db_session.execute(
         text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
         {"c": conv_id},
@@ -698,10 +815,13 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
     await db_session.commit()
 
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
     )
     trace = await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid,
+        conversation_id=conv_id,
+        tenant_id=tid,
         inbound=_make_inbound(conv_id, tid, "muchas gracias por la info"),
         turn_number=1,
     )
@@ -717,8 +837,11 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
 # Phase 3c.2 — pending_confirmation binary handling (T22)
 # ============================================================================
 
+
 async def _seed_pending_confirmation(
-    db_session, tenant_name: str, pending_key: str,
+    db_session,
+    tenant_name: str,
+    pending_key: str,
 ) -> tuple:
     """Seed a tenant + conversation whose state already has the slot set.
 
@@ -727,8 +850,9 @@ async def _seed_pending_confirmation(
     """
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, tenant_name)
     await db_session.execute(
-        text("UPDATE conversation_state SET pending_confirmation = :pc "
-             "WHERE conversation_id = :cid"),
+        text(
+            "UPDATE conversation_state SET pending_confirmation = :pc WHERE conversation_id = :cid"
+        ),
         {"pc": pending_key, "cid": conv_id},
     )
     await db_session.commit()
@@ -739,22 +863,32 @@ async def _seed_pending_confirmation(
 async def test_pending_confirmation_si_assigns_tipo_credito(db_session):
     """User replies 'sí' to is_nomina_tarjeta → fields written, pc cleared."""
     tid, cid, conv_id = await _seed_pending_confirmation(
-        db_session, "test_t22_si_nomina", "is_nomina_tarjeta",
+        db_session,
+        "test_t22_si_nomina",
+        "is_nomina_tarjeta",
     )
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
     )
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid,
-        inbound=_make_inbound(conv_id, tid, "sí"), turn_number=2,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "sí"),
+        turn_number=2,
     )
     await db_session.commit()
 
-    state = (await db_session.execute(
-        text("SELECT extracted_data, pending_confirmation FROM conversation_state "
-             "WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).fetchone()
+    state = (
+        await db_session.execute(
+            text(
+                "SELECT extracted_data, pending_confirmation FROM conversation_state "
+                "WHERE conversation_id = :c"
+            ),
+            {"c": conv_id},
+        )
+    ).fetchone()
     extracted, pc = state
     assert pc is None
     assert extracted["tipo_credito"]["value"] == "Nómina Tarjeta"
@@ -774,22 +908,32 @@ async def test_pending_confirmation_no_to_negocio_sat_assigns_sin_comprobantes(
     leave state alone for the LLM to re-prompt).
     """
     tid, cid, conv_id = await _seed_pending_confirmation(
-        db_session, "test_t22_no_negocio", "is_negocio_sat",
+        db_session,
+        "test_t22_no_negocio",
+        "is_negocio_sat",
     )
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
     )
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid,
-        inbound=_make_inbound(conv_id, tid, "nel"), turn_number=2,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "nel"),
+        turn_number=2,
     )
     await db_session.commit()
 
-    state = (await db_session.execute(
-        text("SELECT extracted_data, pending_confirmation FROM conversation_state "
-             "WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).fetchone()
+    state = (
+        await db_session.execute(
+            text(
+                "SELECT extracted_data, pending_confirmation FROM conversation_state "
+                "WHERE conversation_id = :c"
+            ),
+            {"c": conv_id},
+        )
+    ).fetchone()
     extracted, pc = state
     assert pc is None
     assert extracted["tipo_credito"]["value"] == "Sin Comprobantes"
@@ -807,23 +951,29 @@ async def test_pending_confirmation_ambiguous_reply_does_not_clear(db_session):
     multi-word) so the binary handler punts and the slot is preserved.
     """
     tid, cid, conv_id = await _seed_pending_confirmation(
-        db_session, "test_t22_ambiguous", "is_nomina_tarjeta",
+        db_session,
+        "test_t22_ambiguous",
+        "is_nomina_tarjeta",
     )
     runner = ConversationRunner(
-        db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
     )
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid,
+        conversation_id=conv_id,
+        tenant_id=tid,
         inbound=_make_inbound(conv_id, tid, "sí pero también algo más"),
         turn_number=2,
     )
     await db_session.commit()
 
-    pc = (await db_session.execute(
-        text("SELECT pending_confirmation FROM conversation_state "
-             "WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    pc = (
+        await db_session.execute(
+            text("SELECT pending_confirmation FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert pc == "is_nomina_tarjeta"
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -846,7 +996,8 @@ async def test_composer_pending_confirmation_set_persists(db_session):
             )
 
     tid, cid, conv_id = await _seed_tenant_with_pipeline(
-        db_session, "test_t22_composer_set",
+        db_session,
+        "test_t22_composer_set",
     )
     runner = ConversationRunner(
         db_session,
@@ -854,16 +1005,19 @@ async def test_composer_pending_confirmation_set_persists(db_session):
         _ComposerThatRaisesBinary(),
     )
     await runner.run_turn(
-        conversation_id=conv_id, tenant_id=tid,
-        inbound=_make_inbound(conv_id, tid, "deposito"), turn_number=1,
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "deposito"),
+        turn_number=1,
     )
     await db_session.commit()
 
-    pc = (await db_session.execute(
-        text("SELECT pending_confirmation FROM conversation_state "
-             "WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    pc = (
+        await db_session.execute(
+            text("SELECT pending_confirmation FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
     assert pc == "is_nomina_recibos"
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
@@ -879,10 +1033,12 @@ async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypa
     from atendia.contracts.message import Attachment
 
     tid, cid, conv_id = await _seed_tenant_with_pipeline(
-        db_session, "test_t20_vision_failure",
+        db_session,
+        "test_t20_vision_failure",
     )
     monkeypatch.setenv("ATENDIA_V2_OPENAI_API_KEY", "sk-test-vision-fail")
     from atendia.config import get_settings
+
     get_settings.cache_clear()
 
     with respx.mock:
@@ -891,26 +1047,37 @@ async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypa
         )
 
         runner = ConversationRunner(
-            db_session, _FakeNLUWithCost(Decimal("0.000050")), CannedComposer(),
+            db_session,
+            _FakeNLUWithCost(Decimal("0.000050")),
+            CannedComposer(),
         )
         inbound = _make_inbound(conv_id, tid, "aquí va")
-        inbound.attachments = [Attachment(
-            media_id="MEDIA_FAIL", mime_type="image/jpeg",
-            url="https://lookaside.fbsbx.com/will_500",
-        )]
+        inbound.attachments = [
+            Attachment(
+                media_id="MEDIA_FAIL",
+                mime_type="image/jpeg",
+                url="https://lookaside.fbsbx.com/will_500",
+            )
+        ]
         trace = await runner.run_turn(
-            conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1,
+            conversation_id=conv_id,
+            tenant_id=tid,
+            inbound=inbound,
+            turn_number=1,
         )
         await db_session.commit()
 
     assert trace.nlu_cost_usd == Decimal("0.000050")
     assert trace.vision_cost_usd is None
 
-    err_rows = (await db_session.execute(
-        text("SELECT payload FROM events "
-             "WHERE conversation_id = :c AND type = 'error_occurred'"),
-        {"c": conv_id},
-    )).fetchall()
+    err_rows = (
+        await db_session.execute(
+            text(
+                "SELECT payload FROM events WHERE conversation_id = :c AND type = 'error_occurred'"
+            ),
+            {"c": conv_id},
+        )
+    ).fetchall()
     payloads = [r[0] for r in err_rows]
     assert any(p.get("where") == "vision" for p in payloads)
 

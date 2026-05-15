@@ -7,6 +7,7 @@ for any tenant that wasn't `is_demo=True`.
 Now those tenants receive EmptyXxxProvider which returns [] / None /
 noop responses, keeping the UI usable.
 """
+
 from __future__ import annotations
 
 import asyncio

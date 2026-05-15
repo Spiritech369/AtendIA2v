@@ -13,6 +13,7 @@ Implements design §6's decision tree:
     - top ≥ 0.70, with risks              → medium / clarify
     - else                                → low    / escalate
 """
+
 from __future__ import annotations
 
 from typing import Literal, Protocol
@@ -131,7 +132,9 @@ async def synthesize(
     # Mock provider's ``raw_response={"mock": True}`` is the signal we use
     # to surface mode=mock in the UI without a separate flag on every call.
     mode: Mode = (
-        "mock" if isinstance(output.raw_response, dict) and output.raw_response.get("mock") else "llm"
+        "mock"
+        if isinstance(output.raw_response, dict) and output.raw_response.get("mock")
+        else "llm"
     )
 
     return AnswerResult(

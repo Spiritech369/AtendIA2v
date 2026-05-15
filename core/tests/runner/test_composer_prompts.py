@@ -7,6 +7,7 @@ Two layers:
     (this file's second half). Regenerate fixtures via
     ``scripts/regen_mode_fixtures.py`` when prompts intentionally change.
 """
+
 from pathlib import Path
 
 import pytest
@@ -28,12 +29,22 @@ _FIXTURES = Path(__file__).parent.parent / "fixtures" / "composer"
 # Template / constant invariants
 # ============================================================
 
+
 def test_system_prompt_has_required_placeholders() -> None:
     for ph in [
-        "{{bot_name}}", "{{register}}", "{{use_emojis}}", "{{max_words}}",
-        "{{forbidden_phrases}}", "{{signature_phrases}}",
-        "{{turn_number}}", "{{stage}}", "{{last_intent}}", "{{extracted_data}}",
-        "{{action_payload}}", "{{brand_facts_block}}", "{{mode_guidance}}",
+        "{{bot_name}}",
+        "{{register}}",
+        "{{use_emojis}}",
+        "{{max_words}}",
+        "{{forbidden_phrases}}",
+        "{{signature_phrases}}",
+        "{{turn_number}}",
+        "{{stage}}",
+        "{{last_intent}}",
+        "{{extracted_data}}",
+        "{{action_payload}}",
+        "{{brand_facts_block}}",
+        "{{mode_guidance}}",
         "{{output_instructions}}",
     ]:
         assert ph in SYSTEM_PROMPT_TEMPLATE
@@ -69,13 +80,17 @@ def test_output_instructions_mentions_messages_format() -> None:
 # build_composer_prompt — structural
 # ============================================================
 
+
 def test_build_composer_prompt_basic_structure() -> None:
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.RETENTION,
-        current_stage="sales",
-        tone=Tone(bot_name="Dinamo", register="informal_mexicano"),
-        history=[("inbound", "hola"), ("outbound", "qué onda")],
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            tone=Tone(bot_name="Dinamo", register="informal_mexicano"),
+            history=[("inbound", "hola"), ("outbound", "qué onda")],
+        )
+    )
     assert msgs[0]["role"] == "system"
     assert "Dinamo" in msgs[0]["content"]
     assert "informal_mexicano" in msgs[0]["content"]
@@ -86,29 +101,41 @@ def test_build_composer_prompt_basic_structure() -> None:
 
 
 def test_build_composer_prompt_renders_turn_number() -> None:
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.RETENTION,
-        current_stage="sales", turn_number=7, tone=Tone(),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            turn_number=7,
+            tone=Tone(),
+        )
+    )
     assert "Turno actual: 7" in msgs[0]["content"]
 
 
 def test_build_composer_prompt_no_history_no_user_message() -> None:
     """Composer prompt does NOT append a user message at the end."""
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.RETENTION,
-        current_stage="sales", tone=Tone(),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            tone=Tone(),
+        )
+    )
     assert len(msgs) == 1
     assert msgs[0]["role"] == "system"
 
 
 def test_build_composer_prompt_renders_forbidden_phrases() -> None:
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.RETENTION,
-        current_stage="sales",
-        tone=Tone(forbidden_phrases=["estimado cliente"]),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            tone=Tone(forbidden_phrases=["estimado cliente"]),
+        )
+    )
     assert "estimado cliente" in msgs[0]["content"]
 
 
@@ -116,27 +143,36 @@ def test_build_composer_prompt_renders_forbidden_phrases() -> None:
 # build_composer_prompt — mode dispatch
 # ============================================================
 
+
 def test_dispatch_picks_mode_specific_block() -> None:
     """SALES mode → SALES guidance, not PLAN guidance.
 
     Uses markers that are unique to each mode's body (not cross-references —
     PLAN's prompt mentions "SALES MODE" inside its prohibido section).
     """
-    sales_msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.SALES,
-        current_stage="sales",
-        action_payload={"status": "ok", "name": "Adventure",
-                        "price_contado_mxn": "29900"},
-        brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil"},
-        tone=Tone(),
-    ))
-    plan_msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.PLAN,
-        current_stage="plan",
-        brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil",
-                     "post_completion_form": "https://y"},
-        tone=Tone(),
-    ))
+    sales_msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            action_payload={"status": "ok", "name": "Adventure", "price_contado_mxn": "29900"},
+            brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil"},
+            tone=Tone(),
+        )
+    )
+    plan_msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            brand_facts={
+                "catalog_url": "https://x",
+                "buro_max_amount": "$50 mil",
+                "post_completion_form": "https://y",
+            },
+            tone=Tone(),
+        )
+    )
     # SALES has the price reasoning + objection handling; PLAN does not.
     assert "Puedes liquidar antes sin penalización" in sales_msgs[0]["content"]
     assert "Puedes liquidar antes sin penalización" not in plan_msgs[0]["content"]
@@ -147,28 +183,34 @@ def test_dispatch_picks_mode_specific_block() -> None:
 
 def test_brand_facts_block_omitted_for_retention() -> None:
     """RETENTION + OBSTACLE skip brand_facts injection (token-bloat avoidance)."""
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.RETENTION,
-        current_stage="sales",
-        brand_facts={"catalog_url": "https://x"},
-        tone=Tone(),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            brand_facts={"catalog_url": "https://x"},
+            tone=Tone(),
+        )
+    )
     assert "Brand facts" not in msgs[0]["content"]
 
 
 def test_brand_facts_block_present_for_support() -> None:
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.SUPPORT,
-        current_stage="plan",
-        brand_facts={
-            "address": "Benito Juárez 801",
-            "human_agent_name": "Francisco",
-            "buro_max_amount": "$50 mil",
-            "approval_time_hours": "24",
-            "delivery_time_days": "3-7",
-        },
-        tone=Tone(),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.SUPPORT,
+            current_stage="plan",
+            brand_facts={
+                "address": "Benito Juárez 801",
+                "human_agent_name": "Francisco",
+                "buro_max_amount": "$50 mil",
+                "approval_time_hours": "24",
+                "delivery_time_days": "3-7",
+            },
+            tone=Tone(),
+        )
+    )
     assert "Brand facts" in msgs[0]["content"]
     assert "Benito Juárez 801" in msgs[0]["content"]
     # Sorted keys → address comes before human_agent_name
@@ -179,10 +221,12 @@ def test_brand_facts_block_present_for_support() -> None:
 # brand_facts pre-pass
 # ============================================================
 
+
 def test_resolve_brand_facts_substitutes_dotted_refs() -> None:
     block = "Catálogo: {{brand_facts.catalog_url}} y dirección: {{brand_facts.address}}"
     out = _resolve_brand_facts_in_block(
-        block, {"catalog_url": "https://x", "address": "Calle 1"},
+        block,
+        {"catalog_url": "https://x", "address": "Calle 1"},
     )
     assert out == "Catálogo: https://x y dirección: Calle 1"
 
@@ -210,16 +254,19 @@ def test_resolve_brand_facts_leaves_non_dotted_refs_alone() -> None:
 
 def test_build_composer_prompt_substitutes_brand_facts_in_sales() -> None:
     """SALES mode_block has {{brand_facts.catalog_url}} — must be resolved."""
-    msgs = build_composer_prompt(ComposerInput(
-        action="unused", flow_mode=FlowMode.SALES,
-        current_stage="sales",
-        action_payload={"status": "no_data"},
-        brand_facts={
-            "catalog_url": "https://example.com/cat",
-            "buro_max_amount": "$50 mil",
-        },
-        tone=Tone(),
-    ))
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            action_payload={"status": "no_data"},
+            brand_facts={
+                "catalog_url": "https://example.com/cat",
+                "buro_max_amount": "$50 mil",
+            },
+            tone=Tone(),
+        )
+    )
     assert "https://example.com/cat" in msgs[0]["content"]
     assert "{{brand_facts.catalog_url}}" not in msgs[0]["content"]
 
@@ -231,8 +278,10 @@ def test_build_composer_prompt_substitutes_brand_facts_in_sales() -> None:
 #   PYTHONIOENCODING=utf-8 PYTHONPATH=. uv run python scripts/regen_mode_fixtures.py
 # ============================================================
 _DINAMO_TONE = Tone(
-    register="informal_mexicano", use_emojis="sparingly",
-    max_words_per_message=40, bot_name="Dinamo",
+    register="informal_mexicano",
+    use_emojis="sparingly",
+    max_words_per_message=40,
+    bot_name="Dinamo",
     forbidden_phrases=["estimado cliente", "le saluda atentamente"],
     signature_phrases=["¡qué onda!", "te paso"],
 )
@@ -247,132 +296,223 @@ _BRAND = {
 }
 
 _SNAPSHOT_CASES: list[tuple[str, dict]] = [
-    ("mode_PLAN_state_initial", dict(
-        action="micro_cotizacion", flow_mode=FlowMode.PLAN,
-        current_stage="plan", turn_number=1,
-        extracted_data={}, tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_PLAN_state_antiguedad_set", dict(
-        action="ask_tipo_credito", flow_mode=FlowMode.PLAN,
-        current_stage="plan", turn_number=2,
-        extracted_data={"antigüedad_meses": "24"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_PLAN_state_plan_assigned", dict(
-        action="ask_doc_ine", flow_mode=FlowMode.PLAN,
-        current_stage="plan", turn_number=4,
-        extracted_data={
-            "antigüedad_meses": "24",
-            "tipo_credito": "Nómina Tarjeta",
-            "plan_credito": "10%",
-        },
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_SALES_state_quote_ok", dict(
-        action="quote", flow_mode=FlowMode.SALES,
-        current_stage="sales", turn_number=5,
-        action_payload={
-            "status": "ok",
-            "sku": "adventure-elite-150-cc",
-            "name": "Adventure Elite 150 CC",
-            "category": "Motoneta",
-            "price_lista_mxn": "31395",
-            "price_contado_mxn": "29900",
-            "planes_credito": {"plan_10": {"enganche": 3140,
-                                            "pago_quincenal": 1247,
-                                            "quincenas": 72}},
-            "ficha_tecnica": {"motor_cc": 150},
-        },
-        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_SALES_state_no_data", dict(
-        action="quote", flow_mode=FlowMode.SALES,
-        current_stage="sales", turn_number=5,
-        action_payload={"status": "no_data",
-                        "hint": "no catalog match for 'lambretta'"},
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_SALES_state_objection_caro", dict(
-        action="quote", flow_mode=FlowMode.SALES,
-        current_stage="sales", turn_number=6,
-        action_payload={"status": "objection", "type": "caro"},
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_DOC_state_match", dict(
-        action="confirm_doc", flow_mode=FlowMode.DOC,
-        current_stage="doc", turn_number=7,
-        action_payload={
-            "vision_result": {"category": "ine", "confidence": 0.95,
-                              "metadata": {"ambos_lados": True, "legible": True}},
-            "expected_doc": "ine",
-            "pending_after": ["comprobante", "estados_de_cuenta", "nomina"],
-        },
-        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_DOC_state_unrelated_image", dict(
-        action="reject_unrelated", flow_mode=FlowMode.DOC,
-        current_stage="doc", turn_number=7,
-        action_payload={
-            "vision_result": {"category": "moto", "confidence": 0.92,
-                              "metadata": {"modelo": "Adventure 150"}},
-            "expected_doc": "ine",
-            "pending_after": [],
-        },
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_DOC_state_papeleria_completa", dict(
-        action="papeleria_completa", flow_mode=FlowMode.DOC,
-        current_stage="doc", turn_number=10,
-        action_payload={
-            "vision_result": {"category": "recibo_nomina", "confidence": 0.93,
-                              "metadata": {"fecha_iso": "2026-04-30"}},
-            "expected_doc": "nomina",
-            "pending_after": [],
-        },
-        extracted_data={
-            "plan_credito": "10%", "modelo_moto": "Adventure",
-            "docs_ine": "true", "docs_comprobante": "true",
-            "docs_estados_de_cuenta": "true",
-        },
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_OBSTACLE_state_initial", dict(
-        action="address_obstacle", flow_mode=FlowMode.OBSTACLE,
-        current_stage="plan", turn_number=8,
-        extracted_data={"plan_credito": "10%"},
-        tone=_DINAMO_TONE, brand_facts={},
-    )),
-    ("mode_RETENTION_state_initial", dict(
-        action="retention_pitch", flow_mode=FlowMode.RETENTION,
-        current_stage="sales", turn_number=6,
-        extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
-        tone=_DINAMO_TONE, brand_facts={},
-    )),
-    ("mode_SUPPORT_state_buro_question", dict(
-        action="explain_topic", flow_mode=FlowMode.SUPPORT,
-        current_stage="plan", turn_number=2,
-        action_payload={"status": "no_data", "hint": "no FAQ match"},
-        extracted_data={},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
-    ("mode_SUPPORT_state_faq_match", dict(
-        action="lookup_faq", flow_mode=FlowMode.SUPPORT,
-        current_stage="plan", turn_number=2,
-        action_payload={
-            "matches": [{
-                "pregunta": "¿Cuál es el tiempo de aprobación?",
-                "respuesta": "24 horas con documentación completa.",
-                "score": 0.93,
-            }],
-        },
-        extracted_data={},
-        tone=_DINAMO_TONE, brand_facts=_BRAND,
-    )),
+    (
+        "mode_PLAN_state_initial",
+        dict(
+            action="micro_cotizacion",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            turn_number=1,
+            extracted_data={},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_PLAN_state_antiguedad_set",
+        dict(
+            action="ask_tipo_credito",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            turn_number=2,
+            extracted_data={"antigüedad_meses": "24"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_PLAN_state_plan_assigned",
+        dict(
+            action="ask_doc_ine",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            turn_number=4,
+            extracted_data={
+                "antigüedad_meses": "24",
+                "tipo_credito": "Nómina Tarjeta",
+                "plan_credito": "10%",
+            },
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_SALES_state_quote_ok",
+        dict(
+            action="quote",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            turn_number=5,
+            action_payload={
+                "status": "ok",
+                "sku": "adventure-elite-150-cc",
+                "name": "Adventure Elite 150 CC",
+                "category": "Motoneta",
+                "price_lista_mxn": "31395",
+                "price_contado_mxn": "29900",
+                "planes_credito": {
+                    "plan_10": {"enganche": 3140, "pago_quincenal": 1247, "quincenas": 72}
+                },
+                "ficha_tecnica": {"motor_cc": 150},
+            },
+            extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_SALES_state_no_data",
+        dict(
+            action="quote",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            turn_number=5,
+            action_payload={"status": "no_data", "hint": "no catalog match for 'lambretta'"},
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_SALES_state_objection_caro",
+        dict(
+            action="quote",
+            flow_mode=FlowMode.SALES,
+            current_stage="sales",
+            turn_number=6,
+            action_payload={"status": "objection", "type": "caro"},
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_DOC_state_match",
+        dict(
+            action="confirm_doc",
+            flow_mode=FlowMode.DOC,
+            current_stage="doc",
+            turn_number=7,
+            action_payload={
+                "vision_result": {
+                    "category": "ine",
+                    "confidence": 0.95,
+                    "metadata": {"ambos_lados": True, "legible": True},
+                },
+                "expected_doc": "ine",
+                "pending_after": ["comprobante", "estados_de_cuenta", "nomina"],
+            },
+            extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_DOC_state_unrelated_image",
+        dict(
+            action="reject_unrelated",
+            flow_mode=FlowMode.DOC,
+            current_stage="doc",
+            turn_number=7,
+            action_payload={
+                "vision_result": {
+                    "category": "moto",
+                    "confidence": 0.92,
+                    "metadata": {"modelo": "Adventure 150"},
+                },
+                "expected_doc": "ine",
+                "pending_after": [],
+            },
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_DOC_state_papeleria_completa",
+        dict(
+            action="papeleria_completa",
+            flow_mode=FlowMode.DOC,
+            current_stage="doc",
+            turn_number=10,
+            action_payload={
+                "vision_result": {
+                    "category": "recibo_nomina",
+                    "confidence": 0.93,
+                    "metadata": {"fecha_iso": "2026-04-30"},
+                },
+                "expected_doc": "nomina",
+                "pending_after": [],
+            },
+            extracted_data={
+                "plan_credito": "10%",
+                "modelo_moto": "Adventure",
+                "docs_ine": "true",
+                "docs_comprobante": "true",
+                "docs_estados_de_cuenta": "true",
+            },
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_OBSTACLE_state_initial",
+        dict(
+            action="address_obstacle",
+            flow_mode=FlowMode.OBSTACLE,
+            current_stage="plan",
+            turn_number=8,
+            extracted_data={"plan_credito": "10%"},
+            tone=_DINAMO_TONE,
+            brand_facts={},
+        ),
+    ),
+    (
+        "mode_RETENTION_state_initial",
+        dict(
+            action="retention_pitch",
+            flow_mode=FlowMode.RETENTION,
+            current_stage="sales",
+            turn_number=6,
+            extracted_data={"plan_credito": "10%", "modelo_moto": "Adventure"},
+            tone=_DINAMO_TONE,
+            brand_facts={},
+        ),
+    ),
+    (
+        "mode_SUPPORT_state_buro_question",
+        dict(
+            action="explain_topic",
+            flow_mode=FlowMode.SUPPORT,
+            current_stage="plan",
+            turn_number=2,
+            action_payload={"status": "no_data", "hint": "no FAQ match"},
+            extracted_data={},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
+    (
+        "mode_SUPPORT_state_faq_match",
+        dict(
+            action="lookup_faq",
+            flow_mode=FlowMode.SUPPORT,
+            current_stage="plan",
+            turn_number=2,
+            action_payload={
+                "matches": [
+                    {
+                        "pregunta": "¿Cuál es el tiempo de aprobación?",
+                        "respuesta": "24 horas con documentación completa.",
+                        "score": 0.93,
+                    }
+                ],
+            },
+            extracted_data={},
+            tone=_DINAMO_TONE,
+            brand_facts=_BRAND,
+        ),
+    ),
 ]
 
 

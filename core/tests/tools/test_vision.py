@@ -2,6 +2,7 @@
 
 Mock-based — live calls happen in T9 (gated by RUN_LIVE_LLM_TESTS).
 """
+
 import json
 from decimal import Decimal
 
@@ -25,27 +26,38 @@ def _ok_vision_response(
     tokens_out: int = 80,
     metadata: dict | None = None,
 ) -> Response:
-    md = metadata if metadata is not None else {
-        "ambos_lados": True, "legible": True,
-        "fecha_iso": None, "institucion": None,
-        "modelo": None, "notas": None,
-    }
-    content = json.dumps({
-        "category": category,
-        "confidence": confidence,
-        "metadata": md,
-    })
+    md = (
+        metadata
+        if metadata is not None
+        else {
+            "ambos_lados": True,
+            "legible": True,
+            "fecha_iso": None,
+            "institucion": None,
+            "modelo": None,
+            "notas": None,
+        }
+    )
+    content = json.dumps(
+        {
+            "category": category,
+            "confidence": confidence,
+            "metadata": md,
+        }
+    )
     return Response(
         200,
         json={
             "id": "chatcmpl-vision",
             "object": "chat.completion",
             "model": "gpt-4o-2024-08-06",
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": content},
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": tokens_in,
                 "completion_tokens": tokens_out,
@@ -62,7 +74,8 @@ async def test_classify_image_returns_vision_result() -> None:
     )
     client = AsyncOpenAI(api_key="sk-test")
     result, tin, tout, _, latency = await classify_image(
-        client=client, image_url="https://example.com/ine.jpg",
+        client=client,
+        image_url="https://example.com/ine.jpg",
     )
     assert result.category == VisionCategory.INE
     assert result.confidence == pytest.approx(0.92)
@@ -79,11 +92,12 @@ async def test_classify_image_cost_calculation() -> None:
     )
     client = AsyncOpenAI(api_key="sk-test")
     _, _, _, cost, _ = await classify_image(
-        client=client, image_url="https://example.com/x.jpg",
+        client=client,
+        image_url="https://example.com/x.jpg",
     )
     expected = (
-        Decimal(1500) * VISION_PRICE_PER_1M_INPUT_TOKENS / Decimal("1000000") +
-        Decimal(80) * VISION_PRICE_PER_1M_OUTPUT_TOKENS / Decimal("1000000")
+        Decimal(1500) * VISION_PRICE_PER_1M_INPUT_TOKENS / Decimal("1000000")
+        + Decimal(80) * VISION_PRICE_PER_1M_OUTPUT_TOKENS / Decimal("1000000")
     ).quantize(Decimal("0.000001"))
     assert cost == expected
 
@@ -96,21 +110,29 @@ async def test_classify_image_unrelated_category() -> None:
     )
     client = AsyncOpenAI(api_key="sk-test")
     result, _, _, _, _ = await classify_image(
-        client=client, image_url="https://example.com/selfie.jpg",
+        client=client,
+        image_url="https://example.com/selfie.jpg",
     )
     assert result.category == VisionCategory.UNRELATED
 
 
 @respx.mock
 async def test_classify_image_metadata_passed_through() -> None:
-    md = {"ambos_lados": True, "legible": True, "fecha_iso": "2025-12-15",
-          "institucion": "CFE", "modelo": None, "notas": "recibo de luz"}
+    md = {
+        "ambos_lados": True,
+        "legible": True,
+        "fecha_iso": "2025-12-15",
+        "institucion": "CFE",
+        "modelo": None,
+        "notas": "recibo de luz",
+    }
     respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=_ok_vision_response(category="comprobante", metadata=md),
     )
     client = AsyncOpenAI(api_key="sk-test")
     result, _, _, _, _ = await classify_image(
-        client=client, image_url="https://example.com/recibo.jpg",
+        client=client,
+        image_url="https://example.com/recibo.jpg",
     )
     assert result.category == VisionCategory.COMPROBANTE
     assert result.metadata["fecha_iso"] == "2025-12-15"

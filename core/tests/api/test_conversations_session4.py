@@ -6,6 +6,7 @@
   array through ``PUT /api/v1/customers/{id}/field-values`` and reads back
   through ``GET /api/v1/conversations/{id}``.
 """
+
 from __future__ import annotations
 
 import asyncio

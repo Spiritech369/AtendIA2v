@@ -20,6 +20,7 @@ Scope:
 * Webhook routes (e.g. Meta inbound) are mounted outside `/api/` so they
   are unaffected.
 """
+
 from __future__ import annotations
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -52,9 +53,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         cookie = request.cookies.get(CSRF_COOKIE)
         header = request.headers.get(CSRF_HEADER)
         if not cookie or not header or not constant_time_compare(cookie, header):
-            return JSONResponse(
-                {"detail": "csrf token missing or invalid"}, status_code=403
-            )
+            return JSONResponse({"detail": "csrf token missing or invalid"}, status_code=403)
         return await call_next(request)
 
 

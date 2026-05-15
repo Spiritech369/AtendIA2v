@@ -51,9 +51,13 @@ def test_eval_confidence(ctx):
 
 def test_eval_invalid_syntax_raises():
     from atendia.state_machine.conditions import ConditionSyntaxError
+
     nlu = NLUResult(
-        intent=Intent.GREETING, entities={}, sentiment=Sentiment.NEUTRAL,
-        confidence=0.9, ambiguities=[],
+        intent=Intent.GREETING,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
     )
     c = EvaluationContext(nlu=nlu, extracted_data={}, required_fields=[], turn_count=0)
     with pytest.raises(ConditionSyntaxError):

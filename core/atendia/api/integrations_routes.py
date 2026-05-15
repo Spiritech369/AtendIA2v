@@ -8,6 +8,7 @@ is out of scope for the v1-parity sprint.
 The plain-text fields (``verify_token``) are restricted to ``tenant_admin``
 roles; operators only see the metadata they need to triage issues.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -63,9 +64,7 @@ async def get_whatsapp_details(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> WhatsAppDetails:
-    row = (
-        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
-    ).scalar_one()
+    row = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
     config = row.config or {}
     meta = config.get("meta", {}) if isinstance(config, dict) else {}
 

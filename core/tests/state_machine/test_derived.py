@@ -4,6 +4,7 @@ funnel_stage() y next_pending_doc() son funciones puras, sin DB.
 Toda la lógica de "dónde está el cliente" se deriva del estado
 extraído — no se persiste por separado.
 """
+
 from atendia.contracts.extracted_fields import (
     ExtractedFields,
     PlanCredito,
@@ -16,13 +17,14 @@ from atendia.state_machine.derived import funnel_stage, next_pending_doc
 _DOCS_PER_PLAN = {
     "Nómina Tarjeta": ["ine", "comprobante", "estados_de_cuenta", "nomina"],
     "Nómina Recibos": ["ine", "comprobante", "nomina"],
-    "Pensionados":    ["ine", "comprobante", "estados_de_cuenta", "imss"],
-    "Negocio SAT":    ["ine", "comprobante", "estados_de_cuenta", "constancia_sat", "factura"],
+    "Pensionados": ["ine", "comprobante", "estados_de_cuenta", "imss"],
+    "Negocio SAT": ["ine", "comprobante", "estados_de_cuenta", "constancia_sat", "factura"],
     "Sin Comprobantes": ["ine", "comprobante"],
 }
 
 
 # ----- funnel_stage --------------------------------------------------
+
 
 def test_funnel_stage_plan_when_no_plan_credito() -> None:
     """Cliente nuevo sin plan asignado → stage = plan."""
@@ -60,6 +62,7 @@ def test_funnel_stage_orden_de_precedencia_es_top_down() -> None:
 
 
 # ----- next_pending_doc ----------------------------------------------
+
 
 def test_next_pending_doc_none_when_plan_not_assigned() -> None:
     """Sin plan_credito no sabemos qué pedir."""

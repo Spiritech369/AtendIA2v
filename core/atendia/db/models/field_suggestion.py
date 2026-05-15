@@ -43,15 +43,9 @@ class FieldSuggestion(Base):
     suggested_value: Mapped[str] = mapped_column(Text)
     confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3))
     evidence_text: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(
-        String(20), default="pending", server_default="pending"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    decided_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decided_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("tenant_users.id", ondelete="SET NULL"), nullable=True
     )

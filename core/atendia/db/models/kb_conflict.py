@@ -11,7 +11,9 @@ class KbConflict(Base):
     __tablename__ = "kb_conflicts"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     detection_type: Mapped[str] = mapped_column(String(30), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), default="medium", server_default="medium")

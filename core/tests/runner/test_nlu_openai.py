@@ -9,9 +9,16 @@ from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.nlu_openai import OpenAINLU
 
 
-def _ok_response(intent="ask_info", entities=None, confidence=0.9,
-                 sentiment="neutral", ambiguities=None,
-                 model="gpt-4o-mini", tokens_in=480, tokens_out=80):
+def _ok_response(
+    intent="ask_info",
+    entities=None,
+    confidence=0.9,
+    sentiment="neutral",
+    ambiguities=None,
+    model="gpt-4o-mini",
+    tokens_in=480,
+    tokens_out=80,
+):
     payload = {
         "intent": intent,
         "entities": entities or {},
@@ -26,11 +33,13 @@ def _ok_response(intent="ask_info", entities=None, confidence=0.9,
             "object": "chat.completion",
             "created": 0,
             "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": json.dumps(payload)},
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": json.dumps(payload)},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": tokens_in,
                 "completion_tokens": tokens_out,
@@ -232,8 +241,11 @@ async def test_classify_retries_on_503_then_succeeds():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(50,))
     result, usage = await nlu.classify(
-        text="hola", current_stage="greeting",
-        required_fields=[], optional_fields=[], history=[],
+        text="hola",
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert route.call_count == 2
     assert result.intent == Intent.ASK_INFO  # default in _ok_response
@@ -249,8 +261,11 @@ async def test_classify_returns_unclear_when_all_retries_fail():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, usage = await nlu.classify(
-        text="hola", current_stage="greeting",
-        required_fields=[], optional_fields=[], history=[],
+        text="hola",
+        current_stage="greeting",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert result.intent == Intent.UNCLEAR
     assert result.confidence == 0.0
@@ -268,8 +283,11 @@ async def test_classify_retries_on_429_rate_limit():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[], history=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert result.intent == Intent.UNCLEAR
     assert any("RateLimitError" in a for a in result.ambiguities)
@@ -283,8 +301,11 @@ async def test_classify_does_not_retry_on_401():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[], history=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert route.call_count == 1
     assert result.intent == Intent.UNCLEAR
@@ -299,8 +320,11 @@ async def test_classify_does_not_retry_on_400():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[], history=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert route.call_count == 1
     assert any("BadRequestError" in a for a in result.ambiguities)
@@ -313,23 +337,28 @@ async def test_classify_treats_malformed_json_as_validation_error():
     bad = Response(
         200,
         json={
-            "id": "x", "object": "chat.completion", "created": 0,
+            "id": "x",
+            "object": "chat.completion",
+            "created": 0,
             "model": "gpt-4o-mini",
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": '{"intent": "FAKE"}'},
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": '{"intent": "FAKE"}'},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-        }
+        },
     )
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=bad
-    )
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(return_value=bad)
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[], history=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert route.call_count == 1
     assert result.intent == Intent.UNCLEAR
@@ -344,8 +373,11 @@ async def test_classify_does_not_retry_on_422_unprocessable():
     )
     nlu = OpenAINLU(api_key="sk-test", retry_delays_ms=(10, 20))
     result, _ = await nlu.classify(
-        text="x", current_stage="x",
-        required_fields=[], optional_fields=[], history=[],
+        text="x",
+        current_stage="x",
+        required_fields=[],
+        optional_fields=[],
+        history=[],
     )
     assert route.call_count == 1
     assert result.intent == Intent.UNCLEAR

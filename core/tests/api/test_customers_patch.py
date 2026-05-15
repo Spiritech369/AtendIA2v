@@ -1,4 +1,5 @@
 """Step 1 — PATCH /customers/:id: basic info edit with tenant scoping + CSRF."""
+
 from __future__ import annotations
 
 import asyncio
@@ -206,8 +207,7 @@ def test_patch_customer_attrs_replaces_whole_dict(seed):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["attrs"] == {"foo": "99"}, (
-        "Backend replaces the whole attrs dict on PATCH; "
-        "frontend hooks must merge client-side."
+        "Backend replaces the whole attrs dict on PATCH; frontend hooks must merge client-side."
     )
 
     # PATCH with empty attrs → result is empty dict.

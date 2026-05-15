@@ -7,6 +7,7 @@ Re-running is safe — the script checks for existing rows and skips inserts
 if found. The password is NOT updated on re-run; if you forgot it, delete
 the user row manually and re-seed.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -70,14 +71,9 @@ async def main() -> None:
                         "h": hash_password(DEMO_PASSWORD),
                     },
                 )
-                print(
-                    f"[OK] Created operator {DEMO_EMAIL} (password '{DEMO_PASSWORD}')"
-                )
+                print(f"[OK] Created operator {DEMO_EMAIL} (password '{DEMO_PASSWORD}')")
             else:
-                print(
-                    f"[--] User {DEMO_EMAIL} already exists "
-                    f"(id={uid}; password unchanged)"
-                )
+                print(f"[--] User {DEMO_EMAIL} already exists (id={uid}; password unchanged)")
     finally:
         await engine.dispose()
 

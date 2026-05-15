@@ -4,6 +4,7 @@ Revision ID: e133dc8ec51b
 Revises: dafa3c47b0bb
 Create Date: 2026-05-10
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -22,7 +23,9 @@ def upgrade() -> None:
     op.create_table(
         "kb_conflicts",
         sa.Column("id", sa.UUID(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("detection_type", sa.String(30), nullable=False),
         sa.Column("severity", sa.String(20), nullable=False, server_default="medium"),
@@ -38,15 +41,27 @@ def upgrade() -> None:
         sa.Column("resolved_by", sa.UUID()),
         sa.Column("resolved_at", sa.DateTime(timezone=True)),
         sa.Column("resolution_action", sa.String(40)),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
     op.create_index("ix_kb_conflicts_status", "kb_conflicts", ["tenant_id", "status"])
 
     op.create_table(
         "kb_unanswered_questions",
         sa.Column("id", sa.UUID(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("query", sa.Text(), nullable=False),
         sa.Column("query_normalized", sa.Text(), nullable=False),
         sa.Column("agent", sa.String(40)),
@@ -64,8 +79,18 @@ def upgrade() -> None:
         sa.Column("status", sa.String(20), nullable=False, server_default="open"),
         sa.Column("assigned_to", sa.UUID()),
         sa.Column("linked_faq_id", sa.UUID()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("resolved_at", sa.DateTime(timezone=True)),
     )
     op.create_index(

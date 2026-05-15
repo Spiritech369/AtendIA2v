@@ -4,6 +4,7 @@ Tenant-scoped lightweight CRM with operational scoring, risk detection,
 next-best-actions, timeline, documents, messages, CSV import/export and demo
 data for the AtendIA operator dashboard.
 """
+
 from __future__ import annotations
 
 import csv
@@ -409,7 +410,9 @@ def _risk_rank(level: str) -> int:
     return {"low": 1, "medium": 2, "high": 3, "critical": 4}.get(level, 0)
 
 
-def _sla_status(stage: str, last_activity_at: datetime | None, created_at: datetime | None, now: datetime) -> str:
+def _sla_status(
+    stage: str, last_activity_at: datetime | None, created_at: datetime | None, now: datetime
+) -> str:
     hours = _hours_since(last_activity_at or created_at, now)
     limit = SLA_HOURS.get(stage, 8)
     if hours >= limit:
@@ -588,15 +591,21 @@ def _data_quality_score(customer: Customer) -> tuple[int, list[str]]:
     return max(0, min(100, points)), missing
 
 
-def calculate_customer_score(customer: Customer, docs: list[CustomerDocument], now: datetime | None = None) -> CustomerScore:
+def calculate_customer_score(
+    customer: Customer, docs: list[CustomerDocument], now: datetime | None = None
+) -> CustomerScore:
     ref = now or _now()
     attrs = customer.attrs or {}
     intent_score = int(attrs.get("intent_score") or 50)
     hours_idle = _hours_since(customer.last_activity_at or customer.created_at, ref)
-    activity_score = 100 if hours_idle < 2 else 82 if hours_idle < 8 else 55 if hours_idle < 24 else 25
+    activity_score = (
+        100 if hours_idle < 2 else 82 if hours_idle < 8 else 55 if hours_idle < 24 else 25
+    )
     documentation_score, doc_reason = _document_score(docs)
     data_quality_score, missing = _data_quality_score(customer)
-    conversation_engagement_score = int(attrs.get("engagement_score") or (78 if customer.last_activity_at else 35))
+    conversation_engagement_score = int(
+        attrs.get("engagement_score") or (78 if customer.last_activity_at else 35)
+    )
     stage_progress_score = _stage_progress(customer.stage)
     abandonment_risk_score = 0 if hours_idle < 8 else 18 if hours_idle < 24 else 35
     total = int(
@@ -632,7 +641,9 @@ def calculate_customer_score(customer: Customer, docs: list[CustomerDocument], n
     )
 
 
-def detect_customer_risks(customer: Customer, docs: list[CustomerDocument], now: datetime | None = None) -> list[dict]:
+def detect_customer_risks(
+    customer: Customer, docs: list[CustomerDocument], now: datetime | None = None
+) -> list[dict]:
     ref = now or _now()
     risks: list[dict] = []
     hours_idle = _hours_since(customer.last_activity_at or customer.created_at, ref)
@@ -641,87 +652,111 @@ def detect_customer_risks(customer: Customer, docs: list[CustomerDocument], now:
     attrs = customer.attrs or {}
 
     if hours_idle > 8:
-        risks.append({
-            "risk_type": "idle_too_long",
-            "severity": "high" if hours_idle > 24 else "medium",
-            "reason": f"Cliente sin actividad por {hours_idle:.0f} h.",
-            "recommended_action": "Enviar seguimiento con contexto y proxima pregunta clara.",
-        })
+        risks.append(
+            {
+                "risk_type": "idle_too_long",
+                "severity": "high" if hours_idle > 24 else "medium",
+                "reason": f"Cliente sin actividad por {hours_idle:.0f} h.",
+                "recommended_action": "Enviar seguimiento con contexto y proxima pregunta clara.",
+            }
+        )
     if customer.health_score > 80 and hours_idle > 8:
-        risks.append({
-            "risk_type": "high_score_without_followup",
-            "severity": "high",
-            "reason": "Cliente de alto potencial sin seguimiento reciente.",
-            "recommended_action": "Priorizar seguimiento humano hoy.",
-        })
+        risks.append(
+            {
+                "risk_type": "high_score_without_followup",
+                "severity": "high",
+                "reason": "Cliente de alto potencial sin seguimiento reciente.",
+                "recommended_action": "Priorizar seguimiento humano hoy.",
+            }
+        )
     if customer.stage == "negotiation" and not customer.assigned_user_id:
-        risks.append({
-            "risk_type": "negotiation_without_owner",
-            "severity": "critical",
-            "reason": "Negociacion activa sin vendedor asignado.",
-            "recommended_action": "Asignar asesor y abrir conversacion.",
-        })
+        risks.append(
+            {
+                "risk_type": "negotiation_without_owner",
+                "severity": "critical",
+                "reason": "Negociacion activa sin vendedor asignado.",
+                "recommended_action": "Asignar asesor y abrir conversacion.",
+            }
+        )
     if customer.stage == "documentation" and doc_missing:
-        risks.append({
-            "risk_type": "documentation_incomplete",
-            "severity": "medium",
-            "reason": f"Faltan {len(doc_missing)} documentos para avanzar.",
-            "recommended_action": "Solicitar documentos faltantes por WhatsApp.",
-        })
+        risks.append(
+            {
+                "risk_type": "documentation_incomplete",
+                "severity": "medium",
+                "reason": f"Faltan {len(doc_missing)} documentos para avanzar.",
+                "recommended_action": "Solicitar documentos faltantes por WhatsApp.",
+            }
+        )
     if sla == "breached":
-        risks.append({
-            "risk_type": "sla_breached",
-            "severity": "critical",
-            "reason": "SLA de la etapa vencido.",
-            "recommended_action": "Escalar a humano y registrar resolucion.",
-        })
+        risks.append(
+            {
+                "risk_type": "sla_breached",
+                "severity": "critical",
+                "reason": "SLA de la etapa vencido.",
+                "recommended_action": "Escalar a humano y registrar resolucion.",
+            }
+        )
     data_score, missing = _data_quality_score(customer)
     if data_score < 70:
-        risks.append({
-            "risk_type": "missing_required_fields",
-            "severity": "medium",
-            "reason": "Datos requeridos incompletos: " + ", ".join(missing[:4]),
-            "recommended_action": "Completar ficha antes de cotizar.",
-        })
+        risks.append(
+            {
+                "risk_type": "missing_required_fields",
+                "severity": "medium",
+                "reason": "Datos requeridos incompletos: " + ", ".join(missing[:4]),
+                "recommended_action": "Completar ficha antes de cotizar.",
+            }
+        )
     if (customer.ai_confidence or 1) < 0.62:
-        risks.append({
-            "risk_type": "ai_low_confidence",
-            "severity": "high",
-            "reason": "Ultima accion IA con baja confianza.",
-            "recommended_action": "Enviar a revision IA antes de continuar automatizacion.",
-        })
+        risks.append(
+            {
+                "risk_type": "ai_low_confidence",
+                "severity": "high",
+                "reason": "Ultima accion IA con baja confianza.",
+                "recommended_action": "Enviar a revision IA antes de continuar automatizacion.",
+            }
+        )
     if customer.stage == "pending_handoff" and hours_idle > 0.5:
-        risks.append({
-            "risk_type": "handoff_pending_too_long",
-            "severity": "critical",
-            "reason": "Handoff humano pendiente por mas de 30 minutos.",
-            "recommended_action": "Tomar conversacion o reasignar al supervisor.",
-        })
+        risks.append(
+            {
+                "risk_type": "handoff_pending_too_long",
+                "severity": "critical",
+                "reason": "Handoff humano pendiente por mas de 30 minutos.",
+                "recommended_action": "Tomar conversacion o reasignar al supervisor.",
+            }
+        )
     if attrs.get("objections"):
-        risks.append({
-            "risk_type": "objections_detected",
-            "severity": "medium",
-            "reason": "Objeciones detectadas: " + ", ".join(attrs.get("objections", [])[:3]),
-            "recommended_action": "Responder objecion principal con evidencia.",
-        })
+        risks.append(
+            {
+                "risk_type": "objections_detected",
+                "severity": "medium",
+                "reason": "Objeciones detectadas: " + ", ".join(attrs.get("objections", [])[:3]),
+                "recommended_action": "Responder objecion principal con evidencia.",
+            }
+        )
     return risks
 
 
-def recommend_next_actions(customer: Customer, risks: list[dict], now: datetime | None = None) -> list[dict]:
+def recommend_next_actions(
+    customer: Customer, risks: list[dict], now: datetime | None = None
+) -> list[dict]:
     ref = now or _now()
     risk_types = {r["risk_type"] for r in risks}
     hours_idle = _hours_since(customer.last_activity_at or customer.created_at, ref)
     actions: list[dict] = []
 
-    def add(action_type: str, priority: int, reason: str, confidence: float, message: str | None = None) -> None:
-        actions.append({
-            "action_type": action_type,
-            "priority": priority,
-            "reason": reason,
-            "confidence": confidence,
-            "suggested_message": message,
-            "expires_at": ref + timedelta(hours=8),
-        })
+    def add(
+        action_type: str, priority: int, reason: str, confidence: float, message: str | None = None
+    ) -> None:
+        actions.append(
+            {
+                "action_type": action_type,
+                "priority": priority,
+                "reason": reason,
+                "confidence": confidence,
+                "suggested_message": message,
+                "expires_at": ref + timedelta(hours=8),
+            }
+        )
 
     if customer.health_score > 80 and hours_idle > 8:
         add(
@@ -748,25 +783,42 @@ def recommend_next_actions(customer: Customer, risks: list[dict], now: datetime 
     if customer.stage == "qualified":
         add("move_to_negotiation", 70, "Cliente calificado listo para propuesta.", 0.76)
     if not actions:
-        add("review_conversation", 45, "Mantener monitoreo y revisar contexto antes del siguiente contacto.", 0.64)
+        add(
+            "review_conversation",
+            45,
+            "Mantener monitoreo y revisar contexto antes del siguiente contacto.",
+            0.64,
+        )
     return sorted(actions, key=lambda x: x["priority"], reverse=True)[:3]
 
 
-async def _sync_customer_ops(session: AsyncSession, customer: Customer, *, actor_user_id: UUID | None = None) -> CustomerScore:
+async def _sync_customer_ops(
+    session: AsyncSession, customer: Customer, *, actor_user_id: UUID | None = None
+) -> CustomerScore:
     docs = (
-        await session.execute(
-            select(CustomerDocument).where(
-                CustomerDocument.customer_id == customer.id,
-                CustomerDocument.tenant_id == customer.tenant_id,
+        (
+            await session.execute(
+                select(CustomerDocument).where(
+                    CustomerDocument.customer_id == customer.id,
+                    CustomerDocument.tenant_id == customer.tenant_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     ref = _now()
     score = calculate_customer_score(customer, docs, ref)
     customer.score = score.total_score
     customer.health_score = score.total_score
-    customer.sla_status = _sla_status(customer.stage, customer.last_activity_at, customer.created_at, ref)
-    customer.documents_status = "complete" if docs and all(d.status in {"received", "approved"} for d in docs) else "pending"
+    customer.sla_status = _sla_status(
+        customer.stage, customer.last_activity_at, customer.created_at, ref
+    )
+    customer.documents_status = (
+        "complete"
+        if docs and all(d.status in {"received", "approved"} for d in docs)
+        else "pending"
+    )
     customer.ai_insight_reason = score.explanation.get("summary")
 
     await session.execute(
@@ -776,7 +828,10 @@ async def _sync_customer_ops(session: AsyncSession, customer: Customer, *, actor
     )
     await session.execute(
         update(CustomerNextBestAction)
-        .where(CustomerNextBestAction.customer_id == customer.id, CustomerNextBestAction.status == "active")
+        .where(
+            CustomerNextBestAction.customer_id == customer.id,
+            CustomerNextBestAction.status == "active",
+        )
         .values(status="expired")
     )
     session.add(score)
@@ -791,7 +846,9 @@ async def _sync_customer_ops(session: AsyncSession, customer: Customer, *, actor
 
     action_defs = recommend_next_actions(customer, risk_defs, ref)
     for item in action_defs:
-        session.add(CustomerNextBestAction(tenant_id=customer.tenant_id, customer_id=customer.id, **item))
+        session.add(
+            CustomerNextBestAction(tenant_id=customer.tenant_id, customer_id=customer.id, **item)
+        )
     customer.next_best_action = action_defs[0]["action_type"] if action_defs else None
 
     session.add(
@@ -803,7 +860,11 @@ async def _sync_customer_ops(session: AsyncSession, customer: Customer, *, actor
             description=customer.ai_insight_reason,
             actor_type="ai",
             actor_id=actor_user_id,
-            metadata_json={"score": score.total_score, "risks": len(risk_defs), "actions": len(action_defs)},
+            metadata_json={
+                "score": score.total_score,
+                "risks": len(risk_defs),
+                "actions": len(action_defs),
+            },
         )
     )
     return score
@@ -820,7 +881,9 @@ async def _verify_customer(customer_id: UUID, tenant_id: UUID, session: AsyncSes
     return customer
 
 
-async def _latest_conversation(customer_id: UUID, tenant_id: UUID, session: AsyncSession) -> Conversation | None:
+async def _latest_conversation(
+    customer_id: UUID, tenant_id: UUID, session: AsyncSession
+) -> Conversation | None:
     return (
         await session.execute(
             select(Conversation)
@@ -912,7 +975,9 @@ async def _customer_list_base(
             Conversation.last_activity_at.label("last_activity_at"),
             Conversation.assigned_user_id.label("assigned_user_id"),
             func.row_number()
-            .over(partition_by=Conversation.customer_id, order_by=Conversation.last_activity_at.desc())
+            .over(
+                partition_by=Conversation.customer_id, order_by=Conversation.last_activity_at.desc()
+            )
             .label("rn"),
         )
         .where(Conversation.tenant_id == tenant_id, Conversation.deleted_at.is_(None))
@@ -920,7 +985,9 @@ async def _customer_list_base(
     )
     latest = select(latest_conv_sq).where(latest_conv_sq.c.rn == 1).subquery()
     assigned_id = func.coalesce(Customer.assigned_user_id, latest.c.assigned_user_id)
-    last_activity = func.coalesce(Customer.last_activity_at, latest.c.last_activity_at, Customer.created_at)
+    last_activity = func.coalesce(
+        Customer.last_activity_at, latest.c.last_activity_at, Customer.created_at
+    )
 
     stmt = (
         select(
@@ -961,7 +1028,13 @@ async def _customer_list_base(
     )
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(Customer.phone_e164.ilike(like), Customer.name.ilike(like), Customer.email.ilike(like)))
+        stmt = stmt.where(
+            or_(
+                Customer.phone_e164.ilike(like),
+                Customer.name.ilike(like),
+                Customer.email.ilike(like),
+            )
+        )
     if stage:
         stmt = stmt.where(or_(Customer.stage == stage, latest.c.effective_stage == stage))
     if assigned_user_id:
@@ -979,12 +1052,16 @@ async def _customer_list_base(
         "risk": Customer.risk_level,
         "sla": Customer.sla_status,
     }[sort_by]
-    stmt = stmt.order_by(sort_col.asc().nullslast() if sort_dir == "asc" else sort_col.desc().nullslast())
+    stmt = stmt.order_by(
+        sort_col.asc().nullslast() if sort_dir == "asc" else sort_col.desc().nullslast()
+    )
     rows = (await session.execute(stmt)).all()
     return [_customer_item_from_row(r) for r in rows]
 
 
-async def _detail_payload(customer: Customer, tenant_id: UUID, session: AsyncSession) -> CustomerDetail:
+async def _detail_payload(
+    customer: Customer, tenant_id: UUID, session: AsyncSession
+) -> CustomerDetail:
     list_item = (await _customer_list_base(session, tenant_id, q=customer.phone_e164, limit=1))[0]
     convs_rows = (
         await session.execute(
@@ -997,7 +1074,9 @@ async def _detail_payload(customer: Customer, tenant_id: UUID, session: AsyncSes
                 ConversationStateRow.extracted_data,
             )
             .select_from(Conversation)
-            .outerjoin(ConversationStateRow, ConversationStateRow.conversation_id == Conversation.id)
+            .outerjoin(
+                ConversationStateRow, ConversationStateRow.conversation_id == Conversation.id
+            )
             .where(Conversation.customer_id == customer.id, Conversation.tenant_id == tenant_id)
             .order_by(Conversation.last_activity_at.desc())
         )
@@ -1021,58 +1100,99 @@ async def _detail_payload(customer: Customer, tenant_id: UUID, session: AsyncSes
         )
     ).scalar_one_or_none()
     risks = (
-        await session.execute(
-            select(CustomerRisk)
-            .where(CustomerRisk.customer_id == customer.id, CustomerRisk.tenant_id == tenant_id, CustomerRisk.status == "open")
-            .order_by(CustomerRisk.created_at.desc())
-        )
-    ).scalars().all()
-    actions = (
-        await session.execute(
-            select(CustomerNextBestAction)
-            .where(
-                CustomerNextBestAction.customer_id == customer.id,
-                CustomerNextBestAction.tenant_id == tenant_id,
-                CustomerNextBestAction.status == "active",
+        (
+            await session.execute(
+                select(CustomerRisk)
+                .where(
+                    CustomerRisk.customer_id == customer.id,
+                    CustomerRisk.tenant_id == tenant_id,
+                    CustomerRisk.status == "open",
+                )
+                .order_by(CustomerRisk.created_at.desc())
             )
-            .order_by(CustomerNextBestAction.priority.desc(), CustomerNextBestAction.created_at.desc())
-            .limit(5)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    actions = (
+        (
+            await session.execute(
+                select(CustomerNextBestAction)
+                .where(
+                    CustomerNextBestAction.customer_id == customer.id,
+                    CustomerNextBestAction.tenant_id == tenant_id,
+                    CustomerNextBestAction.status == "active",
+                )
+                .order_by(
+                    CustomerNextBestAction.priority.desc(), CustomerNextBestAction.created_at.desc()
+                )
+                .limit(5)
+            )
+        )
+        .scalars()
+        .all()
+    )
     timeline = (
-        await session.execute(
-            select(CustomerTimelineEvent)
-            .where(CustomerTimelineEvent.customer_id == customer.id, CustomerTimelineEvent.tenant_id == tenant_id)
-            .order_by(CustomerTimelineEvent.created_at.desc())
-            .limit(25)
+        (
+            await session.execute(
+                select(CustomerTimelineEvent)
+                .where(
+                    CustomerTimelineEvent.customer_id == customer.id,
+                    CustomerTimelineEvent.tenant_id == tenant_id,
+                )
+                .order_by(CustomerTimelineEvent.created_at.desc())
+                .limit(25)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     docs = (
-        await session.execute(
-            select(CustomerDocument)
-            .where(CustomerDocument.customer_id == customer.id, CustomerDocument.tenant_id == tenant_id)
-            .order_by(CustomerDocument.document_type.asc())
+        (
+            await session.execute(
+                select(CustomerDocument)
+                .where(
+                    CustomerDocument.customer_id == customer.id,
+                    CustomerDocument.tenant_id == tenant_id,
+                )
+                .order_by(CustomerDocument.document_type.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     conv_ids = [r.id for r in convs_rows]
     messages: list[MessageRow] = []
     if conv_ids:
         messages = (
-            await session.execute(
-                select(MessageRow)
-                .where(MessageRow.conversation_id.in_(conv_ids), MessageRow.tenant_id == tenant_id)
-                .order_by(MessageRow.sent_at.desc())
-                .limit(8)
+            (
+                await session.execute(
+                    select(MessageRow)
+                    .where(
+                        MessageRow.conversation_id.in_(conv_ids), MessageRow.tenant_id == tenant_id
+                    )
+                    .order_by(MessageRow.sent_at.desc())
+                    .limit(8)
+                )
             )
-        ).scalars().all()
-    ai_items = (
-        await session.execute(
-            select(CustomerAIReviewItem)
-            .where(CustomerAIReviewItem.customer_id == customer.id, CustomerAIReviewItem.tenant_id == tenant_id)
-            .order_by(CustomerAIReviewItem.created_at.desc())
-            .limit(10)
+            .scalars()
+            .all()
         )
-    ).scalars().all()
+    ai_items = (
+        (
+            await session.execute(
+                select(CustomerAIReviewItem)
+                .where(
+                    CustomerAIReviewItem.customer_id == customer.id,
+                    CustomerAIReviewItem.tenant_id == tenant_id,
+                )
+                .order_by(CustomerAIReviewItem.created_at.desc())
+                .limit(10)
+            )
+        )
+        .scalars()
+        .all()
+    )
     last_extracted = (convs_rows[0].extracted_data or {}) if convs_rows else {}
     total_cost = sum((r.total_cost_usd or Decimal("0") for r in convs_rows), start=Decimal("0"))
     return CustomerDetail(
@@ -1093,13 +1213,17 @@ async def _detail_payload(customer: Customer, tenant_id: UUID, session: AsyncSes
 
 async def _ensure_default_documents(session: AsyncSession, customer: Customer) -> None:
     existing = (
-        await session.execute(
-            select(CustomerDocument.document_type).where(
-                CustomerDocument.customer_id == customer.id,
-                CustomerDocument.tenant_id == customer.tenant_id,
+        (
+            await session.execute(
+                select(CustomerDocument.document_type).where(
+                    CustomerDocument.customer_id == customer.id,
+                    CustomerDocument.tenant_id == customer.tenant_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     existing_set = set(existing)
     for doc_type, label in DOCUMENT_TYPES:
         if doc_type not in existing_set:
@@ -1114,22 +1238,31 @@ async def _ensure_default_documents(session: AsyncSession, customer: Customer) -
             )
 
 
-async def _backfill_existing_customer_ops(session: AsyncSession, tenant_id: UUID, user: AuthUser) -> bool:
+async def _backfill_existing_customer_ops(
+    session: AsyncSession, tenant_id: UUID, user: AuthUser
+) -> bool:
     changed = False
     customers = (
-        await session.execute(
-            select(Customer)
-            .where(Customer.tenant_id == tenant_id)
-            .order_by(Customer.created_at.desc())
-            .limit(120)
+        (
+            await session.execute(
+                select(Customer)
+                .where(Customer.tenant_id == tenant_id)
+                .order_by(Customer.created_at.desc())
+                .limit(120)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for customer in customers:
         docs_count = (
             await session.execute(
                 select(func.count())
                 .select_from(CustomerDocument)
-                .where(CustomerDocument.customer_id == customer.id, CustomerDocument.tenant_id == tenant_id)
+                .where(
+                    CustomerDocument.customer_id == customer.id,
+                    CustomerDocument.tenant_id == tenant_id,
+                )
             )
         ).scalar_one()
         action_count = (
@@ -1180,21 +1313,63 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
 
     users = (
         await session.execute(
-            select(TenantUser.id, TenantUser.email).where(TenantUser.tenant_id == tenant_id).order_by(TenantUser.created_at.asc())
+            select(TenantUser.id, TenantUser.email)
+            .where(TenantUser.tenant_id == tenant_id)
+            .order_by(TenantUser.created_at.asc())
         )
     ).all()
     user_ids = [u.id for u in users] or [user.user_id]
     names = [
-        "Mariana Perez", "Diego Lopez", "Karla Mendez", "Jose Hernandez", "Sofia Aguilar",
-        "Ricardo Cruz", "Andrea Pineda", "Luis Gonzalez", "Valeria Flores", "Eduardo Medina",
-        "Natalia Rios", "Carlos Ramirez", "Fernanda Ruiz", "Oscar Salinas", "Patricia Vega",
-        "Miguel Torres", "Daniela Castillo", "Roberto Ibarra", "Claudia Pena", "Ivan Contreras",
-        "Paola Sanchez", "Hector Navarro", "Alicia Ortega", "Samuel Moreno", "Gabriel Soto",
-        "Monica Juarez", "Javier Cardenas", "Lorena Acosta", "Emilio Vargas", "Rosa Molina",
-        "Adrian Bautista", "Carmen Leon", "Felipe Luna", "Teresa Cano", "Victor Robles",
-        "Laura Castillo", "Omar Medina", "Elena Vazquez", "Pedro Vega", "Ana Gomez",
-        "Juan Perez", "Maria Lopez", "Carlos Ruiz", "Ana Diaz", "Luis Martinez",
-        "Noemi Herrera", "Ernesto Prieto", "Gloria Franco", "Raul Escobar", "Silvia Nunez",
+        "Mariana Perez",
+        "Diego Lopez",
+        "Karla Mendez",
+        "Jose Hernandez",
+        "Sofia Aguilar",
+        "Ricardo Cruz",
+        "Andrea Pineda",
+        "Luis Gonzalez",
+        "Valeria Flores",
+        "Eduardo Medina",
+        "Natalia Rios",
+        "Carlos Ramirez",
+        "Fernanda Ruiz",
+        "Oscar Salinas",
+        "Patricia Vega",
+        "Miguel Torres",
+        "Daniela Castillo",
+        "Roberto Ibarra",
+        "Claudia Pena",
+        "Ivan Contreras",
+        "Paola Sanchez",
+        "Hector Navarro",
+        "Alicia Ortega",
+        "Samuel Moreno",
+        "Gabriel Soto",
+        "Monica Juarez",
+        "Javier Cardenas",
+        "Lorena Acosta",
+        "Emilio Vargas",
+        "Rosa Molina",
+        "Adrian Bautista",
+        "Carmen Leon",
+        "Felipe Luna",
+        "Teresa Cano",
+        "Victor Robles",
+        "Laura Castillo",
+        "Omar Medina",
+        "Elena Vazquez",
+        "Pedro Vega",
+        "Ana Gomez",
+        "Juan Perez",
+        "Maria Lopez",
+        "Carlos Ruiz",
+        "Ana Diaz",
+        "Luis Martinez",
+        "Noemi Herrera",
+        "Ernesto Prieto",
+        "Gloria Franco",
+        "Raul Escobar",
+        "Silvia Nunez",
     ]
     stages = list(CLIENT_STAGES.keys())
     now = _now()
@@ -1202,20 +1377,28 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
         phone = f"+5255100{i:05d}"
         existing = (
             await session.execute(
-                select(Customer).where(Customer.tenant_id == tenant_id, Customer.phone_e164 == phone)
+                select(Customer).where(
+                    Customer.tenant_id == tenant_id, Customer.phone_e164 == phone
+                )
             )
         ).scalar_one_or_none()
         if existing:
             continue
         stage = stages[i % len(stages)]
         idle_hours = [1, 3, 9, 11, 12, 13, 2, 24, 5, 14, 0.5, 26][i % 12]
-        assigned = None if i % 5 == 0 or stage == "negotiation" and i % 3 == 0 else user_ids[i % len(user_ids)]
+        assigned = (
+            None
+            if i % 5 == 0 or stage == "negotiation" and i % 3 == 0
+            else user_ids[i % len(user_ids)]
+        )
         confidence = 0.52 if i % 13 == 0 else 0.82 + (i % 12) / 100
         customer = Customer(
             tenant_id=tenant_id,
             phone_e164=phone,
             name=name,
-            email=f"{name.split()[0].lower()}.{name.split()[-1].lower()}@example.com" if i % 4 else None,
+            email=f"{name.split()[0].lower()}.{name.split()[-1].lower()}@example.com"
+            if i % 4
+            else None,
             source="AtendIA Demo CRM",
             tags=["credito", "whatsapp"] + (["alto-potencial"] if i % 4 == 0 else []),
             stage=stage,
@@ -1227,14 +1410,18 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
                 "engagement_score": 88 - (i % 5) * 8,
                 "credit_type": "nomina" if i % 2 == 0 else "contado",
                 "budget": 180000 + i * 7500,
-                "vehicle_interest": ["Jetta 2024", "T-Cross 2024", "Virtus 2024", "Tiguan R-Line"][i % 4],
+                "vehicle_interest": ["Jetta 2024", "T-Cross 2024", "Virtus 2024", "Tiguan R-Line"][
+                    i % 4
+                ],
                 "city": ["Monterrey", "CDMX", "Guadalajara", "Queretaro"][i % 4],
                 "objections": ["tasa de interes", "tiempo de aprobacion"] if i % 6 == 0 else [],
             },
             ai_summary="Cliente con senales de compra y avance operativo pendiente.",
             ai_confidence=confidence,
             last_ai_action_at=now - timedelta(hours=idle_hours + 0.4),
-            last_human_action_at=None if i % 4 == 0 else now - timedelta(hours=max(1, idle_hours - 1)),
+            last_human_action_at=None
+            if i % 4 == 0
+            else now - timedelta(hours=max(1, idle_hours - 1)),
         )
         session.add(customer)
         await session.flush()
@@ -1274,7 +1461,11 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
                     conversation_id=conv.id,
                     direction="outbound",
                     text="Generalmente 24-48h con documentos completos.",
-                    metadata_json={"sender_type": "ai", "confidence_score": confidence, "related_workflow": "credit_followup"},
+                    metadata_json={
+                        "sender_type": "ai",
+                        "confidence_score": confidence,
+                        "related_workflow": "credit_followup",
+                    },
                     sent_at=(customer.last_activity_at or now) + timedelta(minutes=2),
                 ),
             ]
@@ -1287,7 +1478,11 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
                     customer_id=customer.id,
                     document_type=doc_type,
                     label=label,
-                    status="approved" if received and j % 2 == 0 else "received" if received else "missing",
+                    status="approved"
+                    if received and j % 2 == 0
+                    else "received"
+                    if received
+                    else "missing",
                     uploaded_at=now - timedelta(hours=idle_hours - 0.2) if received else None,
                 )
             )
@@ -1374,7 +1569,9 @@ async def create_customer(
     if not phone:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid phone")
     existing = (
-        await session.execute(select(Customer).where(Customer.tenant_id == tenant_id, Customer.phone_e164 == phone))
+        await session.execute(
+            select(Customer).where(Customer.tenant_id == tenant_id, Customer.phone_e164 == phone)
+        )
     ).scalar_one_or_none()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "customer already exists")
@@ -1444,7 +1641,9 @@ async def patch_customer(
     previous = {k: getattr(customer, k) for k in changes}
     for k, v in changes.items():
         setattr(customer, k, v)
-    customer.sla_status = _sla_status(customer.stage, customer.last_activity_at, customer.created_at, _now())
+    customer.sla_status = _sla_status(
+        customer.stage, customer.last_activity_at, customer.created_at, _now()
+    )
     await _sync_customer_ops(session, customer, actor_user_id=user.user_id)
     session.add(
         CustomerTimelineEvent(
@@ -1455,7 +1654,10 @@ async def patch_customer(
             description=", ".join(changes.keys()),
             actor_type="human",
             actor_id=user.user_id,
-            metadata_json={"previous": {k: str(v) for k, v in previous.items()}, "new": {k: str(v) for k, v in changes.items()}},
+            metadata_json={
+                "previous": {k: str(v) for k, v in previous.items()},
+                "new": {k: str(v) for k, v in changes.items()},
+            },
         )
     )
     await emit_admin_event(
@@ -1477,7 +1679,9 @@ async def delete_customer(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    result = await session.execute(delete(Customer).where(Customer.id == customer_id, Customer.tenant_id == tenant_id))
+    result = await session.execute(
+        delete(Customer).where(Customer.id == customer_id, Customer.tenant_id == tenant_id)
+    )
     if result.rowcount == 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
     await emit_admin_event(
@@ -1529,7 +1733,9 @@ async def assign_customer(
     if body.assigned_user_id:
         exists = (
             await session.execute(
-                select(TenantUser.id).where(TenantUser.id == body.assigned_user_id, TenantUser.tenant_id == tenant_id)
+                select(TenantUser.id).where(
+                    TenantUser.id == body.assigned_user_id, TenantUser.tenant_id == tenant_id
+                )
             )
         ).scalar_one_or_none()
         if not exists:
@@ -1629,12 +1835,16 @@ async def get_customer_risks(
 ) -> list[CustomerRiskOut]:
     await _verify_customer(customer_id, tenant_id, session)
     rows = (
-        await session.execute(
-            select(CustomerRisk)
-            .where(CustomerRisk.customer_id == customer_id, CustomerRisk.tenant_id == tenant_id)
-            .order_by(CustomerRisk.status.asc(), CustomerRisk.created_at.desc())
+        (
+            await session.execute(
+                select(CustomerRisk)
+                .where(CustomerRisk.customer_id == customer_id, CustomerRisk.tenant_id == tenant_id)
+                .order_by(CustomerRisk.status.asc(), CustomerRisk.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_risk_out(r) for r in rows]
 
 
@@ -1647,16 +1857,20 @@ async def get_next_best_action(
 ) -> list[NextBestActionOut]:
     await _verify_customer(customer_id, tenant_id, session)
     rows = (
-        await session.execute(
-            select(CustomerNextBestAction)
-            .where(
-                CustomerNextBestAction.customer_id == customer_id,
-                CustomerNextBestAction.tenant_id == tenant_id,
-                CustomerNextBestAction.status == "active",
+        (
+            await session.execute(
+                select(CustomerNextBestAction)
+                .where(
+                    CustomerNextBestAction.customer_id == customer_id,
+                    CustomerNextBestAction.tenant_id == tenant_id,
+                    CustomerNextBestAction.status == "active",
+                )
+                .order_by(CustomerNextBestAction.priority.desc())
             )
-            .order_by(CustomerNextBestAction.priority.desc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_action_out(r) for r in rows]
 
 
@@ -1710,16 +1924,27 @@ async def get_customer_timeline(
 ) -> list[TimelineEventOut]:
     await _verify_customer(customer_id, tenant_id, session)
     rows = (
-        await session.execute(
-            select(CustomerTimelineEvent)
-            .where(CustomerTimelineEvent.customer_id == customer_id, CustomerTimelineEvent.tenant_id == tenant_id)
-            .order_by(CustomerTimelineEvent.created_at.desc())
+        (
+            await session.execute(
+                select(CustomerTimelineEvent)
+                .where(
+                    CustomerTimelineEvent.customer_id == customer_id,
+                    CustomerTimelineEvent.tenant_id == tenant_id,
+                )
+                .order_by(CustomerTimelineEvent.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_timeline_out(r) for r in rows]
 
 
-@router.post("/{customer_id:uuid}/timeline", response_model=TimelineEventOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{customer_id:uuid}/timeline",
+    response_model=TimelineEventOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_customer_timeline_event(
     customer_id: UUID,
     body: TimelineCreate,
@@ -1755,16 +1980,27 @@ async def list_customer_documents(
     await _ensure_default_documents(session, customer)
     await session.commit()
     rows = (
-        await session.execute(
-            select(CustomerDocument)
-            .where(CustomerDocument.customer_id == customer_id, CustomerDocument.tenant_id == tenant_id)
-            .order_by(CustomerDocument.document_type.asc())
+        (
+            await session.execute(
+                select(CustomerDocument)
+                .where(
+                    CustomerDocument.customer_id == customer_id,
+                    CustomerDocument.tenant_id == tenant_id,
+                )
+                .order_by(CustomerDocument.document_type.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_document_out(r) for r in rows]
 
 
-@router.post("/{customer_id:uuid}/documents", response_model=CustomerDocumentOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{customer_id:uuid}/documents",
+    response_model=CustomerDocumentOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_customer_document(
     customer_id: UUID,
     body: DocumentCreate,
@@ -1813,7 +2049,9 @@ async def patch_document(
 ) -> CustomerDocumentOut:
     doc = (
         await session.execute(
-            select(CustomerDocument).where(CustomerDocument.id == document_id, CustomerDocument.tenant_id == tenant_id)
+            select(CustomerDocument).where(
+                CustomerDocument.id == document_id, CustomerDocument.tenant_id == tenant_id
+            )
         )
     ).scalar_one_or_none()
     if doc is None:
@@ -1852,24 +2090,38 @@ async def get_customer_messages(
 ) -> list[ConversationMessageOut]:
     await _verify_customer(customer_id, tenant_id, session)
     convs = (
-        await session.execute(
-            select(Conversation.id).where(Conversation.customer_id == customer_id, Conversation.tenant_id == tenant_id)
+        (
+            await session.execute(
+                select(Conversation.id).where(
+                    Conversation.customer_id == customer_id, Conversation.tenant_id == tenant_id
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not convs:
         return []
     rows = (
-        await session.execute(
-            select(MessageRow)
-            .where(MessageRow.conversation_id.in_(convs), MessageRow.tenant_id == tenant_id)
-            .order_by(MessageRow.sent_at.desc())
-            .limit(50)
+        (
+            await session.execute(
+                select(MessageRow)
+                .where(MessageRow.conversation_id.in_(convs), MessageRow.tenant_id == tenant_id)
+                .order_by(MessageRow.sent_at.desc())
+                .limit(50)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_message_out(r) for r in rows]
 
 
-@router.post("/{customer_id:uuid}/messages", response_model=ConversationMessageOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{customer_id:uuid}/messages",
+    response_model=ConversationMessageOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_customer_message(
     customer_id: UUID,
     body: MessageCreate,
@@ -1879,7 +2131,13 @@ async def create_customer_message(
 ) -> ConversationMessageOut:
     customer = await _verify_customer(customer_id, tenant_id, session)
     conv = await _ensure_conversation(customer, session)
-    direction = "inbound" if body.sender_type == "client" else "outbound" if body.sender_type in {"human", "ai"} else "system"
+    direction = (
+        "inbound"
+        if body.sender_type == "client"
+        else "outbound"
+        if body.sender_type in {"human", "ai"}
+        else "system"
+    )
     now = _now()
     row = MessageRow(
         tenant_id=tenant_id,
@@ -1929,16 +2187,20 @@ async def get_customer_audit(
 ) -> dict:
     await _verify_customer(customer_id, tenant_id, session)
     events = (
-        await session.execute(
-            select(EventRow)
-            .where(
-                EventRow.tenant_id == tenant_id,
-                EventRow.payload["customer_id"].astext == str(customer_id),
+        (
+            await session.execute(
+                select(EventRow)
+                .where(
+                    EventRow.tenant_id == tenant_id,
+                    EventRow.payload["customer_id"].astext == str(customer_id),
+                )
+                .order_by(EventRow.occurred_at.desc())
+                .limit(50)
             )
-            .order_by(EventRow.occurred_at.desc())
-            .limit(50)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     timeline = await get_customer_timeline(customer_id, user, tenant_id, session)
     return {
         "events": [
@@ -1962,25 +2224,37 @@ async def get_customer_kpis(
     session: AsyncSession = Depends(get_db_session),
 ) -> CustomerKpis:
     await _ensure_demo_data(session, tenant_id, user)
-    total = (await session.execute(select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id))).scalar_one()
+    total = (
+        await session.execute(
+            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id)
+        )
+    ).scalar_one()
     at_risk = (
         await session.execute(
-            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id, Customer.risk_level.in_(["high", "critical"]))
+            select(func.count())
+            .select_from(Customer)
+            .where(Customer.tenant_id == tenant_id, Customer.risk_level.in_(["high", "critical"]))
         )
     ).scalar_one()
     unassigned = (
         await session.execute(
-            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id, Customer.assigned_user_id.is_(None))
+            select(func.count())
+            .select_from(Customer)
+            .where(Customer.tenant_id == tenant_id, Customer.assigned_user_id.is_(None))
         )
     ).scalar_one()
     docs_pending = (
         await session.execute(
-            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id, Customer.documents_status != "complete")
+            select(func.count())
+            .select_from(Customer)
+            .where(Customer.tenant_id == tenant_id, Customer.documents_status != "complete")
         )
     ).scalar_one()
     negotiations = (
         await session.execute(
-            select(func.count()).select_from(Customer).where(Customer.tenant_id == tenant_id, Customer.stage == "negotiation")
+            select(func.count())
+            .select_from(Customer)
+            .where(Customer.tenant_id == tenant_id, Customer.stage == "negotiation")
         )
     ).scalar_one()
     high_without_followup = (
@@ -1990,21 +2264,32 @@ async def get_customer_kpis(
             .where(
                 Customer.tenant_id == tenant_id,
                 Customer.health_score >= 80,
-                or_(Customer.last_human_action_at.is_(None), Customer.last_human_action_at < _now() - timedelta(hours=8)),
+                or_(
+                    Customer.last_human_action_at.is_(None),
+                    Customer.last_human_action_at < _now() - timedelta(hours=8),
+                ),
             )
         )
     ).scalar_one()
     attention = (
         await session.execute(
-            select(func.count()).select_from(Customer).where(
+            select(func.count())
+            .select_from(Customer)
+            .where(
                 Customer.tenant_id == tenant_id,
-                or_(Customer.risk_level.in_(["high", "critical"]), Customer.sla_status == "breached"),
+                or_(
+                    Customer.risk_level.in_(["high", "critical"]), Customer.sla_status == "breached"
+                ),
             )
         )
     ).scalar_one()
     ai_open = (
         await session.execute(
-            select(func.count()).select_from(CustomerAIReviewItem).where(CustomerAIReviewItem.tenant_id == tenant_id, CustomerAIReviewItem.status == "open")
+            select(func.count())
+            .select_from(CustomerAIReviewItem)
+            .where(
+                CustomerAIReviewItem.tenant_id == tenant_id, CustomerAIReviewItem.status == "open"
+            )
         )
     ).scalar_one()
     return CustomerKpis(
@@ -2028,7 +2313,12 @@ async def get_risk_radar(
     await _ensure_demo_data(session, tenant_id, user)
     rows = (
         await session.execute(
-            select(CustomerRisk.risk_type, CustomerRisk.severity, CustomerRisk.recommended_action, CustomerRisk.customer_id)
+            select(
+                CustomerRisk.risk_type,
+                CustomerRisk.severity,
+                CustomerRisk.recommended_action,
+                CustomerRisk.customer_id,
+            )
             .where(CustomerRisk.tenant_id == tenant_id, CustomerRisk.status == "open")
             .order_by(CustomerRisk.created_at.desc())
         )
@@ -2050,7 +2340,11 @@ async def get_risk_radar(
         item["affected_client_ids"].append(r.customer_id)
         if _risk_rank(r.severity) > _risk_rank(item["severity"]):
             item["severity"] = r.severity
-    items = sorted((RadarItem(**v) for v in grouped.values()), key=lambda x: (_risk_rank(x.severity), x.count), reverse=True)
+    items = sorted(
+        (RadarItem(**v) for v in grouped.values()),
+        key=lambda x: (_risk_rank(x.severity), x.count),
+        reverse=True,
+    )
     return RiskRadarResponse(items=items[:8], updated_at=_now())
 
 
@@ -2062,13 +2356,17 @@ async def list_risks(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CustomerRiskOut]:
     rows = (
-        await session.execute(
-            select(CustomerRisk)
-            .where(CustomerRisk.tenant_id == tenant_id, CustomerRisk.status == status_)
-            .order_by(CustomerRisk.created_at.desc())
-            .limit(200)
+        (
+            await session.execute(
+                select(CustomerRisk)
+                .where(CustomerRisk.tenant_id == tenant_id, CustomerRisk.status == status_)
+                .order_by(CustomerRisk.created_at.desc())
+                .limit(200)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_risk_out(r) for r in rows]
 
 
@@ -2080,7 +2378,11 @@ async def resolve_risk(
     session: AsyncSession = Depends(get_db_session),
 ) -> CustomerRiskOut:
     row = (
-        await session.execute(select(CustomerRisk).where(CustomerRisk.id == risk_id, CustomerRisk.tenant_id == tenant_id))
+        await session.execute(
+            select(CustomerRisk).where(
+                CustomerRisk.id == risk_id, CustomerRisk.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "risk not found")
@@ -2110,13 +2412,20 @@ async def get_ai_review_queue(
     session: AsyncSession = Depends(get_db_session),
 ) -> AIReviewQueueResponse:
     rows = (
-        await session.execute(
-            select(CustomerAIReviewItem)
-            .where(CustomerAIReviewItem.tenant_id == tenant_id, CustomerAIReviewItem.status == status_)
-            .order_by(CustomerAIReviewItem.created_at.desc())
-            .limit(100)
+        (
+            await session.execute(
+                select(CustomerAIReviewItem)
+                .where(
+                    CustomerAIReviewItem.tenant_id == tenant_id,
+                    CustomerAIReviewItem.status == status_,
+                )
+                .order_by(CustomerAIReviewItem.created_at.desc())
+                .limit(100)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return AIReviewQueueResponse(items=[_ai_review_out(r) for r in rows])
 
 
@@ -2128,7 +2437,11 @@ async def resolve_ai_review_item(
     session: AsyncSession = Depends(get_db_session),
 ) -> AIReviewItemOut:
     row = (
-        await session.execute(select(CustomerAIReviewItem).where(CustomerAIReviewItem.id == item_id, CustomerAIReviewItem.tenant_id == tenant_id))
+        await session.execute(
+            select(CustomerAIReviewItem).where(
+                CustomerAIReviewItem.id == item_id, CustomerAIReviewItem.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "review item not found")
@@ -2160,7 +2473,11 @@ async def feedback_ai_review_item(
     session: AsyncSession = Depends(get_db_session),
 ) -> AIReviewItemOut:
     row = (
-        await session.execute(select(CustomerAIReviewItem).where(CustomerAIReviewItem.id == item_id, CustomerAIReviewItem.tenant_id == tenant_id))
+        await session.execute(
+            select(CustomerAIReviewItem).where(
+                CustomerAIReviewItem.id == item_id, CustomerAIReviewItem.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "review item not found")
@@ -2186,7 +2503,9 @@ def _read_csv_rows(raw: bytes) -> list[dict[str, str]]:
     return rows
 
 
-def _parse_import_row(idx: int, row: dict[str, str], seen_phones: set[str]) -> tuple[dict | None, str | None]:
+def _parse_import_row(
+    idx: int, row: dict[str, str], seen_phones: set[str]
+) -> tuple[dict | None, str | None]:
     phone = _normalize_phone(row.get("phone") or row.get("phone_e164") or row.get("telefono") or "")
     if not phone:
         return None, f"row {idx}: invalid phone"
@@ -2211,7 +2530,10 @@ async def preview_import(
 ) -> CustomerImportPreview:
     raw = await file.read()
     if len(raw) > CUSTOMER_IMPORT_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"file too large (max {CUSTOMER_IMPORT_MAX_BYTES // 1024 // 1024} MB)")
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"file too large (max {CUSTOMER_IMPORT_MAX_BYTES // 1024 // 1024} MB)",
+        )
     rows = _read_csv_rows(raw)
     valid: list[CustomerImportPreviewRow] = []
     errors: list[str] = []
@@ -2224,7 +2546,11 @@ async def preview_import(
         assert parsed is not None
         seen.add(parsed["phone"])
         existing = (
-            await session.execute(select(Customer.id).where(Customer.tenant_id == tenant_id, Customer.phone_e164 == parsed["phone"]))
+            await session.execute(
+                select(Customer.id).where(
+                    Customer.tenant_id == tenant_id, Customer.phone_e164 == parsed["phone"]
+                )
+            )
         ).scalar_one_or_none()
         valid.append(
             CustomerImportPreviewRow(
@@ -2248,7 +2574,10 @@ async def import_customers(
 ) -> CustomerImportResult:
     raw = await file.read()
     if len(raw) > CUSTOMER_IMPORT_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"file too large (max {CUSTOMER_IMPORT_MAX_BYTES // 1024 // 1024} MB)")
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"file too large (max {CUSTOMER_IMPORT_MAX_BYTES // 1024 // 1024} MB)",
+        )
     rows = _read_csv_rows(raw)
     created = 0
     updated = 0
@@ -2262,7 +2591,11 @@ async def import_customers(
         assert parsed is not None
         seen.add(parsed["phone"])
         existing = (
-            await session.execute(select(Customer).where(Customer.tenant_id == tenant_id, Customer.phone_e164 == parsed["phone"]))
+            await session.execute(
+                select(Customer).where(
+                    Customer.tenant_id == tenant_id, Customer.phone_e164 == parsed["phone"]
+                )
+            )
         ).scalar_one_or_none()
         if existing:
             if parsed["name"]:
@@ -2307,10 +2640,14 @@ async def export_customers(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:
-    rows = await _customer_list_base(session, tenant_id, sort_by="created_at", sort_dir="desc", limit=5000)
+    rows = await _customer_list_base(
+        session, tenant_id, sort_by="created_at", sort_dir="desc", limit=5000
+    )
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(["name", "phone", "email", "stage", "score", "risk_level", "sla_status", "last_activity"])
+    writer.writerow(
+        ["name", "phone", "email", "stage", "score", "risk_level", "sla_status", "last_activity"]
+    )
     for row in rows:
         writer.writerow(
             [

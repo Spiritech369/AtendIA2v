@@ -3,6 +3,7 @@
 Each class satisfies its corresponding Protocol from atendia.providers.
 When a real implementation is ready, swap the import in api/_deps.py.
 """
+
 from __future__ import annotations
 
 from uuid import UUID

@@ -37,9 +37,7 @@ class Settings(BaseSettings):
     storage_backend: Literal["local"] = Field(default="local")
     # Phase 4 — operator session auth (separate from Meta webhook secret).
     # Override via ATENDIA_V2_AUTH_SESSION_SECRET in production.
-    auth_session_secret: str = Field(
-        default="dev-only-fallback-auth-secret-DO-NOT-USE-IN-PROD"
-    )
+    auth_session_secret: str = Field(default="dev-only-fallback-auth-secret-DO-NOT-USE-IN-PROD")
     auth_session_ttl_s: int = Field(default=28800)  # 8h operator workday
     auth_cookie_secure: bool = Field(default=False)  # True in production behind TLS
     # Phase B2 KB module — selects the LLM provider for retrieval/answer.
@@ -48,9 +46,7 @@ class Settings(BaseSettings):
     kb_provider: Literal["openai", "mock"] = Field(default="openai")
     # Baileys WhatsApp sidecar — see core/baileys-bridge/.
     baileys_bridge_url: str = Field(default="http://baileys-bridge:7755")
-    baileys_internal_token: str = Field(
-        default="dev-only-baileys-token-change-me"
-    )
+    baileys_internal_token: str = Field(default="dev-only-baileys-token-change-me")
     baileys_timeout_s: float = Field(default=8.0)
 
 

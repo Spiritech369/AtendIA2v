@@ -15,18 +15,24 @@ def setup_tenant_with_meta_config():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t12_verify",
-                    "c": json.dumps({
-                        "meta": {
-                            "phone_number_id": "PID",
-                            "verify_token": "tenant_verify_xyz",
-                        }
-                    }),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t12_verify",
+                        "c": json.dumps(
+                            {
+                                "meta": {
+                                    "phone_number_id": "PID",
+                                    "verify_token": "tenant_verify_xyz",
+                                }
+                            }
+                        ),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 
@@ -46,9 +52,13 @@ def setup_tenant_without_meta_config():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES ('test_t12_no_meta', '{}'::jsonb) RETURNING id")
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES ('test_t12_no_meta', '{}'::jsonb) RETURNING id"
+                    )
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 

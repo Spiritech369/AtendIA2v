@@ -98,13 +98,15 @@ def test_nlu_config_validates_range():
 
 
 def test_stage_with_optional_fields_and_field_specs():
-    s = StageDefinition.model_validate({
-        "id": "qualify",
-        "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
-        "optional_fields": ["nombre"],
-        "actions_allowed": ["ask_field"],
-        "transitions": [],
-    })
+    s = StageDefinition.model_validate(
+        {
+            "id": "qualify",
+            "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
+            "optional_fields": ["nombre"],
+            "actions_allowed": ["ask_field"],
+            "transitions": [],
+        }
+    )
     assert s.required_fields[0].name == "ciudad"
     assert s.required_fields[0].description == "Ciudad"
     assert s.optional_fields[0].name == "nombre"
@@ -112,44 +114,52 @@ def test_stage_with_optional_fields_and_field_specs():
 
 
 def test_pipeline_with_nlu_block():
-    p = PipelineDefinition.model_validate({
-        "version": 4,
-        "nlu": {"history_turns": 4},
-        "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
-        "tone": {},
-        "fallback": "x",
-    })
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 4,
+            "nlu": {"history_turns": 4},
+            "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
+            "tone": {},
+            "fallback": "x",
+        }
+    )
     assert p.nlu.history_turns == 4
 
 
 def test_pipeline_default_nlu_block():
-    p = PipelineDefinition.model_validate({
-        "version": 4,
-        "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
-        "tone": {},
-        "fallback": "x",
-    })
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 4,
+            "stages": [{"id": "qualify", "actions_allowed": [], "transitions": []}],
+            "tone": {},
+            "fallback": "x",
+        }
+    )
     assert p.nlu.history_turns == 2
 
 
 def test_stage_default_optional_fields_is_empty():
-    s = StageDefinition.model_validate({
-        "id": "qualify",
-        "actions_allowed": [],
-        "transitions": [],
-    })
+    s = StageDefinition.model_validate(
+        {
+            "id": "qualify",
+            "actions_allowed": [],
+            "transitions": [],
+        }
+    )
     assert s.optional_fields == []
 
 
 def test_stage_rejects_field_in_both_required_and_optional():
     with pytest.raises(ValidationError):
-        StageDefinition.model_validate({
-            "id": "qualify",
-            "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
-            "optional_fields": ["ciudad"],
-            "actions_allowed": [],
-            "transitions": [],
-        })
+        StageDefinition.model_validate(
+            {
+                "id": "qualify",
+                "required_fields": [{"name": "ciudad", "description": "Ciudad"}],
+                "optional_fields": ["ciudad"],
+                "actions_allowed": [],
+                "transitions": [],
+            }
+        )
 
 
 def test_field_spec_description_max_length_enforced():
@@ -169,12 +179,14 @@ def test_pipeline_definition_does_not_have_tone_field():
 
 def test_pipeline_definition_ignores_legacy_tone_input():
     """Backward compat: old pipelines with tone:{} still parse, field is dropped."""
-    p = PipelineDefinition.model_validate({
-        "version": 4,
-        "tone": {"register": "informal"},  # legacy
-        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
-        "fallback": "x",
-    })
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 4,
+            "tone": {"register": "informal"},  # legacy
+            "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+            "fallback": "x",
+        }
+    )
     assert "tone" not in PipelineDefinition.model_fields
     assert "tone" not in p.model_dump()  # legacy keys don't survive serialization
 
@@ -192,19 +204,23 @@ def test_composer_config_validates_range():
 
 
 def test_pipeline_with_composer_block():
-    p = PipelineDefinition.model_validate({
-        "version": 4,
-        "composer": {"history_turns": 4},
-        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
-        "fallback": "x",
-    })
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 4,
+            "composer": {"history_turns": 4},
+            "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+            "fallback": "x",
+        }
+    )
     assert p.composer.history_turns == 4
 
 
 def test_pipeline_default_composer_block():
-    p = PipelineDefinition.model_validate({
-        "version": 4,
-        "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
-        "fallback": "x",
-    })
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 4,
+            "stages": [{"id": "x", "actions_allowed": [], "transitions": []}],
+            "fallback": "x",
+        }
+    )
     assert p.composer.history_turns == 2

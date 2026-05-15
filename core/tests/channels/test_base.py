@@ -32,6 +32,7 @@ def test_outbound_message_template_is_valid():
 
 def test_outbound_message_requires_text_or_template():
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         OutboundMessage(
             tenant_id="x",
@@ -42,6 +43,7 @@ def test_outbound_message_requires_text_or_template():
 
 def test_outbound_message_rejects_both_text_and_template():
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         OutboundMessage(
             tenant_id="x",
@@ -79,6 +81,7 @@ def test_delivery_receipt_failed_with_error():
 
 def test_delivery_receipt_invalid_status_raises():
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         DeliveryReceipt(
             message_id="x",

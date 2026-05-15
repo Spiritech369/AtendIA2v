@@ -20,6 +20,7 @@ The script:
   * Prints affected row count and exits non-zero on missing tenant — silent
     no-ops are exactly how stale prompts ship to production.
 """
+
 import argparse
 import asyncio
 import json
@@ -49,10 +50,12 @@ async def _seed(tenant_name: str, brand_facts: dict) -> int:
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with sessionmaker() as session:
-            tenant_id = (await session.execute(
-                text("SELECT id FROM tenants WHERE name = :n"),
-                {"n": tenant_name},
-            )).scalar()
+            tenant_id = (
+                await session.execute(
+                    text("SELECT id FROM tenants WHERE name = :n"),
+                    {"n": tenant_name},
+                )
+            ).scalar()
             if tenant_id is None:
                 print(f"ERROR: tenant {tenant_name!r} not found", file=sys.stderr)
                 return 0
@@ -84,7 +87,8 @@ async def _seed(tenant_name: str, brand_facts: dict) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
-        "--tenant-name", required=True,
+        "--tenant-name",
+        required=True,
         help="Tenant name in the `tenants` table (e.g. dinamomotos).",
     )
     args = parser.parse_args()

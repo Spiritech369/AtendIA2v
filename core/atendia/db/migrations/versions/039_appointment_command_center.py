@@ -4,6 +4,7 @@ Revision ID: e2f3a4b5c6d7
 Revises: d1e2f3a4b5c6
 Create Date: 2026-05-10
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -76,17 +77,33 @@ def upgrade() -> None:
         "appointments",
         sa.Column("documents_complete", sa.Boolean(), nullable=False, server_default="false"),
     )
-    op.add_column("appointments", sa.Column("last_customer_reply_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("appointments", sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("appointments", sa.Column("arrived_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("appointments", sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("appointments", sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("appointments", sa.Column("no_show_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "appointments",
+        sa.Column("last_customer_reply_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "appointments", sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "appointments", sa.Column("arrived_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "appointments", sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "appointments", sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "appointments", sa.Column("no_show_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.add_column(
         "appointments",
         sa.Column("reminder_status", sa.String(30), nullable=False, server_default="pending"),
     )
-    op.add_column("appointments", sa.Column("reminder_last_sent_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "appointments",
+        sa.Column("reminder_last_sent_at", sa.DateTime(timezone=True), nullable=True),
+    )
     op.add_column(
         "appointments",
         sa.Column(

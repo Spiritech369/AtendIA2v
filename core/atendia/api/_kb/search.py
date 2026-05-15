@@ -5,6 +5,7 @@ uses. Without an ``agent`` query param it runs in a permissive mode
 (all source types allowed); with an agent, it uses that agent's
 allowed_source_types and allowed_collection_slugs.
 """
+
 from __future__ import annotations
 
 from typing import Literal

@@ -11,6 +11,7 @@ because the catalog schema doesn't have dedicated price columns. We
 parse them with `Decimal(str(...))` so floats and ints both round-trip
 without precision loss.
 """
+
 from decimal import Decimal
 from typing import Any
 from uuid import UUID

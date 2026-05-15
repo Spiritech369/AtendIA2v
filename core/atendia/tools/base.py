@@ -15,8 +15,7 @@ class Tool(ABC):
     name: str
 
     @abstractmethod
-    async def run(self, session: AsyncSession, **kwargs: Any) -> dict:
-        ...
+    async def run(self, session: AsyncSession, **kwargs: Any) -> dict: ...
 
 
 class ToolNoDataResult(BaseModel):
@@ -30,6 +29,7 @@ class ToolNoDataResult(BaseModel):
     Phase 3c will populate the catalog/FAQs and tools will start returning real
     data; ToolNoDataResult will become the rare error path then.
     """
+
     status: Literal["no_data"] = "no_data"
     hint: str
 
@@ -51,6 +51,7 @@ class Quote(BaseModel):
     Status is a fixed literal so the Composer router branches on
     `payload["status"] == "ok"` without isinstance checks.
     """
+
     status: Literal["ok"] = "ok"
     sku: str
     name: str
@@ -72,6 +73,7 @@ class FAQMatch(BaseModel):
     deep-link each hit back to the KB module so the operator can edit the
     source row in one click. Both nullable to keep legacy callers working.
     """
+
     pregunta: str
     respuesta: str
     score: float
@@ -90,6 +92,7 @@ class CatalogResult(BaseModel):
     `catalog_item_id` and `collection_id` (migration 045) enable
     DebugPanel deep-links the same way as FAQMatch.
     """
+
     sku: str
     name: str
     category: str

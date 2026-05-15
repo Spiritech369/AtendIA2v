@@ -25,9 +25,7 @@ async def publish_tenant_event(
     config-shaped changes like pipeline edits, branding updates, or
     integration status flips that every open dashboard tab should react
     to. Fire-and-forget; returns the subscriber count for tests."""
-    return await redis.publish(
-        tenant_channel_for(tenant_id=tenant_id), json.dumps(event)
-    )
+    return await redis.publish(tenant_channel_for(tenant_id=tenant_id), json.dumps(event))
 
 
 async def publish_event(

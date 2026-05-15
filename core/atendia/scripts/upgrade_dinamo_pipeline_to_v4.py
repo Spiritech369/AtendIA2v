@@ -7,6 +7,7 @@ Usage:
 Writes a NEW row with version=N+1, active=true. Old row becomes active=false.
 Idempotent if the active pipeline is already v4.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,19 +62,21 @@ async def _main(tenant_id: UUID, dry_run: bool) -> int:
 
     factory = _get_factory()
     async with factory() as session:
-        row = (await session.execute(
-            text("SELECT id, version, definition FROM tenant_pipelines "
-                 "WHERE tenant_id = :t AND active = true LIMIT 1"),
-            {"t": tenant_id},
-        )).fetchone()
+        row = (
+            await session.execute(
+                text(
+                    "SELECT id, version, definition FROM tenant_pipelines "
+                    "WHERE tenant_id = :t AND active = true LIMIT 1"
+                ),
+                {"t": tenant_id},
+            )
+        ).fetchone()
         if not row:
             print(f"No active pipeline for tenant {tenant_id}", file=sys.stderr)
             return 1
         _id, current_version, definition = row
         new_def = upgrade_pipeline_jsonb(definition)
-        if new_def is definition or (
-            definition.get("version") == 4 and "nlu" in definition
-        ):
+        if new_def is definition or (definition.get("version") == 4 and "nlu" in definition):
             print(f"Pipeline for tenant {tenant_id} is already v4. No-op.")
             return 0
         new_version = current_version + 1
@@ -87,8 +90,10 @@ async def _main(tenant_id: UUID, dry_run: bool) -> int:
             {"id": _id},
         )
         await session.execute(
-            text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                 "VALUES (:t, :v, CAST(:d AS jsonb), true)"),
+            text(
+                "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                "VALUES (:t, :v, CAST(:d AS jsonb), true)"
+            ),
             {"t": tenant_id, "v": new_version, "d": json.dumps(new_def)},
         )
         await session.commit()

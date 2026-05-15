@@ -79,12 +79,17 @@ def test_get_provider_returns_openai_when_key_present(monkeypatch):
 @pytest.mark.asyncio
 async def test_mock_generate_answer_includes_context_snippet():
     p = MockProvider()
-    out = await p.generate_answer(PromptInput(
-        system="sys", user="¿enganche?",
-        context="<fuente type=faq>desde 10%</fuente>",
-        response_instructions="responde",
-        model="mock-model", max_tokens=100, temperature=0.0,
-    ))
+    out = await p.generate_answer(
+        PromptInput(
+            system="sys",
+            user="¿enganche?",
+            context="<fuente type=faq>desde 10%</fuente>",
+            response_instructions="responde",
+            model="mock-model",
+            max_tokens=100,
+            temperature=0.0,
+        )
+    )
     assert "fuente" in out.text.lower() or "desde 10%" in out.text
     assert out.cost_usd == 0.0
     assert out.raw_response == {"mock": True}

@@ -10,6 +10,7 @@ Two paths to cover:
 The OpenAI client is monkeypatched so the test never makes a real network
 call. The DB and the rest of the worker codepath run for real.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -27,6 +28,7 @@ from atendia.queue import force_summary_job
 @pytest.fixture
 def seeded_conversation():
     """Insert tenant + customer + conversation + a few messages, return ids."""
+
     async def _seed() -> dict[str, str]:
         engine = create_async_engine(get_settings().database_url)
         try:
@@ -59,11 +61,13 @@ def seeded_conversation():
                     text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
                     {"c": conv},
                 )
-                for i, (direction, body) in enumerate([
-                    ("inbound", "Hola, quiero info"),
-                    ("outbound", "Claro, dime que plan"),
-                    ("inbound", "El de 36 meses"),
-                ]):
+                for i, (direction, body) in enumerate(
+                    [
+                        ("inbound", "Hola, quiero info"),
+                        ("outbound", "Claro, dime que plan"),
+                        ("inbound", "El de 36 meses"),
+                    ]
+                ):
                     await conn.execute(
                         text(
                             "INSERT INTO messages "
@@ -143,6 +147,7 @@ async def test_force_summary_uses_llm_when_summarize_returns_llm(
 ) -> None:
     """We monkeypatch ``_summarize`` to simulate a successful LLM call so
     the test never depends on a real OpenAI key."""
+
     async def fake_summarize(transcript: str, api_key: str) -> tuple[str, str]:
         assert "Hola, quiero info" in transcript
         return "El cliente pregunto por el plan a 36 meses; pendiente cotizacion.", "llm"

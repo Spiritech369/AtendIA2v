@@ -4,6 +4,7 @@ tenant_baileys_config.prefer_over_meta + last_status.
 We exercise the pure decision helper `_should_route_baileys` directly to
 keep the test deterministic without spinning up arq/redis/Meta adapter.
 """
+
 from __future__ import annotations
 
 import asyncio

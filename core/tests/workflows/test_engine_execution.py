@@ -3,6 +3,7 @@
 Redis side-effects are stubbed via the ``stub_outbound_enqueue`` /
 ``stub_step_enqueue`` fixtures (see ``conftest.py``).
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -44,10 +45,12 @@ async def test_message_node_enqueues_outbound(
     # Idempotency key includes execution + node id; arq will dedupe replays.
     assert str(exec_id) in msg.idempotency_key
 
-    status = (await db_session.execute(
-        text("SELECT status FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).scalar()
+    status = (
+        await db_session.execute(
+            text("SELECT status FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).scalar()
     assert status == "completed"
 
 
@@ -87,10 +90,12 @@ async def test_message_node_outside_24h_window_fails(
     await db_session.commit()
 
     assert stub_outbound_enqueue == []
-    row = (await db_session.execute(
-        text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).one()
+    row = (
+        await db_session.execute(
+            text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).one()
     assert row.status == "failed"
     assert row.error_code == "OUTSIDE_24H_WINDOW"
 
@@ -142,10 +147,12 @@ async def test_move_stage_updates_conversation_and_state(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    stage = (await db_session.execute(
-        text("SELECT current_stage FROM conversations WHERE id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
+    stage = (
+        await db_session.execute(
+            text("SELECT current_stage FROM conversations WHERE id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
     assert stage == "won"
 
 
@@ -170,10 +177,12 @@ async def test_assign_agent_rejects_cross_tenant(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    row = (await db_session.execute(
-        text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).one()
+    row = (
+        await db_session.execute(
+            text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).one()
     assert row.status == "failed"
     assert row.error_code == "UNKNOWN_AGENT"
 
@@ -199,17 +208,21 @@ async def test_notify_agent_rejects_cross_tenant_user(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    row = (await db_session.execute(
-        text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).one()
+    row = (
+        await db_session.execute(
+            text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).one()
     assert row.status == "failed"
     assert row.error_code == "UNKNOWN_USER"
 
-    notif_count = (await db_session.execute(
-        text("SELECT count(*) FROM notifications WHERE tenant_id = :t"),
-        {"t": b["tenant_id"]},
-    )).scalar()
+    notif_count = (
+        await db_session.execute(
+            text("SELECT count(*) FROM notifications WHERE tenant_id = :t"),
+            {"t": b["tenant_id"]},
+        )
+    ).scalar()
     assert notif_count == 0
 
 
@@ -233,10 +246,12 @@ async def test_notify_agent_role_target_creates_notifications(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    rows = (await db_session.execute(
-        text("SELECT user_id, title FROM notifications WHERE tenant_id = :t"),
-        {"t": seed["tenant_id"]},
-    )).all()
+    rows = (
+        await db_session.execute(
+            text("SELECT user_id, title FROM notifications WHERE tenant_id = :t"),
+            {"t": seed["tenant_id"]},
+        )
+    ).all()
     assert len(rows) == 1
     assert rows[0].title == "alert"
 
@@ -261,10 +276,12 @@ async def test_update_field_merges_extracted_data(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    extracted = (await db_session.execute(
-        text("SELECT extracted_data FROM conversation_state WHERE conversation_id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
+    extracted = (
+        await db_session.execute(
+            text("SELECT extracted_data FROM conversation_state WHERE conversation_id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
     assert extracted["plan_credito"]["value"] == "36m"
     assert extracted["plan_credito"]["source"] == "workflow"
 
@@ -286,10 +303,12 @@ async def test_pause_bot_sets_flag(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    paused = (await db_session.execute(
-        text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
+    paused = (
+        await db_session.execute(
+            text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
     assert paused is True
 
 
@@ -302,10 +321,7 @@ async def test_condition_routes_on_extracted_field(
     seed = await seed_tenant_factory()
     # Pre-populate extracted field so the condition resolves true.
     await db_session.execute(
-        text(
-            "UPDATE conversation_state SET extracted_data = :d "
-            "WHERE conversation_id = :c"
-        ),
+        text("UPDATE conversation_state SET extracted_data = :d WHERE conversation_id = :c"),
         {"c": seed["conversation_id"], "d": '{"plan":{"value":"36m"}}'},
     )
     await db_session.commit()
@@ -336,10 +352,12 @@ async def test_condition_routes_on_extracted_field(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    paused = (await db_session.execute(
-        text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
+    paused = (
+        await db_session.execute(
+            text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
     assert paused is True
 
 
@@ -376,10 +394,12 @@ async def test_condition_resolves_customer_score(
     await execute_workflow(db_session, exec_id)
     await db_session.commit()
 
-    paused = (await db_session.execute(
-        text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
+    paused = (
+        await db_session.execute(
+            text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
     assert paused is True
 
 
@@ -417,10 +437,12 @@ async def test_delay_pauses_and_enqueues_step(
     assert job["next_node"] == "pb"
     assert job["defer_seconds"] == 60
 
-    row = (await db_session.execute(
-        text("SELECT status, current_node_id FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).one()
+    row = (
+        await db_session.execute(
+            text("SELECT status, current_node_id FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).one()
     assert row.status == "paused"
     assert row.current_node_id == "pb"
 
@@ -456,13 +478,17 @@ async def test_resume_after_delay_continues(
     await execute_workflow(db_session, exec_id, start_node_id="pb")
     await db_session.commit()
 
-    paused = (await db_session.execute(
-        text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
-        {"c": seed["conversation_id"]},
-    )).scalar()
-    status = (await db_session.execute(
-        text("SELECT status FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).scalar()
+    paused = (
+        await db_session.execute(
+            text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
+            {"c": seed["conversation_id"]},
+        )
+    ).scalar()
+    status = (
+        await db_session.execute(
+            text("SELECT status FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).scalar()
     assert paused is True
     assert status == "completed"

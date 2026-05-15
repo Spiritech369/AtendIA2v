@@ -5,6 +5,7 @@ Focus: the safety surface the engine relies on:
 - RBAC: operator forbidden from create/patch/toggle/delete/retry
 - Retry resumes from the failed node
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,10 +25,7 @@ def _seed_agent(tenant_id: str) -> str:
             async with engine.begin() as conn:
                 agent_id = (
                     await conn.execute(
-                        text(
-                            "INSERT INTO agents (tenant_id, name) "
-                            "VALUES (:t, :n) RETURNING id"
-                        ),
+                        text("INSERT INTO agents (tenant_id, name) VALUES (:t, :n) RETURNING id"),
                         {"t": tenant_id, "n": f"agent_{uuid4().hex[:6]}"},
                     )
                 ).scalar()

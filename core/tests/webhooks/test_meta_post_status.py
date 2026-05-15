@@ -26,9 +26,7 @@ def set_app_secret(monkeypatch):
 
 
 def _sign(body: bytes) -> str:
-    return "sha256=" + hmac.new(
-        APP_SECRET.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    return "sha256=" + hmac.new(APP_SECRET.encode("utf-8"), body, hashlib.sha256).hexdigest()
 
 
 @pytest.fixture
@@ -36,24 +34,37 @@ def setup_tenant_with_outbound_message():
     """Seed: tenant with meta config, customer, conversation, and one
     outbound message with channel_message_id='wamid.test_t14_sent'.
     """
+
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t14_status",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID", "verify_token": "vt"}}),
-                },
-            )).scalar()
-            cid = (await conn.execute(
-                text("INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550140') RETURNING id"),
-                {"t": tid},
-            )).scalar()
-            conv_id = (await conn.execute(
-                text("INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"),
-                {"t": tid, "c": cid},
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t14_status",
+                        "c": json.dumps({"meta": {"phone_number_id": "PID", "verify_token": "vt"}}),
+                    },
+                )
+            ).scalar()
+            cid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550140') RETURNING id"
+                    ),
+                    {"t": tid},
+                )
+            ).scalar()
+            conv_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations (tenant_id, customer_id) VALUES (:t, :c) RETURNING id"
+                    ),
+                    {"t": tid, "c": cid},
+                )
+            ).scalar()
             await conn.execute(
                 text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
                 {"c": conv_id},
@@ -86,22 +97,31 @@ def setup_tenant_with_outbound_message():
 def _status_payload(channel_message_id: str, status_value: str) -> dict:
     return {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA_ID",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "5215555000000", "phone_number_id": "PID"},
-                    "statuses": [{
-                        "id": channel_message_id,
-                        "status": status_value,
-                        "timestamp": "1714579260",
-                        "recipient_id": "5215555550140",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA_ID",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "5215555000000",
+                                "phone_number_id": "PID",
+                            },
+                            "statuses": [
+                                {
+                                    "id": channel_message_id,
+                                    "status": status_value,
+                                    "timestamp": "1714579260",
+                                    "recipient_id": "5215555550140",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
 
@@ -109,12 +129,15 @@ def _read_delivery_status(channel_message_id):
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            row = (await conn.execute(
-                text("SELECT delivery_status FROM messages WHERE channel_message_id = :cm"),
-                {"cm": channel_message_id},
-            )).scalar()
+            row = (
+                await conn.execute(
+                    text("SELECT delivery_status FROM messages WHERE channel_message_id = :cm"),
+                    {"cm": channel_message_id},
+                )
+            ).scalar()
         await engine.dispose()
         return row
+
     return asyncio.run(_do())
 
 

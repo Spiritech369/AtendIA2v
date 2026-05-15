@@ -22,6 +22,7 @@ The tool is pure — it reads the pipeline + customer attrs and returns
 a structured result. No DB call. No LLM call. Calling code is in the
 runner (action dispatch) and (later) in the workflows engine.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -45,6 +46,7 @@ class RequiredDoc(BaseModel):
     the composer can write "tu INE salió con reflejo, mándala de nuevo"
     instead of a generic "falta INE".
     """
+
     key: str
     label: str
     hint: str = ""
@@ -155,9 +157,7 @@ def lookup_requirements(
     # configurable (PipelineEditor → "Documentos requeridos"); a key
     # that's referenced in docs_per_plan but missing from the catalog
     # still renders, just with the raw key as label.
-    catalog_by_key = {
-        spec.key: spec for spec in pipeline.documents_catalog
-    }
+    catalog_by_key = {spec.key: spec for spec in pipeline.documents_catalog}
 
     required: list[RequiredDoc] = []
     received: list[RequiredDoc] = []

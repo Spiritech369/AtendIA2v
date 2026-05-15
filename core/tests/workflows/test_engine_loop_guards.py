@@ -7,6 +7,7 @@ Two distinct guards live in the engine:
 - ``execute_workflow`` enforces ``MAX_STEPS`` against the persisted
   ``steps_completed`` so a chain of delays cannot reset the counter.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -124,8 +125,7 @@ async def test_max_steps_persists_across_resume(
     # Simulate that a previous run already burned all steps.
     await db_session.execute(
         text(
-            "UPDATE workflow_executions SET steps_completed = :n, status = 'paused' "
-            "WHERE id = :i"
+            "UPDATE workflow_executions SET steps_completed = :n, status = 'paused' WHERE id = :i"
         ),
         {"i": exec_id, "n": MAX_STEPS},
     )
@@ -134,9 +134,11 @@ async def test_max_steps_persists_across_resume(
     await execute_workflow(db_session, exec_id, start_node_id="action_1")
     await db_session.commit()
 
-    row = (await db_session.execute(
-        text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
-        {"i": exec_id},
-    )).one()
+    row = (
+        await db_session.execute(
+            text("SELECT status, error_code FROM workflow_executions WHERE id = :i"),
+            {"i": exec_id},
+        )
+    ).one()
     assert row.status == "failed"
     assert row.error_code == "MAX_STEPS_EXCEEDED"

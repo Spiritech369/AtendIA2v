@@ -4,6 +4,7 @@ Used as:
 - Default when composer_provider="canned" (Phase 2 behavior preserved).
 - Fallback when OpenAIComposer's retries exhaust (T16+).
 """
+
 from typing import ClassVar
 
 from atendia.runner.composer_protocol import (
@@ -20,8 +21,7 @@ class CannedComposer:
         "lookup_faq": "Déjame revisar nuestra información para responderte.",
         "ask_clarification": "Disculpa, no te entendí del todo. ¿Podrías reformular?",
         "quote": (
-            "El precio depende del modelo y opciones. "
-            "¿Cuál te interesa? Te paso el costo exacto."
+            "El precio depende del modelo y opciones. ¿Cuál te interesa? Te paso el costo exacto."
         ),
         "explain_payment_options": (
             "Aceptamos efectivo, transferencia y crédito. ¿Cuál te conviene?"
@@ -30,7 +30,9 @@ class CannedComposer:
     }
 
     async def compose(
-        self, *, input: ComposerInput,
+        self,
+        *,
+        input: ComposerInput,
     ) -> tuple[ComposerOutput, UsageMetadata | None]:
         text = self._TEXTS.get(
             input.action,

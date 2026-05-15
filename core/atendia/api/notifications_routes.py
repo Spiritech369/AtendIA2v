@@ -49,10 +49,16 @@ async def list_notifications(
         stmt = stmt.where(Notification.read.is_(False))
     rows = (await session.execute(stmt)).scalars().all()
     unread = (
-        await session.execute(
-            select(Notification.id).where(Notification.user_id == user.user_id, Notification.read.is_(False))
+        (
+            await session.execute(
+                select(Notification.id).where(
+                    Notification.user_id == user.user_id, Notification.read.is_(False)
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return NotificationListResponse(
         items=[NotificationItem.model_validate(row, from_attributes=True) for row in rows],
         unread_count=len(unread),
@@ -67,7 +73,9 @@ async def mark_notification_read(
 ) -> NotificationItem:
     row = (
         await session.execute(
-            select(Notification).where(Notification.id == notification_id, Notification.user_id == user.user_id)
+            select(Notification).where(
+                Notification.id == notification_id, Notification.user_id == user.user_id
+            )
         )
     ).scalar_one_or_none()
     if row is None:
@@ -84,7 +92,9 @@ async def mark_all_notifications_read(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, int]:
     result = await session.execute(
-        update(Notification).where(Notification.user_id == user.user_id, Notification.read.is_(False)).values(read=True)
+        update(Notification)
+        .where(Notification.user_id == user.user_id, Notification.read.is_(False))
+        .values(read=True)
     )
     await session.commit()
     return {"updated": result.rowcount or 0}

@@ -29,6 +29,7 @@ The downstream composer (``PLAN MODE PASO 4``) and the
 without updating the others and the bot will hallucinate document
 lists for the wrong plan.
 """
+
 from __future__ import annotations
 
 import json
@@ -166,8 +167,10 @@ MOTOS_CREDITO_STAGES: list[dict] = [
         # The bot asks for antigüedad here; cumple_antiguedad gets derived
         # by NLU from "tengo X meses trabajando" (entity → bool).
         "required_fields": [
-            {"name": "antiguedad_laboral_meses",
-             "description": "Cuántos meses lleva en su empleo actual"},
+            {
+                "name": "antiguedad_laboral_meses",
+                "description": "Cuántos meses lleva en su empleo actual",
+            },
         ],
         "actions_allowed": ["ask_field", "lookup_faq", "ask_clarification"],
         "behavior_mode": "PLAN",
@@ -175,8 +178,7 @@ MOTOS_CREDITO_STAGES: list[dict] = [
             "enabled": True,
             "match": "all",
             "conditions": [
-                {"field": "cumple_antiguedad", "operator": "equals",
-                 "value": True},
+                {"field": "cumple_antiguedad", "operator": "equals", "value": True},
             ],
         },
     },
@@ -186,10 +188,8 @@ MOTOS_CREDITO_STAGES: list[dict] = [
         "color": "#0ea5e9",
         "timeout_hours": 48,
         "required_fields": [
-            {"name": "tipo_credito",
-             "description": "Tipo de comprobación de ingresos"},
-            {"name": "plan_credito",
-             "description": "Plan + porcentaje de enganche"},
+            {"name": "tipo_credito", "description": "Tipo de comprobación de ingresos"},
+            {"name": "plan_credito", "description": "Plan + porcentaje de enganche"},
         ],
         "actions_allowed": ["ask_field", "lookup_faq"],
         "behavior_mode": "PLAN",
@@ -247,8 +247,7 @@ MOTOS_CREDITO_STAGES: list[dict] = [
             "enabled": True,
             "match": "all",
             "conditions": [
-                {"field": "plan_credito",
-                 "operator": "docs_complete_for_plan"},
+                {"field": "plan_credito", "operator": "docs_complete_for_plan"},
             ],
         },
     },
@@ -336,8 +335,7 @@ async def install_motos_credito_pipeline(
     if existing_active is not None:
         await session.execute(
             text(
-                "UPDATE tenant_pipelines SET active = false "
-                "WHERE tenant_id = :t AND active = true"
+                "UPDATE tenant_pipelines SET active = false WHERE tenant_id = :t AND active = true"
             ),
             {"t": tenant_id},
         )

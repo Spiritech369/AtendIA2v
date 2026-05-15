@@ -6,6 +6,7 @@ Three implementations live in this package:
 
 Both return (ComposerOutput, UsageMetadata | None). Mocks/canned return None usage.
 """
+
 from typing import Protocol
 
 from pydantic import BaseModel, Field
@@ -52,5 +53,7 @@ class ComposerOutput(BaseModel):
 
 class ComposerProvider(Protocol):
     async def compose(
-        self, *, input: ComposerInput,
+        self,
+        *,
+        input: ComposerInput,
     ) -> tuple[ComposerOutput, UsageMetadata | None]: ...

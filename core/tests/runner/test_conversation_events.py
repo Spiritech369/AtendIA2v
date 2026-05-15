@@ -12,6 +12,7 @@ discriminates on `metadata.event_type`; drifting the key here without
 updating the bubble would silently downgrade rich events to plain
 italic text.
 """
+
 from __future__ import annotations
 
 from typing import Any

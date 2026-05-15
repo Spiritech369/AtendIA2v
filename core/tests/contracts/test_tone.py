@@ -35,13 +35,15 @@ def test_tone_max_words_range_high():
 
 
 def test_tone_from_dinamo_dict():
-    t = Tone.model_validate({
-        "register": "informal_mexicano",
-        "use_emojis": "sparingly",
-        "max_words_per_message": 40,
-        "bot_name": "Dinamo",
-        "forbidden_phrases": ["estimado cliente"],
-        "signature_phrases": ["¡qué onda!"],
-    })
+    t = Tone.model_validate(
+        {
+            "register": "informal_mexicano",
+            "use_emojis": "sparingly",
+            "max_words_per_message": 40,
+            "bot_name": "Dinamo",
+            "forbidden_phrases": ["estimado cliente"],
+            "signature_phrases": ["¡qué onda!"],
+        }
+    )
     assert t.bot_name == "Dinamo"
     assert "estimado cliente" in t.forbidden_phrases

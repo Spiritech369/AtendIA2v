@@ -10,6 +10,7 @@ Routes:
 Roles: `operator` | `tenant_admin` | `superadmin`. Tenant admins can manage
 users inside their tenant; superadmins can manage every tenant.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -135,9 +136,7 @@ async def create_user(
     return _to_item(new_user)
 
 
-async def _load_or_404(
-    session: AsyncSession, user_id: UUID, *, current: AuthUser
-) -> TenantUser:
+async def _load_or_404(session: AsyncSession, user_id: UUID, *, current: AuthUser) -> TenantUser:
     u = (
         await session.execute(select(TenantUser).where(TenantUser.id == user_id))
     ).scalar_one_or_none()
@@ -164,16 +163,12 @@ async def patch_user(
         values["email"] = body.email
     if body.role is not None:
         if user.role != "superadmin" and body.role == "superadmin":
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, "only superadmin can grant superadmin"
-            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can grant superadmin")
         values["role"] = body.role
     if body.password is not None:
         values["password_hash"] = hash_password(body.password)
     if values:
-        await session.execute(
-            update(TenantUser).where(TenantUser.id == user_id).values(**values)
-        )
+        await session.execute(update(TenantUser).where(TenantUser.id == user_id).values(**values))
         await session.commit()
         await session.refresh(target)
     return _to_item(target)

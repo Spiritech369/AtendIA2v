@@ -51,16 +51,24 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t26_disp",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T26", "verify_token": "vt"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t26_disp",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T26", "verify_token": "vt"}}
+                        ),
+                    },
+                )
+            ).scalar()
             await conn.execute(
-                text("INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
-                     "VALUES (:t, 1, :d\\:\\:jsonb, true)"),
+                text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                    "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+                ),
                 {"t": tid, "d": json.dumps(PIPELINE)},
             )
         await engine.dispose()
@@ -80,28 +88,35 @@ def setup_tenant():
 def _payload(channel_id: str, text_body: str) -> dict:
     return {
         "object": "whatsapp_business_account",
-        "entry": [{
-            "id": "WABA",
-            "changes": [{
-                "field": "messages",
-                "value": {
-                    "messaging_product": "whatsapp",
-                    "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T26"},
-                    "messages": [{
-                        "from": "5215555550260",
-                        "id": channel_id,
-                        "timestamp": "1714579200",
-                        "text": {"body": text_body},
-                        "type": "text",
-                    }],
-                },
-            }],
-        }],
+        "entry": [
+            {
+                "id": "WABA",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"display_phone_number": "x", "phone_number_id": "PID_T26"},
+                            "messages": [
+                                {
+                                    "from": "5215555550260",
+                                    "id": channel_id,
+                                    "timestamp": "1714579200",
+                                    "text": {"body": text_body},
+                                    "type": "text",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
     }
 
 
 async def _redis_clear(channel_id: str):
     from redis.asyncio import Redis
+
     r = Redis.from_url(get_settings().redis_url)
     await r.delete(f"dedup:{channel_id}")
     await r.aclose()
@@ -116,15 +131,19 @@ def _count_outbox_jobs(tid):
     ``arq:job:out:*`` keys directly — that's no longer where new outbound
     messages land first.
     """
+
     async def _do():
         engine = create_async_engine(get_settings().database_url)
         async with engine.connect() as conn:
-            n = (await conn.execute(
-                text("SELECT COUNT(*) FROM outbound_outbox WHERE tenant_id = :t"),
-                {"t": tid},
-            )).scalar_one()
+            n = (
+                await conn.execute(
+                    text("SELECT COUNT(*) FROM outbound_outbox WHERE tenant_id = :t"),
+                    {"t": tid},
+                )
+            ).scalar_one()
         await engine.dispose()
         return n
+
     return asyncio.run(_do())
 
 

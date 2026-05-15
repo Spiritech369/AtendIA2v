@@ -9,6 +9,7 @@ Covers:
 - ``status`` filter rejects unknown values with 400
 - ``scheduled_at`` must be tz-aware (Pydantic validator)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -166,9 +167,7 @@ def test_audit_log_emitted_on_full_lifecycle(client_tenant_admin):
         json={"customer_id": customer_id, "scheduled_at": when, "service": "Lifecycle"},
     )
     appt_id = created.json()["appointment"]["id"]
-    client_tenant_admin.patch(
-        f"/api/v1/appointments/{appt_id}", json={"status": "completed"}
-    )
+    client_tenant_admin.patch(f"/api/v1/appointments/{appt_id}", json={"status": "completed"})
     client_tenant_admin.delete(f"/api/v1/appointments/{appt_id}")
 
     actions = _audit_actions(client_tenant_admin.tenant_id)

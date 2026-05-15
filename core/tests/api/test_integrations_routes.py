@@ -9,6 +9,7 @@ Covers:
 - /ai-provider returns the current settings snapshot, with ``has_openai_key``
   derived from the env-loaded secret
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,10 +27,7 @@ def _set_meta_config(tenant_id: str, meta: dict[str, str]) -> None:
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
             await conn.execute(
-                text(
-                    "UPDATE tenants SET config = :c, meta_business_id = :b "
-                    "WHERE id = :t"
-                ),
+                text("UPDATE tenants SET config = :c, meta_business_id = :b WHERE id = :t"),
                 {
                     "c": '{"meta": ' + _json(meta) + "}",
                     "b": meta.get("business_id"),

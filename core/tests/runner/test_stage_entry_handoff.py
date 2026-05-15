@@ -15,6 +15,7 @@ ORM `.add()` calls — no DB. The composer-skip side of the contract
 (the `auto_handoff_triggered` branch in `run_turn`) is verified at the
 integration layer in Fase 7; here we focus on the helper itself.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -216,8 +217,10 @@ async def test_full_handoff_flow_persists_pauses_emits(fake_session):
 
     # 1. human_handoffs INSERT happened with the reason.
     insert_calls = [
-        params for sql, params in zip(
-            fake_session.executed_sql, fake_session.executed_params,
+        params
+        for sql, params in zip(
+            fake_session.executed_sql,
+            fake_session.executed_params,
         )
         if "INSERT INTO human_handoffs" in sql
     ]
@@ -226,8 +229,10 @@ async def test_full_handoff_flow_persists_pauses_emits(fake_session):
 
     # 2. conversations.bot_paused flipped to true.
     pause_calls = [
-        params for sql, params in zip(
-            fake_session.executed_sql, fake_session.executed_params,
+        params
+        for sql, params in zip(
+            fake_session.executed_sql,
+            fake_session.executed_params,
         )
         if "bot_paused = true" in sql
     ]
@@ -245,8 +250,7 @@ async def test_full_handoff_flow_persists_pauses_emits(fake_session):
     #    (workflows engine listens here).
     awaited = fake_session._fake_emitter.emit.await_args_list
     handoff_calls = [
-        c for c in awaited
-        if c.kwargs.get("event_type") == EventType.HUMAN_HANDOFF_REQUESTED
+        c for c in awaited if c.kwargs.get("event_type") == EventType.HUMAN_HANDOFF_REQUESTED
     ]
     assert len(handoff_calls) >= 1
     payload = handoff_calls[0].kwargs.get("payload") or {}
@@ -296,8 +300,10 @@ async def test_unknown_handoff_reason_falls_back_to_generic(fake_session):
     )
     assert triggered is True
     insert_params = next(
-        params for sql, params in zip(
-            fake_session.executed_sql, fake_session.executed_params,
+        params
+        for sql, params in zip(
+            fake_session.executed_sql,
+            fake_session.executed_params,
         )
         if "INSERT INTO human_handoffs" in sql
     )

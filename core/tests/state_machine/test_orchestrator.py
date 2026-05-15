@@ -22,7 +22,9 @@ def pipeline():
                 required_fields=["interes_producto", "ciudad"],
                 actions_allowed=["ask_field", "lookup_faq", "ask_clarification"],
                 transitions=[
-                    Transition(to="quote", when="all_required_fields_present AND intent == ask_price"),
+                    Transition(
+                        to="quote", when="all_required_fields_present AND intent == ask_price"
+                    ),
                 ],
             ),
             StageDefinition(
@@ -48,8 +50,13 @@ def state_qualify():
 
 
 def test_ambiguous_nlu_forces_ask_clarification(pipeline, state_qualify):
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.5, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.5,
+        ambiguities=[],
+    )
     decision = process_turn(pipeline, state_qualify, nlu, turn_count=2)
     assert decision.action == "ask_clarification"
     assert decision.next_stage == "qualify"
@@ -66,8 +73,13 @@ def test_normal_flow_picks_action_and_transitions(pipeline):
         },
         stage_entered_at=datetime.now(timezone.utc),
     )
-    nlu = NLUResult(intent=Intent.ASK_PRICE, entities={}, sentiment=Sentiment.NEUTRAL,
-                    confidence=0.9, ambiguities=[])
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
     decision = process_turn(pipeline, state, nlu, turn_count=2)
     assert decision.next_stage == "quote"
     # action_resolver should pick from the NEXT stage's allowed actions

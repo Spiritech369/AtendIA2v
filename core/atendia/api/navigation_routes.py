@@ -7,6 +7,7 @@ separate round-trips per tick.
 The "overdue" threshold for handoffs is a project default (2h since
 `requested_at`) since the schema has no dedicated SLA column.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

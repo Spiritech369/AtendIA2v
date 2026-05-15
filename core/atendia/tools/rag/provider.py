@@ -11,6 +11,7 @@ The module is intentionally tiny — keeping it free of imports of the
 two providers themselves means tests can import ``MockProvider``
 without pulling in the OpenAI SDK.
 """
+
 from __future__ import annotations
 
 from typing import Protocol

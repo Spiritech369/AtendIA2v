@@ -19,9 +19,7 @@ def adapter():
 @pytest.mark.asyncio
 @respx.mock
 async def test_send_text_message_returns_delivery_receipt(adapter):
-    route = respx.post(
-        "https://graph.facebook.com/v21.0/PHONE_ID/messages"
-    ).mock(
+    route = respx.post("https://graph.facebook.com/v21.0/PHONE_ID/messages").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -55,9 +53,7 @@ async def test_send_text_message_returns_delivery_receipt(adapter):
 @pytest.mark.asyncio
 @respx.mock
 async def test_send_text_message_returns_failed_on_meta_error(adapter):
-    respx.post(
-        "https://graph.facebook.com/v21.0/PHONE_ID/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PHONE_ID/messages").mock(
         return_value=httpx.Response(
             400,
             json={"error": {"code": 131000, "message": "Recipient phone not on WhatsApp"}},
@@ -78,9 +74,7 @@ async def test_send_text_message_returns_failed_on_meta_error(adapter):
 @pytest.mark.asyncio
 @respx.mock
 async def test_send_template_message(adapter):
-    respx.post(
-        "https://graph.facebook.com/v21.0/PHONE_ID/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PHONE_ID/messages").mock(
         return_value=httpx.Response(
             200,
             json={"messaging_product": "whatsapp", "messages": [{"id": "wamid.TPL"}]},
@@ -101,9 +95,9 @@ async def test_send_template_message(adapter):
 @pytest.mark.asyncio
 @respx.mock
 async def test_send_returns_failed_on_transport_error(adapter):
-    respx.post(
-        "https://graph.facebook.com/v21.0/PHONE_ID/messages"
-    ).mock(side_effect=httpx.ConnectError("connection refused"))
+    respx.post("https://graph.facebook.com/v21.0/PHONE_ID/messages").mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
 
     msg = OutboundMessage(
         tenant_id="t1",
@@ -120,9 +114,7 @@ async def test_send_returns_failed_on_transport_error(adapter):
 @respx.mock
 async def test_send_returns_failed_when_response_lacks_message_id(adapter):
     """Meta returned 200 but no `messages[0].id` — treat as failed."""
-    respx.post(
-        "https://graph.facebook.com/v21.0/PHONE_ID/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PHONE_ID/messages").mock(
         return_value=httpx.Response(200, json={"messaging_product": "whatsapp", "messages": []})
     )
 

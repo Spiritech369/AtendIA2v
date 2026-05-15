@@ -29,13 +29,19 @@ def setup_tenant():
     async def _setup():
         engine = create_async_engine(get_settings().database_url)
         async with engine.begin() as conn:
-            tid = (await conn.execute(
-                text("INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"),
-                {
-                    "n": "test_t18_retry",
-                    "c": json.dumps({"meta": {"phone_number_id": "PID_T18", "verify_token": "vt_t18"}}),
-                },
-            )).scalar()
+            tid = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO tenants (name, config) VALUES (:n, :c\\:\\:jsonb) RETURNING id"
+                    ),
+                    {
+                        "n": "test_t18_retry",
+                        "c": json.dumps(
+                            {"meta": {"phone_number_id": "PID_T18", "verify_token": "vt_t18"}}
+                        ),
+                    },
+                )
+            ).scalar()
         await engine.dispose()
         return tid
 
@@ -53,10 +59,12 @@ def setup_tenant():
 async def _count_messages(tid):
     engine = create_async_engine(get_settings().database_url)
     async with engine.begin() as conn:
-        n = (await conn.execute(
-            text("SELECT COUNT(*) FROM messages WHERE tenant_id = :t"),
-            {"t": tid},
-        )).scalar()
+        n = (
+            await conn.execute(
+                text("SELECT COUNT(*) FROM messages WHERE tenant_id = :t"),
+                {"t": tid},
+            )
+        ).scalar()
     await engine.dispose()
     return n
 
@@ -83,9 +91,7 @@ def test_is_transient_rejects_none():
 async def test_transient_failure_raises_retry_first_time(setup_tenant):
     """First attempt: transient 503 → Retry raised, no row persisted."""
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T18/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PID_T18/messages").mock(
         return_value=httpx.Response(
             503,
             json={"error": {"code": 503, "message": "service unavailable"}},
@@ -115,9 +121,7 @@ async def test_transient_failure_raises_retry_first_time(setup_tenant):
 async def test_transient_failure_persists_after_max_retries(setup_tenant):
     """At job_try >= 4, give up and persist the failed row."""
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T18/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PID_T18/messages").mock(
         return_value=httpx.Response(
             503,
             json={"error": {"code": 503, "message": "service unavailable"}},
@@ -142,9 +146,7 @@ async def test_transient_failure_persists_after_max_retries(setup_tenant):
 async def test_permanent_failure_persists_immediately_no_retry(setup_tenant):
     """4xx with permanent error → persist immediately, no Retry."""
     tid = setup_tenant
-    respx.post(
-        "https://graph.facebook.com/v21.0/PID_T18/messages"
-    ).mock(
+    respx.post("https://graph.facebook.com/v21.0/PID_T18/messages").mock(
         return_value=httpx.Response(
             400,
             json={"error": {"code": 131000, "message": "Recipient not on WhatsApp"}},

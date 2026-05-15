@@ -8,6 +8,7 @@ sort key. The cursor is base64-url-safe JSON `{"ts": iso, "id": uuid}`.
 This is more robust than offset pagination against rows shifting between
 pages while the operator scrolls.
 """
+
 from __future__ import annotations
 
 import base64
@@ -156,9 +157,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid cursor") from e
 
 
-async def _active_pipeline_stage_ids(
-    session: AsyncSession, tenant_id: UUID
-) -> set[str] | None:
+async def _active_pipeline_stage_ids(session: AsyncSession, tenant_id: UUID) -> set[str] | None:
     from atendia.db.models.tenant_config import TenantPipeline
 
     definition = (
@@ -201,9 +200,7 @@ def _user_unread_count_expr(*, tenant_id: UUID, user_id: UUID):
             msg.tenant_id == tenant_id,
             msg.conversation_id == Conversation.id,
             msg.direction == "inbound",
-            msg.sent_at > func.coalesce(
-                last_read_at, datetime(1970, 1, 1, tzinfo=UTC)
-            ),
+            msg.sent_at > func.coalesce(last_read_at, datetime(1970, 1, 1, tzinfo=UTC)),
         )
         .correlate(Conversation)
         .scalar_subquery()
@@ -230,7 +227,9 @@ async def _customer_fields(
                 ),
             )
             .where(CustomerFieldDefinition.tenant_id == tenant_id)
-            .order_by(CustomerFieldDefinition.ordering.asc(), CustomerFieldDefinition.created_at.asc())
+            .order_by(
+                CustomerFieldDefinition.ordering.asc(), CustomerFieldDefinition.created_at.asc()
+            )
         )
     ).all()
     return [
@@ -363,9 +362,7 @@ async def _required_docs(
             # "Present" = the resolved status is "ok"; any other value
             # (None, "missing", "pending") still counts as not-yet-done.
             present = isinstance(value, str) and value.lower() == "ok"
-            items.append(
-                RequiredDocInfo(field_name=field_path, label=label, present=present)
-            )
+            items.append(RequiredDocInfo(field_name=field_path, label=label, present=present))
         return items
 
     # ── 2. Legacy fallback: docs_per_plan ──────────────────────────
@@ -382,7 +379,9 @@ async def _required_docs(
         if isinstance(item, str):
             field_name = item
             label = item.replace("_", " ")
-        elif isinstance(item, dict) and isinstance(item.get("field_name") or item.get("field"), str):
+        elif isinstance(item, dict) and isinstance(
+            item.get("field_name") or item.get("field"), str
+        ):
             field_name = item.get("field_name") or item.get("field")
             label = item.get("label") or field_name.replace("_", " ")
         else:
@@ -445,6 +444,7 @@ async def list_conversations(
     unread_count = _user_unread_count_expr(tenant_id=tenant_id, user_id=user.user_id)
     from atendia.db.models.agent import Agent as _AgentList
     from atendia.db.models.tenant import TenantUser as _TUList
+
     stmt = (
         select(
             Conversation.id,
@@ -560,6 +560,7 @@ async def get_conversation(
     unread_count = _user_unread_count_expr(tenant_id=tenant_id, user_id=user.user_id)
     from atendia.db.models.agent import Agent as _AgentDetail
     from atendia.db.models.tenant import TenantUser as _TU
+
     last_inbound_sq = (
         select(
             func.max(MessageRow.sent_at).label("last_inbound_at"),
@@ -614,9 +615,7 @@ async def get_conversation(
     # statuses written by the upload/extraction sprint
     # (e.g. customer.attrs["DOCS_INE"]["status"] = "ok").
     customer_attrs = (
-        await session.execute(
-            select(Customer.attrs).where(Customer.id == row.customer_id)
-        )
+        await session.execute(select(Customer.attrs).where(Customer.id == row.customer_id))
     ).scalar_one_or_none() or {}
     return ConversationDetail(
         id=row.id,
@@ -656,9 +655,7 @@ async def list_messages(
     user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     limit: int = Query(50, ge=1, le=500),
-    cursor: str | None = Query(
-        None, description="Same cursor format as /conversations list"
-    ),
+    cursor: str | None = Query(None, description="Same cursor format as /conversations list"),
     session: AsyncSession = Depends(get_db_session),
 ) -> MessageListResponse:
     """Returns messages newest-first (operator scrolls UP into history,
@@ -805,9 +802,7 @@ async def intervene(
     #    Using the outbox.id as the message.id lets the worker's
     #    `INSERT ... ON CONFLICT (id) DO UPDATE` hit our pre-inserted row
     #    instead of creating a duplicate.
-    idempotency_key = (
-        f"intervene:{conversation_id}:{int(now.timestamp() * 1000)}"
-    )
+    idempotency_key = f"intervene:{conversation_id}:{int(now.timestamp() * 1000)}"
     outbound_msg = OutboundMessage(
         tenant_id=str(tenant_id),
         to_phone_e164=to_phone_e164,
@@ -838,9 +833,7 @@ async def intervene(
     )
 
     await session.execute(
-        update(Conversation)
-        .where(Conversation.id == conversation_id)
-        .values(last_activity_at=now)
+        update(Conversation).where(Conversation.id == conversation_id).values(last_activity_at=now)
     )
     await session.commit()
 
@@ -938,7 +931,11 @@ async def _check_force_summary_rate_limit(tenant_id: UUID) -> None:
         await client.aclose()
 
 
-@router.post("/{conversation_id}/force-summary", response_model=ProcessingResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{conversation_id}/force-summary",
+    response_model=ProcessingResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def force_summary_endpoint(
     conversation_id: UUID,
     user: AuthUser = Depends(current_user),
@@ -1059,9 +1056,7 @@ async def patch_conversation(
     if "current_stage" in fields and body.current_stage is not None:
         stage_ids = await _active_pipeline_stage_ids(session, tenant_id)
         if stage_ids is None:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "tenant has no active pipeline"
-            )
+            raise HTTPException(status.HTTP_409_CONFLICT, "tenant has no active pipeline")
         if body.current_stage not in stage_ids:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown pipeline stage")
         values["current_stage"] = body.current_stage
@@ -1124,9 +1119,7 @@ async def patch_conversation(
 
     if values:
         await session.execute(
-            update(Conversation)
-            .where(Conversation.id == conversation_id)
-            .values(**values)
+            update(Conversation).where(Conversation.id == conversation_id).values(**values)
         )
         if update_stage_entered_at:
             await session.execute(
@@ -1138,6 +1131,7 @@ async def patch_conversation(
         # Audit event
         from atendia.contracts.event import EventType
         from atendia.state_machine.event_emitter import EventEmitter
+
         emitter = EventEmitter(session)
         await emitter.emit(
             conversation_id=conversation_id,
@@ -1201,6 +1195,7 @@ async def patch_conversation(
         # the persisted patch.
         try:
             import redis.asyncio as redis_async
+
             redis_client = redis_async.Redis.from_url(get_settings().redis_url)
             try:
                 await publish_event(
@@ -1222,22 +1217,25 @@ async def patch_conversation(
 
     # Re-fetch with joined user email
     from atendia.db.models.tenant import TenantUser
+
     unread_count = _user_unread_count_expr(tenant_id=tenant_id, user_id=user.user_id)
-    row = (await session.execute(
-        select(
-            Conversation.id,
-            Conversation.current_stage,
-            Conversation.assigned_user_id,
-            Conversation.assigned_agent_id,
-            Conversation.tags,
-            unread_count.label("unread_count"),
-            Conversation.status,
-            TenantUser.email.label("assigned_user_email"),
+    row = (
+        await session.execute(
+            select(
+                Conversation.id,
+                Conversation.current_stage,
+                Conversation.assigned_user_id,
+                Conversation.assigned_agent_id,
+                Conversation.tags,
+                unread_count.label("unread_count"),
+                Conversation.status,
+                TenantUser.email.label("assigned_user_email"),
+            )
+            .select_from(Conversation)
+            .outerjoin(TenantUser, TenantUser.id == Conversation.assigned_user_id)
+            .where(Conversation.id == conversation_id)
         )
-        .select_from(Conversation)
-        .outerjoin(TenantUser, TenantUser.id == Conversation.assigned_user_id)
-        .where(Conversation.id == conversation_id)
-    )).first()
+    ).first()
 
     return ConversationPatchResponse(
         id=row.id,
@@ -1282,6 +1280,7 @@ async def delete_conversation(
 
     from atendia.contracts.event import EventType
     from atendia.state_machine.event_emitter import EventEmitter
+
     emitter = EventEmitter(session)
     await emitter.emit(
         conversation_id=conversation_id,
@@ -1353,8 +1352,6 @@ async def mark_read(
     # Keep the legacy aggregate column harmless for old callers; API responses
     # now compute unread per user from conversation_reads + messages.
     await session.execute(
-        update(Conversation)
-        .where(Conversation.id == conversation_id)
-        .values(unread_count=0)
+        update(Conversation).where(Conversation.id == conversation_id).values(unread_count=0)
     )
     await session.commit()

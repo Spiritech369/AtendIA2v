@@ -102,6 +102,7 @@ async def _resolve_attachment_urls(
     NOT raise - webhook contract is "always 200, retries are Meta's job".
     """
     from atendia.channels.base import InboundMessageMetadata
+
     for m in inbound_messages:
         if not m.metadata:
             continue
@@ -150,16 +151,12 @@ async def receive_inbound(
         base_url=settings.meta_base_url,
     )
     if not adapter.validate_signature(body, signature):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="invalid signature"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid signature")
 
     try:
         payload = _json.loads(body)
     except _json.JSONDecodeError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="invalid json"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid json")
 
     try:
         cfg = await load_meta_config(session, tenant_id)
@@ -230,60 +227,68 @@ async def receive_inbound(
 
 async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UUID] | None:
     """Find or create customer + conversation, then insert inbound message."""
-    cust_id = (await session.execute(
-        text(
-            "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
-            "ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164 "
-            "RETURNING id"
-        ),
-        {"t": tenant_id, "p": m.from_phone_e164},
-    )).scalar()
+    cust_id = (
+        await session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, :p) "
+                "ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164 "
+                "RETURNING id"
+            ),
+            {"t": tenant_id, "p": m.from_phone_e164},
+        )
+    ).scalar()
     # Soft-deleted conversations are excluded so an inbound after a
     # `DELETE /conversations/:id` opens a fresh conversation instead of
     # attaching the message to the ghosted one (which the UI hides).
-    conv_id = (await session.execute(
-        text(
-            "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
-            "AND deleted_at IS NULL "
-            "ORDER BY last_activity_at DESC LIMIT 1"
-        ),
-        {"t": tenant_id, "c": cust_id},
-    )).scalar()
+    conv_id = (
+        await session.execute(
+            text(
+                "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                "AND deleted_at IS NULL "
+                "ORDER BY last_activity_at DESC LIMIT 1"
+            ),
+            {"t": tenant_id, "c": cust_id},
+        )
+    ).scalar()
     if conv_id is None:
         from atendia.state_machine.pipeline_loader import resolve_initial_stage
 
         initial_stage = await resolve_initial_stage(session, tenant_id)
-        conv_id = (await session.execute(
-            text(
-                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
-                "VALUES (:t, :c, :s) RETURNING id"
-            ),
-            {"t": tenant_id, "c": cust_id, "s": initial_stage},
-        )).scalar()
+        conv_id = (
+            await session.execute(
+                text(
+                    "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                    "VALUES (:t, :c, :s) RETURNING id"
+                ),
+                {"t": tenant_id, "c": cust_id, "s": initial_stage},
+            )
+        ).scalar()
         await session.execute(
             text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
             {"c": conv_id},
         )
     metadata_json = _json.dumps(m.metadata or {})
-    inserted_message_id = (await session.execute(
-        text(
-            "INSERT INTO messages "
-            "(conversation_id, tenant_id, direction, text, channel_message_id, "
-            "sent_at, metadata_json) "
-            "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, CAST(:meta AS JSONB)) "
-            "ON CONFLICT (tenant_id, channel_message_id) "
-            "WHERE channel_message_id IS NOT NULL DO NOTHING "
-            "RETURNING id"
-        ),
-        {
-            "c": conv_id,
-            "t": tenant_id,
-            "txt": m.text or "",
-            "cmid": m.channel_message_id,
-            "ts": datetime.now(UTC),
-            "meta": metadata_json,
-        },
-    )).scalar_one_or_none()
+    inserted_message_id = (
+        await session.execute(
+            text(
+                "INSERT INTO messages "
+                "(conversation_id, tenant_id, direction, text, channel_message_id, "
+                "sent_at, metadata_json) "
+                "VALUES (:c, :t, 'inbound', :txt, :cmid, :ts, CAST(:meta AS JSONB)) "
+                "ON CONFLICT (tenant_id, channel_message_id) "
+                "WHERE channel_message_id IS NOT NULL DO NOTHING "
+                "RETURNING id"
+            ),
+            {
+                "c": conv_id,
+                "t": tenant_id,
+                "txt": m.text or "",
+                "cmid": m.channel_message_id,
+                "ts": datetime.now(UTC),
+                "meta": metadata_json,
+            },
+        )
+    ).scalar_one_or_none()
     if inserted_message_id is None:
         return None
 
@@ -296,6 +301,7 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
     # Emit event (T15)
     from atendia.contracts.event import EventType
     from atendia.state_machine.event_emitter import EventEmitter
+
     emitter = EventEmitter(session)
     event_row = await emitter.emit(
         conversation_id=conv_id,
@@ -312,10 +318,12 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
     # event itself; arq enqueues happen *after* the surrounding commit so the
     # worker never sees an execution id that hasn't been persisted.
     from atendia.workflows.engine import evaluate_event
+
     started_executions = await evaluate_event(session, event_row.id)
 
     # Publish to Pub/Sub for realtime subscribers (T22)
     from atendia.realtime.publisher import publish_event
+
     redis_client = await _get_redis()
     try:
         await publish_event(
@@ -351,11 +359,15 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
     from atendia.runner.conversation_runner import ConversationRunner
 
     # Find the next turn_number for this conversation
-    next_turn = (await session.execute(
-        text("SELECT COALESCE(MAX(turn_number), 0) + 1 FROM turn_traces "
-             "WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )).scalar()
+    next_turn = (
+        await session.execute(
+            text(
+                "SELECT COALESCE(MAX(turn_number), 0) + 1 FROM turn_traces "
+                "WHERE conversation_id = :c"
+            ),
+            {"c": conv_id},
+        )
+    ).scalar()
 
     settings = get_settings()
     nlu = build_nlu(settings)
@@ -366,8 +378,10 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
         meta = InboundMessageMetadata.model_validate(m.metadata)
         canonical_attachments = [
             CanonicalAttachment(
-                media_id=a.media_id, mime_type=a.mime_type,
-                url=a.url, caption=a.caption,
+                media_id=a.media_id,
+                mime_type=a.mime_type,
+                url=a.url,
+                caption=a.caption,
             )
             for a in meta.attachments
         ]
@@ -383,6 +397,7 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
 
     # Build an arq pool so the runner can enqueue outbound messages.
     from arq.connections import RedisSettings, create_pool
+
     arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
     try:
         try:
@@ -399,6 +414,7 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
             # Don't crash the webhook handler if the runner fails - just log via event.
             # In production this would also bubble to monitoring.
             from atendia.contracts.event import EventType
+
             await emitter.emit(
                 conversation_id=conv_id,
                 tenant_id=tenant_id,

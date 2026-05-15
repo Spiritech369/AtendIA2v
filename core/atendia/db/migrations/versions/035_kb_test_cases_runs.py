@@ -4,6 +4,7 @@ Revision ID: 5ab7479a44a0
 Revises: e133dc8ec51b
 Create Date: 2026-05-10
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -22,7 +23,9 @@ def upgrade() -> None:
     op.create_table(
         "kb_test_cases",
         sa.Column("id", sa.UUID(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("user_query", sa.Text(), nullable=False),
         sa.Column(
@@ -54,15 +57,32 @@ def upgrade() -> None:
         sa.Column("minimum_score", sa.Float(), nullable=False, server_default="0.7"),
         sa.Column("is_critical", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("created_by", sa.UUID()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
 
     op.create_table(
         "kb_test_runs",
         sa.Column("id", sa.UUID(), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("test_case_id", sa.UUID(), sa.ForeignKey("kb_test_cases.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "tenant_id", sa.UUID(), sa.ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+        ),
+        sa.Column(
+            "test_case_id",
+            sa.UUID(),
+            sa.ForeignKey("kb_test_cases.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("run_id", sa.UUID(), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column(
@@ -85,7 +105,12 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("ARRAY[]::text[]"),
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
     op.create_index("ix_kb_test_runs_run", "kb_test_runs", ["tenant_id", "run_id"])
 

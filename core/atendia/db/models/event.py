@@ -20,10 +20,14 @@ class EventRow(Base):
         nullable=True,
         index=True,
     )
-    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
     type: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     trace_id: Mapped[str | None] = mapped_column(String(60), index=True)
     # Migration 028: who took this action. NULL when the writer is the system
     # (workflow engine, NLU, runner). Set for operator-initiated audit events.

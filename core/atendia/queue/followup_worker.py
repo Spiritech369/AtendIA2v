@@ -20,6 +20,7 @@ Hardening (per code-review):
     a fresh 12h from now — keeps the silence clock anchored to the most
     recent outbound (the follow-up itself).
 """
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -46,7 +47,10 @@ def _quiet_hours_active(now: datetime) -> bool:
 
 
 async def _pick_due_followups(
-    session: AsyncSession, *, now: datetime, limit: int,
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int,
 ) -> list[dict[str, Any]]:
     """Lock + return up to `limit` due follow-up rows.
 
@@ -54,112 +58,140 @@ async def _pick_due_followups(
     cancelled_at + enqueued_at do the idempotency + cancellation
     re-check inside the same lock window.
     """
-    rows = (await session.execute(
-        text(
-            "SELECT f.id, f.conversation_id, f.tenant_id, f.kind, f.attempts "
-            "FROM followups_scheduled f "
-            "JOIN tenants t ON t.id = f.tenant_id "
-            "WHERE f.status = 'pending' "
-            "  AND f.cancelled_at IS NULL "
-            "  AND f.enqueued_at IS NULL "
-            "  AND f.run_at <= :now "
-            "  AND t.followups_enabled = true "
-            "ORDER BY f.run_at "
-            "LIMIT :lim "
-            "FOR UPDATE SKIP LOCKED"
-        ),
-        {"now": now, "lim": limit},
-    )).fetchall()
+    rows = (
+        await session.execute(
+            text(
+                "SELECT f.id, f.conversation_id, f.tenant_id, f.kind, f.attempts "
+                "FROM followups_scheduled f "
+                "JOIN tenants t ON t.id = f.tenant_id "
+                "WHERE f.status = 'pending' "
+                "  AND f.cancelled_at IS NULL "
+                "  AND f.enqueued_at IS NULL "
+                "  AND f.run_at <= :now "
+                "  AND t.followups_enabled = true "
+                "ORDER BY f.run_at "
+                "LIMIT :lim "
+                "FOR UPDATE SKIP LOCKED"
+            ),
+            {"now": now, "lim": limit},
+        )
+    ).fetchall()
     return [
-        {"id": r[0], "conversation_id": r[1], "tenant_id": r[2],
-         "kind": r[3], "attempts": r[4]}
+        {"id": r[0], "conversation_id": r[1], "tenant_id": r[2], "kind": r[3], "attempts": r[4]}
         for r in rows
     ]
 
 
 async def _load_extracted_data(
-    session: AsyncSession, conversation_id: Any,
+    session: AsyncSession,
+    conversation_id: Any,
 ) -> dict:
-    row = (await session.execute(
-        text("SELECT extracted_data FROM conversation_state "
-             "WHERE conversation_id = :c"),
-        {"c": conversation_id},
-    )).fetchone()
+    row = (
+        await session.execute(
+            text("SELECT extracted_data FROM conversation_state WHERE conversation_id = :c"),
+            {"c": conversation_id},
+        )
+    ).fetchone()
     if not row or not row[0]:
         return {}
     return dict(row[0])
 
 
 async def _load_recipient_phone(
-    session: AsyncSession, conversation_id: Any,
+    session: AsyncSession,
+    conversation_id: Any,
 ) -> str | None:
-    row = (await session.execute(
-        text("SELECT cu.phone_e164 "
-             "FROM conversations c "
-             "JOIN customers cu ON cu.id = c.customer_id "
-             "WHERE c.id = :c"),
-        {"c": conversation_id},
-    )).fetchone()
+    row = (
+        await session.execute(
+            text(
+                "SELECT cu.phone_e164 "
+                "FROM conversations c "
+                "JOIN customers cu ON cu.id = c.customer_id "
+                "WHERE c.id = :c"
+            ),
+            {"c": conversation_id},
+        )
+    ).fetchone()
     return row[0] if row else None
 
 
 async def _mark_in_flight(
-    session: AsyncSession, *, followup_id: Any, now: datetime,
+    session: AsyncSession,
+    *,
+    followup_id: Any,
+    now: datetime,
 ) -> None:
     await session.execute(
-        text("UPDATE followups_scheduled SET enqueued_at = :now "
-             "WHERE id = :fid"),
+        text("UPDATE followups_scheduled SET enqueued_at = :now WHERE id = :fid"),
         {"now": now, "fid": followup_id},
     )
 
 
 async def _mark_sent(
-    session: AsyncSession, *, followup_id: Any, conversation_id: Any,
+    session: AsyncSession,
+    *,
+    followup_id: Any,
+    conversation_id: Any,
 ) -> None:
     await session.execute(
         text("UPDATE followups_scheduled SET status = 'sent' WHERE id = :fid"),
         {"fid": followup_id},
     )
     await session.execute(
-        text("UPDATE conversation_state "
-             "SET followups_sent_count = followups_sent_count + 1 "
-             "WHERE conversation_id = :c"),
+        text(
+            "UPDATE conversation_state "
+            "SET followups_sent_count = followups_sent_count + 1 "
+            "WHERE conversation_id = :c"
+        ),
         {"c": conversation_id},
     )
 
 
 async def _mark_failed(
-    session: AsyncSession, *, followup_id: Any, error: str,
+    session: AsyncSession,
+    *,
+    followup_id: Any,
+    error: str,
 ) -> None:
     await session.execute(
-        text("UPDATE followups_scheduled "
-             "SET status = 'failed', last_error = :err, "
-             "    attempts = attempts + 1 "
-             "WHERE id = :fid"),
+        text(
+            "UPDATE followups_scheduled "
+            "SET status = 'failed', last_error = :err, "
+            "    attempts = attempts + 1 "
+            "WHERE id = :fid"
+        ),
         {"err": error[:500], "fid": followup_id},
     )
 
 
 async def _reschedule_12h_from_now(
-    session: AsyncSession, *, conversation_id: Any, tenant_id: Any, now: datetime,
+    session: AsyncSession,
+    *,
+    conversation_id: Any,
+    tenant_id: Any,
+    now: datetime,
 ) -> None:
     """When a 3h fires, the silence clock should restart — cancel the
     pending 12h (originally anchored to the previous outbound) and re-arm
     a fresh one from THIS follow-up's send time."""
     await session.execute(
-        text("UPDATE followups_scheduled "
-             "SET status = 'cancelled', cancelled_at = :now "
-             "WHERE conversation_id = :c "
-             "  AND kind = '12h_silence' "
-             "  AND status = 'pending' "
-             "  AND cancelled_at IS NULL"),
+        text(
+            "UPDATE followups_scheduled "
+            "SET status = 'cancelled', cancelled_at = :now "
+            "WHERE conversation_id = :c "
+            "  AND kind = '12h_silence' "
+            "  AND status = 'pending' "
+            "  AND cancelled_at IS NULL"
+        ),
         {"now": now, "c": conversation_id},
     )
     new_run_at = now + timedelta(hours=12)
     await session.execute(
-        text("INSERT INTO followups_scheduled "
-             "(conversation_id, tenant_id, run_at, status, kind) "
-             "VALUES (:c, :t, :ra, 'pending', '12h_silence')"),
+        text(
+            "INSERT INTO followups_scheduled "
+            "(conversation_id, tenant_id, run_at, status, kind) "
+            "VALUES (:c, :t, :ra, 'pending', '12h_silence')"
+        ),
         {"c": conversation_id, "t": tenant_id, "ra": new_run_at},
     )
 
@@ -191,7 +223,9 @@ async def poll_followups(ctx: dict) -> dict:
         async with sessionmaker() as session:
             async with session.begin():
                 due = await _pick_due_followups(
-                    session, now=now, limit=_RATE_CAP_PER_TICK,
+                    session,
+                    now=now,
+                    limit=_RATE_CAP_PER_TICK,
                 )
                 # Mark every picked row as in-flight before releasing the
                 # lock. We do this inside the same txn so the SKIP LOCKED
@@ -199,7 +233,9 @@ async def poll_followups(ctx: dict) -> dict:
                 # after still sees enqueued_at IS NOT NULL and skips.
                 for f in due:
                     await _mark_in_flight(
-                        session, followup_id=f["id"], now=now,
+                        session,
+                        followup_id=f["id"],
+                        now=now,
                     )
 
             # Each follow-up: render + enqueue + status-update in its own txn.
@@ -208,24 +244,29 @@ async def poll_followups(ctx: dict) -> dict:
                     async with sessionmaker() as send_session:
                         async with send_session.begin():
                             extracted = await _load_extracted_data(
-                                send_session, f["conversation_id"],
+                                send_session,
+                                f["conversation_id"],
                             )
                             phone = await _load_recipient_phone(
-                                send_session, f["conversation_id"],
+                                send_session,
+                                f["conversation_id"],
                             )
                             if not phone:
                                 # Customer row vanished — mark failed, move on.
                                 await _mark_failed(
-                                    send_session, followup_id=f["id"],
+                                    send_session,
+                                    followup_id=f["id"],
                                     error="recipient_phone_missing",
                                 )
                                 skipped_no_phone += 1
                                 continue
 
                             body = render_followup_body(
-                                kind=f["kind"], extracted_data=extracted,
+                                kind=f["kind"],
+                                extracted_data=extracted,
                             )
                             from atendia.channels.base import OutboundMessage
+
                             outbound = OutboundMessage(
                                 tenant_id=str(f["tenant_id"]),
                                 to_phone_e164=phone,
@@ -252,14 +293,17 @@ async def poll_followups(ctx: dict) -> dict:
                     async with sessionmaker() as err_session:
                         async with err_session.begin():
                             await _mark_failed(
-                                err_session, followup_id=f["id"],
+                                err_session,
+                                followup_id=f["id"],
                                 error=f"{type(exc).__name__}: {exc}",
                             )
     finally:
         await engine.dispose()
 
     return {
-        "status": "ok", "picked": len(due),
-        "sent": sent, "failed": failed,
+        "status": "ok",
+        "picked": len(due),
+        "sent": sent,
+        "failed": failed,
         "skipped_no_phone": skipped_no_phone,
     }

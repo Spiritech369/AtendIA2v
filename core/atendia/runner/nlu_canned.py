@@ -3,6 +3,7 @@
 Reads a list of pre-built NLUResult from a YAML file and returns them in order
 regardless of the actual input. Returns UsageMetadata=None — there's no LLM call.
 """
+
 from pathlib import Path
 
 import yaml

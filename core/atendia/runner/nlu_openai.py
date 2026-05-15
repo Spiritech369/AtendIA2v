@@ -2,6 +2,7 @@
 
 T15: happy path. T16+: retries and error handling.
 """
+
 import asyncio
 import json
 import time
@@ -143,9 +144,9 @@ class OpenAINLU:
                 #      with low-confidence entries that trigger the ambiguity check downstream.
                 if isinstance(raw.get("entities"), dict):
                     raw["entities"] = {
-                        k: v for k, v in raw["entities"].items()
-                        if v is not None
-                        and not (isinstance(v, dict) and v.get("value") is None)
+                        k: v
+                        for k, v in raw["entities"].items()
+                        if v is not None and not (isinstance(v, dict) and v.get("value") is None)
                     }
                 result = NLUResult.model_validate(raw)
                 usage = UsageMetadata(
@@ -153,7 +154,9 @@ class OpenAINLU:
                     tokens_in=resp.usage.prompt_tokens,
                     tokens_out=resp.usage.completion_tokens,
                     cost_usd=compute_cost(
-                        resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens,
+                        resp.model,
+                        resp.usage.prompt_tokens,
+                        resp.usage.completion_tokens,
                     ),
                     latency_ms=int((time.perf_counter() - t0) * 1000),
                 )
