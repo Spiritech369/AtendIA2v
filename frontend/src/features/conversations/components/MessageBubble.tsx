@@ -1,4 +1,4 @@
-import { Check, Copy, Cpu } from "lucide-react";
+import { Check, Copy, Cpu, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import type { MessageItem, MessageMedia } from "@/features/conversations/api";
@@ -16,6 +16,9 @@ interface Props {
   hasTrace?: boolean;
   isSelected?: boolean;
   onDebug?: (messageId: string) => void;
+  // C9 — when provided, the bubble shows inline edit / delete controls.
+  onEdit?: (messageId: string, text: string) => void;
+  onDelete?: (messageId: string) => void;
 }
 
 function extractMedia(metadata: Record<string, unknown>): MessageMedia | null {
@@ -26,11 +29,20 @@ function extractMedia(metadata: Record<string, unknown>): MessageMedia | null {
   return m as unknown as MessageMedia;
 }
 
-export function MessageBubble({ message, hasTrace, isSelected, onDebug }: Props) {
+export function MessageBubble({
+  message,
+  hasTrace,
+  isSelected,
+  onDebug,
+  onEdit,
+  onDelete,
+}: Props) {
   const isInbound = message.direction === "inbound";
   const isSystem = message.direction === "system";
   const clickable = hasTrace && onDebug;
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.text);
 
   // Fase 1 — runner-emitted system events (stage moved, plan updated,
   // doc accepted/rejected) carry `metadata.event_type` and deserve a
@@ -74,7 +86,42 @@ export function MessageBubble({ message, hasTrace, isSelected, onDebug }: Props)
         onClick={clickable ? () => onDebug(message.id) : undefined}
       >
         {media && <MediaContent media={media} />}
-        {showText && <div className="whitespace-pre-wrap">{cleanedText}</div>}
+        {editing ? (
+          <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              aria-label="Editar mensaje"
+              rows={2}
+              className="w-full resize-y rounded bg-background/90 p-1 text-foreground text-sm"
+            />
+            <div className="flex justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(message.text);
+                  setEditing(false);
+                }}
+                className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!draft.trim()}
+                onClick={() => {
+                  onEdit?.(message.id, draft.trim());
+                  setEditing(false);
+                }}
+                className="rounded bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground disabled:opacity-50"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        ) : (
+          showText && <div className="whitespace-pre-wrap">{cleanedText}</div>
+        )}
         <div className="mt-1 flex items-center gap-1">
           {message.sent_at && !isSystem && (
             <span
@@ -89,6 +136,16 @@ export function MessageBubble({ message, hasTrace, isSelected, onDebug }: Props)
               })}
             </span>
           )}
+          {message.edited_at && (
+            <span
+              className={cn(
+                "text-[10px] italic",
+                isInbound ? "text-muted-foreground" : "text-primary-foreground/60",
+              )}
+            >
+              editado
+            </span>
+          )}
           {hasTrace && (
             <Cpu
               className={cn(
@@ -101,19 +158,51 @@ export function MessageBubble({ message, hasTrace, isSelected, onDebug }: Props)
           )}
         </div>
 
-        {!isSystem && (
-          <button
-            type="button"
-            onClick={handleCopy}
+        {!isSystem && !editing && (
+          <div
             className={cn(
-              "absolute -top-2 right-1 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100",
+              "absolute -top-2 right-1 flex gap-0.5 rounded opacity-0 transition-opacity group-hover:opacity-100",
               isInbound
-                ? "bg-background text-muted-foreground hover:text-foreground"
-                : "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30",
+                ? "bg-background text-muted-foreground"
+                : "bg-primary-foreground/20 text-primary-foreground",
             )}
           >
-            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          </button>
+            <button
+              type="button"
+              aria-label="Copiar mensaje"
+              onClick={handleCopy}
+              className="rounded p-0.5 hover:opacity-80"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            </button>
+            {onEdit && (
+              <button
+                type="button"
+                aria-label="Editar mensaje"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDraft(message.text);
+                  setEditing(true);
+                }}
+                className="rounded p-0.5 hover:opacity-80"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                aria-label="Eliminar mensaje"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(message.id);
+                }}
+                className="rounded p-0.5 hover:opacity-80"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

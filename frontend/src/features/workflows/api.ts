@@ -217,6 +217,10 @@ export const workflowsApi = {
   ) => (await api.post<SimulationResult>(`/workflows/${id}/simulate`, body)).data,
   executions: async (id: string) =>
     (await api.get<WorkflowExecution[]>(`/workflows/${id}/executions`)).data,
+  // W16 — execution log export. Blob response so the CSV bytes
+  // round-trip intact; the caller turns it into a file download.
+  exportExecutionsCsv: async (id: string): Promise<Blob> =>
+    (await api.get(`/workflows/${id}/executions.csv`, { responseType: "blob" })).data,
   execution: async (id: string) => (await api.get<WorkflowExecution>(`/executions/${id}`)).data,
   retryExecution: async (id: string) =>
     (await api.post<WorkflowExecution>(`/executions/${id}/retry`)).data,

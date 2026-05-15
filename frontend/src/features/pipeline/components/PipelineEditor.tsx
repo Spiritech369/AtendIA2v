@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Plus,
   Save,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -106,6 +107,23 @@ export interface StageDraft {
   // matching reason string is persisted on `human_handoffs.reason`.
   pause_bot_on_enter?: boolean;
   handoff_reason?: string;
+}
+
+// P11 — long pipelines are unwieldy to scan. The roadmap pain point is
+// >20 stages; the filter input surfaces a bit earlier so it's there
+// before scanning hurts, but stays hidden for the typical 5-6 stage
+// pipeline to avoid clutter.
+const STAGE_SEARCH_MIN = 8;
+
+// P11 — the editor list filters by this predicate; an empty query shows
+// everything. Matches against both the human label and the stage_id so
+// operators can search by either.
+export function stageMatchesQuery(stage: StageDraft, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === "") return true;
+  return (
+    stage.label.toLowerCase().includes(q) || stage.id.toLowerCase().includes(q)
+  );
 }
 
 // Mirror of FlowMode in core/atendia/contracts/flow_mode.py. Kept as a
@@ -498,6 +516,7 @@ export function PipelineEditor({ onClose }: Props) {
   const [newPlanName, setNewPlanName] = useState("");
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [stageFilter, setStageFilter] = useState("");
 
   useEffect(() => {
     if (query.data) {
@@ -995,8 +1014,33 @@ export function PipelineEditor({ onClose }: Props) {
             <span className="text-[10px] text-muted-foreground">Arrastra para reordenar</span>
           </div>
 
+          {draft.stages.length > STAGE_SEARCH_MIN && (
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={stageFilter}
+                onChange={(e) => setStageFilter(e.target.value)}
+                placeholder={`Filtrar ${draft.stages.length} etapas por nombre o stage_id…`}
+                className="h-8 pl-7 pr-7 text-xs"
+                aria-label="Filtrar etapas"
+              />
+              {stageFilter && (
+                <button
+                  type="button"
+                  onClick={() => setStageFilter("")}
+                  aria-label="Limpiar filtro de etapas"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1">
-            {draft.stages.map((stage, idx) => (
+            {draft.stages.map((stage, idx) => {
+              if (!stageMatchesQuery(stage, stageFilter)) return null;
+              return (
               <div
                 key={`${stage.id}-${idx}`}
                 draggable
@@ -1107,7 +1151,15 @@ export function PipelineEditor({ onClose }: Props) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            ))}
+              );
+            })}
+            {draft.stages.length > STAGE_SEARCH_MIN &&
+              stageFilter.trim() !== "" &&
+              !draft.stages.some((s) => stageMatchesQuery(s, stageFilter)) && (
+                <p className="px-2 py-3 text-center text-[11px] text-muted-foreground">
+                  Ninguna etapa coincide con “{stageFilter}”.
+                </p>
+              )}
           </div>
 
           <Button

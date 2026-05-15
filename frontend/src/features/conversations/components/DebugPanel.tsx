@@ -3,7 +3,8 @@
 // secondary panels (entities, knowledge, state diff, latency, cost,
 // fact pack, raw JSON). Vertical-agnostic: zero hardcoded vocabulary.
 import { useQuery } from "@tanstack/react-query";
-import { Cpu, X } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Cpu, ExternalLink, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -100,6 +101,17 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
         <div className="flex flex-col gap-4 p-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <AgentBadge trace={t} />
+            {t.agent_id && (
+              <Link
+                to="/agents/$agentId"
+                params={{ agentId: t.agent_id }}
+                title="Abrir este agente en el editor (prompt + identidad)"
+                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Ver agente
+              </Link>
+            )}
             <AnomalyChips trace={t} />
           </div>
           <ErrorBanner trace={t} />

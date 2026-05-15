@@ -1759,8 +1759,29 @@ function NoteCard({ note, customerId }: { note: CustomerNote; customerId: string
 // Main export
 // ─────────────────────────────────────────────────────────────────────────────
 
+const COLLAPSE_KEY = "atendia.contactPanel.collapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function ContactPanel({ customerId, conversation }: Props) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapse preference persists across remounts: the panel is unmounted
+  // whenever the operator opens the DebugPanel, so a plain useState would
+  // reset the drawer every time they inspect a trace.
+  const [collapsed, setCollapsedState] = useState<boolean>(readCollapsed);
+  const setCollapsed = (v: boolean) => {
+    setCollapsedState(v);
+    try {
+      window.localStorage.setItem(COLLAPSE_KEY, v ? "1" : "0");
+    } catch {
+      /* storage disabled / over quota — non-fatal */
+    }
+  };
   const customer = useCustomerDetail(customerId ?? "");
 
   if (collapsed) {

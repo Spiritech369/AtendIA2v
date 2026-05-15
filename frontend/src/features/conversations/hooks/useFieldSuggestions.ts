@@ -4,16 +4,16 @@ import { toast } from "sonner";
 import { fieldSuggestionsApi } from "@/features/conversations/api";
 
 /**
- * Lists pending NLU suggestions for a customer. Polls every 60s so
- * a new suggestion landing mid-conversation appears without manual
- * refresh.
+ * Lists pending NLU suggestions for a customer. C11 — refreshed in
+ * realtime by useTenantStream (WS) on message_received /
+ * field_extracted / field_updated, plus a resync on socket reconnect.
+ * The old 60s refetchInterval poll is gone.
  */
 export function useFieldSuggestions(customerId: string | undefined) {
   return useQuery({
     queryKey: ["field-suggestions", customerId],
     queryFn: () => fieldSuggestionsApi.list(customerId as string),
     enabled: !!customerId,
-    refetchInterval: 60_000,
   });
 }
 

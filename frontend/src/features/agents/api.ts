@@ -253,9 +253,20 @@ export interface PreviewResult {
   systemPrompt?: string;
 }
 
+export interface WorkflowRef {
+  id: string;
+  name: string;
+  active: boolean;
+  version: number;
+  node_ids: string[];
+}
+
 export const agentsApi = {
   list: async () => (await api.get<AgentItem[]>("/agents")).data,
   get: async (id: string) => (await api.get<AgentItem>(`/agents/${id}`)).data,
+  // W5 — reverse dependency: workflows whose assign_agent nodes point here.
+  workflowsUsing: async (id: string) =>
+    (await api.get<WorkflowRef[]>(`/agents/${id}/workflows`)).data,
   create: async (body: Partial<AgentPayload>) => (await api.post<AgentItem>("/agents", body)).data,
   patch: async (id: string, body: Partial<AgentPayload>) =>
     (await api.patch<AgentItem>(`/agents/${id}`, body)).data,

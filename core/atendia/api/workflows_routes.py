@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
@@ -7,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1732,6 +1735,82 @@ async def list_executions(
         .all()
     )
     return [_execution_item(row, workflow) for row in rows]
+
+
+@router.get("/{workflow_id}/executions.csv")
+async def export_executions_csv(
+    workflow_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    """W16 — stream this workflow's execution log as a CSV attachment.
+
+    Factual DB columns only (no fixture-padded lead names); operators
+    pull this to triage runs offline. Tenant scope + 404 via the
+    workflow lookup, mirroring exports_routes.py.
+    """
+    workflow = await _get_workflow_or_404(session, workflow_id, tenant_id)
+    rows = (
+        (
+            await session.execute(
+                select(WorkflowExecution)
+                .where(WorkflowExecution.workflow_id == workflow_id)
+                .order_by(WorkflowExecution.started_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "execution_id",
+            "workflow_id",
+            "workflow_version",
+            "status",
+            "started_at",
+            "finished_at",
+            "duration_seconds",
+            "current_node_id",
+            "error_code",
+            "error",
+            "conversation_id",
+            "customer_id",
+        ]
+    )
+    for r in rows:
+        duration = ""
+        if r.finished_at is not None and r.started_at is not None:
+            duration = str(max(1, round((r.finished_at - r.started_at).total_seconds())))
+        writer.writerow(
+            [
+                str(r.id),
+                str(r.workflow_id),
+                str(workflow.version),
+                r.status,
+                r.started_at.isoformat() if r.started_at else "",
+                r.finished_at.isoformat() if r.finished_at else "",
+                duration,
+                r.current_node_id or "",
+                r.error_code or "",
+                # csv.writer escapes embedded newlines/commas in the reason
+                r.error or "",
+                str(r.conversation_id) if r.conversation_id else "",
+                str(r.customer_id) if r.customer_id else "",
+            ]
+        )
+    buf.seek(0)
+
+    stamp = datetime.now(UTC).date().isoformat()
+    filename = f"atendia-workflow-{workflow_id}-executions-{stamp}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/{workflow_id}/executions/{execution_id}/retry", response_model=ExecutionItem)
