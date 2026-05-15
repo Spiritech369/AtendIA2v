@@ -102,6 +102,12 @@ function StepInbound({
     <>
       <span className="text-muted-foreground">Cliente escribió</span>
       <div className="mt-1 rounded-md bg-muted px-2 py-1.5 text-sm italic">«{step.text}»</div>
+      {step.cleanedText && step.cleanedText !== step.text && (
+        <div className="mt-1 rounded-md border border-dashed bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground">
+          <span className="mr-1 text-[9px] uppercase tracking-wide">Texto limpio:</span>«
+          {step.cleanedText}»
+        </div>
+      )}
     </>
   ) : step.hasMedia ? (
     <span className="text-muted-foreground">Cliente envió un adjunto (sin texto).</span>

@@ -13,6 +13,7 @@ describe("StepInbound history count chip", () => {
         hasMedia: false,
         turnNumber: 3,
         totalTurns: 12,
+        cleanedText: null,
       },
     ];
     render(<TurnStoryView steps={steps} />);
@@ -30,6 +31,7 @@ describe("StepInbound history count chip", () => {
         hasMedia: false,
         turnNumber: 1,
         totalTurns: null,
+        cleanedText: null,
       },
     ];
     render(<TurnStoryView steps={steps} />);

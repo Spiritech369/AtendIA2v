@@ -21,6 +21,7 @@ export type StoryStep =
       hasMedia: boolean;
       turnNumber: number;
       totalTurns: number | null;
+      cleanedText: string | null;
     }
   | {
       kind: "nlu";
@@ -123,6 +124,7 @@ export function buildTurnStory(
     hasMedia: !trace.inbound_text && !!trace.inbound_message_id,
     turnNumber: trace.turn_number,
     totalTurns: opts.totalTurns ?? null,
+    cleanedText: trace.inbound_text_cleaned,
   });
 
   const { intent, confidence } = readIntent(trace);
