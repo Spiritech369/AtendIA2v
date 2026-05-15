@@ -5,7 +5,7 @@ The runner's `_trigger_stage_entry_handoff` couples six concerns:
   1. detect the stage's `pause_bot_on_enter` flag,
   2. resolve the `handoff_reason` (stage override > generic),
   3. build + persist a HandoffSummary,
-  4. flip `conversations.bot_paused = true`,
+  4. flip `conversation_state.bot_paused = true`,
   5. emit DOCS_COMPLETE_FOR_PLAN (when the stage uses that operator)
      + BOT_PAUSED + HUMAN_HANDOFF_REQUESTED system events,
   6. tell the caller to skip composer via the returned bool.
@@ -18,12 +18,16 @@ integration layer in Fase 7; here we focus on the helper itself.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from atendia.config import get_settings
 from atendia.contracts.event import EventType
 from atendia.contracts.pipeline_definition import (
     AutoEnterRules,
@@ -192,7 +196,7 @@ async def test_full_handoff_flow_persists_pauses_emits(fake_session):
     """Happy path: stage has pause_bot_on_enter=true + uses
     docs_complete_for_plan operator. Expect:
       - human_handoffs INSERT
-      - UPDATE conversations SET bot_paused=true
+      - UPDATE conversation_state SET bot_paused=true
       - system messages for DOCS_COMPLETE_FOR_PLAN, BOT_PAUSED, HUMAN_HANDOFF_REQUESTED
       - EventEmitter.emit() called for HUMAN_HANDOFF_REQUESTED
       - returns True
@@ -226,7 +230,7 @@ async def test_full_handoff_flow_persists_pauses_emits(fake_session):
     assert len(insert_calls) == 1
     assert insert_calls[0]["r"] == "docs_complete_for_plan"
 
-    # 2. conversations.bot_paused flipped to true.
+    # 2. conversation_state.bot_paused flipped to true.
     pause_calls = [
         params
         for sql, params in zip(
@@ -315,3 +319,126 @@ def test_stage_uses_docs_complete_for_plan_helper_pure():
     stage_without = _papeleria_completa_stage(uses_docs_complete=False)
     assert ConversationRunner._stage_uses_docs_complete_for_plan(stage_with) is True
     assert ConversationRunner._stage_uses_docs_complete_for_plan(stage_without) is False
+
+
+# ---------------------------------------------------------------------------
+# Real-DB regression guard
+#
+# The behavior tests above run against _FakeSession, which records the SQL
+# text but never executes it. That string-match masked a bug: the helper
+# wrote `UPDATE conversations SET bot_paused = true`, but bot_paused only
+# exists on conversation_state — the column the top-of-run_turn pause gate
+# actually reads. Against a real Postgres this raises UndefinedColumnError.
+# This test seeds real rows, runs the helper against a real AsyncSession,
+# and asserts the pause is observable where the gate looks for it, so the
+# bug cannot regress behind a mocked session again.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def seeded_conversation() -> tuple[str, str]:
+    """Real tenant + customer + conversation + conversation_state row.
+
+    Mirrors the seed/cleanup fixture in test_runner_suggested_handoff.py.
+    The conversation_state row MUST exist: the fix targets it with an
+    UPDATE, and an UPDATE against a missing row is a silent no-op that
+    would let this regression guard pass for the wrong reason.
+    """
+
+    async def _seed() -> tuple[str, str]:
+        engine = create_async_engine(get_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                tid = (
+                    await conn.execute(
+                        text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+                        {"n": f"stage_handoff_{uuid4().hex[:8]}"},
+                    )
+                ).scalar()
+                cid = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO customers (tenant_id, phone_e164, name) "
+                            "VALUES (:t, :p, 'Stage Handoff Test') RETURNING id"
+                        ),
+                        {"t": tid, "p": f"+5215{uuid4().hex[:9]}"},
+                    )
+                ).scalar()
+                conv = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                            "VALUES (:t, :c, 'nuevo') RETURNING id"
+                        ),
+                        {"t": tid, "c": cid},
+                    )
+                ).scalar()
+                await conn.execute(
+                    text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
+                    {"c": conv},
+                )
+            return str(tid), str(conv)
+        finally:
+            await engine.dispose()
+
+    async def _cleanup(tid: str) -> None:
+        engine = create_async_engine(get_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": tid})
+        finally:
+            await engine.dispose()
+
+    tid, conv = asyncio.run(_seed())
+    yield tid, conv
+    asyncio.run(_cleanup(tid))
+
+
+@pytest.mark.asyncio
+async def test_stage_entry_handoff_pauses_bot_in_conversation_state_real_db(
+    seeded_conversation,
+):
+    """Entering a `pause_bot_on_enter` stage must flip
+    conversation_state.bot_paused to True — the column the
+    top-of-run_turn short-circuit reads. Verified against a real row,
+    not a mocked-SQL string match."""
+    tid, conv = seeded_conversation
+    s = get_settings()
+    engine = create_async_engine(s.database_url)
+    sm = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with sm() as session:
+            runner = ConversationRunner(
+                session=session,  # type: ignore[arg-type]
+                nlu_provider=MagicMock(),
+                composer_provider=MagicMock(),
+            )
+            stage = _papeleria_completa_stage()
+            triggered = await runner._trigger_stage_entry_handoff(
+                tenant_id=UUID(tid),
+                conversation_id=UUID(conv),
+                pipeline=_pipeline_with(stage),
+                new_stage_id="papeleria_completa",
+                last_inbound_text="ya tengo toda la papelería",
+                merged_extracted={"plan_credito": {"value": "nomina_tarjeta_10"}},
+            )
+            await session.commit()
+
+        assert triggered is True
+
+        async with engine.begin() as conn:
+            paused = (
+                await conn.execute(
+                    text(
+                        "SELECT bot_paused FROM conversation_state "
+                        "WHERE conversation_id = :c"
+                    ),
+                    {"c": conv},
+                )
+            ).scalar()
+            assert paused is True, (
+                "bot_paused must be True on conversation_state after a "
+                "pause_bot_on_enter stage is entered"
+            )
+    finally:
+        await engine.dispose()

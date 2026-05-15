@@ -1226,9 +1226,8 @@ class ConversationRunner:
             # Flip the bot_paused gate so the next inbound turn short-
             # circuits at the top of run_turn until an operator resumes.
             # bot_paused lives on conversation_state (the column the
-            # top-of-turn SELECT/JOIN actually reads); the older
-            # STAGE_TRIGGERED_HANDOFF path writes `conversations` instead,
-            # which has no such column — we don't mirror that bug here.
+            # top-of-turn SELECT/JOIN actually reads); `conversations`
+            # has no such column.
             await self._session.execute(
                 text(
                     "UPDATE conversation_state SET bot_paused = true WHERE conversation_id = :cid"
@@ -1344,8 +1343,13 @@ class ConversationRunner:
 
         # Flip the bot_paused gate so subsequent inbound turns short-
         # circuit at the top of run_turn until an operator resumes.
+        # bot_paused lives on conversation_state (the column the
+        # top-of-turn SELECT/JOIN actually reads); `conversations` has
+        # no such column — mirror the D6 suggested_handoff path above.
         await self._session.execute(
-            text("UPDATE conversations SET bot_paused = true WHERE id = :cid"),
+            text(
+                "UPDATE conversation_state SET bot_paused = true WHERE conversation_id = :cid"
+            ),
             {"cid": conversation_id},
         )
 
