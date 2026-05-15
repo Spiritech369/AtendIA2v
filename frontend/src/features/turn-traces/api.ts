@@ -80,6 +80,12 @@ export interface TurnTraceDetail extends TurnTraceListItem {
   agent_id: string | null;
   kb_evidence: KbEvidence | null;
   rules_evaluated: RuleEvaluated[] | null;
+  // Migration 048 — DebugPanel C2 completion. Composer adapter that
+  // served this turn ('canned' | 'openai' | 'fallback') + the
+  // router-cleaned text the keyword matcher saw. NULL on legacy rows
+  // recorded before runner instrumentation landed.
+  composer_provider: "openai" | "canned" | "fallback" | null;
+  inbound_text_cleaned: string | null;
 }
 
 export const turnTracesApi = {

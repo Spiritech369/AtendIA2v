@@ -55,6 +55,8 @@ const baseTrace: TurnTraceDetail = {
   agent_id: null,
   kb_evidence: null,
   rules_evaluated: null,
+  composer_provider: null,
+  inbound_text_cleaned: null,
 };
 
 describe("buildTurnStory", () => {
