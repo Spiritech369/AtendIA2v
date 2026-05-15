@@ -22,6 +22,7 @@ Why this order: customers searching by model name are ~80% of catalog
 queries. Doing alias first costs ~1 ms and avoids paying the embedding
 API call for all those queries. Semantic only kicks in for the long tail.
 """
+
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -71,6 +72,12 @@ async def search_catalog(
     """
     # Path 1: alias-keyword match. JSONB `?|` is "any-of" — true if the
     # array contains any element from the right-hand array.
+    #
+    # Sprint C.6: alphabetical `sku` order is the tiebreaker so a query
+    # like "rayo" against three SKUs sharing that alias always picks the
+    # same row across calls. Without the ORDER BY, Postgres returned
+    # whichever row its planner scanned first and that changed between
+    # vacuum cycles — quotes pinned to a different product silently.
     keyword_stmt = (
         select(TenantCatalogItem)
         .where(
@@ -78,23 +85,22 @@ async def search_catalog(
             TenantCatalogItem.active.is_(True),
             text("attrs->'alias' ?| ARRAY[:alias_q]").bindparams(alias_q=query.lower()),
         )
+        .order_by(TenantCatalogItem.sku)
         .limit(limit)
     )
     if collection_ids:
-        keyword_stmt = keyword_stmt.where(
-            TenantCatalogItem.collection_id.in_(collection_ids)
-        )
+        keyword_stmt = keyword_stmt.where(TenantCatalogItem.collection_id.in_(collection_ids))
     keyword_hits = (await session.execute(keyword_stmt)).scalars().all()
     if keyword_hits:
         return [_to_result(item, score=1.0) for item in keyword_hits]
 
     # Path 2: semantic fallback. Only when caller supplied an embedding.
     if embedding is None:
-        return ToolNoDataResult(
-            hint=f"no alias match for {query!r}; semantic search not invoked"
-        )
+        return ToolNoDataResult(hint=f"no alias match for {query!r}; semantic search not invoked")
 
     distance = TenantCatalogItem.embedding.cosine_distance(embedding)
+    # `sku` is the secondary order so cosine ties (rare but possible
+    # when two embeddings collide) resolve deterministically. Sprint C.6.
     semantic_stmt = (
         select(TenantCatalogItem, (1 - distance).label("score"))
         .where(
@@ -102,13 +108,11 @@ async def search_catalog(
             TenantCatalogItem.active.is_(True),
             TenantCatalogItem.embedding.is_not(None),
         )
-        .order_by(distance)
+        .order_by(distance, TenantCatalogItem.sku)
         .limit(limit)
     )
     if collection_ids:
-        semantic_stmt = semantic_stmt.where(
-            TenantCatalogItem.collection_id.in_(collection_ids)
-        )
+        semantic_stmt = semantic_stmt.where(TenantCatalogItem.collection_id.in_(collection_ids))
     rows = (await session.execute(semantic_stmt)).all()
     if not rows:
         return ToolNoDataResult(hint=f"no semantic match for {query!r}")
