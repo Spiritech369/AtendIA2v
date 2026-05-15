@@ -133,6 +133,10 @@ batches shipped in one session.
 * `workflow_variables` es per-workflow (key `(workflow_id, name)`), no per-execution. Implicación: dos executions concurrentes del mismo workflow comparten variable state — pre-existing engine design choice, not caused by W8 work. Flagged for future revisit.
 * `_node_message` requiere un inbound recent (24h window check) → `ask_question` hereda este constraint. Fine en flujos normales (cliente acaba de escribir), pero documentar para casos edge.
 
+#### Bug latente detectado durante D6 (no arreglado — flagged)
+
+* **`STAGE_TRIGGERED_HANDOFF` escribe `UPDATE conversations SET bot_paused`** — pero `bot_paused` vive en `conversation_state`, NO en `conversations`. Ese UPDATE no falla ruidosamente (afecta 0 filas) así que el stage-triggered handoff **no pausa el bot realmente**. El path D6 nuevo (`60f0349`) escribe correctamente a `conversation_state` y NO replicó el bug. Pendiente: corregir el site de STAGE_TRIGGERED_HANDOFF. ~30 min, su propio commit. Quick win para una próxima sesión.
+
 #### Net deltas
 
 * Backend: +3 migrations (049, 050, 051), +2 new node types, +1 helper (recursion detection), +1 hook (MESSAGE_RECEIVED resume), +19 new tests
@@ -406,7 +410,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | # | Item | Status actual | Acción | Costo |
 |---|---|---|---|---|
 | **D5** | **C.7 Runner-composer reconciliation** | Dual: runner dispatch action-based, composer mode-based | a) Migrar runner a mode-based<br>b) Migrar composer a action-based<br>c) Dejar dual (deuda permanente) | T30+ = 4-6 sesiones |
-| **D6** | **C.9 HandoffReason 4 valores forward-contract** | Composer prompts piden `suggested_handoff=...`, runner NO lo lee | a) Wire (receta en docstring `1571a8e`, ~1 sesión)<br>b) Mantener si no hay user pain | 1 sesión |
+| ~~**D6**~~ | ~~**C.9 HandoffReason 4 valores forward-contract**~~ | ✅ **CERRADO** — `cb31dc9` (ComposerOutput.suggested_handoff + OpenAI schema) + `60f0349` (runner lee el campo → `persist_handoff` + bot pause). Los 4 valores (OBSTACLE_NO_SOLUTION, USER_SIGNALED_PAPELERIA_COMPLETA, PAPELERIA_COMPLETA_FORM_PENDING, ANTIGUEDAD_LT_6M) ya son escalation paths vivos | — | hecho 2026-05-15 |
 | **D7** | **Sprint B.1 happy-paths** | Solo smokes "renders without crash" | a) Agregar 1 user-interaction por página (~12 tests)<br>b) Dejar smokes hasta tener regresiones | ~1 sesión |
 | **D8** | **B.4 entrega real WhatsApp** del reminder | Scheduler dispara + evento; provider noop | Bloqueado por D2 (templates) | — |
 
