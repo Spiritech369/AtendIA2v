@@ -133,9 +133,22 @@ batches shipped in one session.
 * `workflow_variables` es per-workflow (key `(workflow_id, name)`), no per-execution. Implicación: dos executions concurrentes del mismo workflow comparten variable state — pre-existing engine design choice, not caused by W8 work. Flagged for future revisit.
 * `_node_message` requiere un inbound recent (24h window check) → `ask_question` hereda este constraint. Fine en flujos normales (cliente acaba de escribir), pero documentar para casos edge.
 
-#### Bug latente detectado durante D6 (no arreglado — flagged)
+#### Bug latente detectado durante D6 — ✅ CERRADO en Wave 1
 
-* **`STAGE_TRIGGERED_HANDOFF` escribe `UPDATE conversations SET bot_paused`** — pero `bot_paused` vive en `conversation_state`, NO en `conversations`. Ese UPDATE no falla ruidosamente (afecta 0 filas) así que el stage-triggered handoff **no pausa el bot realmente**. El path D6 nuevo (`60f0349`) escribe correctamente a `conversation_state` y NO replicó el bug. Pendiente: corregir el site de STAGE_TRIGGERED_HANDOFF. ~30 min, su propio commit. Quick win para una próxima sesión.
+* ~~**`STAGE_TRIGGERED_HANDOFF` escribe `UPDATE conversations SET bot_paused`**~~ — ✅ **CERRADO `812d2c0`**. Resultó ser un **CRASH** (no dead-write): `bot_paused` solo existe en `conversation_state`, así que el `UPDATE conversations SET bot_paused` lanzaba `UndefinedColumnError` → los stage-triggered handoffs estaban **completamente rotos** (handoff row creado pero excepción antes de pausar). Fix + regression test en `812d2c0`.
+* **Bonus encontrado + cerrado:** `StageDefinition.label` no era campo explícito (solo `extra="allow"`) → `AttributeError` en 3 call sites del runner para cualquier pipeline sin `label` (default, fixtures, programáticos). **Esta era la causa raíz de los 2 "baseline failures" que arrastramos toda la sesión** (`test_runner_extracts_fields_then_transitions_to_quote`, `test_runner_invokes_composer_for_composed_action`). Cerrado en `7b9f11d` (label como campo opcional + `s.label or s.id` en líneas 617/621) + `17dad26` (stale assertion del 2do test, que faltaba `raw_llm_response`/`suggested_handoff`). **Backend baseline failures: 8 → 6.**
+
+### Wave 1 (parte 1) — quick wins sweep (2026-05-15 noche)
+
+| Commit | Item | Cambio |
+|---|---|---|
+| `812d2c0` | Bug | STAGE_TRIGGERED_HANDOFF pausa bot vía `conversation_state` (era crash) |
+| `7b9f11d` | Bug | `StageDefinition.label` campo opcional explícito — fixea 1 baseline failure |
+| `17dad26` | Bug | stale `composer_output` assertion actualizada — fixea 2do baseline failure |
+| `17be60d` | W15 | Node-disabled visual indicator (PowerOff badge + opacity en canvas) |
+| `60bc725` | P6 | Dependency view dentro del stage editor (reusa `/impacted-references`, read-only) |
+
+Wave 1 restante (próxima sesión): A14, P11, A11, C7, C9, C11, W5, W16, etc.
 
 #### Net deltas
 
@@ -239,7 +252,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | P3 | 🟠 | Preview impact en conversaciones in-flight al cambiar `behavior_mode`. | 2-3d | abierto |
 | P4 | 🟠 | Per-stage permissions. | 3d | abierto |
 | P5 | 🟠 | Stage-level workflow trigger preview. | 1-2d | abierto |
-| P6 | 🟠 | Dependency view dentro del stage editor. | 0.5d | abierto |
+| ~~P6~~ | — | ~~Dependency view dentro del stage editor~~ | — | ✅ **cerrado por Wave 1 (`60bc725`)** |
 | P7 | 🟡 | Bulk move N customers. | 1d | abierto |
 | P8 | 🟡 | Stage templates / clone from another tenant. | ~1w | abierto |
 | P9 | 🟡 | Confirmation dialog al toggle behavior_mode / pause_bot. | 1d | abierto |
@@ -320,7 +333,7 @@ Layout del ContactPanel, EditableDetailRow, AddCustomAttrDialog, FieldSuggestion
 | W10 | 🟡 | Auto-layout para arrows. | 2-3d | abierto |
 | W13 | 🟡 | Test-mode que no dispare HTTP / sends reales. | 1.5d | abierto |
 | W14 | 🟡 | Inline variable picker / autocomplete. | 1.5d | abierto |
-| W15 | 🟡 | Node-disabled visual indicator. | 0.5d | abierto |
+| ~~W15~~ | — | ~~Node-disabled visual indicator~~ | — | ✅ **cerrado por Wave 1 (`17be60d`)** |
 | W16 | 🟡 | Execution log export. | 1d | abierto |
 | W17 | 🟡 | Performance hints. | 1d | abierto |
 | ~~W18~~ | — | ~~6 NYI restantes en WorkflowsPage~~ | — | ✅ **mitigado por Sprint B.2** (`8577fad` esconde NYIButton por flag); cablearlos sigue abierto si se quiere |
