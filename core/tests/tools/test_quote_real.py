@@ -17,7 +17,6 @@ from sqlalchemy import text
 from atendia.tools.base import Quote, ToolNoDataResult
 from atendia.tools.quote import quote
 
-
 pytestmark = pytest.mark.asyncio
 
 

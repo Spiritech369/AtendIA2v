@@ -35,7 +35,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from atendia.config import get_settings
 
-
 DEFAULT_COLLECTIONS: list[dict[str, Any]] = [
     {"slug": "requisitos", "name": "Requisitos", "icon": "FileText", "color": "blue"},
     {"slug": "ubicacion", "name": "Ubicación", "icon": "MapPin", "color": "emerald"},
@@ -218,7 +217,7 @@ async def _main(tenant_id_str: str) -> int:
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(
-            f"Usage: python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>",
+            "Usage: python -m atendia.scripts.seed_knowledge_defaults <tenant_uuid>",
             file=sys.stderr,
         )
         sys.exit(2)

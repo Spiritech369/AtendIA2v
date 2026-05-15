@@ -59,7 +59,7 @@ def _to_out(row: FieldSuggestion) -> FieldSuggestionOut:
 async def list_field_suggestions(
     customer_id: UUID,
     status_filter: str = Query("pending", alias="status"),
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FieldSuggestionOut]:

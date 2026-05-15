@@ -1,7 +1,7 @@
 import pytest
 
 from atendia.tools.base import Tool, ToolNotFoundError
-from atendia.tools.registry import register_tool, get_tool, _registry
+from atendia.tools.registry import _registry, get_tool, register_tool
 
 
 @pytest.fixture(autouse=True)

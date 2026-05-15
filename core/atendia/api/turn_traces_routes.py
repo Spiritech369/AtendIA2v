@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
 from atendia.db.models.conversation import Conversation
-from atendia.db.models.turn_trace import ToolCallRow, TurnTrace
+from atendia.db.models.turn_trace import TurnTrace
 from atendia.db.session import get_db_session
 
 router = APIRouter()
@@ -102,7 +102,7 @@ class TurnTraceDetail(TurnTraceListItem):
 
 @router.get("", response_model=TurnTraceListResponse)
 async def list_turn_traces(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     conversation_id: UUID | None = Query(None),
     flow_mode: str | None = Query(None),
@@ -175,7 +175,7 @@ async def list_turn_traces(
 @router.get("/{trace_id}", response_model=TurnTraceDetail)
 async def get_turn_trace(
     trace_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> TurnTraceDetail:

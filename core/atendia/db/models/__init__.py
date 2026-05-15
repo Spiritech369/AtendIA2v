@@ -42,8 +42,8 @@ from atendia.db.models.tenant_config import (
 )
 from atendia.db.models.turn_trace import ToolCallRow, TurnTrace
 from atendia.db.models.workflow import (
-    AIAgent,
     AdvisorPool,
+    AIAgent,
     BusinessHoursRule,
     KnowledgeBaseSource,
     SafetyRule,
@@ -59,10 +59,10 @@ from atendia.db.models.workflow import (
 )
 
 __all__ = [
+    "AIAgent",
     "Advisor",
     "AdvisorPool",
     "Agent",
-    "AIAgent",
     "Appointment",
     "BusinessHoursRule",
     "Conversation",
@@ -100,13 +100,13 @@ __all__ = [
     "OutboundOutbox",
     "SafetyRule",
     "Tenant",
+    "TenantBaileysConfig",
     "TenantBranding",
     "TenantCatalogItem",
     "TenantFAQ",
     "TenantPipeline",
     "TenantTemplateMeta",
     "TenantToolConfig",
-    "TenantBaileysConfig",
     "TenantUser",
     "ToolCallRow",
     "TurnTrace",

@@ -25,17 +25,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-
 # Set env BEFORE importing app modules so Settings picks them up.
 os.environ.setdefault("ATENDIA_V2_META_APP_SECRET", "smoke_secret_phase2")
 os.environ.setdefault("ATENDIA_V2_META_ACCESS_TOKEN", "TOKEN_SMOKE")
 os.environ.setdefault("ATENDIA_V2_META_API_VERSION", "v21.0")
 os.environ.setdefault("ATENDIA_V2_META_BASE_URL", "https://graph.facebook.com")
 
-from atendia.config import get_settings  # noqa: E402
-from atendia.main import app  # noqa: E402
-from atendia.queue.worker import send_outbound  # noqa: E402
-
+from atendia.config import get_settings
+from atendia.main import app
+from atendia.queue.worker import send_outbound
 
 APP_SECRET = os.environ["ATENDIA_V2_META_APP_SECRET"]
 
@@ -142,8 +140,8 @@ async def _redis_clear(channel_id: str):
 
 async def _drain_one_for_tenant(tenant_id: str) -> dict | None:
     """Drain one outbound job for a specific tenant from arq's queue."""
-    from redis.asyncio import Redis
     import arq.jobs
+    from redis.asyncio import Redis
 
     r = Redis.from_url(get_settings().redis_url)
     try:

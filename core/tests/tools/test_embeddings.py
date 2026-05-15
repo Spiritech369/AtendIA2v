@@ -7,7 +7,6 @@ happens, so this is also where cost accounting lives. Tests are mock-only
 
 from decimal import Decimal
 
-import pytest
 import respx
 from httpx import Response
 from openai import AsyncOpenAI

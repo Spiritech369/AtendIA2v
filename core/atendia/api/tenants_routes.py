@@ -81,7 +81,7 @@ class PipelinePutBody(BaseModel):
 
 @router.get("/pipeline", response_model=PipelineResponse)
 async def get_pipeline(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PipelineResponse:
@@ -275,7 +275,7 @@ def _history_entries(row: TenantPipeline) -> list[dict]:
     response_model=list[PipelineVersionListItem],
 )
 async def list_pipeline_versions(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[PipelineVersionListItem]:
@@ -315,7 +315,7 @@ async def list_pipeline_versions(
 )
 async def get_pipeline_version(
     index: int,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> PipelineVersionDetail:
@@ -434,7 +434,7 @@ class ImpactedReferencesResponse(BaseModel):
 )
 async def get_stage_impact(
     stage_id: str,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ImpactedReferencesResponse:
@@ -533,7 +533,7 @@ class AuditLogResponse(BaseModel):
 
 @router.get("/pipeline/audit-log", response_model=AuditLogResponse)
 async def get_pipeline_audit_log(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
     limit: int = 50,
@@ -669,7 +669,7 @@ async def _ensure_branding(session: AsyncSession, tenant_id: UUID) -> TenantBran
 
 @router.get("/brand-facts", response_model=BrandFactsResponse)
 async def get_brand_facts(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BrandFactsResponse:
@@ -681,7 +681,7 @@ async def get_brand_facts(
 @router.put("/brand-facts", response_model=BrandFactsResponse)
 async def put_brand_facts(
     body: BrandFactsPutBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BrandFactsResponse:
@@ -699,7 +699,7 @@ async def put_brand_facts(
 
 @router.get("/tone", response_model=ToneResponse)
 async def get_tone(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ToneResponse:
@@ -710,7 +710,7 @@ async def get_tone(
 @router.put("/tone", response_model=ToneResponse)
 async def put_tone(
     body: TonePutBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ToneResponse:
@@ -724,7 +724,7 @@ async def put_tone(
 
 @router.get("/timezone", response_model=TimezoneResponse)
 async def get_timezone(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> TimezoneResponse:
@@ -737,7 +737,7 @@ async def get_timezone(
 @router.put("/timezone", response_model=TimezoneResponse)
 async def put_timezone(
     body: TimezonePutBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> TimezoneResponse:
@@ -892,7 +892,7 @@ def _normalize_inbox_config(config: object) -> dict:
 
 @router.get("/inbox-config", response_model=InboxConfigResponse)
 async def get_inbox_config(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> InboxConfigResponse:
@@ -904,7 +904,7 @@ async def get_inbox_config(
 @router.put("/inbox-config", response_model=InboxConfigResponse)
 async def put_inbox_config(
     body: InboxConfigBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> InboxConfigResponse:

@@ -2,8 +2,6 @@ import asyncio
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
-from uuid import uuid4
 
 import httpx
 import pytest
@@ -15,8 +13,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from atendia.config import get_settings
 from atendia.main import app
 from atendia.queue.worker import send_outbound
-from atendia.realtime.publisher import channel_for
-
 
 APP_SECRET = "secret_t22"
 

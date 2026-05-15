@@ -19,12 +19,11 @@ from pathlib import Path
 # Python only auto-adds the script's directory; the package lives one up.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from atendia.api._auth_helpers import hash_password  # noqa: E402
-from atendia.config import get_settings  # noqa: E402
-
+from atendia.api._auth_helpers import hash_password
+from atendia.config import get_settings
 
 DEMO_TENANT_NAME = "demo"
 DEMO_EMAIL = "admin@demo.com"

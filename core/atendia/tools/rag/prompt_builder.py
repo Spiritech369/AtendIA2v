@@ -12,7 +12,6 @@ from __future__ import annotations
 from atendia.tools.rag.provider import PromptInput
 from atendia.tools.rag.retriever import RetrievedChunk, SafeAnswerSettings
 
-
 BASE_SYSTEM = (
     "Eres AtendIA, asistente de ventas de un distribuidor automotriz en México. "
     "Responde en español mexicano, claro, concreto y profesional. "

@@ -65,7 +65,7 @@ def _composer() -> OpenAIComposer:
 
 
 @pytest.mark.asyncio
-async def test_live_PLAN_first_turn_hook() -> None:  # noqa: N802
+async def test_live_PLAN_first_turn_hook() -> None:
     """PLAN MODE turn 1 + empty extracted_data → hook about $3,500 enganche."""
     out, _ = await _composer().compose(
         input=ComposerInput(
@@ -84,7 +84,7 @@ async def test_live_PLAN_first_turn_hook() -> None:  # noqa: N802
 
 
 @pytest.mark.asyncio
-async def test_live_SALES_quote_uses_real_price_no_invention() -> None:  # noqa: N802
+async def test_live_SALES_quote_uses_real_price_no_invention() -> None:
     """SALES with status=ok must echo the real price, not hallucinate."""
     out, _ = await _composer().compose(
         input=ComposerInput(
@@ -125,7 +125,7 @@ async def test_live_SALES_quote_uses_real_price_no_invention() -> None:  # noqa:
 
 
 @pytest.mark.asyncio
-async def test_live_DOC_unrelated_image_refuses_to_mark() -> None:  # noqa: N802
+async def test_live_DOC_unrelated_image_refuses_to_mark() -> None:
     """DOC with vision_result=moto must NOT claim INE was received."""
     out, _ = await _composer().compose(
         input=ComposerInput(
@@ -156,7 +156,7 @@ async def test_live_DOC_unrelated_image_refuses_to_mark() -> None:  # noqa: N802
 
 
 @pytest.mark.asyncio
-async def test_live_OBSTACLE_first_turn_disambiguates_blocker() -> None:  # noqa: N802
+async def test_live_OBSTACLE_first_turn_disambiguates_blocker() -> None:
     """OBSTACLE asks which doc is the blocker (comprobante vs nóminas)."""
     out, _ = await _composer().compose(
         input=ComposerInput(
@@ -175,7 +175,7 @@ async def test_live_OBSTACLE_first_turn_disambiguates_blocker() -> None:  # noqa
 
 
 @pytest.mark.asyncio
-async def test_live_RETENTION_keeps_canonical_hook() -> None:  # noqa: N802
+async def test_live_RETENTION_keeps_canonical_hook() -> None:
     """RETENTION must use the 'gracias' rationale, not start a new flow."""
     out, _ = await _composer().compose(
         input=ComposerInput(
@@ -195,7 +195,7 @@ async def test_live_RETENTION_keeps_canonical_hook() -> None:  # noqa: N802
 
 
 @pytest.mark.asyncio
-async def test_live_SUPPORT_honors_brand_facts_on_no_data() -> None:  # noqa: N802
+async def test_live_SUPPORT_honors_brand_facts_on_no_data() -> None:
     """SUPPORT with status=no_data falls back to brand_facts (buró etc.)."""
     out, _ = await _composer().compose(
         input=ComposerInput(

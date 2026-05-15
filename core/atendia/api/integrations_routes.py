@@ -96,8 +96,8 @@ async def get_whatsapp_details(
 
 @router.get("/ai-provider", response_model=AIProviderInfo)
 async def get_ai_provider_info(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
-    tenant_id: UUID = Depends(current_tenant_id),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
 ) -> AIProviderInfo:
     settings = get_settings()
     return AIProviderInfo(

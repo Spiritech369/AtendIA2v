@@ -13,16 +13,12 @@ Distribution targets:
 from __future__ import annotations
 
 import asyncio
-import json
 import random
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from atendia.config import get_settings
-
 
 NAMES = [
     "Carlos Mendoza",

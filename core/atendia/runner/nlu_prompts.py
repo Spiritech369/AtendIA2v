@@ -11,7 +11,7 @@ Los placeholders entre {{ }} se sustituyen al construir la request.
 
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner._template_helpers import (
-    ROLE_LABELS,
+    ROLE_LABELS,  # noqa: F401  (re-exported for tests / external callers)
     _render_history,
     render_template,
 )

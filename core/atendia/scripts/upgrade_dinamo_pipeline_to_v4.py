@@ -20,7 +20,6 @@ from uuid import UUID
 
 from sqlalchemy import text
 
-
 # Edited by humans: descriptions used by the NLU prompt.
 DINAMO_FIELD_DESCRIPTIONS: dict[str, str] = {
     "interes_producto": "Modelo de motocicleta o categoría que le interesa al cliente (ej: 150Z, scooter, deportiva)",

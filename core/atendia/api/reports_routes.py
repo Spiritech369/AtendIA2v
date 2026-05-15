@@ -274,7 +274,7 @@ async def _pipeline_funnel(session: AsyncSession, tenant_id: UUID) -> list[Funne
 
 @router.get("/overview", response_model=ReportsOverview)
 async def get_reports_overview(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ReportsOverview:

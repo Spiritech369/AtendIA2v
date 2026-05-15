@@ -47,7 +47,7 @@ async def search(
     agent: str | None = Query(default=None, max_length=40),
     source_types: list[Literal["faq", "catalog", "document"]] | None = Query(default=None),
     min_score: float | None = Query(default=None, ge=0.0, le=1.0),
-    user: AuthUser = Depends(current_user),  # noqa: ARG001 — auth gate only
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> SearchResponse:

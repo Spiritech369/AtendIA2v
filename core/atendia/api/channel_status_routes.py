@@ -106,7 +106,7 @@ def _legacy_status(active: str, meta_status: str, baileys_status: str) -> str:
 
 @router.get("", response_model=ChannelStatusResponse)
 async def get_channel_status(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ChannelStatusResponse:

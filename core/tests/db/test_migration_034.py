@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from atendia.config import get_settings
 
-
 CONFLICT_COLUMNS = [
     "id",
     "tenant_id",

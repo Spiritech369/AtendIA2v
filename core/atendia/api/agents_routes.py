@@ -907,7 +907,7 @@ async def _preview_response(row: Agent, message: str, draft_config: dict | None 
             ],
             temperature=0.4,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {
             "rawResponse": "",
             "finalResponse": f"Error llamando al LLM: {exc}",
@@ -950,7 +950,7 @@ async def _preview_response(row: Agent, message: str, draft_config: dict | None 
 
 @router.get("", response_model=list[AgentItem])
 async def list_agents(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[AgentItem]:
@@ -999,7 +999,7 @@ async def create_agent(
 @router.post("/compare")
 async def compare_agents(
     body: CompareBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1055,7 +1055,7 @@ async def compare_agents(
 @router.get("/{agent_id}", response_model=AgentItem)
 async def get_agent(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
@@ -1195,7 +1195,7 @@ async def disable_agent(
 @router.post("/{agent_id}/export")
 async def export_agent(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1206,7 +1206,7 @@ async def export_agent(
 @router.get("/{agent_id}/health")
 async def get_agent_health(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1217,7 +1217,7 @@ async def get_agent_health(
 @router.get("/{agent_id}/metrics/snapshot")
 async def get_agent_metrics_snapshot(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1228,7 +1228,7 @@ async def get_agent_metrics_snapshot(
 @router.get("/{agent_id}/config")
 async def get_agent_config(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1269,7 +1269,7 @@ async def patch_agent_config(
 async def validate_agent_config(
     agent_id: UUID,
     draft: dict | None = None,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1281,7 +1281,7 @@ async def validate_agent_config(
 async def preview_agent_response(
     agent_id: UUID,
     body: PreviewBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1292,7 +1292,7 @@ async def preview_agent_response(
 @router.get("/{agent_id}/monitor")
 async def agent_monitor(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1385,7 +1385,7 @@ async def agent_monitor(
 @router.get("/{agent_id}/guardrails")
 async def list_agent_guardrails(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1428,7 +1428,7 @@ async def create_agent_guardrail(
 @router.get("/{agent_id}/extraction-fields")
 async def list_agent_extraction_fields(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1471,7 +1471,7 @@ async def create_agent_extraction_field(
 @router.get("/{agent_id}/live-monitor")
 async def get_live_monitor(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1482,7 +1482,7 @@ async def get_live_monitor(
 @router.get("/{agent_id}/supervisor-decisions")
 async def get_supervisor_decisions(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1503,7 +1503,7 @@ async def get_supervisor_decisions(
 @router.get("/{agent_id}/knowledge-coverage")
 async def get_knowledge_coverage(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1514,7 +1514,7 @@ async def get_knowledge_coverage(
 @router.get("/{agent_id}/failed-queries")
 async def get_failed_queries(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1536,7 +1536,7 @@ async def get_failed_queries(
 @router.get("/{agent_id}/decision-map")
 async def get_decision_map(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1579,7 +1579,7 @@ async def put_decision_map(
 @router.post("/{agent_id}/decision-map/validate")
 async def validate_decision_map(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1599,7 +1599,7 @@ async def validate_decision_map(
 async def test_decision_node(
     agent_id: UUID,
     node_id: str,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1610,7 +1610,7 @@ async def test_decision_node(
 @router.get("/{agent_id}/versions")
 async def get_agent_versions(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1846,7 +1846,7 @@ async def create_version_from_comparison(
 @router.get("/{agent_id}/scenario-runs")
 async def get_agent_scenario_runs(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1858,7 +1858,7 @@ async def get_agent_scenario_runs(
 async def run_agent_scenario(
     agent_id: UUID,
     body: ScenarioRunBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1877,7 +1877,7 @@ async def run_agent_scenario(
 @router.post("/{agent_id}/scenarios/stress-test")
 async def run_agent_stress_test(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1890,7 +1890,7 @@ async def run_agent_stress_test(
 @router.get("/{agent_id}/audit-logs")
 async def get_agent_audit_logs(
     agent_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -1901,8 +1901,8 @@ async def get_agent_audit_logs(
 @router.post("/test", response_model=AgentTestResponse)
 async def test_agent(
     body: AgentTestBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
-    tenant_id: UUID = Depends(current_tenant_id),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
 ) -> AgentTestResponse:
     config = body.agent_config or {}
     name = config.get("name") or "Agente"
@@ -1939,7 +1939,7 @@ async def patch_guardrail(
 @guardrails_router.delete("/{guardrail_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_guardrail(
     guardrail_id: str,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
@@ -1974,7 +1974,7 @@ async def duplicate_guardrail(
 async def test_guardrail(
     guardrail_id: str,
     message: dict | None = None,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -1991,7 +1991,7 @@ async def test_guardrail(
 @guardrails_router.get("/{guardrail_id}/violations")
 async def get_guardrail_violations(
     guardrail_id: str,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -2012,7 +2012,7 @@ async def get_guardrail_violations(
 async def patch_extraction_field(
     field_id: str,
     body: ExtractionFieldBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -2026,7 +2026,7 @@ async def patch_extraction_field(
 @extraction_fields_router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_extraction_field(
     field_id: str,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
@@ -2041,7 +2041,7 @@ async def delete_extraction_field(
 async def test_extraction_field(
     field_id: str,
     message: dict | None = None,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -2062,7 +2062,7 @@ async def test_extraction_field(
 @extraction_fields_router.get("/{field_id}/examples")
 async def get_extraction_examples(
     field_id: str,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
@@ -2078,7 +2078,7 @@ async def get_extraction_examples(
 @supervisor_router.post("/evaluate-response")
 async def evaluate_response(
     body: PreviewBody,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
 ) -> dict:
     risk = "high" if "aprob" in body.message.lower() else "low"
     return {
@@ -2096,11 +2096,11 @@ async def evaluate_response(
 @supervisor_router.get("/decisions/{decision_id}")
 async def get_supervisor_decision(
     decision_id: str,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
 ) -> dict:
     return {"id": decision_id, "outcome": "approved", "created_at": datetime.now(UTC).isoformat()}
 
 
 @scenarios_router.get("")
-async def list_scenarios(user: AuthUser = Depends(current_user)) -> list[dict]:  # noqa: ARG001
+async def list_scenarios(user: AuthUser = Depends(current_user)) -> list[dict]:
     return _default_scenarios("reception")

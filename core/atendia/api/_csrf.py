@@ -62,4 +62,4 @@ def install_csrf_middleware(app) -> None:
     app.add_middleware(CSRFMiddleware)
 
 
-__all__ = ["CSRFMiddleware", "install_csrf_middleware", "CSRF_HEADER"]
+__all__ = ["CSRF_HEADER", "CSRFMiddleware", "install_csrf_middleware"]

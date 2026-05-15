@@ -11,7 +11,6 @@ from atendia.contracts.message import Message, MessageDirection
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
 
-
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "conversations"
 
 

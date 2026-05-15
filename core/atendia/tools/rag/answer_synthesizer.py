@@ -24,7 +24,6 @@ from atendia.tools.rag.provider import AnswerOutput, PromptInput
 from atendia.tools.rag.retriever import RetrievalResult, SafeAnswerSettings
 from atendia.tools.rag.risky_phrase_detector import Risk, detect_risky_phrases
 
-
 Mode = Literal["llm", "sources_only", "empty", "mock"]
 Confidence = Literal["low", "medium", "high"]
 Action = Literal["answer", "clarify", "escalate"]
@@ -67,7 +66,7 @@ async def synthesize(
     retrieval: RetrievalResult,
     prompt: PromptInput,
     settings: SafeAnswerSettings,
-    agent: str,  # noqa: ARG001 — kept for future per-agent overrides
+    agent: str,
     provider: _ProviderLike | None,
 ) -> AnswerResult:
     """Apply the decision tree and return an AnswerResult."""

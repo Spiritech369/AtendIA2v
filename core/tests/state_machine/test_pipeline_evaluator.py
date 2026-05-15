@@ -6,8 +6,6 @@ integration test at the bottom (skipped when DB is unavailable).
 
 from __future__ import annotations
 
-import pytest
-
 from atendia.contracts.pipeline_definition import (
     AutoEnterRules,
     Condition,
@@ -20,7 +18,6 @@ from atendia.state_machine.pipeline_evaluator import (
     resolve_field_path,
     select_best_stage,
 )
-
 
 # ---------- resolve_field_path ----------
 

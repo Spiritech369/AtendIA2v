@@ -33,7 +33,6 @@ from atendia.tools.rag.conflict_detector import (
     detect_conflicts_in_results,
 )
 
-
 _DEFAULT_TOP_K = 6
 _DEFAULT_PRIORITY_BY_SOURCE = {"faq": 100, "catalog": 80, "document": 60}
 _DEFAULT_MIN_SCORE = 0.7

@@ -97,7 +97,7 @@ async def _upsert_config(
 
 @integrations_router.get("/status", response_model=BaileysStatusResponse)
 async def get_baileys_status(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BaileysStatusResponse:
@@ -117,7 +117,7 @@ async def get_baileys_status(
 
 @integrations_router.post("/connect", response_model=BaileysStatusResponse)
 async def baileys_connect(
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BaileysStatusResponse:
@@ -139,7 +139,7 @@ async def baileys_connect(
 
 @integrations_router.post("/disconnect", response_model=BaileysStatusResponse)
 async def baileys_disconnect(
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BaileysStatusResponse:
@@ -161,7 +161,7 @@ async def baileys_disconnect(
 
 @integrations_router.get("/qr")
 async def baileys_qr(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
 ) -> dict:
     """Returns `{qr: 'data:image/png;base64,...'}` when scan is pending."""
@@ -175,7 +175,7 @@ async def baileys_qr(
 @integrations_router.patch("/preference", response_model=BaileysStatusResponse)
 async def update_baileys_preference(
     body: PreferenceBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> BaileysStatusResponse:
@@ -190,14 +190,14 @@ async def update_baileys_preference(
     return await get_baileys_status(  # type: ignore[return-value]
         tenant_id=tenant_id,
         user=None,
-        session=session,  # noqa
+        session=session,
     )
 
 
 @integrations_router.post("/test-send")
 async def baileys_test_send(
     body: TestSendBody,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
 ) -> dict:
     try:

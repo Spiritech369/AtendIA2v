@@ -21,7 +21,6 @@ from itertools import combinations
 
 from pydantic import BaseModel
 
-
 # TODO(kb-followup-10): expand price detector to handle EUR/USD currency
 # variants and locale-specific separators (1.234,56 etc).
 _PRICE_RE = re.compile(r"\$\s?(\d{1,3}(?:[.,]\d{3})*(?:\.\d{2})?)")

@@ -124,7 +124,7 @@ class FieldDefUpdate(BaseModel):
 
 @definitions_router.get("", response_model=list[FieldDefOut])
 async def list_definitions(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FieldDefOut]:
@@ -157,7 +157,7 @@ async def list_definitions(
 @definitions_router.post("", response_model=FieldDefOut, status_code=status.HTTP_201_CREATED)
 async def create_definition(
     body: FieldDefCreate,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> FieldDefOut:
@@ -188,7 +188,7 @@ async def create_definition(
 async def update_definition(
     def_id: UUID,
     body: FieldDefUpdate,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> FieldDefOut:
@@ -226,7 +226,7 @@ async def update_definition(
 @definitions_router.delete("/{def_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_definition(
     def_id: UUID,
-    user: AuthUser = Depends(require_tenant_admin),  # noqa: ARG001
+    user: AuthUser = Depends(require_tenant_admin),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
@@ -372,7 +372,7 @@ def _canonicalize_field_value(
 @values_router.get("", response_model=list[FieldValueOut])
 async def get_field_values(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[FieldValueOut]:
@@ -408,7 +408,7 @@ async def get_field_values(
 async def put_field_values(
     customer_id: UUID,
     body: FieldValuePut,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:

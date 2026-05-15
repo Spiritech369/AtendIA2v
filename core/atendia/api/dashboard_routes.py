@@ -72,7 +72,7 @@ async def _tenant_day_bounds(
 
 @router.get("/summary", response_model=DashboardSummary)
 async def get_dashboard_summary(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> DashboardSummary:

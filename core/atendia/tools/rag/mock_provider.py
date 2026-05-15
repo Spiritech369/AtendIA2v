@@ -26,7 +26,7 @@ class MockProvider:
         normalized = text.strip().lower()
         i = 0
         while len(out) < _EMBED_DIM:
-            digest = hashlib.sha256(f"{normalized}|{i}".encode("utf-8")).digest()
+            digest = hashlib.sha256(f"{normalized}|{i}".encode()).digest()
             for b in digest:
                 out.append((b / 255.0) * 2.0 - 1.0)  # ∈ [-1, 1]
                 if len(out) == _EMBED_DIM:

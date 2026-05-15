@@ -81,7 +81,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
 
 @router.get("", response_model=HandoffListResponse)
 async def list_handoffs(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     handoff_status: str | None = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=200),
@@ -177,7 +177,7 @@ async def assign_handoff(
     handoff_id: UUID,
     body: AssignBody,
     request: Request,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> HandoffItem:
@@ -213,7 +213,7 @@ async def resolve_handoff(
     handoff_id: UUID,
     body: ResolveBody,
     request: Request,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> HandoffItem:

@@ -1,15 +1,14 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
-
 from atendia.config import get_settings
-from atendia.db.base import Base
 from atendia.db import models  # noqa: F401  (registers ORM models on Base.metadata)
+from atendia.db.base import Base
 
 config = context.config
 

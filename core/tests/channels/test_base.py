@@ -3,8 +3,8 @@ import pytest
 from atendia.channels.base import (
     ChannelAdapter,
     DeliveryReceipt,
-    OutboundMessage,
     InboundMessage,
+    OutboundMessage,
 )
 
 

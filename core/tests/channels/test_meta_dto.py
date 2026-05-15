@@ -2,7 +2,6 @@ import pytest
 
 from atendia.channels.meta_dto import (
     MetaInboundWebhook,
-    MetaInboundMessage,
     MetaStatusCallback,
 )
 

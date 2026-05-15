@@ -12,15 +12,12 @@ The hybrid strategy (design doc decision #9):
      Composer redirects ("¿podrías decirme qué modelo te interesa?").
 """
 
-import json
-
 import pytest
 from sqlalchemy import text
 
 from atendia.db.models import TenantCatalogItem
 from atendia.tools.base import CatalogResult, ToolNoDataResult
 from atendia.tools.search_catalog import search_catalog
-
 
 pytestmark = pytest.mark.asyncio
 

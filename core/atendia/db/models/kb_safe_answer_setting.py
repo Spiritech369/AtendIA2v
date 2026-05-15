@@ -7,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from atendia.db.base import Base
 
-
 _DEFAULT_FALLBACK_ES_MX = "Déjame validarlo con un asesor para darte la información correcta."
 
 

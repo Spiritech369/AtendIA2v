@@ -34,11 +34,11 @@ class DemoMessageActionProvider:
     but does not send any real message.
     """
 
-    async def send_reminder(self, appointment_id: UUID) -> dict:  # noqa: ARG002
+    async def send_reminder(self, appointment_id: UUID) -> dict:
         return {"status": "simulated", "_demo": True}
 
-    async def send_location(self, appointment_id: UUID) -> dict:  # noqa: ARG002
+    async def send_location(self, appointment_id: UUID) -> dict:
         return {"status": "simulated", "_demo": True}
 
-    async def request_documents(self, appointment_id: UUID) -> dict:  # noqa: ARG002
+    async def request_documents(self, appointment_id: UUID) -> dict:
         return {"status": "simulated", "_demo": True}

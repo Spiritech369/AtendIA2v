@@ -9,7 +9,7 @@ from atendia.contracts.pipeline_definition import (
     StageDefinition,
     Transition,
 )
-from atendia.state_machine.orchestrator import OrchestratorDecision, process_turn
+from atendia.state_machine.orchestrator import process_turn
 
 
 @pytest.fixture

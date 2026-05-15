@@ -8,7 +8,6 @@ from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
 from atendia.runner.nlu_protocol import UsageMetadata
 
-
 # Keyword tables — order = priority. First match wins.
 _INTENT_KEYWORDS: list[tuple[Intent, list[str]]] = [
     (Intent.GREETING, ["hola", "buenos días", "buenas", "qué tal", "saludos"]),

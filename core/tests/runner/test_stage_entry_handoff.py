@@ -34,7 +34,6 @@ from atendia.contracts.pipeline_definition import (
 from atendia.db.models import MessageRow
 from atendia.runner.conversation_runner import ConversationRunner
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------
@@ -63,7 +62,7 @@ class _FakeSession:
     async def execute(self, stmt: Any, params: dict | None = None) -> Any:
         # Best-effort SQL stringify; works for sqlalchemy.text() compiled
         # forms and plain str alike.
-        sql = str(stmt) if not hasattr(stmt, "text") else getattr(stmt, "text")
+        sql = str(stmt) if not hasattr(stmt, "text") else stmt.text
         self.executed_sql.append(sql)
         self.executed_params.append(params or {})
         return MagicMock()

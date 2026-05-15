@@ -15,7 +15,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 DEFAULT_RISKY_PHRASES: list[dict[str, str]] = [
     {"pattern": r"crédito\s+aprobado", "rewrite": "Podemos revisar tu crédito"},
     {"pattern": r"aprobado\s+seguro", "rewrite": "Sujeto a validación"},

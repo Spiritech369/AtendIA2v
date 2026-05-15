@@ -21,7 +21,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.contracts.event import EventType
 from atendia.db.models.workflow import Workflow

@@ -17,7 +17,6 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from uuid import uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine

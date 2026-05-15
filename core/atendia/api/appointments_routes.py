@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import UTC, datetime, time, timedelta
-import re
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -23,14 +23,14 @@ from atendia.api._deps import (
     get_vehicle_provider,
     require_tenant_admin,
 )
-from atendia.providers.advisors import AdvisorProvider
-from atendia.providers.messaging import MessageActionProvider
-from atendia.providers.vehicles import VehicleProvider
 from atendia.db.models.advisor import Advisor, Vehicle
 from atendia.db.models.appointment import Appointment
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.customer import Customer
 from atendia.db.session import get_db_session
+from atendia.providers.advisors import AdvisorProvider
+from atendia.providers.messaging import MessageActionProvider
+from atendia.providers.vehicles import VehicleProvider
 
 router = APIRouter()
 
@@ -1216,7 +1216,7 @@ async def create_appointment(
 @router.get("/{appointment_id}", response_model=AppointmentItem)
 async def get_appointment(
     appointment_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AppointmentItem:

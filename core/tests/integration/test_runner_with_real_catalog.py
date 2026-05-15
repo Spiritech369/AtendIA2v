@@ -43,7 +43,6 @@ from atendia.runner.composer_protocol import (
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_protocol import NLUProvider, UsageMetadata
 
-
 _PIPELINE = {
     "version": 1,
     "stages": [

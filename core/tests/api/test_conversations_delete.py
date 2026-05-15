@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from uuid import uuid4
 
-import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 

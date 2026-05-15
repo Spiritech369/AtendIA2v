@@ -1,6 +1,6 @@
 from atendia.contracts.conversation_state import ExtractedField
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
-from atendia.state_machine.ambiguity import is_ambiguous, AMBIGUITY_CONFIDENCE_THRESHOLD
+from atendia.state_machine.ambiguity import AMBIGUITY_CONFIDENCE_THRESHOLD, is_ambiguous
 
 
 def test_high_confidence_no_ambiguities_is_not_ambiguous():

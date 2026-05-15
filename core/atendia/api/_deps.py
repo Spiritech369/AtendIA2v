@@ -16,16 +16,15 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Query, status
-from fastapi import status as http_status
-from atendia.providers.advisors import AdvisorProvider
-from atendia.providers.vehicles import VehicleProvider
-from atendia.providers.messaging import MessageActionProvider
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser, get_current_user
 from atendia.db.models.tenant import Tenant
 from atendia.db.session import get_db_session
+from atendia.providers.advisors import AdvisorProvider
+from atendia.providers.messaging import MessageActionProvider
+from atendia.providers.vehicles import VehicleProvider
 
 # Re-export for convenience: routes can `Depends(current_user)`.
 current_user = get_current_user

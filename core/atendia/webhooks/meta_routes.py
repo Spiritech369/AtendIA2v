@@ -9,11 +9,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.channels.meta_cloud_api import MetaCloudAPIAdapter
+from atendia.channels.meta_dto import MetaInboundWebhook
 from atendia.channels.tenant_config import (
     MetaTenantConfigNotFoundError,
     load_meta_config,
 )
-from atendia.channels.meta_dto import MetaInboundWebhook
 from atendia.config import get_settings
 from atendia.db.session import get_db_session
 from atendia.runner.composer_canned import CannedComposer
@@ -210,6 +210,7 @@ async def receive_inbound(
 
     if started_execution_ids:
         from arq.connections import RedisSettings, create_pool
+
         from atendia.workflows.engine import enqueue_executions_to_workflows_queue
 
         arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))

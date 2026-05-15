@@ -38,7 +38,6 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 # ---------------------------------------------------------------------------
 # Doc keys — uppercase, prefix DOCS_, used in:
 #   - auto_enter_rules conditions (e.g. "DOCS_INE_FRENTE.status = ok")

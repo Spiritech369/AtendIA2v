@@ -11,6 +11,7 @@ by tags like ``demo:diego-lopez`` and refreshed instead of duplicated.
 """
 
 # ruff: noqa: E501
+
 from __future__ import annotations
 
 import asyncio

@@ -1,10 +1,7 @@
 import hashlib
 import hmac
 
-import pytest
-
 from atendia.channels.meta_signing import verify_meta_signature
-
 
 SECRET = "test_app_secret"
 BODY = b'{"object":"whatsapp_business_account","entry":[{"id":"123"}]}'
@@ -35,6 +32,7 @@ def test_empty_signature_returns_false():
 def test_constant_time_comparison_used():
     """Smoke: ensure we use hmac.compare_digest (timing attack protection)."""
     import inspect
+
     from atendia.channels import meta_signing
 
     src = inspect.getsource(meta_signing)

@@ -11,6 +11,7 @@ lists, detail pages and command centers.
 """
 
 # ruff: noqa: E501, PLR0912, PLR0915
+
 from __future__ import annotations
 
 import asyncio

@@ -600,7 +600,7 @@ class PipelineStageDef(BaseModel):
 
 @router.get("/stages", response_model=list[PipelineStageDef])
 async def list_pipeline_stages(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[PipelineStageDef]:

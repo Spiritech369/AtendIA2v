@@ -20,7 +20,7 @@ without requiring a full integration harness.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -44,14 +44,12 @@ from atendia.state_machine.motos_credito_pipeline import (
     MOTOS_CREDITO_PIPELINE_DEFINITION,
 )
 from atendia.state_machine.pipeline_evaluator import (
-    evaluate_condition,
     evaluate_rule_group,
 )
 from atendia.tools.lookup_requirements import (
     RequirementsResult,
     lookup_requirements,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test infrastructure: a fake session/customer pair so the helpers

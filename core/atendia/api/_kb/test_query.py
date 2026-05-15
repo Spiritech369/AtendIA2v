@@ -27,11 +27,10 @@ from atendia.tools.rag import get_provider
 from atendia.tools.rag.answer_synthesizer import synthesize
 from atendia.tools.rag.prompt_builder import build_prompt
 from atendia.tools.rag.retriever import (
+    RetrievedChunk,
     load_safe_answer_settings,
     retrieve,
-    RetrievedChunk,
 )
-
 
 router = APIRouter()
 

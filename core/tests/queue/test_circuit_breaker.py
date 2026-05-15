@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from atendia.queue.circuit_breaker import (
@@ -57,7 +55,7 @@ async def test_record_success_resets_counters(redis_client):
     assert await is_open(redis_client, "t19_c") is False
 
     # And the failure counter is gone too
-    assert await redis_client.get(f"breaker:fail:t19_c") is None
+    assert await redis_client.get("breaker:fail:t19_c") is None
 
 
 @pytest.mark.asyncio
@@ -72,12 +70,12 @@ async def test_failures_for_different_tenants_do_not_mix(redis_client):
 async def test_open_circuit_has_ttl_close_to_open_duration(redis_client):
     for _ in range(THRESHOLD):
         await record_failure(redis_client, "t19_d")
-    ttl = await redis_client.ttl(f"breaker:open:t19_d")
+    ttl = await redis_client.ttl("breaker:open:t19_d")
     assert 0 < ttl <= OPEN_DURATION_SECONDS
 
 
 @pytest.mark.asyncio
 async def test_failure_counter_has_window_ttl(redis_client):
     await record_failure(redis_client, "t19_d")
-    ttl = await redis_client.ttl(f"breaker:fail:t19_d")
+    ttl = await redis_client.ttl("breaker:fail:t19_d")
     assert 0 < ttl <= WINDOW_SECONDS

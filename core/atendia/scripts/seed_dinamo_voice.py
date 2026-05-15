@@ -13,7 +13,6 @@ from uuid import UUID
 
 from sqlalchemy import text
 
-
 DINAMO_VOICE = {
     "register": "informal_mexicano",
     "use_emojis": "sparingly",

@@ -53,13 +53,13 @@ class FunnelResponse(BaseModel):
 
 @router.get("/funnel", response_model=FunnelResponse)
 async def funnel(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     from_: date | None = Query(None, alias="from"),
     to: date | None = Query(None),
     session: AsyncSession = Depends(get_db_session),
 ) -> FunnelResponse:
-    has_field = lambda key: ConversationStateRow.extracted_data[key].astext.is_not(None)  # noqa: E731
+    has_field = lambda key: ConversationStateRow.extracted_data[key].astext.is_not(None)
 
     stmt = (
         select(
@@ -135,7 +135,7 @@ class HandoffAgentMetric(BaseModel):
 
 
 async def _handoff_snapshot(
-    user: AuthUser,  # noqa: ARG001
+    user: AuthUser,
     tenant_id: UUID,
     session: AsyncSession,
 ) -> HandoffCommandCenterResponse:
@@ -277,7 +277,7 @@ class CostResponse(BaseModel):
 
 @router.get("/cost", response_model=CostResponse)
 async def cost(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     from_: date | None = Query(None, alias="from"),
     to: date | None = Query(None),
@@ -337,7 +337,7 @@ class VolumeResponse(BaseModel):
 
 @router.get("/volume", response_model=VolumeResponse)
 async def volume(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     from_: date | None = Query(None, alias="from"),
     to: date | None = Query(None),

@@ -586,7 +586,7 @@ class ConversationRunner:
                 # final stage.
                 next_stage_id = rules_result.to_stage
                 new_stage_entered_at = datetime.now(UTC)
-        except Exception as exc:  # noqa: BLE001 — never let rules block a turn
+        except Exception as exc:
             import logging
 
             logging.getLogger(__name__).warning(

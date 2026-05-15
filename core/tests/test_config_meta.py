@@ -1,5 +1,3 @@
-import pytest
-
 from atendia.config import Settings, get_settings
 
 

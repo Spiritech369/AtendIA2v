@@ -6,18 +6,15 @@ Sidecar HTTP calls are mocked via monkeypatching baileys_client module.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from atendia.config import get_settings
 from atendia.integrations import baileys_client
 from atendia.integrations.baileys_client import BaileysSendResult, BaileysStatus
-from atendia.main import app
 
 
 def _clean(tenant_id: str) -> None:

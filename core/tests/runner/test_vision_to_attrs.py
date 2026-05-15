@@ -34,7 +34,6 @@ from atendia.runner.vision_to_attrs import (
     apply_vision_to_attrs,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: in-memory pipeline + a fake customer/session pair so we don't
 # need a DB to assert the helper's behaviour.

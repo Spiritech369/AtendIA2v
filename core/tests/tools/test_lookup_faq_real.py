@@ -18,7 +18,6 @@ from atendia.db.models import TenantFAQ
 from atendia.tools.base import FAQMatch, ToolNoDataResult
 from atendia.tools.lookup_faq import lookup_faq
 
-
 pytestmark = pytest.mark.asyncio
 
 

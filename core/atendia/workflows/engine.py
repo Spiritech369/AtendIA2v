@@ -153,7 +153,7 @@ class WorkflowValidationError(ValueError):
     """Raised when ``validate_definition`` or ``validate_references`` rejects a workflow."""
 
 
-class _ExecutionFailure(Exception):  # noqa: N818 — internal control-flow, not an Error class
+class _ExecutionFailure(Exception):
     """Internal control-flow exception carrying an ``error_code``."""
 
     def __init__(self, error: str, *, code: str | None = None) -> None:

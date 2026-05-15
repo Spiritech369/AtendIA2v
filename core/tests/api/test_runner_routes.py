@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +40,7 @@ def setup_tenant_and_pipeline():
 
     # Use a regular sync connection just for fixture setup
     import asyncio
+
     from sqlalchemy.ext.asyncio import create_async_engine
 
     async def _setup():

@@ -24,7 +24,6 @@ from openai import (
 )
 from pydantic import ValidationError
 
-
 _RETRIABLE = (
     APITimeoutError,
     APIConnectionError,

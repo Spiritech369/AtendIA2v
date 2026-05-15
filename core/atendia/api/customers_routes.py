@@ -34,7 +34,8 @@ from atendia.db.models.customer import (
 )
 from atendia.db.models.event import EventRow
 from atendia.db.models.message import MessageRow
-from atendia.db.models.tenant import Tenant as _Tenant, TenantUser
+from atendia.db.models.tenant import Tenant as _Tenant
+from atendia.db.models.tenant import TenantUser
 from atendia.db.session import get_db_session
 
 router = APIRouter()
@@ -1292,7 +1293,7 @@ async def _backfill_existing_customer_ops(
     return changed
 
 
-async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUser) -> None:  # noqa: ARG002
+async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUser) -> None:
     # Gate on tenant.is_demo, not on email — email is fragile.
     _result = await session.execute(_sa_select(_Tenant).where(_Tenant.id == tenant_id))
     _tenant = _result.scalar_one_or_none()
@@ -1388,7 +1389,7 @@ async def _ensure_demo_data(session: AsyncSession, tenant_id: UUID, user: AuthUs
         idle_hours = [1, 3, 9, 11, 12, 13, 2, 24, 5, 14, 0.5, 26][i % 12]
         assigned = (
             None
-            if i % 5 == 0 or stage == "negotiation" and i % 3 == 0
+            if i % 5 == 0 or (stage == "negotiation" and i % 3 == 0)
             else user_ids[i % len(user_ids)]
         )
         confidence = 0.52 if i % 13 == 0 else 0.82 + (i % 12) / 100
@@ -1810,7 +1811,7 @@ async def recalculate_customer_score(
 @router.get("/{customer_id:uuid}/score", response_model=CustomerScoreOut | None)
 async def get_customer_score(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> CustomerScoreOut | None:
@@ -1829,7 +1830,7 @@ async def get_customer_score(
 @router.get("/{customer_id:uuid}/risks", response_model=list[CustomerRiskOut])
 async def get_customer_risks(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CustomerRiskOut]:
@@ -1851,7 +1852,7 @@ async def get_customer_risks(
 @router.get("/{customer_id:uuid}/next-best-action", response_model=list[NextBestActionOut])
 async def get_next_best_action(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[NextBestActionOut]:
@@ -1918,7 +1919,7 @@ async def execute_next_best_action(
 @router.get("/{customer_id:uuid}/timeline", response_model=list[TimelineEventOut])
 async def get_customer_timeline(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[TimelineEventOut]:
@@ -1972,7 +1973,7 @@ async def create_customer_timeline_event(
 @router.get("/{customer_id:uuid}/documents", response_model=list[CustomerDocumentOut])
 async def list_customer_documents(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CustomerDocumentOut]:
@@ -2084,7 +2085,7 @@ async def patch_document(
 @router.get("/{customer_id:uuid}/messages", response_model=list[ConversationMessageOut])
 async def get_customer_messages(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[ConversationMessageOut]:
@@ -2181,7 +2182,7 @@ async def create_customer_message(
 @router.get("/{customer_id:uuid}/audit")
 async def get_customer_audit(
     customer_id: UUID,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
@@ -2350,7 +2351,7 @@ async def get_risk_radar(
 
 @risks_router.get("", response_model=list[CustomerRiskOut])
 async def list_risks(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     status_: str = Query("open", alias="status"),
     session: AsyncSession = Depends(get_db_session),
@@ -2406,7 +2407,7 @@ async def resolve_risk(
 
 @ai_review_router.get("", response_model=AIReviewQueueResponse)
 async def get_ai_review_queue(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     status_: str = Query("open", alias="status"),
     session: AsyncSession = Depends(get_db_session),
@@ -2468,7 +2469,7 @@ async def resolve_ai_review_item(
 async def feedback_ai_review_item(
     item_id: UUID,
     body: dict,
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AIReviewItemOut:
@@ -2524,7 +2525,7 @@ def _parse_import_row(
 @router.post("/import/preview", response_model=CustomerImportPreview)
 async def preview_import(
     file: UploadFile = File(...),
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> CustomerImportPreview:
@@ -2636,7 +2637,7 @@ async def import_customers(
 
 @router.get("/export")
 async def export_customers(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:

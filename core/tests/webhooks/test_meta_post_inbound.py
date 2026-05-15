@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from atendia.config import get_settings
 from atendia.main import app
 
-
 APP_SECRET = "test_app_secret_for_t13"
 
 

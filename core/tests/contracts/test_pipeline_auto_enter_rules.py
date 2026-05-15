@@ -11,13 +11,12 @@ import pytest
 from pydantic import ValidationError
 
 from atendia.contracts.pipeline_definition import (
+    OPERATORS,
     AutoEnterRules,
     Condition,
-    OPERATORS,
     PipelineDefinition,
     StageDefinition,
 )
-
 
 # ---------- Condition ----------
 

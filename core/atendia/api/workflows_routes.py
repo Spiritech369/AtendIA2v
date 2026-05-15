@@ -1,21 +1,20 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
-import re
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
-from atendia.db.models.customer import Customer
-from atendia.db.models.workflow import Workflow, WorkflowExecution, WhatsAppTemplate
+from atendia.db.models.workflow import WhatsAppTemplate, Workflow, WorkflowExecution
 from atendia.db.session import get_db_session
 from atendia.workflows.engine import (
     TRIGGERS,

@@ -5,7 +5,6 @@ import pytest
 from atendia.contracts.nlu_result import Intent
 from atendia.runner.nlu_canned import CannedNLU
 
-
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 

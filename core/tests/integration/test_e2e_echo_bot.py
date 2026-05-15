@@ -18,7 +18,6 @@ import json
 import httpx
 import pytest
 import respx
-from arq.connections import RedisSettings, create_pool
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -26,7 +25,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from atendia.config import get_settings
 from atendia.main import app
 from atendia.queue.worker import send_outbound
-
 
 APP_SECRET = "secret_for_t27_e2e"
 

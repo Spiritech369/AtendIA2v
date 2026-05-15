@@ -213,7 +213,7 @@ def test_invalid_status_filter_returns_400(client_tenant_admin):
 
 def test_naive_datetime_rejected(client_tenant_admin):
     customer_id = _seed_customers(client_tenant_admin.tenant_id, 1)[0]
-    naive = datetime.utcnow().replace(tzinfo=None).isoformat()  # noqa: DTZ003
+    naive = datetime.utcnow().replace(tzinfo=None).isoformat()
     resp = client_tenant_admin.post(
         "/api/v1/appointments",
         json={"customer_id": customer_id, "scheduled_at": naive, "service": "X"},

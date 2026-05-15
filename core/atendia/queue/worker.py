@@ -12,8 +12,8 @@ from atendia.channels.base import DeliveryReceipt, OutboundMessage
 from atendia.channels.meta_cloud_api import MetaCloudAPIAdapter
 from atendia.channels.tenant_config import load_meta_config
 from atendia.config import get_settings
-from atendia.integrations import baileys_client
 from atendia.db.models.outbound_outbox import OutboundOutbox
+from atendia.integrations import baileys_client
 from atendia.queue.circuit_breaker import (
     OPEN_DURATION_SECONDS,
     is_open,

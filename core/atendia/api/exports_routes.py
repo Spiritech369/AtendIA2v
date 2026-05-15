@@ -40,7 +40,7 @@ def _date_to_dt(d: date | None, *, end_of_day: bool = False) -> datetime | None:
 
 @router.get("/conversations.csv")
 async def export_conversations(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     from_: date | None = Query(None, alias="from"),
     to: date | None = Query(None),
@@ -130,7 +130,7 @@ async def export_conversations(
 
 @router.get("/messages.csv")
 async def export_messages(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     from_: date | None = Query(None, alias="from"),
     to: date | None = Query(None),

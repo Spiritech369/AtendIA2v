@@ -64,7 +64,7 @@ def _to_item(row: KbCollection) -> CollectionItem:
 
 @router.get("/collections", response_model=list[CollectionItem])
 async def list_collections(
-    user: AuthUser = Depends(current_user),  # noqa: ARG001
+    user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CollectionItem]:

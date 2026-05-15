@@ -11,41 +11,57 @@ from atendia.api._csrf import install_csrf_middleware
 from atendia.api.agents_routes import (
     extraction_fields_router,
     guardrails_router,
-    router as agents_router,
     scenarios_router,
     supervisor_router,
+)
+from atendia.api.agents_routes import (
+    router as agents_router,
 )
 from atendia.api.analytics_routes import router as analytics_router
 from atendia.api.appointments_routes import router as appointments_router
 from atendia.api.audit_log_routes import router as audit_log_router
-from atendia.api.channel_status_routes import router as channel_status_router
 from atendia.api.auth_routes import router as auth_router
+from atendia.api.baileys_routes import (
+    integrations_router as baileys_integrations_router,
+)
+from atendia.api.baileys_routes import (
+    internal_router as baileys_internal_router,
+)
+from atendia.api.channel_status_routes import router as channel_status_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customer_fields_routes import (
     definitions_router as field_defs_router,
+)
+from atendia.api.customer_fields_routes import (
     values_router as field_values_router,
 )
 from atendia.api.customer_notes_routes import router as customer_notes_router
 from atendia.api.customers_routes import (
     ai_review_router as customer_ai_review_router,
+)
+from atendia.api.customers_routes import (
     dashboard_router as customer_dashboard_router,
+)
+from atendia.api.customers_routes import (
     documents_router as customer_documents_router,
+)
+from atendia.api.customers_routes import (
     risks_router as customer_risks_router,
+)
+from atendia.api.customers_routes import (
     router as customers_router,
 )
 from atendia.api.dashboard_routes import router as dashboard_router
 from atendia.api.exports_routes import router as exports_router
+from atendia.api.field_suggestions_routes import (
+    actions_router as field_suggestions_actions_router,
+)
+from atendia.api.field_suggestions_routes import (
+    per_customer_router as field_suggestions_per_customer_router,
+)
 from atendia.api.handoffs_routes import router as handoffs_router
 from atendia.api.integrations_routes import router as integrations_router
 from atendia.api.knowledge_routes import router as knowledge_router
-from atendia.api.baileys_routes import (
-    integrations_router as baileys_integrations_router,
-    internal_router as baileys_internal_router,
-)
-from atendia.api.field_suggestions_routes import (
-    actions_router as field_suggestions_actions_router,
-    per_customer_router as field_suggestions_per_customer_router,
-)
 from atendia.api.navigation_routes import router as navigation_router
 from atendia.api.notifications_routes import router as notifications_router
 from atendia.api.pipeline_routes import router as pipeline_router
@@ -56,8 +72,10 @@ from atendia.api.turn_traces_routes import router as turn_traces_router
 from atendia.api.users_routes import router as users_router
 from atendia.api.workflows_routes import (
     executions_router,
-    router as workflows_router,
     templates_router,
+)
+from atendia.api.workflows_routes import (
+    router as workflows_router,
 )
 from atendia.realtime.ws_routes import router as ws_router
 from atendia.tools import register_all_tools
