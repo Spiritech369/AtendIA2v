@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useWebSocket, type WSEvent } from "@/api/ws-client";
+import { affectsFieldSuggestions } from "@/features/conversations/lib/streamInvalidation";
 import { useAuthStore } from "@/stores/auth";
 
 interface ConversationEvent extends WSEvent {
@@ -46,6 +47,17 @@ export function useTenantStream(): void {
         void queryClient.invalidateQueries({ queryKey: ["conversation", e.conversation_id] });
         void queryClient.invalidateQueries({ queryKey: ["messages", e.conversation_id] });
 
+        // C11 — push field_suggestions in realtime, replacing the old
+        // 60s poll. `message_received` covers the SUGGEST path (those
+        // rows are created during the inbound turn but emit no
+        // dedicated event); the AUTO path still flows via
+        // field_extracted/field_updated. The query only refetches when
+        // the panel is actually mounted.
+        if (affectsFieldSuggestions(e.type)) {
+          void queryClient.invalidateQueries({ queryKey: ["customers"] });
+          void queryClient.invalidateQueries({ queryKey: ["field-suggestions"] });
+        }
+
         // Fase 1 — runner-emitted system events that mutate customer or
         // conversation state. The messages query already picks up the
         // new system-row bubble; these extra invalidations refresh the
@@ -53,11 +65,6 @@ export function useTenantStream(): void {
         // so the operator sees the new field/stage/doc state without a
         // manual reload.
         switch (e.type) {
-          case "field_updated":
-          case "field_extracted":
-            void queryClient.invalidateQueries({ queryKey: ["customers"] });
-            void queryClient.invalidateQueries({ queryKey: ["field-suggestions"] });
-            break;
           case "stage_changed":
           case "stage_entered":
           case "stage_exited":
@@ -84,6 +91,9 @@ export function useTenantStream(): void {
     void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     void queryClient.invalidateQueries({ queryKey: ["handoffs"] });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    // C11 — resync suggestions after a dropped+restored socket, the
+    // safety net the 60s poll used to provide.
+    void queryClient.invalidateQueries({ queryKey: ["field-suggestions"] });
   }, [queryClient]);
 
   useWebSocket<ConversationEvent>({
