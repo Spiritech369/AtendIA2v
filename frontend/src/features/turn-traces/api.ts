@@ -89,6 +89,17 @@ export const turnTracesApi = {
         params: { conversation_id: conversationId },
       })
     ).data,
+  /** Sprint C.2 / T56 — cross-conversation explorer. Omitting
+   * conversation_id pulls the tenant's most-recent traces across every
+   * conversation, optionally filtered by `flow_mode`. */
+  listRecent: async (
+    params: { limit?: number; flow_mode?: string } = {},
+  ): Promise<{ items: TurnTraceListItem[] }> =>
+    (
+      await api.get<{ items: TurnTraceListItem[] }>("/turn-traces", {
+        params: { limit: params.limit ?? 100, flow_mode: params.flow_mode },
+      })
+    ).data,
   getOne: async (id: string): Promise<TurnTraceDetail> =>
     (await api.get<TurnTraceDetail>(`/turn-traces/${id}`)).data,
 };

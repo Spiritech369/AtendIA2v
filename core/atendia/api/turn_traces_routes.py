@@ -6,6 +6,7 @@ Two endpoints:
 * `GET /api/v1/turn-traces/:id` — full row including nlu_input/output,
   composer_input/output, state_before/after, outbound_messages.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -92,33 +93,54 @@ class TurnTraceDetail(TurnTraceListItem):
 
 @router.get("", response_model=TurnTraceListResponse)
 async def list_turn_traces(
-    conversation_id: UUID = Query(...),
     user: AuthUser = Depends(current_user),  # noqa: ARG001
     tenant_id: UUID = Depends(current_tenant_id),
+    conversation_id: UUID | None = Query(None),
+    flow_mode: str | None = Query(None),
     limit: int = Query(100, ge=1, le=500),
     session: AsyncSession = Depends(get_db_session),
 ) -> TurnTraceListResponse:
+    """List turn traces.
+
+    Two modes:
+
+    * **Single-conversation** (legacy): pass ``conversation_id`` and the
+      response is ordered by ``turn_number ASC`` (chronological inside
+      the conversation).
+    * **Cross-conversation explorer** (Sprint C.2 / T56): omit
+      ``conversation_id`` and the response is ordered by ``created_at
+      DESC`` across every conversation in the tenant — the operator's
+      entry point when investigating recent runner activity without
+      knowing which conversation to look at first. Optional
+      ``flow_mode`` narrows the slice (e.g. only the SUPPORT-mode
+      turns, useful when triaging a regression in one mode).
+    """
     # Existence + tenant-scope check on the conversation. 404 (not 403)
     # if the operator tries to read a different tenant's traces.
-    own = (
-        await session.execute(
-            select(Conversation.id).where(
-                Conversation.id == conversation_id,
-                Conversation.tenant_id == tenant_id,
+    if conversation_id is not None:
+        own = (
+            await session.execute(
+                select(Conversation.id).where(
+                    Conversation.id == conversation_id,
+                    Conversation.tenant_id == tenant_id,
+                )
             )
-        )
-    ).scalar_one_or_none()
-    if own is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+        ).scalar_one_or_none()
+        if own is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
 
-    rows = (
-        await session.execute(
-            select(TurnTrace)
-            .where(TurnTrace.conversation_id == conversation_id)
-            .order_by(TurnTrace.turn_number.asc())
-            .limit(limit)
+    stmt = select(TurnTrace).where(TurnTrace.tenant_id == tenant_id)
+    if conversation_id is not None:
+        stmt = stmt.where(TurnTrace.conversation_id == conversation_id).order_by(
+            TurnTrace.turn_number.asc()
         )
-    ).scalars().all()
+    else:
+        # Cross-conversation: most recent activity first.
+        stmt = stmt.order_by(TurnTrace.created_at.desc())
+    if flow_mode is not None:
+        stmt = stmt.where(TurnTrace.flow_mode == flow_mode)
+    stmt = stmt.limit(limit)
+    rows = (await session.execute(stmt)).scalars().all()
 
     return TurnTraceListResponse(
         items=[
