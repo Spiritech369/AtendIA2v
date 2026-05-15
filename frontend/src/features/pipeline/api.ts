@@ -70,6 +70,16 @@ export interface BoardParams {
 export const pipelineApi = {
   board: async (params: BoardParams = {}) =>
     (await api.get<PipelineBoardResponse>("/pipeline/board", { params })).data,
+  /** Sprint C.3 — fetch the next page of a stage's conversations.
+   * `offset` is the count of cards the caller already has. The backend
+   * returns the same `StageGroup` shape with `conversations` shifted by
+   * `offset` and `total_count` unchanged so the kanban can compare. */
+  stagePage: async (stageId: string, params: { offset: number; limit?: number }) =>
+    (
+      await api.get<StageGroup>(`/pipeline/board/${encodeURIComponent(stageId)}`, {
+        params: { offset: params.offset, limit: params.limit ?? 50 },
+      })
+    ).data,
   alerts: async () =>
     (await api.get<{ items: PipelineConversationCard[] }>("/pipeline/alerts")).data,
   move: async (body: { conversation_id: string; to_stage: string }) =>

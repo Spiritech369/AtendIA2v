@@ -333,6 +333,7 @@ async def _cards(
     stage_id: str | None,
     timeout_hours_by_stage: dict[str, int | None],
     limit: int,
+    offset: int = 0,
     assigned_user_id: UUID | None = None,
     orphan_stage_ids: list[str] | None = None,
 ) -> list[PipelineConversationCard]:
@@ -363,8 +364,9 @@ async def _cards(
         .join(ConversationStateRow, ConversationStateRow.conversation_id == Conversation.id)
         .outerjoin(last_msg, last_msg.c.cid == Conversation.id)
         .where(Conversation.tenant_id == tenant_id, Conversation.deleted_at.is_(None))
-        .order_by(Conversation.last_activity_at.desc())
+        .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
         .limit(limit)
+        .offset(offset)
     )
     if stage_id is not None:
         stmt = stmt.where(Conversation.current_stage == stage_id)
@@ -429,11 +431,7 @@ async def _board_cards_one_shot(
         .where(MessageRow.tenant_id == tenant_id)
         .subquery()
     )
-    last_msg = (
-        select(last_msg_sq.c.cid, last_msg_sq.c.text)
-        .where(last_msg_sq.c.rn == 1)
-        .subquery()
-    )
+    last_msg = select(last_msg_sq.c.cid, last_msg_sq.c.text).where(last_msg_sq.c.rn == 1).subquery()
     appt_sq = (
         select(
             Appointment.conversation_id.label("cid"),
@@ -516,11 +514,7 @@ async def _board_cards_one_shot(
         .subquery()
     )
 
-    rows = (
-        await session.execute(
-            select(inner).where(inner.c.stage_rank <= cards_per_stage)
-        )
-    ).all()
+    rows = (await session.execute(select(inner).where(inner.c.stage_rank <= cards_per_stage))).all()
 
     now = datetime.now(UTC)
     grouped: dict[str, list[PipelineConversationCard]] = {}
@@ -626,7 +620,9 @@ async def list_pipeline_stages(
     if not isinstance(definition, dict):
         return []
     return [
-        PipelineStageDef(id=str(s["id"]), label=str(s.get("label") or s["id"]), color=s.get("color"))
+        PipelineStageDef(
+            id=str(s["id"]), label=str(s.get("label") or s["id"]), color=s.get("color")
+        )
         for s in _stage_defs(definition)
     ]
 
@@ -672,9 +668,7 @@ async def get_pipeline_board(
         )
     ).all()
     counts_by_stage: dict[str, int] = {row.current_stage: row.n for row in count_rows}
-    orphan_stage_ids = [
-        sid for sid in counts_by_stage if sid not in active_stage_ids
-    ]
+    orphan_stage_ids = [sid for sid in counts_by_stage if sid not in active_stage_ids]
 
     cards_by_stage = await _board_cards_one_shot(
         session,
@@ -872,6 +866,12 @@ async def get_pipeline_stage(
     user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
     limit: int = Query(50, ge=1, le=200),
+    # Sprint C.3 — offset-based pagination so the kanban "Cargar más"
+    # can fetch the next page of a stage. Frontend calls the same
+    # endpoint with offset = (cards already shown). Order is stable
+    # (last_activity_at DESC, id DESC) so pages don't reshuffle while
+    # the operator scrolls.
+    offset: int = Query(0, ge=0, le=10_000),
     session: AsyncSession = Depends(get_db_session),
 ) -> StageGroup:
     definition = await _active_pipeline(session, tenant_id)
@@ -902,6 +902,7 @@ async def get_pipeline_stage(
             stage_id=stage_id,
             timeout_hours_by_stage=timeout_by_stage,
             limit=limit,
+            offset=offset,
         ),
     )
 

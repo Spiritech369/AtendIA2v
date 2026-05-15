@@ -14,6 +14,7 @@ Coverage:
 - 404 when the tenant has no active pipeline.
 - Cross-tenant isolation: tenant A's board never includes tenant B's rows.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,14 +27,16 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from atendia.config import get_settings
 
-PIPELINE_DEF_THREE_STAGES = json.dumps({
-    "stages": [
-        {"id": "nuevo", "label": "Nuevo", "timeout_hours": 24},
-        {"id": "interesado", "label": "Interesado", "timeout_hours": 1},
-        {"id": "cerrado", "label": "Cerrado", "timeout_hours": 0},
-    ],
-    "docs_per_plan": {"default": ["docs_ine"]},
-})
+PIPELINE_DEF_THREE_STAGES = json.dumps(
+    {
+        "stages": [
+            {"id": "nuevo", "label": "Nuevo", "timeout_hours": 24},
+            {"id": "interesado", "label": "Interesado", "timeout_hours": 1},
+            {"id": "cerrado", "label": "Cerrado", "timeout_hours": 0},
+        ],
+        "docs_per_plan": {"default": ["docs_ine"]},
+    }
+)
 
 
 def _seed_pipeline(tenant_id: str, definition: str = PIPELINE_DEF_THREE_STAGES) -> None:
@@ -43,10 +46,7 @@ def _seed_pipeline(tenant_id: str, definition: str = PIPELINE_DEF_THREE_STAGES) 
             async with engine.begin() as conn:
                 # Ensure no existing active pipeline so our INSERT wins.
                 await conn.execute(
-                    text(
-                        "UPDATE tenant_pipelines SET active=false "
-                        "WHERE tenant_id = :t"
-                    ),
+                    text("UPDATE tenant_pipelines SET active=false WHERE tenant_id = :t"),
                     {"t": tenant_id},
                 )
                 await conn.execute(
@@ -146,10 +146,14 @@ def test_card_is_stale_after_timeout(client_tenant_admin) -> None:
     _seed_pipeline(client_tenant_admin.tenant_id)
     # ``interesado`` has timeout_hours=1; this card has been there for 5h.
     conv_id = _seed_conversation(
-        client_tenant_admin.tenant_id, stage="interesado", stage_entered_hours_ago=5,
+        client_tenant_admin.tenant_id,
+        stage="interesado",
+        stage_entered_hours_ago=5,
     )
     fresh_id = _seed_conversation(
-        client_tenant_admin.tenant_id, stage="interesado", stage_entered_hours_ago=0.1,
+        client_tenant_admin.tenant_id,
+        stage="interesado",
+        stage_entered_hours_ago=0.1,
     )
     resp = client_tenant_admin.get("/api/v1/pipeline/board")
     by_id = {s["stage_id"]: s for s in resp.json()["stages"]}
@@ -161,10 +165,14 @@ def test_card_is_stale_after_timeout(client_tenant_admin) -> None:
 def test_alerts_endpoint_returns_only_stale(client_tenant_admin) -> None:
     _seed_pipeline(client_tenant_admin.tenant_id)
     stale_id = _seed_conversation(
-        client_tenant_admin.tenant_id, stage="interesado", stage_entered_hours_ago=5,
+        client_tenant_admin.tenant_id,
+        stage="interesado",
+        stage_entered_hours_ago=5,
     )
     _seed_conversation(
-        client_tenant_admin.tenant_id, stage="interesado", stage_entered_hours_ago=0.1,
+        client_tenant_admin.tenant_id,
+        stage="interesado",
+        stage_entered_hours_ago=0.1,
     )
     resp = client_tenant_admin.get("/api/v1/pipeline/alerts")
     assert resp.status_code == 200
@@ -177,7 +185,9 @@ def test_cerrado_stage_with_zero_timeout_is_never_stale(client_tenant_admin) -> 
     """``timeout_hours=0`` is a sentinel for "never alert" (e.g. closed)."""
     _seed_pipeline(client_tenant_admin.tenant_id)
     _seed_conversation(
-        client_tenant_admin.tenant_id, stage="cerrado", stage_entered_hours_ago=999,
+        client_tenant_admin.tenant_id,
+        stage="cerrado",
+        stage_entered_hours_ago=999,
     )
     resp = client_tenant_admin.get("/api/v1/pipeline/board")
     by_id = {s["stage_id"]: s for s in resp.json()["stages"]}
@@ -194,12 +204,14 @@ def test_conversation_with_unknown_stage_appears_in_orphan_group(
     the active pipeline used to disappear from the board entirely."""
     _seed_pipeline(client_tenant_admin.tenant_id)
     orphan_id = _seed_conversation(
-        client_tenant_admin.tenant_id, stage="ghost_stage_that_existed_before",
+        client_tenant_admin.tenant_id,
+        stage="ghost_stage_that_existed_before",
     )
     resp = client_tenant_admin.get("/api/v1/pipeline/board")
     body = resp.json()
     orphan_group = next(
-        (s for s in body["stages"] if s.get("is_orphan") is True), None,
+        (s for s in body["stages"] if s.get("is_orphan") is True),
+        None,
     )
     assert orphan_group is not None
     assert orphan_group["stage_id"] == "__orphan__"
@@ -226,7 +238,9 @@ def test_assigned_user_id_filters_cards(client_tenant_admin) -> None:
         assigned_user_id=client_tenant_admin.user_id,
     )
     _other_id = _seed_conversation(
-        client_tenant_admin.tenant_id, stage="nuevo", assigned_user_id=None,
+        client_tenant_admin.tenant_id,
+        stage="nuevo",
+        assigned_user_id=None,
     )
     resp = client_tenant_admin.get(
         "/api/v1/pipeline/board",
@@ -253,3 +267,41 @@ def test_board_is_tenant_scoped(client_tenant_admin) -> None:
             seen.add(c["id"])
     # All seen ids must be ours (we only seeded one).
     assert seen == {own_id}
+
+
+def test_stage_endpoint_supports_offset_pagination(client_tenant_admin) -> None:
+    """Sprint C.3 — GET /board/{stage_id}?offset=N&limit=M returns the next
+    page. The kanban front-end calls this when the operator clicks
+    "Cargar más" on a stage that has more cards than the initial page.
+
+    Order is stable (last_activity_at DESC, id DESC) so paging through
+    doesn't reshuffle. ``total_count`` keeps returning the full count
+    regardless of offset, so the front-end can hide "Cargar más" once
+    `offset + page_size >= total`.
+    """
+    _seed_pipeline(client_tenant_admin.tenant_id)
+    # Seed 5 conversations in 'interesado' so we can ask for offset=2,limit=2.
+    ids = [_seed_conversation(client_tenant_admin.tenant_id, stage="interesado") for _ in range(5)]
+
+    page1 = client_tenant_admin.get("/api/v1/pipeline/board/interesado?limit=2&offset=0")
+    assert page1.status_code == 200, page1.text
+    p1 = page1.json()
+    assert p1["total_count"] == 5
+    assert len(p1["conversations"]) == 2
+    page1_ids = [c["id"] for c in p1["conversations"]]
+
+    page2 = client_tenant_admin.get("/api/v1/pipeline/board/interesado?limit=2&offset=2")
+    assert page2.status_code == 200, page2.text
+    p2 = page2.json()
+    assert p2["total_count"] == 5
+    assert len(p2["conversations"]) == 2
+    page2_ids = [c["id"] for c in p2["conversations"]]
+    # No overlap between pages.
+    assert set(page1_ids).isdisjoint(set(page2_ids))
+
+    page3 = client_tenant_admin.get("/api/v1/pipeline/board/interesado?limit=2&offset=4")
+    p3 = page3.json()
+    assert page3.status_code == 200
+    assert len(p3["conversations"]) == 1, "tail page has the last remaining card"
+    # Combined coverage: every seeded id surfaced across the 3 pages.
+    assert set(page1_ids) | set(page2_ids) | {p3["conversations"][0]["id"]} == set(ids)

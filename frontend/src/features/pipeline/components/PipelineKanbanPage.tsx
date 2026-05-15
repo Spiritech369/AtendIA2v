@@ -237,8 +237,33 @@ function StageColumn({
   const isBeingDraggedOver = dragState !== null && dragState.fromStage !== stage.stage_id && dropHover;
   const bottleneck = !stage.is_orphan && stage.total_count >= 10;
 
+  // Sprint C.3 — load-more support. The board endpoint only returns the
+  // first page per stage; clicking "Cargar más" fetches subsequent pages
+  // via `pipelineApi.stagePage(stage_id, offset)` and appends them here.
+  // De-dupe by id when merging because the user can drag a card across
+  // stages between page fetches and re-trigger a fetch.
+  const [extraCards, setExtraCards] = useState<PipelineConversationCard[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const mergedCards = useMemo(() => {
+    const seen = new Set<string>();
+    const out: PipelineConversationCard[] = [];
+    for (const c of [...stage.conversations, ...extraCards]) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      out.push(c);
+    }
+    return out;
+  }, [stage.conversations, extraCards]);
+  // Reset extras whenever the parent re-fetches the board (the page-1
+  // slice will probably include cards we previously loaded as "extras";
+  // dropping them avoids stale state).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset on first-page identity
+  useEffect(() => {
+    setExtraCards([]);
+  }, [stage.conversations]);
+
   const visibleCards = useMemo(() => {
-    let cards = stage.conversations;
+    let cards = mergedCards;
     const now = Date.now();
     if (kpiFilter === "stale") cards = cards.filter((c) => c.is_stale);
     if (kpiFilter === "inactive_24h")
@@ -387,9 +412,37 @@ function StageColumn({
           ))
         )}
 
-        {stage.total_count > stage.conversations.length && (
+        {stage.total_count > mergedCards.length && !stage.is_orphan && (
+          <button
+            type="button"
+            disabled={loadingMore}
+            onClick={async () => {
+              setLoadingMore(true);
+              try {
+                const next = await pipelineApi.stagePage(stage.stage_id, {
+                  offset: mergedCards.length,
+                  limit: 50,
+                });
+                setExtraCards((prev) => [...prev, ...next.conversations]);
+              } catch (err) {
+                toast.error("No se pudo cargar más", {
+                  description: (err as Error)?.message ?? "Intenta de nuevo.",
+                });
+              } finally {
+                setLoadingMore(false);
+              }
+            }}
+            className="w-full rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-center text-[11px] text-muted-foreground transition hover:border-solid hover:bg-muted/60 disabled:opacity-60"
+            aria-label={`Cargar más conversaciones de ${stage.stage_label}`}
+          >
+            {loadingMore
+              ? "Cargando…"
+              : `Cargar más (${stage.total_count - mergedCards.length} restantes)`}
+          </button>
+        )}
+        {stage.total_count > stage.conversations.length && stage.is_orphan && (
           <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-center text-[11px] text-muted-foreground">
-            Mostrando {stage.conversations.length} de {stage.total_count}. Ve a Conversaciones para ver el resto.
+            Mostrando {stage.conversations.length} de {stage.total_count}.
           </div>
         )}
       </div>
