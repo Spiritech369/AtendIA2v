@@ -8,6 +8,7 @@ import {
   Copy,
   FileCheck2,
   GitBranch,
+  MessageCircleQuestionMark,
   MessageSquare,
   Play,
   Plus,
@@ -120,6 +121,12 @@ const NODE_META: Record<string, { label: string; icon: typeof Zap; color: string
     icon: Workflow,
     color: "text-emerald-300",
     bg: "bg-emerald-500/15",
+  },
+  ask_question: {
+    label: "Preguntar al cliente",
+    icon: MessageCircleQuestionMark,
+    color: "text-amber-300",
+    bg: "bg-amber-500/15",
   },
   branch: { label: "Bifurcación", icon: GitBranch, color: "text-amber-300", bg: "bg-amber-500/15" },
   create_task: {
@@ -246,6 +253,16 @@ const ADD_NODE_TEMPLATES: AddNodeTemplate[] = [
     },
   },
   {
+    key: "ask_question",
+    label: "Preguntar al cliente",
+    description: "Pausa el workflow y guarda la respuesta del lead en una variable.",
+    body: {
+      type: "ask_question",
+      title: "Preguntar al cliente",
+      config: { question: "", variable: "", type: "text" },
+    },
+  },
+  {
     key: "jump_to",
     label: "Saltar a otro nodo",
     description: "Reintenta un paso anterior o crea un loop con tope de 100 pasos.",
@@ -320,6 +337,15 @@ function summaryFor(node: WorkflowNode, agentNameById?: Map<string, string>, tri
   if (node.type === "trigger_workflow") {
     const target = String(cfg.target_workflow_id ?? "");
     return target ? `Workflow ${target.slice(0, 8)}` : "Workflow sin definir";
+  }
+  if (node.type === "ask_question") {
+    const variable = String(cfg.variable ?? "").trim();
+    const question = String(cfg.question ?? "").trim();
+    if (!variable && !question) return "Pregunta sin definir";
+    const preview = question
+      ? `"${question.slice(0, 40)}${question.length > 40 ? "…" : ""}"`
+      : "Pregunta vacía";
+    return variable ? `${preview} → \`${variable}\`` : preview;
   }
   if (node.type === "request_documents") return "INE, comprobante, ingresos";
   if (node.type === "end") return String(cfg.result ?? "finaliza");
@@ -1370,6 +1396,97 @@ export function WorkflowEditor({
                   <p className="text-[10px] text-slate-500">
                     El workflow hijo arranca con su propio contexto. Variables del padre no se pasan
                     en MVP.
+                  </p>
+                </div>
+              )}
+              {selectedNode.type === "ask_question" && (
+                <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-2">
+                  <div>
+                    <Label
+                      htmlFor={`${selectedNode.id}-ask-question`}
+                      className="text-[10px] uppercase text-slate-400"
+                    >
+                      Pregunta al cliente
+                    </Label>
+                    <Textarea
+                      id={`${selectedNode.id}-ask-question`}
+                      className="mt-1 min-h-[60px] resize-none border-white/10 bg-white/5 text-xs text-slate-100"
+                      placeholder="¿Cuál es tu correo electrónico?"
+                      defaultValue={readConfigString(configDraft, "question")}
+                      disabled={readOnly}
+                      onBlur={(event) =>
+                        setConfigDraft(
+                          writeConfigValue(configDraft, "question", event.target.value),
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor={`${selectedNode.id}-ask-variable`}
+                      className="text-[10px] uppercase text-slate-400"
+                    >
+                      Variable
+                    </Label>
+                    <Input
+                      id={`${selectedNode.id}-ask-variable`}
+                      className="mt-1 h-8 border-white/10 bg-white/5 text-xs text-slate-100"
+                      placeholder="email"
+                      defaultValue={readConfigString(configDraft, "variable")}
+                      disabled={readOnly}
+                      onChange={(event) => {
+                        const sanitized = event.target.value.replace(/[^A-Za-z0-9_]/g, "");
+                        if (sanitized !== event.target.value) {
+                          event.target.value = sanitized;
+                        }
+                      }}
+                      onBlur={(event) => {
+                        const sanitized = event.target.value
+                          .replace(/[^A-Za-z0-9_]/g, "")
+                          .replace(/^[0-9]+/, "");
+                        event.target.value = sanitized;
+                        setConfigDraft(writeConfigValue(configDraft, "variable", sanitized));
+                      }}
+                    />
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      Identificador (letras, números, guion bajo). Sin espacios y sin empezar con
+                      dígito.
+                    </p>
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor={`${selectedNode.id}-ask-type`}
+                      className="text-[10px] uppercase text-slate-400"
+                    >
+                      Tipo
+                    </Label>
+                    <select
+                      id={`${selectedNode.id}-ask-type`}
+                      className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
+                      value={readConfigString(configDraft, "type") || "text"}
+                      disabled={readOnly}
+                      onChange={(event) =>
+                        setConfigDraft(writeConfigValue(configDraft, "type", event.target.value))
+                      }
+                    >
+                      <option value="text">Texto</option>
+                      <option value="email" disabled title="Disponible en una versión futura">
+                        Email (próximamente)
+                      </option>
+                      <option value="number" disabled title="Disponible en una versión futura">
+                        Número (próximamente)
+                      </option>
+                      <option value="phone" disabled title="Disponible en una versión futura">
+                        Teléfono (próximamente)
+                      </option>
+                      <option value="boolean" disabled title="Disponible en una versión futura">
+                        Sí/No (próximamente)
+                      </option>
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    El workflow pausa esperando la respuesta del cliente. Solo el tipo "texto" está
+                    validado en esta versión.
                   </p>
                 </div>
               )}
