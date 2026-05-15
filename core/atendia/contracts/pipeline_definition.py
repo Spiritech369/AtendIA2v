@@ -179,6 +179,13 @@ class StageDefinition(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    # Presentation-only display name. Optional: the default pipeline and
+    # real tenant pipelines carry it in JSONB, but programmatically-built
+    # and fixture pipelines omit it. Declaring it explicitly (instead of
+    # relying on extra="allow") means `stage.label` returns None instead
+    # of raising AttributeError when it's absent. Call sites use the
+    # `stage.label or stage.id` fallback to degrade to the stage id.
+    label: str | None = None
     required_fields: list[FieldSpec] = Field(default_factory=list)
     optional_fields: list[FieldSpec] = Field(default_factory=list)
     actions_allowed: list[str] = Field(default_factory=list)
