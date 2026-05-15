@@ -94,8 +94,6 @@ async def test_live_sandbox_turn_real_providers_zero_side_effects():
         assert after == before, f"live sandbox turn leaked rows: before={before} after={after}"
     finally:
         async with factory() as cleanup_session:
-            await cleanup_session.execute(
-                text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid}
-            )
+            await cleanup_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
             await cleanup_session.commit()
         await engine.dispose()
