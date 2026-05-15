@@ -19,6 +19,7 @@ while still undoing everything with exactly ONE rollback at the end.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -108,6 +109,7 @@ async def run_sandbox_turn(
     turn_number: int = 1,
     nlu_provider: NLUProvider,
     composer_provider: ComposerProvider,
+    apply_overrides: Callable[[AsyncSession], Awaitable[None]] | None = None,
 ) -> SandboxTurnResult:
     # Use the private _get_factory() (loop-scoped engine reuse) rather than
     # the public get_db_session(): the latter is an async-generator FastAPI
@@ -117,6 +119,12 @@ async def run_sandbox_turn(
     factory = _get_factory()
     session = factory()
     try:
+        if apply_overrides is not None:
+            # Mutate config (e.g. agent.system_prompt) INSIDE this session
+            # and flush so the runner's _load_agent SELECT sees it. The
+            # rollback in `finally` discards it — production stays untouched.
+            await apply_overrides(session)
+            await session.flush()
         return await _run_turn_on_session(
             session,
             conversation_id=conversation_id,
