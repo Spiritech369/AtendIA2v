@@ -1,7 +1,8 @@
 # AtendIA v2 — Estado del proyecto y gaps vs respond.io
 
-> **Última revisión:** 2026-05-15 (post Sprint A/B/C)
-> **Reemplaza:** `docs/AUDIT-2026-05-13.md`, `docs/PROJECT_MAP.md`, `docs/handoffs/v1-v2-conversations-gap.md`, todos los `docs/plans/*.md`.
+> **Última revisión:** 2026-05-15 (post Sprint A/B/C + cleanup)
+> **Reemplaza** (todos archivados bajo `docs/_archive/`, ver [`docs/_archive/README.md`](_archive/README.md)):
+> 20 plans en `docs/_archive/plans/`, `docs/_archive/AUDIT-2026-05-13.md`, `docs/_archive/PROJECT_MAP.md`.
 > **Documentos que NO reemplaza (siguen vigentes):** `docs/design/atendia-v2-architecture.md` (visión técnica), `docs/handoffs/2026-05-14-inbound-message-flow.md` (flujo runtime), `docs/runbooks/*` (operación diaria).
 
 ---
