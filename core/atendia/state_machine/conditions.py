@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from atendia.contracts.nlu_result import NLUResult
 
@@ -43,6 +44,11 @@ def _eval_atom(expr: str, ctx: EvaluationContext) -> bool:
     if raw_val.startswith(("=", "<", ">", "!")):
         raise ConditionSyntaxError(f"cannot parse condition: {expr!r}")
 
+    # `left` / `right` are unioned (str | float | int) — mypy needs the
+    # explicit annotation so the branches that bind floats/ints don't
+    # collide with the initial str inference from the intent branch.
+    left: Any
+    right: Any
     if var == "intent":
         left = ctx.nlu.intent.value
         right = raw_val
