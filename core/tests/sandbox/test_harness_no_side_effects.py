@@ -92,6 +92,14 @@ async def test_run_sandbox_turn_persists_nothing():
         assert after == before, f"sandbox turn leaked rows: before={before} after={after}"
         assert result.composer_output is not None
         assert isinstance(result.would_be_outbound, list)
+        # The runner records _FakeNLUWithCost's cost onto trace.nlu_cost_usd
+        # (conversation_runner.py:1128) and never assigns trace.total_cost_usd
+        # (the runner only accumulates into conversation_state). The harness
+        # must surface the per-turn component cost; here only NLU has a cost
+        # (the composer/tool/vision components are zero for this turn).
+        assert result.cost_usd == Decimal("0.000050"), (
+            f"harness did not surface the NLU component cost: {result.cost_usd!r}"
+        )
     finally:
         async with factory() as cleanup_session:
             await cleanup_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})

@@ -35,6 +35,11 @@ async def run_sandbox_turn(
     nlu_provider: NLUProvider,
     composer_provider: ComposerProvider,
 ) -> SandboxTurnResult:
+    # Use the private _get_factory() (loop-scoped engine reuse) rather than
+    # the public get_db_session(): the latter is an async-generator FastAPI
+    # dependency that doesn't fit this explicit try/finally single-session
+    # lifecycle (we need one session we own and roll back); no public
+    # equivalent exposes the sessionmaker directly.
     factory = _get_factory()
     pool = CapturingArqPool()
     session = factory()
@@ -53,14 +58,29 @@ async def run_sandbox_turn(
             tenant_id=tenant_id,
             inbound=inbound,
             turn_number=turn_number,
-            arq_pool=pool,  # type: ignore[arg-type]  # defensive; runner stages to session
+            # Structural/duck typing: CapturingArqPool implements enqueue_job
+            # so it satisfies the arq pool usage, but it isn't the declared
+            # ArqRedis type. On the runner path outbound is staged into the
+            # session (and only when to_phone_e164 is set, which the harness
+            # never passes), so enqueue_job is never actually called here.
+            arq_pool=pool,  # type: ignore[arg-type]
         )
         return SandboxTurnResult(
             flow_mode=getattr(trace, "flow_mode", None),
             nlu_output=getattr(trace, "nlu_output", None),
             composer_output=getattr(trace, "composer_output", None),
             would_be_outbound=list(getattr(trace, "outbound_messages", None) or []),
-            cost_usd=getattr(trace, "total_cost_usd", None) or Decimal("0"),
+            # The runner never assigns TurnTrace.total_cost_usd on the
+            # in-memory trace (it only accumulates per-turn cost into
+            # conversation_state.total_cost_usd via raw SQL). It DOES set the
+            # individual component costs on the trace, so sum those to get
+            # the real per-turn cost (reading total_cost_usd was always 0).
+            cost_usd=(
+                (getattr(trace, "nlu_cost_usd", None) or Decimal("0"))
+                + (getattr(trace, "composer_cost_usd", None) or Decimal("0"))
+                + (getattr(trace, "tool_cost_usd", None) or Decimal("0"))
+                + (getattr(trace, "vision_cost_usd", None) or Decimal("0"))
+            ),
             latency_ms=getattr(trace, "total_latency_ms", None),
         )
     finally:
