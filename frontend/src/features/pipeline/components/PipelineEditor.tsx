@@ -47,6 +47,7 @@ import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { PipelineVersionHistoryButton } from "./PipelineVersionHistoryDrawer";
 import { RuleBuilder } from "./RuleBuilder";
 import { StageDeleteDialog } from "./StageDeleteDialog";
+import { StageDependencyView } from "./StageDependencyView";
 import { UnsavedChangesGuard } from "./UnsavedChangesGuard";
 
 // Operators must match the backend Condition.operator literal in
@@ -1456,6 +1457,15 @@ export function PipelineEditor({ onClose }: Props) {
                 disabled={!canEdit}
               />
             </div>
+
+            {/* P6: read-only dependency view. Surfaces the same
+                impacted-references data the delete dialog uses, but
+                here so an operator sees how many conversations sit in
+                this stage and which workflows reference it BEFORE
+                editing behavior_mode / rules — not only on delete.
+                Keyed on the persisted stage id; while a brand-new
+                stage's id is still being typed the query is disabled. */}
+            <StageDependencyView stageId={selected.id} />
           </div>
         )}
 
