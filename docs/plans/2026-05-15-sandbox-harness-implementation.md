@@ -4,7 +4,12 @@
 
 **Goal:** A side-effect-free way to run the real `ConversationRunner` against a real conversation and capture what it *would* do (composer output, NLU, cost, would-be outbound) without persisting anything or sending any WhatsApp message.
 
-**Architecture:** Two-layer isolation over the *unchanged* runner: (1) a `CapturingArqPool` fake passed as `arq_pool` so `enqueue_messages` records instead of enqueues (no send, no followup schedule); (2) the run executes on an `AsyncSession` that is **always rolled back** — verified safe because there is **no `.commit()`** anywhere in the runner or its callees, so rollback fully undoes every write. The runner is invoked directly (not via the webhook), so the webhook's `publish_event` WS broadcast never happens. Returns a `SandboxResult` built from the `TurnTrace` the runner already returns + the captured outbound.
+**Architecture:** Isolation over the *unchanged* runner. The **rolled-back `AsyncSession` is the real safety mechanism** — verified safe because there is **no `.commit()`** anywhere in the runner or its callees, so rollback fully undoes every write. The runner is invoked directly (not via the webhook), so the webhook's `publish_event` WS broadcast never happens.
+
+> **Correction (code-review finding #1, Task 1):** `outbound_dispatcher.enqueue_messages(arq_pool, *, session=...)` (lines 55-58) takes the `stage_outbound(session, msg)` branch whenever a real `session` is passed — and the runner **always** passes `self._session`. So `arq_pool.enqueue_job` is **never called** on the runner path; the outbound is staged as an `outbox` row *inside the session* (and rolled back). Therefore:
+> - **`would_be_outbound` is sourced from the returned `TurnTrace.outbound_messages`** (`conversation_runner.py:1154` sets `outbound_messages=composer_output.messages`), **NOT** from `pool.captured`.
+> - `CapturingArqPool` stays as a **defensive stub** for the `session=None`/`arq_redis` fallback path (harmless, already built + approved in Task 1). It is *not* the capture mechanism.
+> - The zero-side-effects invariant test (Task 3) **must also assert zero new `outbox` rows**, since `stage_outbound` writes there.
 
 **Tech Stack:** Python 3.12, SQLAlchemy 2.0 async, asyncpg, pytest-asyncio, `uv`. Dev DB = Docker Postgres on host **5433** (copy `core/.env` from the main checkout into the worktree `core/` first; verify `uv run python -c "from atendia.config import get_settings; print(get_settings().database_url)"` shows `:5433`).
 
@@ -190,9 +195,11 @@ async def test_sandbox_turn_persists_nothing(db_session_factory):
         return (await s.execute(text(f"SELECT count(*) FROM {table} "
             "WHERE conversation_id = :c"), {"c": conv.id})).scalar()
 
-    # snapshot row counts in a fresh session
+    # snapshot row counts in a fresh session. `outbox` is included
+    # because the runner stages outbound there (review finding #1) —
+    # the rollback must undo it too.
     before = {t: await _count(s, t) for t in
-              ("messages", "turn_traces", "field_suggestions")}
+              ("messages", "turn_traces", "field_suggestions", "outbox")}
 
     result = await run_sandbox_turn(
         conversation_id=conv.id, tenant_id=conv.tenant_id,
@@ -212,13 +219,18 @@ async def test_sandbox_turn_persists_nothing(db_session_factory):
 ```python
 """Run the real ConversationRunner with zero side effects.
 
-Safe because: (a) arq_pool is a CapturingArqPool (no enqueue/send/
-followup), (b) the AsyncSession is always rolled back, and there is NO
-.commit() anywhere in the runner or its callees, (c) run_turn is called
-directly so the webhook's publish_event WS broadcast never happens.
+Safe because the AsyncSession is ALWAYS rolled back and there is NO
+.commit() anywhere in the runner or its callees, so every write —
+messages, turn_traces, field_suggestions, AND the staged `outbox`
+row — is undone. run_turn is called directly so the webhook's
+publish_event WS broadcast never happens. CapturingArqPool is only a
+defensive stub for the session=None/arq fallback branch; on the real
+runner path outbound is staged into the (rolled-back) session, and
+the would-be reply text is read from the returned TurnTrace.
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
 from atendia.contracts.message import Message, MessageDirection
@@ -256,11 +268,11 @@ async def run_sandbox_turn(
             flow_mode=getattr(trace, "flow_mode", None),
             nlu_output=getattr(trace, "nlu_output", None),
             composer_output=getattr(trace, "composer_output", None),
-            would_be_outbound=[
-                a[0].get("text", "") if a and isinstance(a[0], dict) else ""
-                for (_fn, a, _kw) in pool.captured
-            ],
-            cost_usd=getattr(trace, "total_cost_usd", None) or __import__("decimal").Decimal("0"),
+            # review finding #1: the runner stages outbound into the
+            # session (rolled back); the would-be reply text lives on
+            # the returned trace, NOT pool.captured.
+            would_be_outbound=list(getattr(trace, "outbound_messages", None) or []),
+            cost_usd=getattr(trace, "total_cost_usd", None) or Decimal("0"),
             latency_ms=getattr(trace, "total_latency_ms", None),
         )
     finally:
@@ -269,8 +281,14 @@ async def run_sandbox_turn(
 ```
 *(Implementer: confirm the exact `Message` constructor + `TurnTrace`
 attribute names against `contracts/message.py` and the object `run_turn`
-returns; adjust the `getattr` mapping accordingly. The invariant test is
-the source of truth — make it green without changing the runner.)*
+returns (esp. `outbound_messages` — set at `conversation_runner.py:1154`
+to `composer_output.messages`); adjust the `getattr` mapping accordingly.
+The invariant test is the source of truth — make it green without
+changing the runner. Also apply review finding #2: add a `job_id`
+attribute to `_CapturedJob` in `transport.py` (e.g.
+`self.job_id = f"captured:{function}"`) so the defensive stub fully
+duck-types `arq.jobs.Job` for the fallback path — small hardening,
+commit it as part of this task.)*
 
 **Step 4: Run** the test → PASS (`after == before`, composer_output present).
 
@@ -296,7 +314,12 @@ turn 2, with `.partial` holding the 2 completed `SandboxTurnResult`s and
 
 **Step 2: Run** → FAIL (`ImportError: CostCapExceeded`).
 
-**Step 3: Implement** `run_sandbox_conversation(*, conversation_id, tenant_id, script: list[str], cost_cap_usd: Decimal | None, ...)` that loops `run_sandbox_turn` over the script, accumulates `total_cost_usd`, and raises `CostCapExceeded(partial=..., spent=...)` the moment the running total exceeds the cap. Add an `estimate_cost(...)` helper that returns `n_turns * avg_cost_per_turn` where `avg_cost_per_turn` is read from the tenant's recent `turn_traces` (fallback constant `Decimal("0.02")` when no history).
+> **Design correction (controller, pre-Task-4 — same class as finding #1):** Task 4 must NOT "loop `run_sandbox_turn`". `run_sandbox_turn` opens its own session and rolls back **per turn**, so turn 2 would not see turn 1's `conversation_state`/extracted-data — that is not a faithful multi-turn replay (and A4/A3/P2 depend on faithful multi-turn). Refactor first: extract an internal `async def _run_turn_on_session(session, *, conversation_id, tenant_id, inbound_text, turn_number, nlu_provider, composer_provider) -> SandboxTurnResult` that does the runner call + `TurnTrace`→`SandboxTurnResult` mapping **but does NOT open/rollback the session** (caller owns the session lifecycle). Then:
+> - `run_sandbox_turn(...)` = open one session → `_run_turn_on_session(...)` once → `finally: rollback + close` (behaviour unchanged; existing Task 3 invariant test must still pass untouched).
+> - `run_sandbox_conversation(...)` = open **one** session, loop `_run_turn_on_session` over the script (state accumulates across turns within that session, faithful multi-turn), accumulate cost, and **`finally: rollback + close` exactly once** at the end (the zero-side-effects invariant still holds — one rollback undoes all N turns).
+> Add a `test_sandbox_conversation_persists_nothing` invariant test for the multi-turn path too (same fresh-session row-count technique as Task 3, asserting `after == before` after an N-message script).
+
+**Step 3: Implement** `run_sandbox_conversation(*, conversation_id, tenant_id, script: list[str], cost_cap_usd: Decimal | None, nlu_provider, composer_provider) -> SandboxRunResult` per the design correction above (one session, loop `_run_turn_on_session`, single rollback in `finally`). Accumulate `total_cost_usd` from each turn's `SandboxTurnResult.cost_usd` (now correct after Task-3 fix I1); raise `CostCapExceeded(partial=[...completed SandboxTurnResult...], spent=Decimal)` the moment the running total exceeds `cost_cap_usd` (the tripping turn still counts in `spent` and `partial`); the rollback in `finally` still runs when this raises. Add an `estimate_cost(*, tenant_id, n_turns) -> Decimal` helper returning `n_turns * avg_cost_per_turn`, where `avg_cost_per_turn` is the mean of recent `turn_traces` component costs for the tenant (fallback constant `Decimal("0.02")` when no history). `CostCapExceeded` goes in `result.py` (carries `.partial: list[SandboxTurnResult]` and `.spent: Decimal`).
 
 **Step 4: Run** → PASS.
 
