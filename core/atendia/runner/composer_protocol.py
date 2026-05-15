@@ -9,9 +9,10 @@ Both return (ComposerOutput, UsageMetadata | None). Mocks/canned return None usa
 
 from typing import Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from atendia.contracts.flow_mode import FlowMode
+from atendia.contracts.handoff_summary import HandoffReason
 from atendia.contracts.tone import Tone
 from atendia.contracts.vision_result import VisionResult
 from atendia.runner.nlu_protocol import UsageMetadata
@@ -49,6 +50,25 @@ class ComposerOutput(BaseModel):
     # composers can also surface their canned text for the DebugPanel
     # raw-vs-final comparison. None on legacy paths that don't capture it.
     raw_llm_response: str | None = None
+    # D6 — composer's hint to the runner that THIS turn should escalate
+    # via human_handoffs. The runner reads this and routes through
+    # persist_handoff(reason=HandoffReason(value)) when set. Must be
+    # exactly one of HandoffReason enum values OR null. Validated against
+    # the enum so a hallucinated value surfaces as ValidationError instead
+    # of a runtime crash deeper in the handoff dispatch path.
+    suggested_handoff: str | None = None
+
+    @field_validator("suggested_handoff")
+    @classmethod
+    def _validate_handoff_value(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        allowed = {r.value for r in HandoffReason}
+        if v not in allowed:
+            raise ValueError(
+                f"suggested_handoff must be one of {sorted(allowed)} or null, got {v!r}"
+            )
+        return v
 
 
 class ComposerProvider(Protocol):
