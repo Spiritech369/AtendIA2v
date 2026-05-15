@@ -1,5 +1,6 @@
 import asyncio
 import time
+import unicodedata
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -66,6 +67,34 @@ def _maybe_uuid(s: str) -> UUID | None:
         return None
 
 
+def _composer_provider_short_name(composer) -> str | None:
+    """Return short adapter name for the composer instance.
+
+    'openai' — OpenAIComposer hitting the API successfully.
+    'fallback' — OpenAIComposer that fell back to canned (its
+      ``_fallback_triggered`` flag is set by the retry loop).
+    'canned' — CannedComposer (deterministic dev/test path).
+    None — any future class we don't recognize (frontend degrades to
+      no badge; the CHECK constraint rejects '' so NEVER return that).
+    """
+    cls = type(composer).__name__
+    if cls == "CannedComposer":
+        return "canned"
+    if cls == "OpenAIComposer":
+        return "fallback" if getattr(composer, "_fallback_triggered", False) else "openai"
+    return None
+
+
+def _clean_inbound_text(raw: str) -> str:
+    """Mirror the cleanup the NLU does on inbound text: NFKD strip of
+    combining marks (diacritics), lowercase, surrounding whitespace
+    trimmed. Persisted alongside the raw inbound so the DebugPanel can
+    show side-by-side."""
+    normalized = unicodedata.normalize("NFKD", raw)
+    stripped = "".join(c for c in normalized if not unicodedata.combining(c))
+    return stripped.lower().strip()
+
+
 # Phase 3c.2 — pending_confirmation handling
 #
 # The runner only listens for SHORT, UNAMBIGUOUS sí/no replies; long
@@ -76,14 +105,25 @@ def _maybe_uuid(s: str) -> UUID | None:
 # Mexican Spanish slang adds "simon" (yes) and "nel" (no); we keep the
 # whitelist short on purpose — multi-word phrases need substring rules
 # that we'd rather get wrong loudly than silently.
-_AFFIRMATIVE: frozenset[str] = frozenset({
-    "si", "sí", "claro", "ok", "okay", "yes", "ya", "sip", "simon",
-})
+_AFFIRMATIVE: frozenset[str] = frozenset(
+    {
+        "si",
+        "sí",
+        "claro",
+        "ok",
+        "okay",
+        "yes",
+        "ya",
+        "sip",
+        "simon",
+    }
+)
 _NEGATIVE: frozenset[str] = frozenset({"no", "nop", "nada", "nel"})
 
 
 def _confirmation_side_effects(
-    pending_key: str, answer: str,
+    pending_key: str,
+    answer: str,
 ) -> dict[str, str]:
     """Translate a yes/no answer to a pending_confirmation key into
     extracted-field updates. Returns a dict of {field_name: value} to
@@ -170,21 +210,28 @@ class ConversationRunner:
         # review H1 — cancel before short-circuit was wiping the silence
         # clock for paused conversations even though the runner wasn't
         # producing a replacement schedule).
-        row = (await self._session.execute(
-            text("""SELECT current_stage, extracted_data, last_intent, stage_entered_at,
+        row = (
+            await self._session.execute(
+                text("""SELECT current_stage, extracted_data, last_intent, stage_entered_at,
                            followups_sent_count, total_cost_usd, pending_confirmation,
                            bot_paused
                     FROM conversation_state cs JOIN conversations c ON c.id = cs.conversation_id
                     WHERE cs.conversation_id = :cid"""),
-            {"cid": conversation_id},
-        )).fetchone()
-        if row is None:
-            raise RuntimeError(
-                f"conversation_state not found for conversation {conversation_id}"
+                {"cid": conversation_id},
             )
-        (current_stage, extracted_jsonb, last_intent,
-         stage_entered_at, followups_sent_count,
-         total_cost_usd, pending_confirmation, bot_paused) = row
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"conversation_state not found for conversation {conversation_id}")
+        (
+            current_stage,
+            extracted_jsonb,
+            last_intent,
+            stage_entered_at,
+            followups_sent_count,
+            total_cost_usd,
+            pending_confirmation,
+            bot_paused,
+        ) = row
 
         # Phase 4 T24 — operator-driven conversation. Persist a minimal
         # turn_trace so the audit log shows the inbound landed but the bot
@@ -201,6 +248,8 @@ class ConversationRunner:
                 tenant_id=tenant_id,
                 turn_number=turn_number,
                 inbound_text=inbound.text,
+                inbound_text_cleaned=_clean_inbound_text(inbound.text),
+                composer_provider=_composer_provider_short_name(self._composer),
                 bot_paused=True,
                 state_before={"current_stage": current_stage},
                 state_after={"current_stage": current_stage},
@@ -215,7 +264,8 @@ class ConversationRunner:
         # has engaged. Lives in the caller's transaction so a crash
         # mid-turn does NOT leave a stale silence reminder primed.
         await cancel_pending_followups(
-            session=self._session, conversation_id=conversation_id,
+            session=self._session,
+            conversation_id=conversation_id,
         )
 
         pipeline = await load_active_pipeline(self._session, tenant_id)
@@ -246,9 +296,8 @@ class ConversationRunner:
         # Build a ConversationState-like object for the orchestrator (it consumes
         # an object with `current_stage` and `extracted_data` containing values).
         from atendia.contracts.conversation_state import ConversationState, ExtractedField
-        state_obj_extracted = {
-            k: ExtractedField(**v) for k, v in (extracted_jsonb or {}).items()
-        }
+
+        state_obj_extracted = {k: ExtractedField(**v) for k, v in (extracted_jsonb or {}).items()}
         state_obj = ConversationState(
             conversation_id=str(conversation_id),
             tenant_id=str(tenant_id),
@@ -263,13 +312,15 @@ class ConversationRunner:
 
         # Fetch the last N (inbound + outbound) messages for NLU context.
         history_turns = pipeline.nlu.history_turns
-        history_rows = (await self._session.execute(
-            text("""SELECT direction, text FROM messages
+        history_rows = (
+            await self._session.execute(
+                text("""SELECT direction, text FROM messages
                     WHERE conversation_id = :cid
                     ORDER BY sent_at DESC
                     LIMIT :n"""),
-            {"cid": conversation_id, "n": history_turns * 2},
-        )).fetchall()
+                {"cid": conversation_id, "n": history_turns * 2},
+            )
+        ).fetchall()
         # Reverse so oldest is first; rows come back newest-first.
         history: list[tuple[str, str]] = [(r[0], r[1]) for r in reversed(history_rows)]
 
@@ -301,9 +352,8 @@ class ConversationRunner:
             )
             # Refresh state_obj so process_turn sees the just-applied fields.
             from atendia.contracts.conversation_state import ExtractedField
-            state_obj.extracted_data = {
-                k: ExtractedField(**v) for k, v in extracted_jsonb.items()
-            }
+
+            state_obj.extracted_data = {k: ExtractedField(**v) for k, v in extracted_jsonb.items()}
             state_obj.pending_confirmation = None
 
         # Phase 3c.2 — run NLU and (optionally) Vision in parallel. Vision
@@ -330,12 +380,16 @@ class ConversationRunner:
 
         if first_image and first_image.url and settings.openai_api_key:
             from openai import AsyncOpenAI
+
             vision_client = AsyncOpenAI(api_key=settings.openai_api_key)
             vision_task = classify_image(
-                client=vision_client, image_url=first_image.url,
+                client=vision_client,
+                image_url=first_image.url,
             )
             nlu_outcome, vision_outcome = await asyncio.gather(
-                nlu_task, vision_task, return_exceptions=True,
+                nlu_task,
+                vision_task,
+                return_exceptions=True,
             )
             if isinstance(nlu_outcome, BaseException):
                 raise nlu_outcome
@@ -353,8 +407,9 @@ class ConversationRunner:
                 )
             else:
                 # vision_result is consumed by mode-specific dispatch in T21.
-                (vision_result, _tokens_in, _tokens_out,
-                 vision_cost_usd, vision_latency_ms) = vision_outcome
+                (vision_result, _tokens_in, _tokens_out, vision_cost_usd, vision_latency_ms) = (
+                    vision_outcome
+                )
         else:
             nlu, usage = await nlu_task
 
@@ -378,8 +433,10 @@ class ConversationRunner:
                 )
             except Exception:
                 import logging as _logging
+
                 _logging.getLogger(__name__).exception(
-                    "process_vision_result failed for conv=%s", conversation_id,
+                    "process_vision_result failed for conv=%s",
+                    conversation_id,
                 )
 
         # Surface NLU-level errors as ERROR_OCCURRED events for observability.
@@ -446,9 +503,11 @@ class ConversationRunner:
                         )
                     except Exception:
                         import logging as _logging
+
                         _logging.getLogger(__name__).exception(
                             "emit_field_updated failed for conv=%s key=%s",
-                            conversation_id, change.attr_key,
+                            conversation_id,
+                            change.attr_key,
                         )
         except Exception:
             import logging as _logging
@@ -471,9 +530,7 @@ class ConversationRunner:
         previous_stage = current_stage
         next_stage_id = decision.next_stage
         new_stage_entered_at = (
-            datetime.now(UTC)
-            if next_stage_id != previous_stage
-            else stage_entered_at
+            datetime.now(UTC) if next_stage_id != previous_stage else stage_entered_at
         )
 
         # Persist updated state
@@ -514,6 +571,7 @@ class ConversationRunner:
         # Wrapped in try/except so a malformed rule never crashes the
         # turn — the conversation just stays where the FSM put it.
         from atendia.state_machine.pipeline_evaluator import evaluate_pipeline_rules
+
         # rules_evaluated is captured for migration 045 so the DebugPanel
         # can render per-rule pass/fail. None when evaluation never ran
         # (e.g. evaluator raised below).
@@ -535,6 +593,7 @@ class ConversationRunner:
                 new_stage_entered_at = datetime.now(UTC)
         except Exception as exc:  # noqa: BLE001 — never let rules block a turn
             import logging
+
             logging.getLogger(__name__).warning(
                 "auto_enter_rules evaluation raised; staying at FSM stage %s",
                 next_stage_id,
@@ -580,9 +639,12 @@ class ConversationRunner:
                 )
             except Exception:
                 import logging as _logging
+
                 _logging.getLogger(__name__).exception(
                     "emit_stage_changed failed for conv=%s %s->%s",
-                    conversation_id, previous_stage, next_stage_id,
+                    conversation_id,
+                    previous_stage,
+                    next_stage_id,
                 )
 
         # Fase 4 — stage-entry handoff. When the just-entered stage has
@@ -607,9 +669,11 @@ class ConversationRunner:
                 )
             except Exception:
                 import logging as _logging
+
                 _logging.getLogger(__name__).exception(
                     "stage_entry_handoff failed for conv=%s stage=%s",
-                    conversation_id, next_stage_id,
+                    conversation_id,
+                    next_stage_id,
                 )
 
         # ===== Phase 3b: tone, tools, 24h check, Composer =====
@@ -618,10 +682,12 @@ class ConversationRunner:
         # voice -> Tone (Phase 3b). default_messages.brand_facts -> dict (Phase 3c.2,
         # T23 will populate the slot; until then it's an empty dict and the composer
         # pre-pass leaves brand_facts placeholders literal).
-        branding_row = (await self._session.execute(
-            text("SELECT voice, default_messages FROM tenant_branding WHERE tenant_id = :t"),
-            {"t": tenant_id},
-        )).fetchone()
+        branding_row = (
+            await self._session.execute(
+                text("SELECT voice, default_messages FROM tenant_branding WHERE tenant_id = :t"),
+                {"t": tenant_id},
+            )
+        ).fetchone()
         tone = Tone.model_validate(branding_row[0] if branding_row else {})
         brand_facts: dict = {}
         if branding_row and branding_row[1]:
@@ -629,8 +695,12 @@ class ConversationRunner:
         if agent_row is not None:
             tone_data = tone.model_dump()
             tone_data["bot_name"] = agent_row.name
-            tone_data["max_words_per_message"] = max(10, min(120, (agent_row.max_sentences or 5) * 20))
-            tone_data["use_emojis"] = "never" if agent_row.no_emoji else tone_data.get("use_emojis", "sparingly")
+            tone_data["max_words_per_message"] = max(
+                10, min(120, (agent_row.max_sentences or 5) * 20)
+            )
+            tone_data["use_emojis"] = (
+                "never" if agent_row.no_emoji else tone_data.get("use_emojis", "sparingly")
+            )
             tone_data["register"] = _agent_tone_to_register(agent_row.tone)
             tone = Tone.model_validate(tone_data)
             brand_facts = dict(brand_facts)
@@ -649,18 +719,12 @@ class ConversationRunner:
                 prompt_parts.append(agent_row.system_prompt.strip())
             active_rules = [
                 str(g.get("rule_text", "")).strip()
-                for g in (
-                    (agent_row.ops_config or {}).get("guardrails") or []
-                )
-                if isinstance(g, dict)
-                and g.get("active") is True
-                and g.get("rule_text")
+                for g in ((agent_row.ops_config or {}).get("guardrails") or [])
+                if isinstance(g, dict) and g.get("active") is True and g.get("rule_text")
             ]
             if active_rules:
                 rendered = "\n".join(f"- {r}" for r in active_rules)
-                prompt_parts.append(
-                    "REGLAS QUE NO PUEDES ROMPER (guardrails):\n" + rendered
-                )
+                prompt_parts.append("REGLAS QUE NO PUEDES ROMPER (guardrails):\n" + rendered)
             if prompt_parts:
                 brand_facts["agent_system_prompt"] = "\n\n".join(prompt_parts)
 
@@ -687,8 +751,10 @@ class ConversationRunner:
         # get the default `always -> SUPPORT` fallback so this never raises.
         from atendia.contracts.extracted_fields import ExtractedFields
         from atendia.runner.flow_router import pick_flow_mode
+
         ext_fields_data = {
-            k: v["value"] for k, v in merged_extracted.items()
+            k: v["value"]
+            for k, v in merged_extracted.items()
             if k in ExtractedFields.model_fields and v.get("value") is not None
         }
         try:
@@ -717,7 +783,8 @@ class ConversationRunner:
         # stage where the turn started, so a Plan→DOC transition that
         # happens this turn lands the customer's reply in DOC mode.
         final_stage_def = next(
-            (s for s in pipeline.stages if s.id == next_stage_id), None,
+            (s for s in pipeline.stages if s.id == next_stage_id),
+            None,
         )
         stage_pinned_mode = getattr(final_stage_def, "behavior_mode", None)
         if stage_pinned_mode:
@@ -725,9 +792,12 @@ class ConversationRunner:
                 flow_mode = FlowMode(stage_pinned_mode)
             except (ValueError, KeyError):
                 import logging as _logging
+
                 _logging.getLogger(__name__).warning(
                     "stage %s behavior_mode=%r is invalid; using router's %s",
-                    next_stage_id, stage_pinned_mode, flow_mode,
+                    next_stage_id,
+                    stage_pinned_mode,
+                    flow_mode,
                 )
 
         # ===== Phase 3c.1: real-data tool dispatch =====
@@ -745,13 +815,17 @@ class ConversationRunner:
             if interes_value:
                 # Step 1: alias-keyword resolve (no embedding cost).
                 catalog_hits = await search_catalog(
-                    session=self._session, tenant_id=tenant_id,
-                    query=str(interes_value), embedding=None, limit=1,
+                    session=self._session,
+                    tenant_id=tenant_id,
+                    query=str(interes_value),
+                    embedding=None,
+                    limit=1,
                     collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(catalog_hits, list) and catalog_hits:
                     quote_result = await quote(
-                        session=self._session, tenant_id=tenant_id,
+                        session=self._session,
+                        tenant_id=tenant_id,
                         sku=catalog_hits[0].sku,
                     )
                     action_payload = quote_result.model_dump(mode="json")
@@ -767,14 +841,18 @@ class ConversationRunner:
         elif decision.action == "lookup_faq":
             if settings.openai_api_key:
                 from openai import AsyncOpenAI
+
                 client = AsyncOpenAI(api_key=settings.openai_api_key)
                 embedding, _, emb_cost = await generate_embedding(
-                    client=client, text=inbound.text,
+                    client=client,
+                    text=inbound.text,
                 )
                 tool_cost_usd += emb_cost
                 faq_result = await lookup_faq(
-                    session=self._session, tenant_id=tenant_id,
-                    embedding=embedding, top_k=3,
+                    session=self._session,
+                    tenant_id=tenant_id,
+                    embedding=embedding,
+                    top_k=3,
                     collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(faq_result, list):
@@ -794,8 +872,10 @@ class ConversationRunner:
             query_text = str(interes_value) if interes_value else inbound.text
             # Path 1: alias-keyword (free).
             keyword_hits = await search_catalog(
-                session=self._session, tenant_id=tenant_id,
-                query=query_text, embedding=None,
+                session=self._session,
+                tenant_id=tenant_id,
+                query=query_text,
+                embedding=None,
                 collection_ids=agent_collection_ids or None,
             )
             if isinstance(keyword_hits, list) and keyword_hits:
@@ -805,14 +885,18 @@ class ConversationRunner:
             elif settings.openai_api_key:
                 # Path 2: semantic fallback (embedding cost).
                 from openai import AsyncOpenAI
+
                 client = AsyncOpenAI(api_key=settings.openai_api_key)
                 embedding, _, emb_cost = await generate_embedding(
-                    client=client, text=query_text,
+                    client=client,
+                    text=query_text,
                 )
                 tool_cost_usd += emb_cost
                 semantic_hits = await search_catalog(
-                    session=self._session, tenant_id=tenant_id,
-                    query=query_text, embedding=embedding,
+                    session=self._session,
+                    tenant_id=tenant_id,
+                    query=query_text,
+                    embedding=embedding,
                     collection_ids=agent_collection_ids or None,
                 )
                 if isinstance(semantic_hits, list):
@@ -829,8 +913,7 @@ class ConversationRunner:
         elif decision.action == "ask_field":
             extracted_keys = set(merged_extracted.keys())
             missing = next(
-                (f for f in current_stage_def.required_fields
-                 if f.name not in extracted_keys),
+                (f for f in current_stage_def.required_fields if f.name not in extracted_keys),
                 None,
             )
             if missing:
@@ -860,19 +943,21 @@ class ConversationRunner:
             )
         except Exception:
             import logging as _logging
+
             _logging.getLogger(__name__).exception(
                 "attach_requirements_to_payload failed for conv=%s",
                 conversation_id,
             )
 
         # 24h window check.
-        last_activity_at = (await self._session.execute(
-            text("SELECT last_activity_at FROM conversations WHERE id = :cid"),
-            {"cid": conversation_id},
-        )).scalar()
-        inside_24h = (
-            last_activity_at is None
-            or (datetime.now(UTC) - last_activity_at) < timedelta(hours=24)
+        last_activity_at = (
+            await self._session.execute(
+                text("SELECT last_activity_at FROM conversations WHERE id = :cid"),
+                {"cid": conversation_id},
+            )
+        ).scalar()
+        inside_24h = last_activity_at is None or (datetime.now(UTC) - last_activity_at) < timedelta(
+            hours=24
         )
 
         composer_input: ComposerInput | None = None
@@ -896,6 +981,7 @@ class ConversationRunner:
                 build_handoff_summary,
                 persist_handoff,
             )
+
             await persist_handoff(
                 session=self._session,
                 conversation_id=conversation_id,
@@ -904,9 +990,7 @@ class ConversationRunner:
                     reason=HandoffReason.OUTSIDE_24H_WINDOW,
                     extracted=ext_fields,
                     last_inbound_text=inbound.text,
-                    suggested_next_action=(
-                        "Contactar al cliente fuera del 24h window."
-                    ),
+                    suggested_next_action=("Contactar al cliente fuera del 24h window."),
                     docs_per_plan=pipeline.docs_per_plan,
                 ),
             )
@@ -920,9 +1004,7 @@ class ConversationRunner:
             # Inside 24h, action produces text: invoke Composer.
             composer_history_turns = pipeline.composer.history_turns
             history_for_composer = (
-                history[-composer_history_turns * 2:]
-                if composer_history_turns > 0
-                else []
+                history[-composer_history_turns * 2 :] if composer_history_turns > 0 else []
             )
             composer_input = ComposerInput(
                 action=decision.action,
@@ -964,6 +1046,7 @@ class ConversationRunner:
                     build_handoff_summary,
                     persist_handoff,
                 )
+
                 await persist_handoff(
                     session=self._session,
                     conversation_id=conversation_id,
@@ -1033,6 +1116,8 @@ class ConversationRunner:
             turn_number=turn_number,
             inbound_message_id=None,  # phase 1: messages table not populated yet
             inbound_text=inbound.text,
+            inbound_text_cleaned=_clean_inbound_text(inbound.text),
+            composer_provider=_composer_provider_short_name(self._composer),
             nlu_input={"text": inbound.text, "history": history},
             nlu_output=_jsonable(nlu.model_dump(mode="json")),
             nlu_model=usage.model if usage else None,
@@ -1043,9 +1128,7 @@ class ConversationRunner:
             state_before=_jsonable(state_before),
             state_after=_jsonable(state_after),
             stage_transition=(
-                f"{previous_stage}->{next_stage_id}"
-                if next_stage_id != previous_stage
-                else None
+                f"{previous_stage}->{next_stage_id}" if next_stage_id != previous_stage else None
             ),
             composer_input=(
                 _jsonable(composer_input.model_dump(mode="json"))
@@ -1066,9 +1149,7 @@ class ConversationRunner:
             vision_cost_usd=vision_cost_usd if vision_cost_usd > 0 else None,
             vision_latency_ms=vision_latency_ms,
             flow_mode=flow_mode.value,
-            outbound_messages=(
-                composer_output.messages if composer_output is not None else None
-            ),
+            outbound_messages=(composer_output.messages if composer_output is not None else None),
             total_latency_ms=latency_ms,
             # ── Migration 045 — DebugPanel observability ────────────────
             router_trigger=router_trigger,
@@ -1083,11 +1164,7 @@ class ConversationRunner:
         await self._session.flush()
 
         # Enqueue outbound messages onto arq if we have a queue and recipient.
-        if (
-            composer_output is not None
-            and arq_pool is not None
-            and to_phone_e164 is not None
-        ):
+        if composer_output is not None and arq_pool is not None and to_phone_e164 is not None:
             await enqueue_messages(
                 arq_pool,
                 session=self._session,
@@ -1134,7 +1211,8 @@ class ConversationRunner:
         — no race where the handoff lands first with stale fields.
         """
         stage = next(
-            (s for s in pipeline.stages if s.id == new_stage_id), None,
+            (s for s in pipeline.stages if s.id == new_stage_id),
+            None,
         )
         if stage is None or not getattr(stage, "pause_bot_on_enter", False):
             return False
@@ -1150,7 +1228,8 @@ class ConversationRunner:
         # shape the summary builder expects (it's a Pydantic model with
         # a known field list; extras are ignored).
         ext_fields_data = {
-            k: v["value"] for k, v in merged_extracted.items()
+            k: v["value"]
+            for k, v in merged_extracted.items()
             if k in ExtractedFields.model_fields and v.get("value") is not None
         }
         try:
@@ -1176,9 +1255,7 @@ class ConversationRunner:
             reason=reason,
             extracted=ext_fields,
             last_inbound_text=last_inbound_text,
-            suggested_next_action=(
-                f"Revisar la conversación: entró a {stage.label or stage.id}."
-            ),
+            suggested_next_action=(f"Revisar la conversación: entró a {stage.label or stage.id}."),
             docs_per_plan=pipeline.docs_per_plan,
         )
         await persist_handoff(
@@ -1191,9 +1268,7 @@ class ConversationRunner:
         # Flip the bot_paused gate so subsequent inbound turns short-
         # circuit at the top of run_turn until an operator resumes.
         await self._session.execute(
-            text(
-                "UPDATE conversations SET bot_paused = true WHERE id = :cid"
-            ),
+            text("UPDATE conversations SET bot_paused = true WHERE id = :cid"),
             {"cid": conversation_id},
         )
 
@@ -1214,14 +1289,14 @@ class ConversationRunner:
                     ),
                     payload={
                         "plan_credito": (
-                            ext_fields.plan_credito.value
-                            if ext_fields.plan_credito else None
+                            ext_fields.plan_credito.value if ext_fields.plan_credito else None
                         ),
                         "docs_recibidos": summary.docs_recibidos,
                     },
                 )
             except Exception:
                 import logging as _logging
+
                 _logging.getLogger(__name__).exception(
                     "emit DOCS_COMPLETE_FOR_PLAN failed for conv=%s",
                     conversation_id,
@@ -1304,10 +1379,12 @@ class ConversationRunner:
             return
         if customer_id is None:
             return
-        row = (await self._session.execute(
-            text("SELECT attrs FROM customers WHERE id = :cid"),
-            {"cid": customer_id},
-        )).fetchone()
+        row = (
+            await self._session.execute(
+                text("SELECT attrs FROM customers WHERE id = :cid"),
+                {"cid": customer_id},
+            )
+        ).fetchone()
         if row is None:
             return
         attrs = dict(row[0] or {})
