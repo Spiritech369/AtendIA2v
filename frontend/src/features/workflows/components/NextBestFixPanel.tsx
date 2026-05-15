@@ -21,7 +21,10 @@ type FixCard = {
   area: string;
 };
 
-const SEVERITY_STYLES: Record<FixCard["severity"], { badge: string; border: string; text: string; icon: typeof AlertTriangle }> = {
+const SEVERITY_STYLES: Record<
+  FixCard["severity"],
+  { badge: string; border: string; text: string; icon: typeof AlertTriangle }
+> = {
   critical: {
     badge: "border-red-400/40 bg-red-500/10 text-red-200",
     border: "border-red-400/30",
@@ -58,7 +61,8 @@ function buildFixes(workflow: WorkflowItem): FixCard[] {
         : issue.severity === "warning"
           ? "warning"
           : "info";
-    const fix = suggestions[idx] || suggestions[0] || "Abre el nodo y revisa la configuración pendiente.";
+    const fix =
+      suggestions[idx] || suggestions[0] || "Abre el nodo y revisa la configuración pendiente.";
     cards.push({
       key: `issue-${idx}-${issue.code || issue.node_id || "x"}`,
       severity,

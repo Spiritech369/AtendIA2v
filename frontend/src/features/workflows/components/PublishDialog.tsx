@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { workflowsApi, type WorkflowItem } from "@/features/workflows/api";
+import { type WorkflowItem, workflowsApi } from "@/features/workflows/api";
 import { cn } from "@/lib/utils";
 
 const ROLLOUTS = [10, 25, 50, 100] as const;
@@ -73,8 +73,9 @@ export function PublishDialog({ workflow, open, onOpenChange, onPublished }: Pub
             Publicar cambios — {workflow.name}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400">
-            Borrador v{workflow.draft_version} → Producción v{workflow.published_version + 1}.
-            Esta acción es auditada y no se puede deshacer automáticamente; podrás restaurar la versión anterior si surge un problema.
+            Borrador v{workflow.draft_version} → Producción v{workflow.published_version + 1}. Esta
+            acción es auditada y no se puede deshacer automáticamente; podrás restaurar la versión
+            anterior si surge un problema.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,7 +100,8 @@ export function PublishDialog({ workflow, open, onOpenChange, onPublished }: Pub
           <div className="min-w-0">
             <p className="font-medium">{validation.summary || "Listo para publicar"}</p>
             <p className="text-[10px] opacity-80">
-              {validation.critical_count} crítico{validation.critical_count === 1 ? "" : "s"} · {warnings} advertencia
+              {validation.critical_count} crítico{validation.critical_count === 1 ? "" : "s"} ·{" "}
+              {warnings} advertencia
               {warnings === 1 ? "" : "s"} · {validation.ok_count} OK
             </p>
           </div>
@@ -142,16 +144,36 @@ export function PublishDialog({ workflow, open, onOpenChange, onPublished }: Pub
               value={formatNumber(impact.affectedLeads)}
               tone="info"
             />
-            <ImpactCard icon={Workflow} label="Nodos en producción" value={String(impact.changedNodes)} tone="info" />
+            <ImpactCard
+              icon={Workflow}
+              label="Nodos en producción"
+              value={String(impact.changedNodes)}
+              tone="info"
+            />
             <ImpactCard
               icon={ShieldAlert}
               label="Dependencias rotas"
               value={String(impact.brokenDeps)}
               tone={impact.brokenDeps > 0 ? "warn" : "ok"}
             />
-            <ImpactCard icon={Users} label="Agentes IA usados" value={String(impact.agents)} tone="info" />
-            <ImpactCard icon={Users} label="Plantillas usadas" value={String(impact.templates)} tone="info" />
-            <ImpactCard icon={Users} label="Etapas pipeline" value={String(impact.stages)} tone="info" />
+            <ImpactCard
+              icon={Users}
+              label="Agentes IA usados"
+              value={String(impact.agents)}
+              tone="info"
+            />
+            <ImpactCard
+              icon={Users}
+              label="Plantillas usadas"
+              value={String(impact.templates)}
+              tone="info"
+            />
+            <ImpactCard
+              icon={Users}
+              label="Etapas pipeline"
+              value={String(impact.stages)}
+              tone="info"
+            />
           </div>
         </div>
 

@@ -1,5 +1,13 @@
-import { Lock, Maximize2, Minus, MoreVertical, Plus, Unlock, Zap } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { Lock, Maximize2, Minus, MoreVertical, Plus, Unlock, type Zap } from "lucide-react";
+import {
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -137,7 +145,7 @@ export function computeLayout(nodes: WorkflowNode[], edges: Edge[]): Layout {
       occupied.add(`${row}:${pos.col}`);
       return { node, row, col: pos.col };
     })
-    .sort((a, b) => (a.row - b.row) || (a.col - b.col));
+    .sort((a, b) => a.row - b.row || a.col - b.col);
 
   // Build layout edges. Prefer explicit edges; else connect each node to the
   // next node in topological order (whose row is strictly greater).
@@ -250,13 +258,31 @@ export function WorkflowCanvas({
           {addNodeMenu}
         </div>
         <div className="pointer-events-auto flex flex-col rounded-md border border-white/10 bg-[#101b27]/95 shadow-lg backdrop-blur">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5" title="Acercar" onClick={zoomIn}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5"
+            title="Acercar"
+            onClick={zoomIn}
+          >
             <Plus className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5" title="Alejar" onClick={zoomOut}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5"
+            title="Alejar"
+            onClick={zoomOut}
+          >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5" title="Ajustar (100%)" onClick={fit}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-none text-slate-300 hover:bg-white/5"
+            title="Ajustar (100%)"
+            onClick={fit}
+          >
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -301,15 +327,15 @@ export function WorkflowCanvas({
           }}
         >
           {/* Grid background */}
-          <svg
-            width={canvasWidth}
-            height={canvasHeight}
-            className="absolute inset-0"
-            aria-hidden
-          >
+          <svg width={canvasWidth} height={canvasHeight} className="absolute inset-0" aria-hidden>
             <defs>
               <pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(148,163,184,0.07)" strokeWidth="1" />
+                <path
+                  d="M 24 0 L 0 0 0 24"
+                  fill="none"
+                  stroke="rgba(148,163,184,0.07)"
+                  strokeWidth="1"
+                />
               </pattern>
               <marker
                 id="canvas-arrow"
@@ -332,8 +358,7 @@ export function WorkflowCanvas({
               const toX = xFor(edge.to.col) + NODE_WIDTH / 2;
               const toY = yFor(edge.to.row);
               const midY = (fromY + toY) / 2;
-              const isBranch =
-                edge.label !== null && edge.label !== undefined && edge.label !== "";
+              const isBranch = edge.label !== null && edge.label !== undefined && edge.label !== "";
               const path =
                 fromX === toX
                   ? `M ${fromX} ${fromY} L ${toX} ${toY}`
@@ -368,11 +393,7 @@ export function WorkflowCanvas({
                         textAnchor="middle"
                         fontSize="9"
                         fontWeight="600"
-                        fill={
-                          edge.label?.toLowerCase().startsWith("s")
-                            ? "#34d399"
-                            : "#f87171"
-                        }
+                        fill={edge.label?.toLowerCase().startsWith("s") ? "#34d399" : "#f87171"}
                       >
                         {edge.label?.toUpperCase()}
                       </text>

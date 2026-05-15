@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { workflowsApi, type WorkflowItem } from "@/features/workflows/api";
+import { type WorkflowItem, workflowsApi } from "@/features/workflows/api";
 import { cn } from "@/lib/utils";
 
 type ComparePayload = {
@@ -31,7 +31,10 @@ interface VersionCompareDialogProps {
 }
 
 const RISK_TONES: Record<string, { label: string; classes: string }> = {
-  low: { label: "Riesgo bajo", classes: "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" },
+  low: {
+    label: "Riesgo bajo",
+    classes: "border-emerald-400/40 bg-emerald-500/10 text-emerald-200",
+  },
   medium: { label: "Riesgo medio", classes: "border-amber-400/40 bg-amber-500/10 text-amber-200" },
   high: { label: "Riesgo alto", classes: "border-red-400/40 bg-red-500/10 text-red-200" },
 };
@@ -68,7 +71,7 @@ export function VersionCompareDialog({
   });
 
   const data = query.data;
-  const risk = data?.risk ? RISK_TONES[data.risk] ?? RISK_TONES.medium! : null;
+  const risk = data?.risk ? (RISK_TONES[data.risk] ?? RISK_TONES.medium!) : null;
   const totalChanges = data ? data.added.length + data.changed.length + data.removed.length : 0;
 
   return (
@@ -84,7 +87,9 @@ export function VersionCompareDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {query.isLoading && <div className="py-10 text-center text-xs text-slate-400">Calculando diff…</div>}
+        {query.isLoading && (
+          <div className="py-10 text-center text-xs text-slate-400">Calculando diff…</div>
+        )}
         {query.isError && (
           <div className="rounded-md border border-red-400/30 bg-red-500/10 p-3 text-[11px] text-red-200">
             No se pudo cargar la comparación: {(query.error as Error).message}
@@ -96,7 +101,12 @@ export function VersionCompareDialog({
             {/* Risk + counts summary */}
             <div className="flex flex-wrap items-center gap-1.5">
               {risk && (
-                <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", risk.classes)}>
+                <span
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    risk.classes,
+                  )}
+                >
                   {risk.label}
                 </span>
               )}
@@ -195,13 +205,21 @@ function DiffSection({
   } as const;
   return (
     <section className="rounded-md border border-white/10 bg-white/[0.03] p-2">
-      <header className={cn("mb-1.5 flex items-center gap-1.5 text-[11px] font-medium", headerTones[tone])}>
+      <header
+        className={cn(
+          "mb-1.5 flex items-center gap-1.5 text-[11px] font-medium",
+          headerTones[tone],
+        )}
+      >
         <Icon className="h-3 w-3" />
         {title} · {rows.length}
       </header>
       <ul className="space-y-1">
         {rows.map((row, idx) => (
-          <li key={`${row.nodeId}-${idx}`} className="rounded border border-white/5 bg-black/20 px-2 py-1.5 text-[11px]">
+          <li
+            key={`${row.nodeId}-${idx}`}
+            className="rounded border border-white/5 bg-black/20 px-2 py-1.5 text-[11px]"
+          >
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-slate-200">{row.label}</span>
               <span className="shrink-0 font-mono text-[9px] text-slate-500">{row.nodeId}</span>
@@ -209,11 +227,17 @@ function DiffSection({
             {row.before !== undefined && row.after !== undefined ? (
               <div className="mt-1 grid grid-cols-[60px_1fr_8px_1fr] gap-1 text-[10px]">
                 <span className="text-slate-500">{row.detail}</span>
-                <span className="truncate rounded bg-red-500/10 px-1 text-red-200" title={row.before}>
+                <span
+                  className="truncate rounded bg-red-500/10 px-1 text-red-200"
+                  title={row.before}
+                >
                   {row.before}
                 </span>
                 <span className="text-slate-500">→</span>
-                <span className="truncate rounded bg-emerald-500/10 px-1 text-emerald-200" title={row.after}>
+                <span
+                  className="truncate rounded bg-emerald-500/10 px-1 text-emerald-200"
+                  title={row.after}
+                >
                   {row.after}
                 </span>
               </div>

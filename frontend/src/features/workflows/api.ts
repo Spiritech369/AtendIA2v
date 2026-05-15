@@ -182,8 +182,10 @@ export const workflowsApi = {
   delete: async (id: string) => api.delete(`/workflows/${id}`),
   toggle: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/toggle`)).data,
   activate: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/activate`)).data,
-  deactivate: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/deactivate`)).data,
-  duplicate: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/duplicate`)).data,
+  deactivate: async (id: string) =>
+    (await api.post<WorkflowItem>(`/workflows/${id}/deactivate`)).data,
+  duplicate: async (id: string) =>
+    (await api.post<WorkflowItem>(`/workflows/${id}/duplicate`)).data,
   archive: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/archive`)).data,
   pause: async (id: string) => (await api.post<WorkflowItem>(`/workflows/${id}/pause`)).data,
   safePause: async (id: string, mode: string) =>
@@ -193,9 +195,12 @@ export const workflowsApi = {
   restore: async (id: string, versionId: string) =>
     (await api.post<WorkflowItem>(`/workflows/${id}/restore/${versionId}`)).data,
   compare: async (id: string, from = "v12", to = "v13") =>
-    (await api.get<Record<string, unknown>>(`/workflows/${id}/compare`, { params: { from, to } })).data,
-  addNode: async (id: string, body: { type: string; title?: string; config: Record<string, unknown> }) =>
-    (await api.post<WorkflowItem>(`/workflows/${id}/nodes`, body)).data,
+    (await api.get<Record<string, unknown>>(`/workflows/${id}/compare`, { params: { from, to } }))
+      .data,
+  addNode: async (
+    id: string,
+    body: { type: string; title?: string; config: Record<string, unknown> },
+  ) => (await api.post<WorkflowItem>(`/workflows/${id}/nodes`, body)).data,
   patchNode: async (id: string, nodeId: string, body: Partial<WorkflowNode>) =>
     (await api.patch<WorkflowItem>(`/workflows/${id}/nodes/${nodeId}`, body)).data,
   deleteNode: async (id: string, nodeId: string) =>
@@ -204,16 +209,25 @@ export const workflowsApi = {
     (await api.post<WorkflowItem>(`/workflows/${id}/nodes/${nodeId}/duplicate`)).data,
   reorderNodes: async (id: string, nodeIds: string[]) =>
     (await api.post<WorkflowItem>(`/workflows/${id}/nodes/reorder`, { node_ids: nodeIds })).data,
-  validate: async (id: string) => (await api.post<WorkflowValidation>(`/workflows/${id}/validate`)).data,
-  simulate: async (id: string, body: { sample_lead_id?: string; incoming_message: string; version: string }) =>
-    (await api.post<SimulationResult>(`/workflows/${id}/simulate`, body)).data,
+  validate: async (id: string) =>
+    (await api.post<WorkflowValidation>(`/workflows/${id}/validate`)).data,
+  simulate: async (
+    id: string,
+    body: { sample_lead_id?: string; incoming_message: string; version: string },
+  ) => (await api.post<SimulationResult>(`/workflows/${id}/simulate`, body)).data,
   executions: async (id: string) =>
     (await api.get<WorkflowExecution[]>(`/workflows/${id}/executions`)).data,
   execution: async (id: string) => (await api.get<WorkflowExecution>(`/executions/${id}`)).data,
-  retryExecution: async (id: string) => (await api.post<WorkflowExecution>(`/executions/${id}/retry`)).data,
+  retryExecution: async (id: string) =>
+    (await api.post<WorkflowExecution>(`/executions/${id}/retry`)).data,
   retryExecutionFromNode: async (id: string, nodeId: string) =>
-    (await api.post<WorkflowExecution>(`/executions/${id}/retry-from-node`, null, { params: { node_id: nodeId } })).data,
-  replay: async (id: string) => (await api.get<WorkflowExecution["replay"]>(`/executions/${id}/replay`)).data,
+    (
+      await api.post<WorkflowExecution>(`/executions/${id}/retry-from-node`, null, {
+        params: { node_id: nodeId },
+      })
+    ).data,
+  replay: async (id: string) =>
+    (await api.get<WorkflowExecution["replay"]>(`/executions/${id}/replay`)).data,
   exportExecution: async (id: string) =>
     (await api.get<Record<string, unknown>>(`/executions/${id}/export-json`)).data,
   templates: async () => (await api.get<WorkflowTemplate[]>("/templates")).data,
