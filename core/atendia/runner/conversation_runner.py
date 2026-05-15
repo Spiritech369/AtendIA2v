@@ -1344,8 +1344,12 @@ class ConversationRunner:
 
         # Flip the bot_paused gate so subsequent inbound turns short-
         # circuit at the top of run_turn until an operator resumes.
+        # bot_paused lives on conversation_state (the column the
+        # top-of-turn SELECT/JOIN actually reads) — NOT conversations,
+        # which has no such column. Mirrors the sibling pause site in
+        # the composer-suggested handoff path.
         await self._session.execute(
-            text("UPDATE conversations SET bot_paused = true WHERE id = :cid"),
+            text("UPDATE conversation_state SET bot_paused = true WHERE conversation_id = :cid"),
             {"cid": conversation_id},
         )
 
