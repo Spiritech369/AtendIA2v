@@ -64,6 +64,37 @@ Branch `main` ahora va 15 commits adelante de `origin/main`. Resumen de lo que c
 | `521c746` | C.1 | Playwright smoke spec para 7 rutas + README (browsers no instalados — run deferred a decision matrix) |
 | C.5, C.7 | ⏸️ | **Forgot password** (necesita proveedor email) + **Runner-composer reconciliation** (T30+) |
 
+### Sprint C2 entregado — DebugPanel completion (12 commits)
+
+The audit's C2 item ("DebugPanel rebuild") was completed across 13
+atomic TDD tasks. The 8 wishlist items are all wired to real data.
+
+| Commit | Task | Item |
+|---|---|---|
+| `6010f94` | 1 | Migration 048: `turn_traces.composer_provider` + `inbound_text_cleaned` |
+| `219ee15` + `7280912` | 2 | Runner persists both fields (`fallback_used` plumbed per-call, normalizer shared with router) |
+| `1809eb1` | 3 | `GET /turn-traces/:id` exposes both fields |
+| `53539eb` | 4 | TypeScript `TurnTraceDetail` interface mirrors the migration |
+| `6a7f8d4` | 5 | History count chip "N / M" in `StepInbound` |
+| `b7775c9` | 6 | LLM provider badge in `StepComposer` (3 tones) |
+| `930555b` | 7 | Cleaned-text side-by-side in `StepInbound` |
+| `249f2c0` | 8 | Agent name + role in `StepComposer` (5min staleTime fetch) |
+| `8163c96` | 9 | `<ActionsPanel />` listing `composer_output.action_payload` |
+| `b38ca0b` | 10 | `<LatencyPerStepBar />` (NLU / Vision / Composer / Tools / Overhead) |
+| `a56425d` | 11 | `<PromptTemplateBreakdown />` parsing `###` markers |
+| `d6b41c2` | 12 | `<ToolCallsTimeline />` with input/output drilldown |
+
+Net deltas (compared to Sprint A/B/C baseline):
+* Backend: +1 migration (048), +2 new fields persisted by the runner,
+  +1 new field-pair on the API response.
+* Frontend: +4 new analyzer functions, +4 new panels in TurnPanels.tsx,
+  +4 new story-step fields (history count, provider, cleanedText,
+  agentName/Role).
+* Tests: ~26 new frontend tests across 8 files, +1 backend runner test,
+  +1 backend API test. All green except baseline pre-existing
+  failures (6 frontend + 2 backend regression, all flagged in prior
+  Sprint A/B/C commits).
+
 ### Bugs pre-existentes encontrados de paso (no arreglados, en decision matrix)
 
 - Migration 026 emite `DEFAULT '''user'''` (tres comillas literales) para `appointments.created_by_type` — viola `ck_appointments_created_by_type`. Workaround en tests: pasar `created_by_type` explícito.
@@ -123,7 +154,7 @@ Inbox y ContactPanel **cumplen paridad funcional**. La intervención humana, pau
 | # | Sev | Gap | Costo | Status |
 |---|---|---|---|---|
 | C1 | 🔴 | WhatsApp status badge en header (poll `/whatsapp/status` + `/automation-config/status` cada 10s; verde/ámbar/rojo + "WA pausado"). | 0.5-1d | abierto |
-| C2 | 🔴 | DebugPanel rebuild: Mode + Intent bar + Recorrido per-step + Entities pills + Knowledge sources con scores y citas + Actions list + per-step pipeline bars + Rules pass/fail + LLM raw vs final. | 1-2 sesiones | abierto |
+| ~~C2~~ | — | ~~DebugPanel rebuild~~ | — | ✅ **cerrado por Sprint C2 (12 commits, see §0bis)** |
 | C3 | 🟠 | Mailbox sections en lista de conversaciones: por AI agent + por pipeline stage con counts en vivo. | 2-3 sesiones | abierto |
 | C4 | 🟠 | Right-click context menu en lista (assign / close / archive / tag). | 1-1.5d | abierto |
 | C5 | 🟠 | Composer slash-commands + snippet browser + variable picker. | 2-3d | abierto |
