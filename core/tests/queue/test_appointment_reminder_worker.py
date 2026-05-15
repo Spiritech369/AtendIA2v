@@ -84,20 +84,17 @@ async def _insert_appointment(
     engine = create_async_engine(get_settings().database_url)
     try:
         async with engine.begin() as conn:
-            # `created_by_type` set explicitly to dodge a pre-existing
-            # schema bug: migration 026 emitted DEFAULT '''user'''
-            # (3 single quotes) for this column, so any INSERT without
-            # an explicit value lands a literal "'user'" — which then
-            # fails ck_appointments_created_by_type. The runtime code
-            # always sets it via the SQLAlchemy model's Python-level
-            # default; raw-SQL tests need to mirror that.
+            # Migration 049 fixed the appointments.created_by_type default
+            # so this raw INSERT works without specifying the column. (Prior
+            # to 049, migration 026's busted default forced raw INSERTs to
+            # pass an explicit value or hit the CHECK constraint.)
             aid = (
                 await conn.execute(
                     text(
                         "INSERT INTO appointments "
                         "(tenant_id, customer_id, scheduled_at, service, status, "
-                        " reminder_status, created_by_type) "
-                        "VALUES (:t, :c, :sa, 'test-drive', :st, :rs, 'user') "
+                        " reminder_status) "
+                        "VALUES (:t, :c, :sa, 'test-drive', :st, :rs) "
                         "RETURNING id"
                     ),
                     {
