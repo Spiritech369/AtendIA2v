@@ -56,6 +56,15 @@ class WorkflowExecution(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(Text)
     error_code: Mapped[str | None] = mapped_column(String(60))
+    # Migration 051 (W6/W8). Both nullable; set by the engine when a
+    # trigger_workflow node fires a child (parent_execution_id) or an
+    # ask_question node pauses awaiting customer input
+    # (awaiting_variable).
+    parent_execution_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("workflow_executions.id", ondelete="SET NULL"),
+        index=True,
+    )
+    awaiting_variable: Mapped[str | None] = mapped_column(String(80))
     # Persisted across delay/resume so MAX_STEPS holds even if execution
     # pauses and re-enters via execute_workflow_step.
     steps_completed: Mapped[int] = mapped_column(
