@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { conversationsApi } from "@/features/conversations/api";
-import { useConversation } from "@/features/conversations/hooks/useConversations";
+import { useConversation, useMessages } from "@/features/conversations/hooks/useConversations";
+import { buildMessageTraceMap } from "@/features/conversations/lib/messageTraceMap";
 import { turnTracesApi } from "@/features/turn-traces/api";
 import { ChatWindow } from "./ChatWindow";
 import { ContactPanel } from "./ContactPanel";
@@ -42,16 +43,19 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
     enabled: !!conversationId,
   });
 
-  const messageToTrace = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!traces.data?.items) return map;
-    for (const t of traces.data.items) {
-      if (t.inbound_message_id) {
-        map.set(t.inbound_message_id, t.id);
-      }
-    }
-    return map;
-  }, [traces.data]);
+  const msgs = useMessages(conversationId);
+  const messageItems = useMemo(
+    () => msgs.data?.pages.flatMap((p) => p.items) ?? [],
+    [msgs.data],
+  );
+
+  // A14 — also attribute each turn's bot reply(ies) to its trace, so
+  // clicking the outbound bubble opens the same DebugPanel (agent +
+  // prompt + retrieval) as the inbound bubble: "why did the agent say X".
+  const messageToTrace = useMemo(
+    () => buildMessageTraceMap(traces.data?.items ?? [], messageItems),
+    [traces.data, messageItems],
+  );
 
   const handleDebug = useCallback(
     (messageId: string) => {
