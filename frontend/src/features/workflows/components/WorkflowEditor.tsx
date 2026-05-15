@@ -20,7 +20,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { type MouseEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,14 +33,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { agentsApi } from "@/features/agents/api";
-import { pipelineStagesApi, workflowsApi, type WorkflowItem, type WorkflowNode } from "@/features/workflows/api";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WorkflowCanvas } from "./WorkflowCanvas";
+import {
+  pipelineStagesApi,
+  type WorkflowItem,
+  type WorkflowNode,
+  workflowsApi,
+} from "@/features/workflows/api";
+import { cn } from "@/lib/utils";
 import { PublishDialog } from "./PublishDialog";
 import { VersionCompareDialog } from "./VersionCompareDialog";
-import { cn } from "@/lib/utils";
+import { WorkflowCanvas } from "./WorkflowCanvas";
 
 type ContextAction = { label: string; action: () => void; danger?: boolean };
 
@@ -54,26 +59,82 @@ interface WorkflowEditorProps {
   focusNodeId?: string | null;
 }
 
-const DEFAULT_NODE_META = { label: "Acción", icon: Zap, color: "text-slate-300", bg: "bg-white/10" };
+const DEFAULT_NODE_META = {
+  label: "Acción",
+  icon: Zap,
+  color: "text-slate-300",
+  bg: "bg-white/10",
+};
 
 const NODE_META: Record<string, { label: string; icon: typeof Zap; color: string; bg: string }> = {
   trigger: { label: "Disparador", icon: Zap, color: "text-emerald-300", bg: "bg-emerald-500/15" },
-  template_message: { label: "Acción", icon: MessageSquare, color: "text-emerald-300", bg: "bg-emerald-500/15" },
-  message: { label: "Acción", icon: MessageSquare, color: "text-emerald-300", bg: "bg-emerald-500/15" },
-  detect_intent: { label: "Condición", icon: GitBranch, color: "text-amber-300", bg: "bg-amber-500/15" },
-  condition: { label: "Condición", icon: GitBranch, color: "text-amber-300", bg: "bg-amber-500/15" },
+  template_message: {
+    label: "Acción",
+    icon: MessageSquare,
+    color: "text-emerald-300",
+    bg: "bg-emerald-500/15",
+  },
+  message: {
+    label: "Acción",
+    icon: MessageSquare,
+    color: "text-emerald-300",
+    bg: "bg-emerald-500/15",
+  },
+  detect_intent: {
+    label: "Condición",
+    icon: GitBranch,
+    color: "text-amber-300",
+    bg: "bg-amber-500/15",
+  },
+  condition: {
+    label: "Condición",
+    icon: GitBranch,
+    color: "text-amber-300",
+    bg: "bg-amber-500/15",
+  },
   classify_credit: { label: "Acción", icon: Bot, color: "text-blue-300", bg: "bg-blue-500/15" },
-  request_documents: { label: "Acción", icon: FileCheck2, color: "text-blue-300", bg: "bg-blue-500/15" },
+  request_documents: {
+    label: "Acción",
+    icon: FileCheck2,
+    color: "text-blue-300",
+    bg: "bg-blue-500/15",
+  },
   advisor_pool: { label: "Acción", icon: UserCheck, color: "text-blue-300", bg: "bg-blue-500/15" },
   assign_agent: { label: "Agente IA", icon: Bot, color: "text-blue-300", bg: "bg-blue-500/15" },
-  move_stage: { label: "Mover etapa", icon: ArrowDown, color: "text-blue-300", bg: "bg-blue-500/15" },
+  move_stage: {
+    label: "Mover etapa",
+    icon: ArrowDown,
+    color: "text-blue-300",
+    bg: "bg-blue-500/15",
+  },
   delay: { label: "Esperar", icon: RotateCcw, color: "text-slate-300", bg: "bg-white/10" },
   jump_to: { label: "Saltar a", icon: ArrowUp, color: "text-amber-300", bg: "bg-amber-500/15" },
-  http_request: { label: "HTTP Request", icon: Send, color: "text-purple-300", bg: "bg-purple-500/15" },
+  http_request: {
+    label: "HTTP Request",
+    icon: Send,
+    color: "text-purple-300",
+    bg: "bg-purple-500/15",
+  },
+  trigger_workflow: {
+    label: "Disparar workflow",
+    icon: Workflow,
+    color: "text-emerald-300",
+    bg: "bg-emerald-500/15",
+  },
   branch: { label: "Bifurcación", icon: GitBranch, color: "text-amber-300", bg: "bg-amber-500/15" },
-  create_task: { label: "Acción", icon: CheckCircle2, color: "text-blue-300", bg: "bg-blue-500/15" },
+  create_task: {
+    label: "Acción",
+    icon: CheckCircle2,
+    color: "text-blue-300",
+    bg: "bg-blue-500/15",
+  },
   followup: { label: "Acción", icon: Send, color: "text-blue-300", bg: "bg-blue-500/15" },
-  escalate_manager: { label: "Escalar", icon: ShieldCheck, color: "text-red-300", bg: "bg-red-500/15" },
+  escalate_manager: {
+    label: "Escalar",
+    icon: ShieldCheck,
+    color: "text-red-300",
+    bg: "bg-red-500/15",
+  },
   end: { label: "Final", icon: Workflow, color: "text-violet-300", bg: "bg-violet-500/15" },
 };
 
@@ -92,7 +153,10 @@ const ADD_NODE_TEMPLATES: AddNodeTemplate[] = [
     body: {
       type: "template_message",
       title: "Enviar mensaje WhatsApp",
-      config: { template: "seguimiento_v2", text: "Hola {{nombre}}, seguimos atentos a tu solicitud." },
+      config: {
+        template: "seguimiento_v2",
+        text: "Hola {{nombre}}, seguimos atentos a tu solicitud.",
+      },
     },
   },
   {
@@ -148,9 +212,7 @@ const ADD_NODE_TEMPLATES: AddNodeTemplate[] = [
             label: "califica",
             group: {
               op: "and",
-              rules: [
-                { field: "extracted.tipo_credito", operator: "eq", value: "nomina" },
-              ],
+              rules: [{ field: "extracted.tipo_credito", operator: "eq", value: "nomina" }],
             },
           },
         ],
@@ -164,7 +226,23 @@ const ADD_NODE_TEMPLATES: AddNodeTemplate[] = [
     body: {
       type: "http_request",
       title: "Llamar a servicio externo",
-      config: { method: "POST", url: "https://api.example.com", timeout_seconds: 10, headers: {}, body: {} },
+      config: {
+        method: "POST",
+        url: "https://api.example.com",
+        timeout_seconds: 10,
+        headers: {},
+        body: {},
+      },
+    },
+  },
+  {
+    key: "trigger_workflow",
+    label: "Disparar otro workflow",
+    description: "Arranca otro workflow fire-and-forget. El hijo corre con su propio contexto.",
+    body: {
+      type: "trigger_workflow",
+      title: "Disparar otro workflow",
+      config: { target_workflow_id: null },
     },
   },
   {
@@ -193,21 +271,19 @@ function titleFor(node: WorkflowNode) {
   return node.title || NODE_META[node.type]?.label || node.type;
 }
 
-function summaryFor(
-  node: WorkflowNode,
-  agentNameById?: Map<string, string>,
-  triggerType?: string,
-) {
+function summaryFor(node: WorkflowNode, agentNameById?: Map<string, string>, triggerType?: string) {
   const cfg = node.config;
   if (node.type === "trigger") {
     return triggerLabel(triggerType ?? String(cfg.event ?? "message_received"));
   }
-  if (node.type === "template_message") return `Plantilla: ${String(cfg.template ?? "sin plantilla")}`;
+  if (node.type === "template_message")
+    return `Plantilla: ${String(cfg.template ?? "sin plantilla")}`;
   if (node.type === "message") {
     const text = String(cfg.text ?? "").slice(0, 60);
     return text ? `“${text}${text.length === 60 ? "…" : ""}”` : "Mensaje sin texto";
   }
-  if (node.type === "condition") return `Regla: ${String(cfg.field ?? "sin campo")} ${String(cfg.operator ?? "eq")}`;
+  if (node.type === "condition")
+    return `Regla: ${String(cfg.field ?? "sin campo")} ${String(cfg.operator ?? "eq")}`;
   if (node.type === "advisor_pool") return `Pool: ${String(cfg.pool ?? "sin pool")}`;
   if (node.type === "assign_agent") {
     const id = String(cfg.agent_id ?? "");
@@ -240,6 +316,10 @@ function summaryFor(
     const method = String(cfg.method ?? "GET");
     const url = String(cfg.url ?? "");
     return url ? `${method} ${url}` : `${method} sin URL`;
+  }
+  if (node.type === "trigger_workflow") {
+    const target = String(cfg.target_workflow_id ?? "");
+    return target ? `Workflow ${target.slice(0, 8)}` : "Workflow sin definir";
   }
   if (node.type === "request_documents") return "INE, comprobante, ingresos";
   if (node.type === "end") return String(cfg.result ?? "finaliza");
@@ -315,7 +395,13 @@ function writeSelectedAgentId(configDraft: string, agentId: string): string {
 type TriggerConfigField =
   | { key: string; label: string; kind: "text"; placeholder?: string; description?: string }
   | { key: string; label: string; kind: "csv"; placeholder?: string; description?: string }
-  | { key: string; label: string; kind: "select"; options: Array<{ value: string; label: string }>; description?: string }
+  | {
+      key: string;
+      label: string;
+      kind: "select";
+      options: Array<{ value: string; label: string }>;
+      description?: string;
+    }
   | { key: string; label: string; kind: "stage"; description?: string };
 
 interface TriggerDef {
@@ -387,24 +473,26 @@ const TRIGGER_CATALOG: TriggerDef[] = [
     label: "Campo de contacto actualizado",
     description: "Un campo del contacto cambió de valor.",
     fields: [
-      { key: "field", label: "Campo", kind: "text", placeholder: "tipo_credito", description: "Nombre del campo (custom o estándar)." },
+      {
+        key: "field",
+        label: "Campo",
+        kind: "text",
+        placeholder: "tipo_credito",
+        description: "Nombre del campo (custom o estándar).",
+      },
     ],
   },
   {
     value: "field_extracted",
     label: "Campo extraído por IA",
     description: "Un Agente IA extrajo un valor de la conversación.",
-    fields: [
-      { key: "field", label: "Campo", kind: "text", placeholder: "plan_credito" },
-    ],
+    fields: [{ key: "field", label: "Campo", kind: "text", placeholder: "plan_credito" }],
   },
   {
     value: "stage_entered",
     label: "Entró a etapa",
     description: "El lead llegó a una etapa específica del pipeline.",
-    fields: [
-      { key: "to", label: "Etapa de destino", kind: "stage" },
-    ],
+    fields: [{ key: "to", label: "Etapa de destino", kind: "stage" }],
   },
   {
     value: "stage_changed",
@@ -475,7 +563,8 @@ const TRIGGER_CATALOG: TriggerDef[] = [
   {
     value: "human_handoff_requested",
     label: "Handoff humano solicitado",
-    description: "El bot solicitó intervención humana (papelería completa, fuera de 24h, error, etc.).",
+    description:
+      "El bot solicitó intervención humana (papelería completa, fuera de 24h, error, etc.).",
     fields: [
       {
         key: "reason",
@@ -500,7 +589,9 @@ function triggerLabel(value: string): string {
 }
 
 function nodeMetrics(workflow: WorkflowItem, nodeId: string) {
-  const ops = workflow.definition.ops as { node_metrics?: Record<string, Record<string, unknown>> } | undefined;
+  const ops = workflow.definition.ops as
+    | { node_metrics?: Record<string, Record<string, unknown>> }
+    | undefined;
   return ops?.node_metrics?.[nodeId] ?? {};
 }
 
@@ -508,7 +599,13 @@ function pct(value: unknown, fallback = 0) {
   return typeof value === "number" ? `${value}%` : `${fallback}%`;
 }
 
-export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onShowExecutions, focusNodeId }: WorkflowEditorProps) {
+export function WorkflowEditor({
+  workflow,
+  onRunSimulation,
+  onContextMenu,
+  onShowExecutions,
+  focusNodeId,
+}: WorkflowEditorProps) {
   const qc = useQueryClient();
   const nodes = workflow.definition.nodes;
   const [selectedNodeId, setSelectedNodeId] = useState(nodes[0]?.id ?? "");
@@ -582,7 +679,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
       void invalidate();
       toast.success("Nodo actualizado");
     },
-    onError: (error) => toast.error("No se pudo actualizar el nodo", { description: error.message }),
+    onError: (error) =>
+      toast.error("No se pudo actualizar el nodo", { description: error.message }),
   });
 
   const addNode = useMutation({
@@ -614,6 +712,16 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
   });
   const stages = stagesQuery.data ?? [];
 
+  // Peer workflows for the `trigger_workflow` node config form. The current
+  // workflow is filtered out at render time so the dropdown can't be set
+  // to self — the backend recursion guard catches deeper cycles.
+  const peerWorkflowsQuery = useQuery({
+    queryKey: ["workflows"],
+    queryFn: workflowsApi.list,
+    staleTime: 60_000,
+  });
+  const peerWorkflows = (peerWorkflowsQuery.data ?? []).filter((w) => w.id !== workflow.id);
+
   const patchTrigger = useMutation({
     mutationFn: (body: { trigger_type: string; trigger_config: Record<string, unknown> }) =>
       workflowsApi.patch(workflow.id, body),
@@ -621,7 +729,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
       void invalidate();
       toast.success("Disparador actualizado");
     },
-    onError: (error) => toast.error("No se pudo actualizar el disparador", { description: error.message }),
+    onError: (error) =>
+      toast.error("No se pudo actualizar el disparador", { description: error.message }),
   });
 
   const deleteNode = useMutation({
@@ -708,7 +817,11 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
   const nodeActions = (node: WorkflowNode): ContextAction[] => [
     { label: "Editar configuración", action: () => setSelectedNodeId(node.id) },
     { label: "Duplicar nodo", action: () => duplicateNode.mutate(node.id) },
-    { label: "Desactivar nodo", action: () => patchNode.mutate({ nodeId: node.id, body: { enabled: node.enabled === false } }) },
+    {
+      label: "Desactivar nodo",
+      action: () =>
+        patchNode.mutate({ nodeId: node.id, body: { enabled: node.enabled === false } }),
+    },
     { label: "Mover arriba", action: () => moveNode(node.id, -1) },
     { label: "Mover abajo", action: () => moveNode(node.id, 1) },
     { label: "Ver métricas", action: () => showNodeMetrics(node.id) },
@@ -755,7 +868,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                 type="button"
                 disabled={readOnly}
                 onClick={() => !readOnly && setRenaming(true)}
-                title={readOnly ? "Detén el workflow para editar el nombre" : "Click para renombrar"}
+                title={
+                  readOnly ? "Detén el workflow para editar el nombre" : "Click para renombrar"
+                }
                 className={cn(
                   "truncate rounded px-1 text-sm font-semibold text-slate-100",
                   readOnly ? "cursor-not-allowed opacity-80" : "hover:bg-white/10",
@@ -775,19 +890,38 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={() => setCompareOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200"
+            onClick={() => setCompareOpen(true)}
+          >
             <GitBranch className="mr-1 h-3 w-3" /> Comparar
           </Button>
-          <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={() => restore.mutate()}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200"
+            onClick={() => restore.mutate()}
+          >
             <RotateCcw className="mr-1 h-3 w-3" /> Restaurar
           </Button>
-          <Button variant="outline" size="sm" className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200" onClick={onRunSimulation}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 border-white/10 bg-white/5 text-[11px] text-slate-200"
+            onClick={onRunSimulation}
+          >
             <Play className="mr-1 h-3 w-3" /> Probar
           </Button>
           <Button size="sm" className="h-7 text-[11px]" onClick={() => saveDraft.mutate()}>
             <Save className="mr-1 h-3 w-3" /> Guardar draft
           </Button>
-          <Button size="sm" className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500" onClick={() => setPublishOpen(true)}>
+          <Button
+            size="sm"
+            className="h-7 bg-blue-600 text-[11px] hover:bg-blue-500"
+            onClick={() => setPublishOpen(true)}
+          >
             Publicar cambios
           </Button>
         </div>
@@ -803,13 +937,22 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
           }}
         >
           <TabsList className="h-8 bg-transparent p-0">
-            <TabsTrigger value="design" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+            <TabsTrigger
+              value="design"
+              className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100"
+            >
               Diseño
             </TabsTrigger>
-            <TabsTrigger value="simulation" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+            <TabsTrigger
+              value="simulation"
+              className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100"
+            >
               Simulación
             </TabsTrigger>
-            <TabsTrigger value="production" className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100">
+            <TabsTrigger
+              value="production"
+              className="h-7 px-3 text-[11px] data-[state=active]:bg-white/10 data-[state=active]:text-slate-100"
+            >
               Producción
             </TabsTrigger>
           </TabsList>
@@ -856,7 +999,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                     className="flex flex-col items-start gap-0.5"
                   >
                     <span className="font-medium">{template.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{template.description}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {template.description}
+                    </span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -867,7 +1012,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
         <div className="flex min-h-0 flex-col">
           <div className="border-b border-white/10 p-3">
             <p className="text-xs font-semibold text-slate-100">Formulario de nodo</p>
-            <p className="mt-1 text-[10px] text-slate-400">Edita la configuración del paso seleccionado.</p>
+            <p className="mt-1 text-[10px] text-slate-400">
+              Edita la configuración del paso seleccionado.
+            </p>
           </div>
           {selectedNode ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
@@ -883,7 +1030,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
               {selectedNode.type === "trigger" && (
                 <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-2">
                   <div>
-                    <Label className="text-[10px] uppercase text-slate-400">Tipo de disparador</Label>
+                    <Label className="text-[10px] uppercase text-slate-400">
+                      Tipo de disparador
+                    </Label>
                     <select
                       className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
                       value={workflow.trigger_type}
@@ -907,7 +1056,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                   </div>
                   {workflow.trigger_type === "webhook_received" && (
                     <div>
-                      <Label className="text-[10px] uppercase text-slate-400">URL del webhook</Label>
+                      <Label className="text-[10px] uppercase text-slate-400">
+                        URL del webhook
+                      </Label>
                       {workflow.webhook_url ? (
                         <div className="mt-1 flex gap-1">
                           <Input
@@ -922,7 +1073,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                             size="sm"
                             className="h-8 border-white/10 bg-white/5 text-[10px] text-slate-200"
                             onClick={() => {
-                              void navigator.clipboard.writeText(`${window.location.origin}${workflow.webhook_url}`);
+                              void navigator.clipboard.writeText(
+                                `${window.location.origin}${workflow.webhook_url}`,
+                              );
                               toast.success("URL copiada");
                             }}
                           >
@@ -935,12 +1088,17 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                         </p>
                       )}
                       <p className="mt-1 text-[10px] text-slate-500">
-                        Envía un POST con JSON a este URL. El workflow debe estar publicado para aceptar peticiones.
+                        Envía un POST con JSON a este URL. El workflow debe estar publicado para
+                        aceptar peticiones.
                       </p>
                     </div>
                   )}
-                  {(TRIGGER_CATALOG.find((t) => t.value === workflow.trigger_type)?.fields ?? []).map((field) => {
-                    const rawValue = (workflow.trigger_config as Record<string, unknown>)[field.key];
+                  {(
+                    TRIGGER_CATALOG.find((t) => t.value === workflow.trigger_type)?.fields ?? []
+                  ).map((field) => {
+                    const rawValue = (workflow.trigger_config as Record<string, unknown>)[
+                      field.key
+                    ];
                     const currentValue =
                       field.kind === "csv" && Array.isArray(rawValue)
                         ? (rawValue as string[]).join(", ")
@@ -948,7 +1106,10 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                     const commit = (next: string) => {
                       const config = { ...(workflow.trigger_config as Record<string, unknown>) };
                       if (field.kind === "csv") {
-                        const items = next.split(",").map((t) => t.trim()).filter(Boolean);
+                        const items = next
+                          .split(",")
+                          .map((t) => t.trim())
+                          .filter(Boolean);
                         if (items.length) config[field.key] = items;
                         else delete config[field.key];
                       } else if (next) {
@@ -956,11 +1117,16 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                       } else {
                         delete config[field.key];
                       }
-                      patchTrigger.mutate({ trigger_type: workflow.trigger_type, trigger_config: config });
+                      patchTrigger.mutate({
+                        trigger_type: workflow.trigger_type,
+                        trigger_config: config,
+                      });
                     };
                     return (
                       <div key={field.key}>
-                        <Label className="text-[10px] uppercase text-slate-400">{field.label}</Label>
+                        <Label className="text-[10px] uppercase text-slate-400">
+                          {field.label}
+                        </Label>
                         {(field.kind === "text" || field.kind === "csv") && (
                           <Input
                             className="mt-1 h-8 border-white/10 bg-white/5 text-xs text-slate-100"
@@ -981,12 +1147,14 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                           >
                             <option value="">— Selecciona —</option>
                             {field.options.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
                             ))}
                           </select>
                         )}
-                        {field.kind === "stage" && (
-                          stages.length === 0 ? (
+                        {field.kind === "stage" &&
+                          (stages.length === 0 ? (
                             <p className="mt-1 rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
                               No hay pipeline activo. Configura uno en la sección de Pipeline.
                             </p>
@@ -999,11 +1167,12 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                             >
                               <option value="">— Cualquier etapa —</option>
                               {stages.map((stage) => (
-                                <option key={stage.id} value={stage.id}>{stage.label}</option>
+                                <option key={stage.id} value={stage.id}>
+                                  {stage.label}
+                                </option>
                               ))}
                             </select>
-                          )
-                        )}
+                          ))}
                         {field.description && (
                           <p className="mt-1 text-[10px] text-slate-500">{field.description}</p>
                         )}
@@ -1024,11 +1193,17 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                       className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
                       value={readConfigString(configDraft, "stage_id")}
                       disabled={readOnly}
-                      onChange={(event) => setConfigDraft(writeConfigValue(configDraft, "stage_id", event.target.value))}
+                      onChange={(event) =>
+                        setConfigDraft(
+                          writeConfigValue(configDraft, "stage_id", event.target.value),
+                        )
+                      }
                     >
                       <option value="">— Selecciona una etapa —</option>
                       {stages.map((stage) => (
-                        <option key={stage.id} value={stage.id}>{stage.label}</option>
+                        <option key={stage.id} value={stage.id}>
+                          {stage.label}
+                        </option>
                       ))}
                     </select>
                   )}
@@ -1059,7 +1234,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                       disabled={readOnly}
                       onChange={(event) => {
                         const { amount } = readDelayParts(configDraft);
-                        setConfigDraft(writeDelayParts(configDraft, amount, event.target.value as DelayUnit));
+                        setConfigDraft(
+                          writeDelayParts(configDraft, amount, event.target.value as DelayUnit),
+                        );
                       }}
                     >
                       <option value="seconds">Segundos</option>
@@ -1077,7 +1254,11 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                     className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
                     value={readConfigString(configDraft, "target_node_id")}
                     disabled={readOnly}
-                    onChange={(event) => setConfigDraft(writeConfigValue(configDraft, "target_node_id", event.target.value))}
+                    onChange={(event) =>
+                      setConfigDraft(
+                        writeConfigValue(configDraft, "target_node_id", event.target.value),
+                      )
+                    }
                   >
                     <option value="">— Selecciona un nodo —</option>
                     {nodes
@@ -1089,7 +1270,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                       ))}
                   </select>
                   <p className="mt-1 text-[10px] text-slate-500">
-                    Útil para reintentar una pregunta o volver a un paso anterior. El motor corta loops al pasar de 100 pasos.
+                    Útil para reintentar una pregunta o volver a un paso anterior. El motor corta
+                    loops al pasar de 100 pasos.
                   </p>
                 </div>
               )}
@@ -1109,7 +1291,11 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                         className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
                         value={readConfigString(configDraft, "method") || "GET"}
                         disabled={readOnly}
-                        onChange={(event) => setConfigDraft(writeConfigValue(configDraft, "method", event.target.value))}
+                        onChange={(event) =>
+                          setConfigDraft(
+                            writeConfigValue(configDraft, "method", event.target.value),
+                          )
+                        }
                       >
                         <option value="GET">GET</option>
                         <option value="POST">POST</option>
@@ -1125,7 +1311,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                         placeholder="https://api.tu-servicio.com/leads"
                         defaultValue={readConfigString(configDraft, "url")}
                         disabled={readOnly}
-                        onBlur={(event) => setConfigDraft(writeConfigValue(configDraft, "url", event.target.value))}
+                        onBlur={(event) =>
+                          setConfigDraft(writeConfigValue(configDraft, "url", event.target.value))
+                        }
                       />
                     </div>
                   </div>
@@ -1138,11 +1326,50 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                       className="mt-1 h-8 border-white/10 bg-white/5 text-xs text-slate-100"
                       defaultValue={readConfigString(configDraft, "timeout_seconds") || "10"}
                       disabled={readOnly}
-                      onBlur={(event) => setConfigDraft(writeConfigValue(configDraft, "timeout_seconds", String(Math.max(1, Math.min(60, Number(event.target.value || 10))))))}
+                      onBlur={(event) =>
+                        setConfigDraft(
+                          writeConfigValue(
+                            configDraft,
+                            "timeout_seconds",
+                            String(Math.max(1, Math.min(60, Number(event.target.value || 10)))),
+                          ),
+                        )
+                      }
                     />
                   </div>
                   <p className="text-[10px] text-slate-500">
-                    Headers y body se editan en el Config JSON. La respuesta se guardará en variables si configuras <code>save_to</code>.
+                    Headers y body se editan en el Config JSON. La respuesta se guardará en
+                    variables si configuras <code>save_to</code>.
+                  </p>
+                </div>
+              )}
+              {selectedNode.type === "trigger_workflow" && (
+                <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-2">
+                  <div>
+                    <Label className="text-[10px] uppercase text-slate-400">
+                      Workflow a invocar
+                    </Label>
+                    <select
+                      className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
+                      value={readConfigString(configDraft, "target_workflow_id")}
+                      disabled={readOnly}
+                      onChange={(event) =>
+                        setConfigDraft(
+                          writeConfigValue(configDraft, "target_workflow_id", event.target.value),
+                        )
+                      }
+                    >
+                      <option value="">— Selecciona un workflow —</option>
+                      {peerWorkflows.map((peer) => (
+                        <option key={peer.id} value={peer.id}>
+                          {peer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    El workflow hijo arranca con su propio contexto. Variables del padre no se pasan
+                    en MVP.
                   </p>
                 </div>
               )}
@@ -1151,7 +1378,8 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                   <Label className="text-[10px] uppercase text-slate-400">Agente IA</Label>
                   {agents.length === 0 ? (
                     <p className="mt-1 rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
-                      Aún no tienes agentes. Crea uno en la sección de Agentes para poder seleccionarlo aquí.
+                      Aún no tienes agentes. Crea uno en la sección de Agentes para poder
+                      seleccionarlo aquí.
                     </p>
                   ) : (
                     <select
@@ -1185,7 +1413,10 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
               {workflow.validation.issues.some((issue) => issue.node_id === selectedNode.id) && (
                 <div className="rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[11px] text-amber-100">
                   <AlertTriangle className="mr-1 inline h-3 w-3" />
-                  {workflow.validation.issues.find((issue) => issue.node_id === selectedNode.id)?.message}
+                  {
+                    workflow.validation.issues.find((issue) => issue.node_id === selectedNode.id)
+                      ?.message
+                  }
                 </div>
               )}
               {readOnly && (
@@ -1194,16 +1425,31 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="h-8 border-white/10 bg-white/5 text-xs text-slate-200" onClick={() => duplicateNode.mutate(selectedNode.id)} disabled={readOnly}>
+                <Button
+                  variant="outline"
+                  className="h-8 border-white/10 bg-white/5 text-xs text-slate-200"
+                  onClick={() => duplicateNode.mutate(selectedNode.id)}
+                  disabled={readOnly}
+                >
                   <Copy className="mr-1 h-3 w-3" /> Duplicar
                 </Button>
                 <Button className="h-8 text-xs" onClick={saveSelectedNode} disabled={readOnly}>
                   <Save className="mr-1 h-3 w-3" /> Guardar nodo
                 </Button>
-                <Button variant="outline" className="h-8 border-white/10 bg-white/5 text-xs text-slate-200" onClick={() => moveNode(selectedNode.id, -1)} disabled={readOnly}>
+                <Button
+                  variant="outline"
+                  className="h-8 border-white/10 bg-white/5 text-xs text-slate-200"
+                  onClick={() => moveNode(selectedNode.id, -1)}
+                  disabled={readOnly}
+                >
                   <ArrowUp className="mr-1 h-3 w-3" /> Subir
                 </Button>
-                <Button variant="outline" className="h-8 border-white/10 bg-white/5 text-xs text-slate-200" onClick={() => moveNode(selectedNode.id, 1)} disabled={readOnly}>
+                <Button
+                  variant="outline"
+                  className="h-8 border-white/10 bg-white/5 text-xs text-slate-200"
+                  onClick={() => moveNode(selectedNode.id, 1)}
+                  disabled={readOnly}
+                >
                   <ArrowDown className="mr-1 h-3 w-3" /> Bajar
                 </Button>
                 <Button
@@ -1217,7 +1463,9 @@ export function WorkflowEditor({ workflow, onRunSimulation, onContextMenu, onSho
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 items-center justify-center text-xs text-slate-500">Selecciona un nodo</div>
+            <div className="flex flex-1 items-center justify-center text-xs text-slate-500">
+              Selecciona un nodo
+            </div>
           )}
         </div>
       </div>
@@ -1262,7 +1510,10 @@ function parseBranchConfig(configDraft: string): BranchConfig {
             op: branch.group?.op === "or" ? "or" : "and",
             rules: Array.isArray(branch.group?.rules)
               ? branch.group.rules
-                  .filter((rule): rule is BranchRule => rule != null && typeof rule === "object" && !("rules" in rule))
+                  .filter(
+                    (rule): rule is BranchRule =>
+                      rule != null && typeof rule === "object" && !("rules" in rule),
+                  )
                   .map((rule) => ({
                     field: String(rule.field ?? ""),
                     operator: String(rule.operator ?? "eq"),
@@ -1337,7 +1588,10 @@ function BranchEditor({
     commit({
       branches: [
         ...config.branches,
-        { label: `rama_${config.branches.length + 1}`, group: { op: "and", rules: [{ field: "extracted.", operator: "eq", value: "" }] } },
+        {
+          label: `rama_${config.branches.length + 1}`,
+          group: { op: "and", rules: [{ field: "extracted.", operator: "eq", value: "" }] },
+        },
       ],
     });
   };
@@ -1345,7 +1599,9 @@ function BranchEditor({
   return (
     <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-2">
       <div className="flex items-center justify-between">
-        <Label className="text-[10px] uppercase text-slate-400">Ramas (en orden de evaluación)</Label>
+        <Label className="text-[10px] uppercase text-slate-400">
+          Ramas (en orden de evaluación)
+        </Label>
         <Button
           type="button"
           variant="outline"
@@ -1358,10 +1614,15 @@ function BranchEditor({
         </Button>
       </div>
       {config.branches.length === 0 && (
-        <p className="text-[10px] text-slate-500">Sin ramas. Agrega al menos una; las que no coincidan caerán a la rama "else".</p>
+        <p className="text-[10px] text-slate-500">
+          Sin ramas. Agrega al menos una; las que no coincidan caerán a la rama "else".
+        </p>
       )}
       {config.branches.map((branch, branchIndex) => (
-        <div key={branchIndex} className="space-y-1.5 rounded-md border border-white/10 bg-black/20 p-2">
+        <div
+          key={branchIndex}
+          className="space-y-1.5 rounded-md border border-white/10 bg-black/20 p-2"
+        >
           <div className="flex items-center gap-1.5">
             <Input
               className="h-7 flex-1 border-white/10 bg-white/5 text-[11px] text-slate-100"
@@ -1379,7 +1640,10 @@ function BranchEditor({
               disabled={readOnly}
               onChange={(event) => {
                 const op = event.target.value as "and" | "or";
-                updateBranch(branchIndex, (current) => ({ ...current, group: { ...current.group, op } }));
+                updateBranch(branchIndex, (current) => ({
+                  ...current,
+                  group: { ...current.group, op },
+                }));
               }}
             >
               <option value="and">Y</option>
@@ -1422,7 +1686,9 @@ function BranchEditor({
                   }}
                 >
                   {BRANCH_OPERATORS.map((op) => (
-                    <option key={op.value} value={op.value}>{op.label}</option>
+                    <option key={op.value} value={op.value}>
+                      {op.label}
+                    </option>
                   ))}
                 </select>
                 <Input
@@ -1467,7 +1733,10 @@ function BranchEditor({
                 ...current,
                 group: {
                   ...current.group,
-                  rules: [...current.group.rules, { field: "extracted.", operator: "eq", value: "" }],
+                  rules: [
+                    ...current.group.rules,
+                    { field: "extracted.", operator: "eq", value: "" },
+                  ],
                 },
               }));
             }}
@@ -1477,7 +1746,8 @@ function BranchEditor({
         </div>
       ))}
       <p className="text-[10px] text-slate-500">
-        Conecta una arista por cada etiqueta de rama. Para una rama "else", conecta una arista con etiqueta <code>else</code>.
+        Conecta una arista por cada etiqueta de rama. Para una rama "else", conecta una arista con
+        etiqueta <code>else</code>.
       </p>
     </div>
   );
