@@ -46,6 +46,14 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "RUF"]
+extend-ignore = [
+    # FastAPI's idiomatic dependency-injection pattern uses
+    # Depends() / Query() in argument defaults — a deliberate
+    # framework convention, not a Python anti-pattern. Ruff flags
+    # this 780 times across the codebase; ignoring it project-wide
+    # is the correct call.
+    "B008",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
