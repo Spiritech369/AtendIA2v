@@ -27,6 +27,7 @@ Design notes baked in here:
 
 from __future__ import annotations
 
+import re
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -128,6 +129,12 @@ MAX_DELAY_SECONDS: int = 60 * 60 * 24 * 30
 MAX_NODES: int = 100
 MAX_EDGES: int = 150
 WHATSAPP_WINDOW_SECONDS: int = 60 * 60 * 24
+
+# ask_question stores the operator reply under config.variable. We render
+# template references like {{ extracted.<variable> }} downstream, so the
+# name must be a Python-style identifier (alphanumeric + underscore, no
+# leading digit) — anything fancier produces unreadable variable refs.
+_ASK_QUESTION_VARIABLE_RE: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 # Allowlists for the condition resolver. ``extracted.*`` is open by design
 # (operator-defined keys) but the resolver only ever reads from
@@ -248,6 +255,35 @@ def validate_definition(definition: dict) -> None:
             if timeout < 1 or timeout > 60:
                 raise WorkflowValidationError(
                     f"http_request node {node['id']} timeout must be 1..60 seconds",
+                )
+        if node.get("type") == "trigger_workflow":
+            target = config.get("target_workflow_id")
+            if not target:
+                raise WorkflowValidationError(
+                    f"trigger_workflow node {node['id']} missing config.target_workflow_id",
+                )
+            try:
+                UUID(str(target))
+            except (ValueError, TypeError) as exc:
+                raise WorkflowValidationError(
+                    f"trigger_workflow node {node['id']} target_workflow_id "
+                    f"must be a UUID, got {target!r}",
+                ) from exc
+        if node.get("type") == "ask_question":
+            question = config.get("question")
+            variable = config.get("variable")
+            if not isinstance(question, str) or not question.strip():
+                raise WorkflowValidationError(
+                    f"ask_question node {node['id']} missing config.question (non-empty string)",
+                )
+            if not isinstance(variable, str) or not variable.strip():
+                raise WorkflowValidationError(
+                    f"ask_question node {node['id']} missing config.variable (non-empty string)",
+                )
+            if not _ASK_QUESTION_VARIABLE_RE.fullmatch(variable):
+                raise WorkflowValidationError(
+                    f"ask_question node {node['id']} variable must be a valid identifier "
+                    f"(alphanumeric + underscore, no leading digit), got {variable!r}",
                 )
 
     for edge in edges:
