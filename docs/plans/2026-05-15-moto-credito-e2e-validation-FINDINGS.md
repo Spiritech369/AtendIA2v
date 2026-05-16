@@ -160,7 +160,50 @@ This task: 1 real gpt-4o preview call (3035in/37out) ≈ **$0.008**. **Cumulativ
 
 **Status: ✅ PASS** on the substantive criteria (Prompt master loaded via the frontend API, byte-identical, agent behaves per prompt through the product's own test path); 1 sub-item explicitly deferred; 3 real findings recorded.
 
-## Task 3 — KB ingestion + retrieval + scoping — pending
+## Task 3 — KB ingestion + retrieval + scoping
+
+Code: `tools/e2e/e2e_setup.py` (`ingest_kb` / `retrieval_check` / `scope_agent` / `run_task3`, all additive — Task 2 `main()` untouched) + launcher `tools/e2e/run_task3.py`. Run via core venv. No writes under `core/`.
+
+### Endpoints + exact contracts used (read READ-ONLY from source)
+- `POST /api/v1/knowledge/faqs` — `FAQBody` (`knowledge_routes.py:53`): `question` str 1..500, `answer` str 1..2000, `tags` list[str] ≤20 (each ≤40 ch, server-lowercased/deduped). → **201** `FAQItem`. Embeds `question\nanswer` **synchronously** on create (`:354`, `_maybe_embed`).
+- `POST /api/v1/knowledge/catalog` — `CatalogBody` (`:89`): `sku` 1..80, `name` 1..200, `attrs` dict, `category` str|None ≤60, `tags` ≤20, `active` bool. → **201** `CatalogItem`. Embeds `name\njson(attrs)` synchronously (`:436`).
+- `POST /api/v1/knowledge/test` — `{query}` 1..1000 → **200** `{answer, sources[], mode}` (`:716`). Tenant-scoped (NOT agent-scoped). Semantic cosine path first, ILIKE fallback only `if not sources`.
+- `PATCH /api/v1/agents/{id}/config` — `AgentPatch` (extra=forbid) → **200** `AgentItem` (`agents_routes.py:1309`, delegates to `patch_agent`). `GET /agents/{id}/config` (`:1280`) surfaces `knowledge_config["linked_sources"]` as `linked_knowledge_bases`.
+
+### Data mapping (the 3 real JSON files at repo `docs/`)
+- `FAQ_CREDITO.json` → 26 FAQs. Structured extras (`detalle_por_plan`, `documentos`, `enlace`) folded into the `answer` text so the single column is self-contained for search. tags `["credito","faq"]`.
+- `REQUISITOS_PLANES.json` → 6 FAQs (one per plan: "¿Qué requisitos necesito para el plan {nombre}?" + enganche% + requisitos list + nota). tags `["requisitos","planes","credito"]`. Chose FAQ over document/source: the document endpoint needs a multipart upload + the async arq `index_document` worker (non-deterministic for this check); FAQ embeds synchronously.
+- `CATALOGO_MODELOS.json` → 34 catalog items (one per moto model). `attrs` = full `ficha_tecnica`+`precios`+`planes_credito`; `category` = `categoria`; `tags` = model `alias` (trimmed ≤40ch, ≤19) + category.
+
+### Per-file ingest result (live, isolated tenant `867a1047-...`)
+| Source | Planned | Inserted | Status | Errors |
+|---|---|---|---|---|
+| FAQ_CREDITO.json | 26 | 26 | 201 | 0 |
+| REQUISITOS_PLANES.json | 6 | 6 | 201 | 0 |
+| CATALOGO_MODELOS.json | 34 | 34 | 201 | 0 |
+
+All 66 rows inserted clean (`faq_inserted 32/32`, `catalog_inserted 34/34`).
+
+### Retrieval check (`POST /api/v1/knowledge/test`)
+All 3 queries → HTTP 200, `mode=llm` (semantic cosine + gpt-4o-mini synthesis; OpenAI key live, consistent with Task 2). **Path that answered = SEMANTIC** for all (top-source `score>0`; the ILIKE fallback hard-codes `score=0`).
+
+1. `faq_paraphrase` — query *"¿en cuánto tiempo aprueban el crédito?"* (paraphrase of ingested *"¿Cuál es el tiempo de aprobación del crédito?"*). 3 sources, cosine 0.24. Synthesized answer (verbatim): *"El tiempo de aprobación del crédito es de 24 horas una vez que se entrega la documentación completa y correcta."* — correct, traceable to the ingested FAQ. ✅
+2. `requisitos_paraphrase` — *"requisitos del plan 20% sin comprobar ingresos"*. Top source verbatim: *"¿Qué requisitos necesito para el plan 20% Sin Comprobantes de Ingresos?\nRequisitos para el plan 20% Sin Comprobantes de Ingresos\nEnganche: 20%\n- INE vigente por ambos lados\n- Comprobante de domicilio menor a 2 meses"*. Answer correctly enumerated 20% + INE + comprobante. ✅
+3. `catalog_model` — *"Adventure Elite 150 CC ficha tecnica y precio"*. HTTP 200 but **the catalog item was NOT retrieved**; top source was an unrelated FAQ (cosine 0.59) and the LLM answered *"No encuentro esta informacion en la base de conocimiento."* — see Bug 6. ⚠️
+
+### Agent scoping (`PATCH /api/v1/agents/e34419ae-.../config`)
+PATCH `knowledge_config = {linked_sources:["faq","catalog"], linked_inboxes:["whatsapp_monterrey"], ingested_counts:{faqs:32,catalog:34}, source_files:[3 files]}` → **HTTP 200**. `GET /api/v1/agents/{id}` readback → `knowledge_config` **round-trips byte-identical** (`persisted: true`). `GET /api/v1/agents/{id}/config` → `linked_knowledge_bases=["faq","catalog"]`, `linked_whatsapp_inboxes=["whatsapp_monterrey"]`. **Scoping persisted PASS.**
+
+### Findings / bugs
+6. **CONFIRMED BUG — `/api/v1/knowledge/test` cannot retrieve catalog items via its primary (semantic) path.** The embedding branch (`core/atendia/api/knowledge_routes.py:737-770`) cosine-searches only `TenantFAQ` (`:741`) and `KnowledgeChunk` (`:759`). `TenantCatalogItem` appears **only** in the ILIKE fallback (`:793-814`), which runs `if not sources:` (`:771`). Because any tenant FAQ with an embedding always yields ≥1 row, `sources` is never empty once FAQs exist → the catalog branch is **dead code in practice**. Net: with a populated FAQ table, the entire moto catalog is unreachable through this endpoint; a model-spec/price question returns unrelated FAQs and the guarded LLM correctly says "no encuentro". Operator-visible: the KB "probar" tool silently can't answer catalog questions. (NB: the *agent-scoped* `/api/v1/knowledge/test-query` → `retriever.py:240` `_fetch_catalog_candidates` *does* embed-search catalog — so the capability exists but the simpler/legacy `/test` endpoint the cockpit/this check uses is broken for catalog.)
+7. **CONFIRMED — `agent.knowledge_config` is decorative for RAG (same class as Bug 1).** The agent-scoped retriever resolves source/collection permissions from the **`KbAgentPermission`** table keyed by the agent *string* (`core/atendia/tools/rag/retriever.py:101-136`, `load_agent_permissions`), and `/api/v1/knowledge/test` is purely tenant-scoped. Nothing in the retrieval path reads `agent.knowledge_config`. Setting it (operator-realistic, surfaced in Agente-IA-Manager via `GET /agents/{id}/config`) persists and renders but does **not** scope retrieval. Real KB→agent scoping requires seeding `KbAgentPermission` (`allowed_source_types`/`allowed_collection_slugs`) — no frontend endpoint observed for that in the routes read. Recorded; not a Task-3 blocker (the task asked to set & verify `knowledge_config` persistence, which passes).
+8. **SMELL — no collection assignment on ingest.** `FAQBody`/`CatalogBody` expose no `collection_id`; rows land with `collection_id=NULL`. The retriever's collection whitelist (`retriever.py:224-226`) treats NULL-collection rows as excluded whenever an agent has a non-empty `allowed_collection_slugs`. So even after seeding `KbAgentPermission` with collections, these ingested rows would be invisible unless permissions use an empty (= unrestricted) collection list. The frontend FAQ/Catalog create contract has no way to file content into a collection.
+
+### Cost
+No LLM loops. Real spend = synchronous server-side embeddings on create + 3 `/test` calls (1 query embedding + 1 gpt-4o-mini synth each). Calculated estimate (not metered — `/knowledge/test` returns no usage; turn_traces not written for KB endpoints): embeddings text-embedding-3-large ≈ 10.5k tok ≈ **$0.0014**; 3× gpt-4o-mini synth ≈ **$0.0008**. **Task 3 ≈ $0.003** (≤ $0.005 worst-case). **Cumulative validation spend ≈ $0.013 / $1.53.**
+
+### Verdict
+**Status: ⚠️ PARTIAL.** Ingestion (66/66, 201) and agent `knowledge_config` persistence are solid PASS. Retrieval PASSES for FAQ + requisitos via the real semantic path with correct synthesized answers. It **FAILS for catalog** through `/api/v1/knowledge/test` due to Bug 6 (real product defect, not a harness issue) — catalog data was ingested correctly and *is* reachable via the agent-scoped `/test-query`, but the cockpit's `/test` endpoint cannot surface it. Two further config-fidelity findings (Bugs 7, 8) recorded honestly. Browser verification deferred to controller.
 ## Task 4 — Pipeline text+document moves — pending
 ## Task 5 — Conversaciones committed + browser — pending
 ## Task 6 — Workflow create+trigger+execute — pending
