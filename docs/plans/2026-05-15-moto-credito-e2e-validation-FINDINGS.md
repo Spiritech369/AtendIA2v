@@ -8,7 +8,7 @@
 - Date: 2026-05-15
 - Branch: `claude/moto-credito-e2e-validation` (main checkout)
 - Isolated tenant: `dele.zored@hotmail.com` → `tenant_id = 867a1047-6aea-4b21-85d8-898aef0051cb` ("Zored QA Workspace" — verified empty in prior recon: 0 agents/catalog/faqs/conversations → ideal isolated target)
-- **Validation API budget: $1.53. Cumulative spent (this plan): $0.00 after Task 0; $0.00 after Task 1 ($0 fake-provider probe); $0.00 after Task 2** (Task 2's single budgeted preview-response LLM call was never reached — blocked at the first HTTP `login()` call by a hung backend; zero LLM tokens consumed).
+- **Validation API budget: $1.53. FINAL cumulative spent (this plan): ~ $0.144 / $1.53.** Per task (real, metered from TurnTrace where available): T0 $0 · T1 $0 (fake-provider probe) · T2 ~$0.008 (1 preview-response; the earlier blocked attempt spent $0) · T3 ~$0.003 · T4 ~$0.065 · T5 ~$0.066 · T6 ~$0.0001. (The header previously showed a stale "$0.00 after Task 2" from the pre-recovery blocked state — corrected after Task 2 was re-run green.)
 - Transparency note: ~$0.04 was spent earlier this session on the *separate* sandbox-smoke exploration (not part of this plan's budget).
 
 ---
@@ -382,4 +382,55 @@ Browser screenshot of the Workflows UI not captured — **same infra gate as Tas
 
 ### Verdict
 **Status: ✅ PASS.** Workflow created (`POST` 201) + published (`/publish` 200, `active=true`, `validation.critical_count=0`) via the product's own REST API; triggered by a **real committed `STAGE_ENTERED` event** from an autonomous `ConversationRunner` document-path transition (`nuevo_lead->papeleria_completa`); the `atendia_workflow_worker` cron (`poll_workflow_triggers`) picked it up ~9s later and ran execution `3e98668a-…` to `status=completed` with `steps_completed=3` and `workflow_action_runs` for **both** `assign_1` (assign_agent) and `note_1` (structured internal note) — verbatim DB proof above, corroborated by the UI's `GET /executions` (200). Cleanup restored tenant `867a1047` **exactly to baseline** (all residual 0; agents=1/faqs=32/catalog=34/pipelines_active=1/conversations=0/customers=0/workflows=0/turn_traces=0). One real product gap (#14) and one observability smell (#15) recorded with file:line. Real spend ≈ $0.0001. No runtime code modified; zero net side-effects on the tenant. Browser screenshot explicitly DEFERRED (infra-gated, substantively covered).
-## Task 7 — Scorecard + Respond.io + recommendation — pending
+## Task 7 — Scorecard + Respond.io + recommendation — ✅ DONE
+
+**Method (verification-before-completion):** every score cites recorded FINDINGS evidence that was *independently re-verified live* by the controller as the run progressed — $0 DB baseline/row-count checks after T3/T5/T6, in-code spot-checks of #1/#12/#14, the T1 probe re-run, and T2 executed by the controller. No score on faith; deferred/uncertain items are stated, not scored as PASS.
+
+### Consolidated bug/finding ledger (file:line, all verified)
+
+| # | Sev | What | Evidence |
+|---|-----|------|----------|
+| 1 | HIGH | `agent.flow_mode_rules` is stored/returned by the API + editable in Agente IA Manager but **never read by the runner**; routing is ONLY `pipeline.flow_mode_rules` | `conversation_runner.py:766` + grep-confirmed |
+| 6 | HIGH | `/api/v1/knowledge/test` (cockpit "probar" KB tool) **cannot retrieve catalog** — catalog only in a dead ILIKE fallback that never runs once any FAQ exists | `knowledge_routes.py:737-770,771,793-814` |
+| 7 | HIGH | `agent.knowledge_config` is decorative for RAG — retriever uses `KbAgentPermission`, not `knowledge_config` | `tools/rag/retriever.py:101-136` |
+| 9 | HIGH | Shipped `motos_credito_pipeline.json:167` `flow_mode_rules:[]` → `pick_flow_mode` raises every turn → **runner crash** for any tenant publishing it verbatim | `flow_router.py:111` |
+| 10 | CRITICAL | Shipped moto pipeline **can never auto-advance past `nuevo_lead` via text/NLU** (`required_fields:[]` → zero NLU extraction; forward conditions reference fields nothing produces) | `motos_credito_pipeline.json:9`, `conversation_runner.py:120`, `nlu_openai.py:36-51`; 6 live LLM turns + $0 dry-run |
+| 12 | MED | `ConversationRunner.run_turn` does NOT populate `messages` — operator transcript depends entirely on the webhook/dispatch path | `conversation_runner.py:1116` |
+| 14 | HIGH | `PATCH /conversations/{id}` stage move emits only `CONVERSATION_UPDATED`, never `STAGE_ENTERED` → `stage_entered` workflows **don't fire on a manual UI/kanban stage move** | `conversations_routes.py:1237-1242` |
+| 2,8,11,15 | LOW | Smells: trace.outbound vs enqueued decoupled; no `collection_id` on ingest; `rules_evaluated` dup stage_id; `notify_agent` silent no-op on zero-user role (`engine.py:1116-1137`) | task sections |
+| pre-1 | MED | Pre-existing (not from this run): inbound webhook for unknown tenant → `ForeignKeyViolationError` on `customers` insert; `_persist_inbound` lacks tenant-exists guard | T2 backend logs |
+| infra | MED | uvicorn `--reload` graceful-shutdown hangs indefinitely on a file change under bind-mounted `core/` → API wedged, no auto-recovery | T2 backend logs |
+
+### Scores (0–10) — evidence-based, non-celebratory
+
+**1. Flujo msg→proceso→envío — 7/10.** Full ordered file:line trace + a $0 probe empirically confirmed NLU→router→composer, zero side-effects (T1 PASS). Architecture coherent/correct on the production webhook path. Deductions: dual action-vs-mode dispatch (D5, unreconciled), smell #2, #12 (runner doesn't persist transcript). *Mejorar:* reconcile action/flow_mode dispatch; make `trace.outbound_messages` reflect what's enqueued; document the runner/messages boundary.
+
+**2. Agente IA — 6/10.** Loading the real Prompt master via the frontend API is flawless: 201, byte-identical 10,802-char round-trip, agent obeyed PASO 0 verbatim via the product's own preview-response (T2 PASS, controller-run). Deductions: **#1 + #7** — the editor exposes `flow_mode_rules`/`knowledge_config` that persist and render but the runner ignores both (operator configures, nothing happens); preview-response is a simplified path. *Mejorar:* wire those into the runner or remove from the editor.
+
+**3. Conocimiento (KB) — 5/10.** Ingestion of the 3 real JSON via frontend endpoints solid (66/66 rows 201; $0-DB-verified faqs=32/catalog=34). FAQ + requisitos retrieval works via the real semantic path with correct answers (T3). Deductions: **#6 (critical for this business — catalog IS the product)**, #7/#8. *Mejorar:* add catalog to the `/knowledge/test` semantic branch; make agent KB scoping actually filter; expose `collection_id` on ingest.
+
+**4. Pipelines — 4/10.** The ENGINE works: PUT via frontend API (200, 7 rules round-trip, $0-DB-verified active) and the document-driven move executed with full per-rule audit (`nuevo_lead→papeleria_completa`, T4 sub-goals 1+3 PASS). But the **shipped purpose-built moto pipeline is broken two independent ways** (#9 crash, #10 cannot advance via text) — verbatim use → crashing/stuck bot. *Mejorar (highest impact for the user's real case):* fix the shipped JSON — `always`-terminated rules, give `nuevo_lead` extractable fields/transition, implement `cumple_antiguedad`.
+
+**5. Conversaciones — 7/10.** A committed real-LLM conversation surfaces via the UI's own REST APIs (list + detail + verbatim message bubbles + 3 turn_traces with full DebugPanel payloads) and is tunable from the FrontEnd (PATCH tags → persisted, read-back-verified); cleanup left the tenant byte-identical to baseline ($0-DB-verified) (T5). Deduction: #12. *Mejorar:* close or document the runner/messages boundary.
+
+**6. Workflows — 7/10.** Strongest: full create→publish→trigger→execute→audit on first attempt — created (201) + published (200, critical_count=0) via REST, triggered by a **real committed STAGE_ENTERED**, picked up autonomously by the `atendia_workflow_worker` cron ~9s later, execution `completed` with both nodes' `workflow_action_runs`; idempotency + FK cascade sound; UI `/executions` corroborates (T6 PASS). Deductions: **#14** (manual UI stage move doesn't fire stage_entered workflows) + #15. *Mejorar:* emit STAGE_ENTERED on manual moves; make notify_agent record/raise on empty role.
+
+### vs Respond.io (anchored to ESTADO-Y-GAPS §1/§8 + maturity audit + live findings)
+
+ESTADO-Y-GAPS §1 claims "near functional parity" with quality/maturity gaps. This live run **confirms the differentiating engines are real and functional** — deterministic flow-mode routing, per-stage behavior_mode, Vision→doc auto-write, plan-doc requirements, guardrails, and a workflow engine with safety rules + idempotency all work *when correctly configured* (§8 differentiators verified, not just claimed). For moto-crédito these are **ahead of Respond.io's core** (no per-stage behavior modes or Vision doc-mapping there).
+
+**But** the run also shows the gap is bigger than "polish": the *shipped* moto pipeline is broken (#9/#10), operator-facing config is silently dead in two places (#1/#7), and the KB test tool is catalog-blind (#6). Respond.io's flow/agent/KB builders are battle-tested and don't have "config that looks live but isn't" traps. **Honest verdict: AtendIA is *better than Respond.io in architecture and vertical-fit differentiators for moto-crédito*, but *behind Respond.io in operator-facing reliability/coherence*** until the HIGH/CRITICAL ledger closes. Net: engine parity-or-ahead; operator-readiness behind.
+
+### Premium-SaaS recommendation (single highest-leverage move)
+
+The PMF risk is **not missing features — it's operator-facing config that silently does nothing**. Your explicit requirement is "que la afinación posterior se cumpla desde FrontEnd"; today an operator can set agent.flow_mode_rules / agent.knowledge_config and publish the shipped moto pipeline and get **zero or broken** effect with no error. Recommended next piece (its own session, TDD, one piece): a **"config-coherence hardening" sprint** — (a) fix shipped `motos_credito_pipeline.json` #9+#10, (b) wire or remove agent.flow_mode_rules/knowledge_config (#1/#7), (c) make `/knowledge/test` catalog-aware (#6), (d) emit STAGE_ENTERED on manual stage moves (#14), (e) tenant-exists guard in `_persist_inbound` (pre-1). Converts "near-parity with trust traps" into "trustworthy premium SaaS" — higher leverage than any new feature; each is small and FrontEnd-verifiable.
+
+### Scope cuts (declared, per contract)
+- **General / multi-niche scenario: NOT done this session** — deferred to a next session per the approved design (this session = moto-crédito E2E only).
+- **Browser screenshots (T2–T6): explicitly DEFERRED, not faked** — preview tooling requires editing `.claude/launch.json` (gated as agent self-modification) + the frontend is Docker-served (:5173), not preview-managed. The "via frontend" requirement was met by driving the product's *own REST endpoints* (the exact APIs the SPA calls) + its own preview-response feature, with $0 DB cross-checks. A browser pass is available if you authorize the launch.json change.
+- Discovered bugs were **reported, not fixed** (per plan scope; the hardening sprint above is the fix piece).
+
+### Final cost
+Real API spend this validation: **~ $0.144 / $1.53** (well under budget). Separately, ~$0.04 earlier this session on the unrelated sandbox-smoke exploration (disclosed, not in this budget).
+
+**Status: ✅ DONE.** 6 areas scored with verified evidence; 7 HIGH/CRITICAL findings + 5 smells + 2 infra/pre-existing issues catalogued with file:line; Respond.io verdict + the single highest-leverage recommendation delivered; scope cuts declared.
