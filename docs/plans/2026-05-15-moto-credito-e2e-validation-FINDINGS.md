@@ -132,104 +132,33 @@ here); two sequencing smells documented honestly. No runtime code modified.
 
 ---
 
-## Task 2 — Prompt master via /agents + browser — ⚠️ BLOCKED (infra), code complete
+## Task 2 — Prompt master via /agents (frontend API) — ✅ PASS (browser screenshot deferred, declared)
 
-**Goal:** load `docs/Prompt master.txt` (10802 chars, read as bytes→utf-8)
-into the product as a real Agent via `POST /api/v1/agents`, read it back
-byte-identical, persist operator-realistic `flow_mode_rules`, and do ONE
-real-LLM `preview-response` sanity call.
+**Outcome:** the Prompt master loads into the product as a real Agent through
+the frontend's own REST API and the agent behaves per the prompt via the
+product's built-in test path. One infra blocker was hit, diagnosed, and
+recovered with user authorization (a real finding, kept below).
 
-### Deliverable (complete, verified static)
+### Live evidence (post-recovery, real stack)
+- Login `POST /api/v1/auth/login` → 200, tenant_id `867a1047-6aea-4b21-85d8-898aef0051cb` (isolated).
+- `POST /api/v1/agents` → **HTTP 201**, `agent_id = e34419ae-3829-4004-ad08-e133d9eb7109`.
+- `GET /api/v1/agents/{id}` → 200; **system_prompt round-trip PASS** (10802 chars byte-identical to `docs/Prompt master.txt`); **flow_mode_rules persisted PASS** (7 rules).
+- `POST /api/v1/agents/{id}/preview-response` (the Agente IA Manager's own "probar agente" path) → 200. Reply was **exactly the Prompt master's PASO 0 micro-cotización**, verbatim:
+  > "Qué bueno que escribes. En Dínamo puedes arrancar con enganche desde $3,500 dependiendo de tu plan. ¿Cuánto tiempo llevas en tu empleo actual?"
+  confidence 1.0; `gpt-4o-2024-08-06 · 2162ms · 3035in/37out`; supervisorDecision `ok`.
+- Observation: the product composes prompt = a product preamble ("Eres {name}. Tono: {tone}. Responde en {language}. Objetivo operativo: {goal}. Limita… No uses emojis. Instrucciones específicas del operador:") **+ the operator system_prompt verbatim**. The agent followed PASO 0 correctly.
 
-`core/scripts/e2e_setup.py` — reusable `Client` (httpx.Client; the core
-venv has **no `requests`**, has `httpx` 0.28.1 — switched accordingly) that
-logs in, keeps the session+csrf cookie jar, and injects `X-CSRF-Token` on
-every unsafe verb. `create_agent()` POSTs the exact contract; `get_agent()`
-+ `preview_response()` for steps 3–4. Runnable as `__main__`.
-
-Static verification (no network) — all PASS:
-- `ast.parse` + import + `Client()` construct OK.
-- `load_prompt_master()` reads **10802 chars** from `docs/Prompt master.txt`
-  (bytes→utf-8, no newline munging, for an exact round-trip compare).
-- `AGENT_FLOW_MODE_RULES` = the exact 7-rule dict from the task spec
-  (doc_attachment / obstacle_kw / retention_kw / plan_missing_tipo /
-  plan_missing_plan / sales_plan_present / fallback_support→always).
-- CSRF guard raises if `login()` not called before any POST/PATCH/PUT.
-
-API contract pinned from source (not guessed):
-`agents_routes.py:972` `POST ""` → `AgentCreate` (req `['name']`;
-`max_sentences` `ge=1,le=5` so `2` valid; `flow_mode_rules: dict|None`;
-accepts `system_prompt/language/no_emoji/tone/goal/is_default`).
-`:1056` `GET /{id}` → `AgentItem`. `:1332` `POST /{id}/preview-response` →
-`PreviewBody` (`message` 1–2000 chars; `conversationContext`/`draftConfig`
-aliases). Router mounted `/api/v1/agents` (`main.py:151`).
-
-### Steps 2–4 — NOT EXECUTED: shared backend is hung
-
-Could not run end-to-end. The shared `atendia_backend` (container `running`,
-restarts=0, up ~44 min, port `0.0.0.0:8001` mapped) **accepts TCP but never
-returns an HTTP response** — every path (`/`, `/openapi.json`,
-`/api/v1/health`) `ReadTimeout`s via httpx **and** `curl` (curl exit 28, 0
-bytes), so it is not a client/sandbox artifact. `docker logs atendia_backend`
-ends at:
-```
-WARNING:  WatchFiles detected changes in 'scripts/e2e_flow_probe.py'. Reloading...
-INFO:     Shutting down
-INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
-```
-**Root cause:** the dev backend runs uvicorn `--reload` (WatchFiles) and the
-container mounts the **main repo `core/`** (per memory `docker_dev_stack_crashloop.md`).
-A WatchFiles reload (triggered by churn in `core/scripts/` — Task 1's
-`e2e_flow_probe.py`, and this branch is the main checkout so a new
-`core/scripts/e2e_setup.py` also lands in the watched tree) hit a uvicorn
-**graceful-shutdown that hung on a never-completing background task**, so the
-reload never finishes and HTTP never resumes. Sibling `atendia_worker` is
-healthy (arq `cron:dispatch_outbox` ticking) → Postgres :5433 / Redis :6380
-are fine; only the backend HTTP app is dead. Recovery requires
-`docker restart atendia_backend`, which was **explicitly denied** as
-out-of-scope shared-infra modification (this task forbids runtime/infra
-changes), and a 75 s recovery poll showed no self-recovery (hung shutdown
-does not time out here). Not worked around.
-
-- create HTTP status: **N/A — request never issued** (blocked at `login()`,
-  the first call, which `ReadTimeout`d).
-- system_prompt round-trip: **N/A — not executed.**
-- flow_mode_rules persisted: **N/A — not executed.**
-- preview-response reply: **N/A — Step 4 never reached.**
-
-### Confirmed bug (pre-found, re-verified on this branch — recorded)
-
-**`agent.flow_mode_rules` is stored + returned by the API but NEVER consumed
-by the runner/router; flow routing is pipeline-sourced only.** Verified:
-`conversation_runner.py:766` calls `pick_flow_mode(rules=pipeline.flow_mode_rules, …)`
-— the *pipeline's* rules; the comment at `conversation_runner.py:749` says
-"Tenants without rules in **pipeline.flow_mode_rules** get the default
-`always -> SUPPORT` fallback". `grep flow_mode_rules core/atendia` shows the
-only `agent.flow_mode_rules` touches are in `agents_routes.py`
-(`:658`/`:1157` round-trip it; `:83/:120/:176` schema) and the ORM column
-(`db/models/agent.py:44`) — **no runner/router read of
-`agent.flow_mode_rules` anywhere**. So setting `flow_mode_rules` on the
-agent (as `e2e_setup.py` does, operator-realistically) is **DEAD for
-routing**; the real routing rules must live in the pipeline
-(`PipelineDefinition.flow_mode_rules`, `contracts/pipeline_definition.py:296`)
-— a later task. Operator-misleading: the Agente IA Manager UI/API accepts
-and echoes back agent-level flow rules that have zero runtime effect.
+### Findings / bugs
+1. **CONFIRMED BUG — dead operator config.** `agent.flow_mode_rules` is accepted, stored and returned by the API (and editable in Agente IA Manager) but is **never read by the runner**; routing uses only `pipeline.flow_mode_rules` (`core/atendia/runner/conversation_runner.py:766`; comment `:749`; grep across `core/atendia` shows no runner read of `agent.flow_mode_rules`). An operator configuring flow routing on the agent sees zero effect. The real routing rules must live in the pipeline (Task 4).
+2. **ROBUSTNESS GAP.** Dev backend runs uvicorn `--reload` and Docker bind-mounts the main checkout `./core`. Writing scripts into `core/scripts/` (Tasks 1–2) triggered a WatchFiles reload whose **graceful shutdown hung indefinitely** ("Waiting for background tasks to complete") — API wedged, `restarts=0`, no self-recovery. A benign file add bricked the HTTP app. Mitigation applied: e2e scripts relocated to repo-root `tools/e2e/` (out of the watched mount, commit on branch) + user-authorized `docker restart atendia_backend` → healthy (HTTP 200) in ~12s. Recommend: cancel background tasks on shutdown / exclude `scripts/` from `--reload`.
+3. **PRE-EXISTING BUG (unrelated, seen in backend logs).** An inbound webhook for a non-existent tenant `141ba992-094c-49bd-bd8b-6d9652036913` raised `ForeignKeyViolationError` on `INSERT INTO customers` (`customers_tenant_id_fkey`). Not caused by this validation (our tenant is `867a1047`). Webhook ingestion (`_persist_inbound`) lacks a tenant-exists guard before customer upsert → unhandled 500-class error per stray inbound.
+4. **SCOPE HONESTY — preview-response ≠ full runner.** `preview-response` is a simplified path: a direct LLM call with the agent prompt (`retrievedFragments` / `extractedFields` empty, no deterministic flow router, no KB tools). It proves the Prompt master loads and the LLM obeys it; it does NOT exercise router→flow_mode→composer-MODE_PROMPTS→KB. Full-pipeline behavior is validated separately via the harness (Task 4) and the real committed runner (Task 5).
+5. **DEFERRED SUB-ITEM (declared, not faked).** The literal Agente-IA-Manager browser screenshot was not captured: the preview tooling requires editing `.claude/launch.json`, which the harness gates as agent self-modification, and the frontend is Docker-served (not preview-managed). The substantive "via frontend" requirement is met by the real frontend REST API + the product's own preview-response feature. Browser pass offered to the user at the scorecard.
 
 ### Cost
+This task: 1 real gpt-4o preview call (3035in/37out) ≈ **$0.008**. **Cumulative validation spend ≈ $0.01 / $1.53.**
 
-**$0.00 spent.** The single budgeted `preview-response` LLM call (Step 4)
-was never reached — failure occurred at the very first HTTP call
-(`login()`). No LLM tokens consumed. Cumulative unchanged.
-
-### Status: ⚠️ PARTIAL / BLOCKED
-
-Code deliverable complete and statically verified against the source-pinned
-contract; the **confirmed agent.flow_mode_rules-dead bug is recorded with
-fresh `file:line` evidence**. Live steps 2–4 (create / round-trip /
-preview) are **unverified** — blocked by a hung shared backend whose only
-fix (container restart) is out of scope for this task. Re-run
-`e2e_setup.py` once the backend HTTP is restored to obtain the live
-evidence; expected HTTP 201 + byte-identical round-trip.
+**Status: ✅ PASS** on the substantive criteria (Prompt master loaded via the frontend API, byte-identical, agent behaves per prompt through the product's own test path); 1 sub-item explicitly deferred; 3 real findings recorded.
 
 ## Task 3 — KB ingestion + retrieval + scoping — pending
 ## Task 4 — Pipeline text+document moves — pending
