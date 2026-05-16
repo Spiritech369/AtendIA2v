@@ -204,7 +204,68 @@ No LLM loops. Real spend = synchronous server-side embeddings on create + 3 `/te
 
 ### Verdict
 **Status: ⚠️ PARTIAL.** Ingestion (66/66, 201) and agent `knowledge_config` persistence are solid PASS. Retrieval PASSES for FAQ + requisitos via the real semantic path with correct synthesized answers. It **FAILS for catalog** through `/api/v1/knowledge/test` due to Bug 6 (real product defect, not a harness issue) — catalog data was ingested correctly and *is* reachable via the agent-scoped `/test-query`, but the cockpit's `/test` endpoint cannot surface it. Two further config-fidelity findings (Bugs 7, 8) recorded honestly. Browser verification deferred to controller.
-## Task 4 — Pipeline text+document moves — pending
+## Task 4 — Pipeline text+document moves — ⚠️ PARTIAL (pipeline PUT ✅, DOCUMENT move ✅, TEXT-FIELD move ❌ by latent pipeline-design bug)
+
+Code: `tools/e2e/task4_pipeline_moves.py` (run via core venv; no writes under `core/`). Reads `core/atendia/state_machine/motos_credito_pipeline.json` READ-ONLY and swaps only its `flow_mode_rules` key in-memory.
+
+### Sub-goal 1 — Pipeline PUT via the frontend API — ✅ PASS
+- `PUT /api/v1/tenants/pipeline {definition:<motos_credito_pipeline.json with flow_mode_rules replaced by the 7 spec rules>}` → **HTTP 200** (first attempt, no 422).
+- `GET /api/v1/tenants/pipeline` → HTTP 200; **`active=true`**, `stages=[nuevo_lead, calificacion_inicial, plan_seleccionado, papeleria_incompleta, papeleria_completa, revision_humana]`, **`flow_mode_rules` round-trips byte-identical** to the 7 injected rules (doc_attachment→DOC, obstacle_kw→OBSTACLE, retention_kw→RETENTION, plan_missing_tipo→PLAN, plan_missing_plan→PLAN, sales_plan_present→SALES, fallback_support→SUPPORT). FlowMode values stored UPPERCASE per `core/atendia/contracts/flow_mode.py:13-18`.
+
+**LATENT BUG #9 (recorded, this is the one the injected rules fix).** `core/atendia/state_machine/motos_credito_pipeline.json:167` ships `"flow_mode_rules": []`. The runner consumes routing ONLY from `pipeline.flow_mode_rules` (`core/atendia/runner/conversation_runner.py:766`), passing it to `pick_flow_mode` (`core/atendia/runner/flow_router.py:90-111`), which **`raise RuntimeError("flow_mode_rules MUST end with an `always` fallback rule")` at `flow_router.py:111`** whenever the list is empty (no rule matches, including no `always`). The runner wraps NLU/router so a raise there crashes the turn. So the purpose-built pipeline as committed is unusable until an `always`-terminated rule list is PUT (note: `PipelineDefinition.flow_mode_rules` has a `_default_flow_mode_rules` default at `pipeline_definition.py:49-59,296-298`, but an **explicit** `[]` in the JSON overrides that default — the model only fills the default when the key is absent, not when it is present-but-empty). Confirmed empirically: with the 7 rules PUT, every runner turn below routed cleanly (`flow_mode=PLAN`, no crash).
+
+### Sub-goal 2 — TEXT-FIELD MOVE (real OpenAINLU + OpenAIComposer, capped) — ❌ PARTIAL (no move; root-caused)
+
+Seeded a fresh customer+conversation+conversation_state in tenant `867a1047` at stage `nuevo_lead` (committed; hard-deleted in `finally`). Ran the REAL `ConversationRunner` on a single rolled-back session (faithful copy of `harness._run_turn_on_session`; the harness's `SandboxTurnResult` drops `stage_transition`/`state_after`/`rules_evaluated`, so a local rolled-back loop that surfaces the in-memory `TurnTrace` was used — same zero-side-effects invariant, one `rollback()` in `finally`). Two script variants, ≤2 attempts, hard `cost_cap_usd=Decimal("0.40")` per attempt.
+
+Turn-by-turn (real gpt-4o-mini NLU + gpt-4o composer, all turns):
+
+| Variant | Turn | Inbound | flow_mode | stage_transition | stage | cost $ |
+|---|---|---|---|---|---|---|
+| v1 | 1 | "hola, quiero una moto a crédito" | PLAN | **None** | nuevo_lead | 0.010911 |
+| v1 | 2 | "tengo 3 años en mi trabajo" | PLAN | **None** | nuevo_lead | 0.010711 |
+| v1 | 3 | "me depositan la nómina en una tarjeta de débito" | PLAN | **None** | nuevo_lead | 0.010712 |
+| v2 | 1 | "hola, quiero una moto a crédito por nómina" | PLAN | **None** | nuevo_lead | 0.010911 |
+| v2 | 2 | "tengo 3 años en mi empleo actual y cobro por tarjeta de nómina" | PLAN | **None** | nuevo_lead | 0.010712 |
+| v2 | 3 | "mi tipo de crédito es nómina tarjeta, el plan de enganche 10%" | PLAN | **None** | nuevo_lead | 0.010712 |
+
+`final_extracted_data = {}` for both variants. **No text-field-driven stage transition observed.** This is **not** an LLM-prompting issue — it is a deterministic **latent pipeline-design bug**, root-caused at the code level and verified with a $0 pure-function dry-run:
+
+**BUG #10 — `motos_credito_pipeline.json` can never auto-advance out of `nuevo_lead` via text/NLU.** The runner builds the NLU extraction schema from **only the current stage's `required_fields` + `optional_fields`** (`core/atendia/runner/conversation_runner.py:120` builds `field_names`; `core/atendia/runner/nlu_openai.py:36-51,120-121` `_entities_schema` lists exactly those names; NLU returns `entities` keyed by them, merged into `extracted_data` at `conversation_runner.py:463-464`). Stage `nuevo_lead` has **`required_fields: []`** (`motos_credito_pipeline.json:9`) → the NLU schema has zero extractable fields → **NLU extracts nothing on every turn while in `nuevo_lead`**. The M3 auto-enter evaluator (`core/atendia/state_machine/pipeline_evaluator.py:326-445`) is the *only* mover (every stage has no `transitions`, so the FSM `transitioner.next_stage` is a no-op — `core/atendia/state_machine/transitioner.py:28-31`). The two forward auto-enter conditions are unreachable from `nuevo_lead`:
+- `calificacion_inicial` auto-enters on `cumple_antiguedad == true` (`motos_credito_pipeline.json:39-42`), but `cumple_antiguedad` is **never produced**: it is not in any stage's fields and `map_entity_to_attr` (`core/atendia/runner/field_extraction_mapping.py:17-35,45-47`) has no key that maps to it. The comment at `core/atendia/state_machine/motos_credito_pipeline.py:166-167` ("cumple_antiguedad gets derived by NLU from 'tengo X meses'") is **false — no derivation code exists**.
+- `plan_seleccionado` auto-enters on `plan_credito exists` (`motos_credito_pipeline.json:69-74`), but `tipo_credito`/`plan_credito` are only in `plan_seleccionado`'s OWN `required_fields` (`:51-59`) — so NLU only extracts them once the conversation is *already there*. Chicken-and-egg: nothing can put `plan_credito` into the field set while in `nuevo_lead`, so `plan_seleccionado` can never auto-fire from the start state.
+
+Net: a brand-new lead in this pipeline is permanently stuck at `nuevo_lead` for any text conversation; only the document path (Vision/operator writing `customer.attrs`) or a manual operator stage move can advance it. Recorded as a real product/config defect (the pipeline file is purpose-built and shipped this way). $0 dry-run confirming the mechanism: with `{plan_credito:...}` injected, `select_best_stage` from `nuevo_lead` → `plan_seleccionado`; with `{}` → no match (matches the live LLM result exactly).
+
+### Sub-goal 3 — DOCUMENT MOVE (`apply_overrides`, rolled back) — ✅ PASS
+
+Evaluator resolution (READ): `core/atendia/state_machine/pipeline_evaluator.py:300-323` `_merge_fields` builds the field dict as **`customer.attrs` UNION `conversation_state.extracted_data`** (`:355-358`); `resolve_field_path` (`:63-112`) walks dot paths and unwraps `{value,confidence}`; `docs_complete_for_plan` (`:166-195`) reads `pipeline.docs_per_plan[plan]` and checks each `<DOC>.status == "ok"`. So the correct store to set is **`customer.attrs`**.
+
+Via the harness's documented `run_sandbox_turn(apply_overrides=…)` hook (and cross-checked with an equivalent local rolled-back turn that exposes the trace), the override loaded the seeded `Customer` and set `attrs = {plan_credito:"sin_comprobantes_25", DOCS_INE_FRENTE:{status:"ok"}, DOCS_INE_REVERSO:{status:"ok"}, DOCS_COMPROBANTE_DOMICILIO:{status:"ok"}}` (uncommitted, flushed before the turn, **rolled back after** — zero side-effects; seed customer hard-deleted in `finally`). `sin_comprobantes_25` is the minimal plan: `docs_per_plan["sin_comprobantes_25"]` = exactly those 3 docs (`motos_credito_pipeline.json:193-197`).
+
+Result — **`stage_transition = "nuevo_lead->papeleria_completa"`** (status PASS). The `TurnTrace.rules_evaluated` per-rule audit (migration 045) proves the path:
+- `plan_seleccionado` / `plan_credito exists` → **passed**
+- `papeleria_incompleta` / `DOCS_INE_FRENTE.status==ok`, `DOCS_INE_REVERSO.status==ok`, `DOCS_COMPROBANTE_DOMICILIO.status==ok` → **passed** (the other 4 DOCS_* conditions fail; rule group is `match:any` so the stage matches)
+- `papeleria_completa` / `plan_credito docs_complete_for_plan` → **passed** (all 3 docs `sin_comprobantes_25` requires are `ok`)
+- `select_best_stage` forward-bias (`pipeline_evaluator.py:226-279`) picks the latest matching stage → `papeleria_completa`.
+
+`papeleria_completa` has `pause_bot_on_enter:true` (`motos_credito_pipeline.json:133`) so the composer is correctly skipped on the transition turn (outbound `[]`); only NLU ran (gpt-4o-mini, cost $0.000088). Both the harness path and the local-trace path returned the identical transition — the harness `apply_overrides` mechanism drives a real document-based stage move with zero persistence.
+
+### Cost (real, metered from `TurnTrace` component costs)
+- TEXT-FIELD move: 6 real turns (gpt-4o composer + gpt-4o-mini NLU), summed per-turn `nlu+composer+tool+vision` cost ≈ **$0.0644** (3×~$0.01073 ×2 variants).
+- DOCUMENT move: 1 NLU-only turn (composer skipped by pause) ≈ **$0.000088** ×(1 harness + 1 local) ≈ **$0.0002**.
+- One extra standalone `document_move` invocation during SQL-fix verification: +1 NLU turn ≈ **$0.0001**.
+- **Task 4 real spend ≈ $0.065.** Prior cumulative ≈ $0.013 → **new cumulative ≈ $0.078 / $1.53**. Well under the $0.50 task hard cap and the plan budget. Cost cap (`Decimal("0.40")`) enforced per attempt and never tripped (each turn ~$0.011).
+
+### Findings / bugs (new this task)
+- **#9 LATENT BUG** — `motos_credito_pipeline.json:167` `"flow_mode_rules": []` → `flow_router.py:111` raises every turn → runner-crash for any tenant who publishes the shipped purpose-built pipeline verbatim. Fixed here by PUTting an `always`-terminated 7-rule list. (The Pydantic `_default_flow_mode_rules` default does NOT save it: an explicit empty list in the JSON is preserved, not replaced.)
+- **#10 LATENT BUG (design)** — same file: no text/NLU conversation can auto-advance past `nuevo_lead` (zero `required_fields` ⇒ zero NLU extraction in the start stage), and the only forward auto-enter conditions reference fields nothing on the reachable path produces (`cumple_antiguedad` has no derivation; `plan_credito` is gated behind being in `plan_seleccionado` already). Document/Vision path and manual operator moves still work. File:line evidence above. Verified by live LLM (6 turns stuck) + $0 pure-function dry-run.
+- **Smell #11** — `pipeline_evaluator.py` `rules_evaluated` lists each condition with its own `stage_id`, so a `match:any` multi-condition stage (e.g. `papeleria_incompleta`) appears 7× in the audit (3 passed / 4 failed). Cosmetic for the DebugPanel but a consumer counting "matched stages" by unique `stage_id` from this list must dedupe (the script does).
+- **Confirms prior #1** — routing read only from `pipeline.flow_mode_rules` (`conversation_runner.py:766`); the 7 rules took effect immediately on PUT (every turn `flow_mode=PLAN`, driven by `nuevo_lead`'s `behavior_mode:"PLAN"` stage pin overriding the router — `motos_credito_pipeline.json:15` + runner stage-pin override), proving pipeline-level rules are live while agent-level ones remain dead.
+
+### Verdict
+**Status: ⚠️ PARTIAL.** Sub-goal 1 (pipeline PUT + active + rules round-trip) **PASS**. Sub-goal 3 (document-driven stage move via the rolled-back `apply_overrides` hook into `papeleria_completa`, with full per-rule audit) **PASS**. Sub-goal 2 (text-field-driven move) **does not occur** — root-caused to latent pipeline-design BUG #10 (not an LLM/script deficiency; proven with real LLM turns + a deterministic $0 dry-run), recorded honestly as PARTIAL with file:line. Two latent shipped-pipeline bugs (#9, #10) and one observability smell (#11) recorded. No runtime code modified; zero production side-effects (every runner turn rolled back; seed rows hard-deleted).
+
 ## Task 5 — Conversaciones committed + browser — pending
 ## Task 6 — Workflow create+trigger+execute — pending
 ## Task 7 — Scorecard + Respond.io + recommendation — pending
