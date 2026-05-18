@@ -125,6 +125,13 @@ npm run typecheck
 For a clean tenant setup, follow:
 [docs/runbooks/laptop-new-tenant-setup.md](docs/runbooks/laptop-new-tenant-setup.md).
 
+Fast local tenant bootstrap:
+
+```powershell
+cd core
+uv run python scripts/bootstrap_tenant.py --email admin@demo.com --password admin123 --tenant-name "Mi Tenant"
+```
+
 ## Useful Local Checks
 
 ```powershell

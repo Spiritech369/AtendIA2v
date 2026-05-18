@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.config_validation import validate_agent_config as validate_agent_references
 from atendia.config import get_settings
 from atendia.db.models.agent import Agent
 from atendia.db.models.workflow import Workflow
@@ -800,6 +801,20 @@ def _validate_agent_config(row: Agent, draft: dict | None = None) -> dict:
     }
 
 
+def _merge_validation_dict(base: dict, extra: dict) -> dict:
+    issues = [*(base.get("issues") or []), *(extra.get("issues") or [])]
+    critical = sum(1 for item in issues if item.get("severity") == "critical")
+    warning = sum(1 for item in issues if item.get("severity") == "warning")
+    return {
+        **base,
+        "status": "blocked" if critical else ("warning" if warning else "ready"),
+        "summary": "Listo para publicar" if not critical else f"No publicable: {critical} criticos",
+        "critical_count": critical,
+        "warning_count": warning,
+        "issues": issues,
+    }
+
+
 def _build_preview_system_prompt(
     *,
     name: str,
@@ -1080,6 +1095,12 @@ async def patch_agent(
     values = body.model_dump(exclude_unset=True)
     if not values:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no fields to update")
+    if {"extraction_config", "system_prompt"} & set(values):
+        draft = _item(row).model_dump(mode="json")
+        draft.update(values)
+        validation = await validate_agent_references(session, tenant_id, draft)
+        if validation.critical_count:
+            raise HTTPException(422, validation.error_message())
     if values.get("is_default") is True:
         await _clear_default(session, tenant_id)
     for key, value in values.items():
@@ -1330,7 +1351,12 @@ async def validate_agent_config(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
-    return _validate_agent_config(row, draft)
+    base = _validate_agent_config(row, draft)
+    data = _item(row).model_dump(mode="json")
+    if draft:
+        data.update(draft)
+    extra = await validate_agent_references(session, tenant_id, data)
+    return _merge_validation_dict(base, extra.as_dict())
 
 
 @router.post("/{agent_id}/preview-response")

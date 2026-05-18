@@ -104,6 +104,18 @@ Pipeline and rule evaluation.
 - `conditions.py`, `transitioner.py`, `action_resolver.py`: supporting pipeline logic.
 - `motos_credito_pipeline.json`: seed/reference pipeline, not a hardcoded runtime contract.
 
+### `core/atendia/config_validation.py`
+
+Central validator for tenant-authored configuration. It is called before saving
+pipeline/docs configuration and by agent validation. It catches:
+
+- `docs_ine_frente` style legacy/lowercase keys instead of `DOCS_INE_FRENTE`.
+- `docs_per_plan` entries that reference missing document catalog keys.
+- `docs_per_plan` plan names that are not exact choices of `docs_plan_field`.
+- Vision mappings that point at removed or misspelled `DOCS_*`.
+- `docs_complete_for_plan` rules whose field does not match `docs_plan_field`.
+- Prompt references to missing customer fields or missing KB documents.
+
 ### `core/atendia/tools/`
 
 Tools used by the runner and prompts.

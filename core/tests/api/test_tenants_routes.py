@@ -173,6 +173,69 @@ def test_put_pipeline_preserves_mode_prompts_when_omitted(operator_seed_local):
     assert cur.get("mode_prompts") == {"PLAN": "GUION PLAN DEL TENANT"}  # preserved
 
 
+def test_put_pipeline_rejects_lowercase_legacy_doc_key(operator_seed_local):
+    _, _, email, plain = operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    definition = {
+        "version": 1,
+        "stages": [{"id": "nuevo"}],
+        "documents_catalog": [{"key": "DOCS_INE_FRENTE", "label": "INE - Frente"}],
+        "docs_per_plan": {"Sin Comprobantes": ["docs_ine_frente"]},
+    }
+    resp = client.put(
+        "/api/v1/tenants/pipeline",
+        json={"definition": definition},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 422
+    assert "mayusculas" in resp.json()["detail"]
+
+
+def test_put_pipeline_rejects_docs_plan_key_not_in_customer_field_choices(
+    operator_seed_local,
+):
+    _, _, email, plain = operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+    client.headers["X-CSRF-Token"] = csrf
+
+    client.post(
+        "/api/v1/customer-fields/definitions",
+        json={
+            "key": "tipo_credito",
+            "label": "Tipo de credito",
+            "field_type": "select",
+            "field_options": {"choices": ["Sin Comprobantes"]},
+        },
+    )
+    client.post(
+        "/api/v1/customer-fields/definitions",
+        json={
+            "key": "DOCS_INE_FRENTE",
+            "label": "INE - Frente",
+            "field_type": "select",
+            "field_options": {"choices": ["missing", "ok", "rejected"]},
+        },
+    )
+
+    definition = {
+        "version": 1,
+        "stages": [{"id": "nuevo"}],
+        "docs_plan_field": "tipo_credito",
+        "documents_catalog": [{"key": "DOCS_INE_FRENTE", "label": "INE - Frente"}],
+        "docs_per_plan": {"sin_comprobantes": ["DOCS_INE_FRENTE"]},
+    }
+    resp = client.put(
+        "/api/v1/tenants/pipeline",
+        json={"definition": definition},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert resp.status_code == 422
+    assert "opcion exacta" in resp.json()["detail"]
+
+
 def test_pipeline_versions_list_endpoint(operator_seed_local):
     _, _, email, plain = operator_seed_local
     client = TestClient(app)

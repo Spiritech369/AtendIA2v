@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.config_validation import validate_pipeline_config
 from atendia.config import get_settings
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.tenant import Tenant
@@ -80,6 +81,21 @@ class PipelinePutBody(BaseModel):
     definition: dict = Field(..., description="The full pipeline JSONB.")
 
 
+class ConfigValidationIssue(BaseModel):
+    code: str
+    severity: str
+    message: str
+    path: str | None = None
+
+
+class ConfigValidationResponse(BaseModel):
+    status: str
+    summary: str
+    critical_count: int
+    warning_count: int
+    issues: list[ConfigValidationIssue]
+
+
 @router.get("/pipeline", response_model=PipelineResponse)
 async def get_pipeline(
     user: AuthUser = Depends(current_user),
@@ -105,6 +121,17 @@ async def get_pipeline(
         active=row.active,
         created_at=row.created_at,
     )
+
+
+@router.post("/pipeline/validate", response_model=ConfigValidationResponse)
+async def validate_pipeline(
+    body: PipelinePutBody,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    result = await validate_pipeline_config(session, tenant_id, dict(body.definition))
+    return result.as_dict()
 
 
 HISTORY_CAP = 10
@@ -183,6 +210,10 @@ async def put_pipeline(
         prior = (existing.definition or {}).get("mode_prompts")
         if prior:
             definition["mode_prompts"] = prior
+
+    validation = await validate_pipeline_config(session, tenant_id, definition)
+    if validation.critical_count:
+        raise HTTPException(422, validation.error_message())
 
     if existing is None:
         new_row = TenantPipeline(

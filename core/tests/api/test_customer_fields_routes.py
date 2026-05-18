@@ -364,6 +364,49 @@ def test_put_values_canonicalizes_typed_fields(seed):
     assert by_key["interests"] == '["moto","credito"]'
 
 
+def test_put_doc_field_value_canonicalizes_and_syncs_attrs(seed):
+    tid, _, cust_id, email, plain = seed
+    c = TestClient(app)
+    csrf = _login(c, email, plain)
+    c.headers["X-CSRF-Token"] = csrf
+
+    c.post(
+        "/api/v1/customer-fields/definitions",
+        json={
+            "key": "DOCS_INE_FRENTE",
+            "label": "INE - Frente",
+            "field_type": "select",
+            "field_options": {"choices": ["missing", "ok", "rejected"]},
+        },
+    )
+
+    resp = c.put(
+        f"/api/v1/customers/{cust_id}/field-values",
+        json={"values": {"DOCS_INE_FRENTE": True}},
+    )
+    assert resp.status_code == 200, resp.text
+
+    items = c.get(f"/api/v1/customers/{cust_id}/field-values").json()
+    by_key = {v["key"]: v["value"] for v in items}
+    assert by_key["DOCS_INE_FRENTE"] == "ok"
+
+    async def _attrs() -> dict:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            attrs = (
+                await conn.execute(
+                    text("SELECT attrs FROM customers WHERE tenant_id=:t AND id=:c"),
+                    {"t": tid, "c": cust_id},
+                )
+            ).scalar_one()
+        await engine.dispose()
+        return attrs
+
+    attrs = asyncio.run(_attrs())
+    assert attrs["DOCS_INE_FRENTE"]["status"] == "ok"
+    assert attrs["DOCS_INE_FRENTE"]["source"] == "manual"
+
+
 def test_put_values_can_trigger_pipeline_stage_move(seed):
     tid, _, cust_id, email, plain = seed
 

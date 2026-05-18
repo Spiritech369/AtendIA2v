@@ -63,6 +63,8 @@ This is the short navigation map. Use
 | Agent mode prompts | PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT behavior |
 | Knowledge Base documents | Catalog, requirements, FAQ and policies used as evidence |
 | `tenants.config.qos` | Max messages per turn and response SLO |
+| `core/atendia/config_validation.py` | Blocks mismatched DOCS keys, docs-per-plan, Vision mapping and prompt references |
+| `core/scripts/bootstrap_tenant.py` | Seeds fields, pipeline, docs, prompts, KB, QoS and default agent |
 
 ## Tooling Folders
 

@@ -140,14 +140,22 @@ tenant needs:
 - Knowledge Base documents.
 - Channel credentials if WhatsApp will be used.
 
-If a helper script exists for your branch, start there:
+Recommended path:
 
 ```powershell
 cd core
-uv run python scripts/prepare_beta_tenant.py
+uv run python scripts/bootstrap_tenant.py --email admin@demo.com --password admin123 --tenant-name "Mi Tenant"
 ```
 
-Review the script before using it for a production tenant.
+For an existing local tenant that you want to reset:
+
+```powershell
+uv run python scripts/bootstrap_tenant.py --email admin@demo.com --password admin123 --tenant-name "Mi Tenant" --reset
+```
+
+The script seeds customer fields, pipeline, document catalog, docs-per-plan,
+Vision mapping, mode prompts, Knowledge Base chunks, QoS and a default agent.
+Review it before using it for a production tenant.
 
 ### 10. Configure Customer Fields
 

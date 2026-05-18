@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
@@ -283,10 +283,40 @@ def _choices_for(defn: CustomerFieldDefinition) -> set[str] | None:
     return {str(v) for v in raw}
 
 
+def _is_document_status_field(defn: CustomerFieldDefinition) -> bool:
+    return defn.key.startswith("DOCS_")
+
+
+def _canonicalize_doc_status(
+    defn: CustomerFieldDefinition,
+    value: str | int | float | bool | list[str] | None,
+) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "ok" if value else "missing"
+    if not isinstance(value, str):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{defn.key} must be a document status")
+    normalized = value.strip().lower()
+    if normalized in ("ok", "recibido", "received", "true", "1", "yes", "si", "sí"):
+        return "ok"
+    if normalized in ("missing", "pendiente", "pending", "false", "0", "no"):
+        return "missing"
+    if normalized in ("rejected", "rechazado", "rechazada"):
+        return "rejected"
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        f"{defn.key} must be one of: missing, ok, rejected",
+    )
+
+
 def _canonicalize_field_value(
     defn: CustomerFieldDefinition,
     value: str | int | float | bool | list[str] | None,
 ) -> str | None:
+    if _is_document_status_field(defn):
+        return _canonicalize_doc_status(defn, value)
+
     if value is None:
         return None
 
@@ -438,9 +468,12 @@ async def put_field_values(
             f"unknown field keys: {', '.join(sorted(unknown))}",
         )
 
+    doc_status_updates: dict[str, str | None] = {}
     for key, val in body.values.items():
         defn = key_to_def[key]
         canonical = _canonicalize_field_value(defn, val)
+        if _is_document_status_field(defn):
+            doc_status_updates[key] = canonical
         existing = (
             await session.execute(
                 select(CustomerFieldValue).where(
@@ -460,6 +493,33 @@ async def put_field_values(
                     value=canonical,
                 )
             )
+
+    if doc_status_updates:
+        customer = (
+            await session.execute(
+                select(Customer).where(
+                    Customer.id == customer_id,
+                    Customer.tenant_id == tenant_id,
+                )
+            )
+        ).scalar_one()
+        attrs = dict(customer.attrs or {})
+        now = datetime.now(UTC).isoformat()
+        for key, canonical in doc_status_updates.items():
+            if canonical is None:
+                attrs.pop(key, None)
+                continue
+            current = attrs.get(key)
+            payload = dict(current) if isinstance(current, dict) else {}
+            payload.update(
+                {
+                    "status": canonical,
+                    "source": "manual",
+                    "verified_at": now,
+                }
+            )
+            attrs[key] = payload
+        customer.attrs = attrs
 
     await session.flush()
     try:

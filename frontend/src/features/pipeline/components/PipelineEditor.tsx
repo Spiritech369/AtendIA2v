@@ -878,15 +878,11 @@ export function PipelineEditor({ onClose }: Props) {
     });
   };
 
-  // docs_per_plan CRUD. Plan names are stored as the operator typed them
-  // (they appear in `customer.attrs.plan_credito` exactly as the AI agent
+  // docs_per_plan CRUD.
   // extracted them — typically snake_case or short tokens).
-  const normalizePlanName = (raw: string): string =>
-    raw
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
+  // Keep exact display values like "Sin Comprobantes"; the backend validator
+  // rejects docs_per_plan keys that are not selectable by docs_plan_field.
+  const normalizePlanName = (raw: string): string => raw.trim().replace(/\s+/g, " ");
 
   const addPlan = () => {
     const name = normalizePlanName(newPlanName);
