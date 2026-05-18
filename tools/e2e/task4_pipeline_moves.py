@@ -3,11 +3,10 @@
 Three sub-goals, all against the live stack + the REAL ConversationRunner:
 
   1. Build the pipeline = the JSON of
-     core/atendia/state_machine/motos_credito_pipeline.json with its
-     (latently-broken) empty `flow_mode_rules` replaced by the 7
-     operator-realistic rules from the task spec, PUT it via the
-     frontend API (`PUT /api/v1/tenants/pipeline`), GET read-back,
-     assert the pipeline is active.
+     core/atendia/state_machine/motos_credito_pipeline.json, PUT it via
+     the frontend API (`PUT /api/v1/tenants/pipeline`), GET read-back,
+     assert the pipeline is active and does not carry Agent IA routing
+     rules. Flow routing belongs to the agent created by e2e_setup.py.
 
   2. TEXT-FIELD MOVE — drive a real OpenAINLU + OpenAIComposer
      conversation that should make the LLM extract `tipo_credito` /
@@ -67,54 +66,6 @@ BASE_PIPELINE_PATH = (
     REPO_ROOT / "core" / "atendia" / "state_machine" / "motos_credito_pipeline.json"
 )
 
-# The 7 rules EXACTLY as mandated by the task spec. FlowMode values are the
-# UPPERCASE enum values (PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT —
-# core/atendia/contracts/flow_mode.py). FlowModeRule shape is
-# {"id","trigger":{"type",..},"mode"} (core/atendia/runner/flow_router.py).
-FLOW_MODE_RULES: list[dict[str, Any]] = [
-    {"id": "doc_attachment", "trigger": {"type": "has_attachment"}, "mode": "DOC"},
-    {
-        "id": "obstacle_kw",
-        "trigger": {
-            "type": "keyword_in_text",
-            "list": [
-                "manana",
-                "ahorita",
-                "al rato",
-                "cuando llegue",
-                "luego",
-                "luego te mando",
-                "tengo que pedirlas",
-            ],
-        },
-        "mode": "OBSTACLE",
-    },
-    {
-        "id": "retention_kw",
-        "trigger": {
-            "type": "keyword_in_text",
-            "list": ["gracias", "ok gracias", "gracias por la info"],
-        },
-        "mode": "RETENTION",
-    },
-    {
-        "id": "plan_missing_tipo",
-        "trigger": {"type": "field_missing", "field": "tipo_credito"},
-        "mode": "PLAN",
-    },
-    {
-        "id": "plan_missing_plan",
-        "trigger": {"type": "field_missing", "field": "plan_credito"},
-        "mode": "PLAN",
-    },
-    {
-        "id": "sales_plan_present",
-        "trigger": {"type": "field_present", "field": "plan_credito"},
-        "mode": "SALES",
-    },
-    {"id": "fallback_support", "trigger": {"type": "always"}, "mode": "SUPPORT"},
-]
-
 # Plan with the SHORTEST docs requirement (only 3 docs) so the DOCUMENT
 # proof override is minimal. From motos_credito_pipeline.json docs_per_plan.
 DOC_PROOF_PLAN = "sin_comprobantes_25"
@@ -126,19 +77,9 @@ DOC_PROOF_DOCS = [
 
 
 def build_pipeline_definition() -> dict[str, Any]:
-    """The base motos_credito pipeline JSON with flow_mode_rules swapped.
-
-    Read READ-ONLY from core/ (never written). Only the in-memory dict's
-    `flow_mode_rules` key is replaced — everything else (stages,
-    auto_enter_rules, docs_per_plan, documents_catalog, vision_doc_mapping)
-    is byte-for-byte the purpose-built pipeline.
-    """
+    """The base motos_credito pipeline JSON, without Agent IA router rules."""
     base = json.loads(BASE_PIPELINE_PATH.read_text(encoding="utf-8"))
-    assert base.get("flow_mode_rules") == [], (
-        f"expected base pipeline flow_mode_rules == [] (latent bug), "
-        f"got {base.get('flow_mode_rules')!r}"
-    )
-    base["flow_mode_rules"] = FLOW_MODE_RULES
+    base.pop("flow_mode_rules", None)
     return base
 
 
@@ -194,13 +135,13 @@ def put_pipeline(client: Client) -> dict[str, Any]:
         )
         rb_rules = (defn or {}).get("flow_mode_rules")
         out["readback_flow_mode_rules"] = rb_rules
-        out["flow_mode_rules_match"] = rb_rules == FLOW_MODE_RULES
+        out["flow_mode_rules_absent"] = rb_rules in (None, [])
         out["readback_stage_ids"] = [
             s.get("id") for s in (defn or {}).get("stages", [])
         ]
         print(
             f"[pipeline] read-back active={out['readback_active']} "
-            f"flow_mode_rules_match={out['flow_mode_rules_match']} "
+            f"flow_mode_rules_absent={out['flow_mode_rules_absent']} "
             f"stages={out['readback_stage_ids']}"
         )
     else:
@@ -670,7 +611,7 @@ async def _amain() -> int:
     # Sub-goal 1
     pipe = put_pipeline(client)
     pipe_ok = pipe.get("put_status") in (200, 201) and pipe.get(
-        "flow_mode_rules_match"
+        "flow_mode_rules_absent"
     )
 
     # Sub-goal 2 (only meaningful if the pipeline is active)

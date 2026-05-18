@@ -95,6 +95,7 @@ def pick_flow_mode(
     vision: VisionResult | None,
     inbound_text: str,
     pending_confirmation: str | None,
+    has_attachment: bool = False,
 ) -> FlowDecision:
     """Return the first FlowMode whose rule matches, plus the rule id.
 
@@ -102,7 +103,15 @@ def pick_flow_mode(
     """
     normalized = _normalize_for_router(inbound_text)
     for rule in rules:
-        if _matches(rule.trigger, extracted, nlu, vision, normalized, pending_confirmation):
+        if _matches(
+            rule.trigger,
+            extracted,
+            nlu,
+            vision,
+            normalized,
+            pending_confirmation,
+            has_attachment,
+        ):
             return FlowDecision(
                 mode=rule.mode,
                 rule_id=rule.id,
@@ -118,9 +127,10 @@ def _matches(
     vision: VisionResult | None,
     normalized_text: str,
     pending_confirmation: str | None,
+    has_attachment: bool = False,
 ) -> bool:
     if isinstance(trigger, HasAttachmentTrigger):
-        return vision is not None
+        return has_attachment or vision is not None
     if isinstance(trigger, KeywordInTextTrigger):
         return any(_normalize_for_router(kw) in normalized_text for kw in trigger.list)
     if isinstance(trigger, FieldMissingTrigger):

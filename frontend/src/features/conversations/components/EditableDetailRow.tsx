@@ -124,7 +124,7 @@ export function EditableDetailRow({
               }}
               className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
             >
-              <option value="" disabled>
+              <option value="">
                 {placeholder}
               </option>
               {(options ?? []).map((opt) => (

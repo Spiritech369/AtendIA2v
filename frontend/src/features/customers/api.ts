@@ -237,11 +237,36 @@ export interface FieldDefinition {
   created_at: string;
 }
 
+export type FieldDefinitionType =
+  | "text"
+  | "select"
+  | "number"
+  | "date"
+  | "checkbox"
+  | "multiselect";
+
+export interface FieldDefinitionCreate {
+  key: string;
+  label: string;
+  field_type: FieldDefinitionType;
+  field_options?: Record<string, unknown> | null;
+  ordering?: number;
+}
+
+export interface FieldDefinitionUpdate {
+  label?: string;
+  field_type?: FieldDefinitionType;
+  field_options?: Record<string, unknown> | null;
+  ordering?: number;
+}
+
 export interface FieldValue {
   field_definition_id: string;
   key: string;
   value: string | null;
 }
+
+export type FieldValueInput = string | number | boolean | string[] | null;
 
 export interface CustomerImportPreviewRow {
   row: number;
@@ -343,8 +368,13 @@ export const notesApi = {
 export const fieldsApi = {
   listDefinitions: async () =>
     (await api.get<FieldDefinition[]>("/customer-fields/definitions")).data,
+  createDefinition: async (body: FieldDefinitionCreate) =>
+    (await api.post<FieldDefinition>("/customer-fields/definitions", body)).data,
+  updateDefinition: async (id: string, body: FieldDefinitionUpdate) =>
+    (await api.patch<FieldDefinition>(`/customer-fields/definitions/${id}`, body)).data,
+  deleteDefinition: async (id: string) => api.delete(`/customer-fields/definitions/${id}`),
   getValues: async (customerId: string) =>
     (await api.get<FieldValue[]>(`/customers/${customerId}/field-values`)).data,
-  putValues: async (customerId: string, values: Record<string, string | null>) =>
+  putValues: async (customerId: string, values: Record<string, FieldValueInput>) =>
     (await api.put<{ updated: number }>(`/customers/${customerId}/field-values`, { values })).data,
 };

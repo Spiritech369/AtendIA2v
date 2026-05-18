@@ -1,4 +1,5 @@
 import json as _json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -25,6 +26,15 @@ from atendia.runner.nlu_protocol import NLUProvider
 from atendia.webhooks.deduplication import mark_processed
 
 router = APIRouter()
+
+
+@dataclass(frozen=True)
+class InboundPersistResult:
+    started_execution_ids: list[UUID]
+    tenant_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    from_phone_e164: str
 
 
 def build_nlu(settings) -> NLUProvider:
@@ -184,6 +194,7 @@ async def receive_inbound(
     received_count = 0
     processed_message_ids: list[str] = []
     started_execution_ids = []
+    inbound_jobs: list[InboundPersistResult] = []
     try:
         # Record webhook arrival for channel status badge (Step 6).
         from datetime import datetime
@@ -194,12 +205,13 @@ async def receive_inbound(
             ex=86400,  # expire after 24h of inactivity
         )
         for m in inbound_messages:
-            started = await _persist_inbound(session, tenant_id, m)
-            if started is None:
+            persisted = await _persist_inbound(session, tenant_id, m)
+            if persisted is None:
                 continue
             received_count += 1
             processed_message_ids.append(m.channel_message_id)
-            started_execution_ids.extend(started)
+            started_execution_ids.extend(persisted.started_execution_ids)
+            inbound_jobs.append(persisted)
         for r in statuses:
             await _update_status(session, tenant_id, r)
         await session.commit()
@@ -208,14 +220,24 @@ async def receive_inbound(
     finally:
         await redis.aclose()
 
-    if started_execution_ids:
+    if started_execution_ids or inbound_jobs:
         from arq.connections import RedisSettings, create_pool
 
+        from atendia.queue.inbound_burst import enqueue_inbound_burst
         from atendia.workflows.engine import enqueue_executions_to_workflows_queue
 
         arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
         try:
-            await enqueue_executions_to_workflows_queue(arq_pool, started_execution_ids)
+            if started_execution_ids:
+                await enqueue_executions_to_workflows_queue(arq_pool, started_execution_ids)
+            for job in inbound_jobs:
+                await enqueue_inbound_burst(
+                    arq_pool,
+                    tenant_id=job.tenant_id,
+                    conversation_id=job.conversation_id,
+                    latest_message_id=job.message_id,
+                    from_phone_e164=job.from_phone_e164,
+                )
         finally:
             await arq_pool.aclose()
 
@@ -226,7 +248,9 @@ async def receive_inbound(
     }
 
 
-async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UUID] | None:
+async def _persist_inbound(
+    session: AsyncSession, tenant_id: UUID, m
+) -> InboundPersistResult | None:
     """Find or create customer + conversation, then insert inbound message."""
     cust_id = (
         await session.execute(
@@ -293,10 +317,19 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
     if inserted_message_id is None:
         return None
 
-    # Bump unread count for the badge (scope gap: unread tracking)
+    # Bump unread count and activity so inbox ordering follows the latest
+    # inbound immediately, even before the deferred runner finishes.
     await session.execute(
-        text("UPDATE conversations SET unread_count = unread_count + 1 WHERE id = :c"),
-        {"c": conv_id},
+        text(
+            "UPDATE conversations "
+            "SET unread_count = unread_count + 1, last_activity_at = :ts "
+            "WHERE id = :c"
+        ),
+        {"c": conv_id, "ts": datetime.now(UTC)},
+    )
+    await session.execute(
+        text("UPDATE customers SET last_activity_at = :ts WHERE id = :c"),
+        {"c": cust_id, "ts": datetime.now(UTC)},
     )
 
     # Emit event (T15)
@@ -343,88 +376,13 @@ async def _persist_inbound(session: AsyncSession, tenant_id: UUID, m) -> list[UU
     finally:
         await redis_client.aclose()
 
-    # Run conversation turn (T25): drives the state machine using the configured NLU.
-    from datetime import datetime as _dt
-    from uuid import uuid4 as _uuid4
-
-    from atendia.channels.base import InboundMessageMetadata
-    from atendia.contracts.message import (
-        Attachment as CanonicalAttachment,
+    return InboundPersistResult(
+        started_execution_ids=started_executions,
+        tenant_id=tenant_id,
+        conversation_id=conv_id,
+        message_id=inserted_message_id,
+        from_phone_e164=m.from_phone_e164,
     )
-    from atendia.contracts.message import (
-        Message as CanonicalMessage,
-    )
-    from atendia.contracts.message import (
-        MessageDirection,
-    )
-    from atendia.runner.conversation_runner import ConversationRunner
-
-    # Find the next turn_number for this conversation
-    next_turn = (
-        await session.execute(
-            text(
-                "SELECT COALESCE(MAX(turn_number), 0) + 1 FROM turn_traces "
-                "WHERE conversation_id = :c"
-            ),
-            {"c": conv_id},
-        )
-    ).scalar()
-
-    settings = get_settings()
-    nlu = build_nlu(settings)
-    composer = build_composer(settings)
-    runner = ConversationRunner(session, nlu, composer)
-    canonical_attachments: list[CanonicalAttachment] = []
-    if m.metadata:
-        meta = InboundMessageMetadata.model_validate(m.metadata)
-        canonical_attachments = [
-            CanonicalAttachment(
-                media_id=a.media_id,
-                mime_type=a.mime_type,
-                url=a.url,
-                caption=a.caption,
-            )
-            for a in meta.attachments
-        ]
-    inbound_canonical = CanonicalMessage(
-        id=str(_uuid4()),
-        conversation_id=str(conv_id),
-        tenant_id=str(tenant_id),
-        direction=MessageDirection.INBOUND,
-        text=m.text or "",
-        sent_at=_dt.now(UTC),
-        attachments=canonical_attachments,
-    )
-
-    # Build an arq pool so the runner can enqueue outbound messages.
-    from arq.connections import RedisSettings, create_pool
-
-    arq_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-    try:
-        try:
-            trace = await runner.run_turn(
-                conversation_id=conv_id,
-                tenant_id=tenant_id,
-                inbound=inbound_canonical,
-                turn_number=next_turn,
-                arq_pool=arq_pool,
-                to_phone_e164=m.from_phone_e164,
-            )
-            _ = trace  # silence unused-trace lint
-        except Exception:
-            # Don't crash the webhook handler if the runner fails - just log via event.
-            # In production this would also bubble to monitoring.
-            from atendia.contracts.event import EventType
-
-            await emitter.emit(
-                conversation_id=conv_id,
-                tenant_id=tenant_id,
-                event_type=EventType.ERROR_OCCURRED,
-                payload={"where": "conversation_runner", "message": "run_turn failed"},
-            )
-    finally:
-        await arq_pool.aclose()
-    return started_executions
 
 
 async def _update_status(session: AsyncSession, tenant_id: UUID, r) -> None:

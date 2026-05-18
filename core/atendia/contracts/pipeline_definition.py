@@ -12,7 +12,19 @@ from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule
 # the per-turn router result when set.
 _FLOW_MODE_VALUES: frozenset[str] = frozenset(m.value for m in FlowMode)
 
-_FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_FIELD_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+_DEFAULT_ACTIONS_ALLOWED: list[str] = [
+    "greet",
+    "ask_field",
+    "ask_clarification",
+    "lookup_faq",
+    "search_catalog",
+    "quote",
+    "book_appointment",
+    "close",
+    "escalate_to_human",
+]
 
 # Auto-enter rule paths use dot-separated nesting so
 # "DOCS_INE.status" resolves to customer.attrs["DOCS_INE"]["status"].
@@ -61,7 +73,7 @@ def _default_flow_mode_rules() -> list[FlowModeRule]:
 
 class FieldSpec(BaseModel):
     name: str
-    description: str = Field(default="", max_length=200)
+    description: str = Field(default="", max_length=10000)
 
     @field_validator("name")
     @classmethod
@@ -224,6 +236,13 @@ class StageDefinition(BaseModel):
     # writing rule expressions.
     behavior_mode: str | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _default_missing_actions_allowed(cls, data):
+        if isinstance(data, dict) and "actions_allowed" not in data:
+            return {**data, "actions_allowed": list(_DEFAULT_ACTIONS_ALLOWED)}
+        return data
+
     @field_validator("behavior_mode")
     @classmethod
     def _validate_behavior_mode(cls, v: str | None) -> str | None:
@@ -297,6 +316,10 @@ class PipelineDefinition(BaseModel):
         default_factory=_default_flow_mode_rules,
     )
     docs_per_plan: dict[str, list[str]] = Field(default_factory=dict)
+    # Customer field whose value selects the docs_per_plan entry to use.
+    # Defaults to the legacy `plan_credito`; tenants can point it to
+    # `tipo_credito`, `CREDITO_TIPO`, or any custom customer field.
+    docs_plan_field: str = "plan_credito"
     # Tenant-configurable document catalog. The Pipeline editor renders
     # this as the "Documentos requeridos" checklist; checking a doc
     # writes a `DOCS_<KEY>.status equals "ok"` condition into the
@@ -311,6 +334,62 @@ class PipelineDefinition(BaseModel):
     # Empty dict = no auto-writing on Vision; tenants relying on
     # manual operator marking keep that behaviour by leaving this empty.
     vision_doc_mapping: dict[str, list[str]] = Field(default_factory=dict)
+    # Multi-tenant generalization: per-mode composer guidance authored by
+    # the tenant (Pipeline editor). Keys are FlowMode string values
+    # ("plan", "sales", …); the runner passes the matching entry to the
+    # composer as `mode_guidance`. Empty/missing key → the composer uses
+    # its generic vertical-neutral default (NOT moto). Existing tenants
+    # are backfilled with the legacy moto playbook by migration so they
+    # do not regress.
+    mode_prompts: dict[str, str] = Field(default_factory=dict)
+    # Presentation-only aliases for the six internal flow modes. The
+    # runner still receives PLAN/SALES/DOC/etc.; tenants can name those
+    # buckets in their own language/domain so operators do not have to
+    # learn the internal contract.
+    mode_labels: dict[str, str] = Field(default_factory=dict)
+    # Presentation-only visibility for the Pipeline editor. Hidden modes
+    # keep their prompts and remain valid in saved stages/rules; the UI
+    # just keeps unused buckets out of the operator's way.
+    hidden_modes: list[str] = Field(default_factory=list)
+
+    @field_validator("mode_prompts")
+    @classmethod
+    def _validate_mode_prompt_keys(cls, v: dict[str, str]) -> dict[str, str]:
+        unknown = sorted(set(v) - _FLOW_MODE_VALUES)
+        if unknown:
+            raise ValueError(
+                f"mode_prompts has unknown flow mode keys {unknown}; "
+                f"allowed: {sorted(_FLOW_MODE_VALUES)}"
+            )
+        return v
+
+    @field_validator("mode_labels")
+    @classmethod
+    def _validate_mode_label_keys(cls, v: dict[str, str]) -> dict[str, str]:
+        unknown = sorted(set(v) - _FLOW_MODE_VALUES)
+        if unknown:
+            raise ValueError(
+                f"mode_labels has unknown flow mode keys {unknown}; "
+                f"allowed: {sorted(_FLOW_MODE_VALUES)}"
+            )
+        return v
+
+    @field_validator("hidden_modes")
+    @classmethod
+    def _validate_hidden_modes(cls, v: list[str]) -> list[str]:
+        unknown = sorted(set(v) - _FLOW_MODE_VALUES)
+        if unknown:
+            raise ValueError(
+                f"hidden_modes has unknown flow modes {unknown}; "
+                f"allowed: {sorted(_FLOW_MODE_VALUES)}"
+            )
+        seen = set()
+        ordered: list[str] = []
+        for mode in [m.value for m in FlowMode]:
+            if mode in v and mode not in seen:
+                seen.add(mode)
+                ordered.append(mode)
+        return ordered
 
     @model_validator(mode="after")
     def _validate_stage_ids_unique(self) -> "PipelineDefinition":

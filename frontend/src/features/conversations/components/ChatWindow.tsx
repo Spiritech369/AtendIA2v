@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,18 @@ interface Props {
   onDebug: (messageId: string) => void;
 }
 
+function messageTime(message: { sent_at: string | null; created_at: string }): number {
+  const raw = message.sent_at ?? message.created_at;
+  const parsed = new Date(raw).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function directionOrder(direction: string): number {
+  if (direction === "inbound") return 0;
+  if (direction === "system") return 1;
+  return 2;
+}
+
 export function ChatWindow({
   conversationId,
   botPaused,
@@ -29,6 +41,13 @@ export function ChatWindow({
   const msgs = useMessages(conversationId);
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior,
+    });
+  };
 
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
@@ -53,21 +72,47 @@ export function ChatWindow({
   });
 
   useConversationStream(conversationId, () => {
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }, 50);
+    setTimeout(() => scrollToBottom("smooth"), 50);
   });
 
+  const messages = useMemo(
+    () =>
+      (msgs.data?.pages.flatMap((p) => p.items) ?? [])
+        .slice()
+        .sort((a, b) => {
+          const timeDelta = messageTime(a) - messageTime(b);
+          if (timeDelta !== 0) return timeDelta;
+          const directionDelta = directionOrder(a.direction) - directionOrder(b.direction);
+          if (directionDelta !== 0) return directionDelta;
+          return a.id.localeCompare(b.id);
+        }),
+    [msgs.data],
+  );
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
+    scrollToBottom();
   }, []);
 
-  const messages = msgs.data?.pages.flatMap((p) => p.items) ?? [];
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length]);
 
   return (
     <>
       <ScrollArea className="flex-1" ref={scrollRef}>
-        <div className="flex flex-col-reverse gap-2 p-4">
+        <div className="flex flex-col gap-2 p-4">
+          {msgs.hasNextPage && (
+            <div className="flex justify-center pb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => msgs.fetchNextPage()}
+                disabled={msgs.isFetchingNextPage}
+              >
+                {msgs.isFetchingNextPage ? "Cargando…" : "Más mensajes"}
+              </Button>
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               Sin mensajes en esta conversación.
@@ -96,18 +141,6 @@ export function ChatWindow({
                 }
               />
             ))
-          )}
-          {msgs.hasNextPage && (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => msgs.fetchNextPage()}
-                disabled={msgs.isFetchingNextPage}
-              >
-                {msgs.isFetchingNextPage ? "Cargando…" : "Más mensajes"}
-              </Button>
-            </div>
           )}
         </div>
       </ScrollArea>

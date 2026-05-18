@@ -168,7 +168,7 @@ class OpenAINLU:
                 last_exc = e
                 break
 
-        return self._error_result(last_exc), self._zero_usage(t0)
+        return self._error_result(last_exc), self._zero_usage(t0, last_exc)
 
     def _error_result(self, exc: Exception | None) -> NLUResult:
         name = type(exc).__name__ if exc else "Unknown"
@@ -180,11 +180,17 @@ class OpenAINLU:
             ambiguities=[f"nlu_error:{name}"],
         )
 
-    def _zero_usage(self, t0: float) -> UsageMetadata:
+    def _zero_usage(self, t0: float, exc: Exception | None = None) -> UsageMetadata:
+        # Keep the exception type in usage metadata so the runner can show
+        # operator-visible errors without asking the customer to reformulate.
+        # The actual exception text can include account details, so it stays
+        # out of the persisted public trace.
+        error_type = type(exc).__name__ if exc else None
         return UsageMetadata(
             model=self._model,
             tokens_in=0,
             tokens_out=0,
             cost_usd=Decimal("0"),
             latency_ms=int((time.perf_counter() - t0) * 1000),
+            error_type=error_type,
         )

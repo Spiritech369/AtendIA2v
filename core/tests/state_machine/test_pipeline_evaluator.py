@@ -105,6 +105,80 @@ def test_condition_in_not_in():
     assert evaluate_condition(not_in_op, {"plan": "12"}) is False
 
 
+def test_docs_complete_for_plan_uses_configured_plan_field():
+    c = Condition(field="credito_plan", operator="docs_complete_for_plan")
+    fields = {
+        "credito_plan": "20%",
+        "tipo_credito": "Sin Comprobantes",
+        "DOCS_INE_FRENTE": {"status": "ok"},
+        "DOCS_INE_ATRAS": {"status": "ok"},
+        "DOCS_DOMICILIO": {"status": "ok"},
+    }
+    assert (
+        evaluate_condition(
+            c,
+            fields,
+            docs_per_plan={
+                "Sin Comprobantes": [
+                    "DOCS_INE_FRENTE",
+                    "DOCS_INE_ATRAS",
+                    "DOCS_DOMICILIO",
+                ],
+            },
+            docs_plan_field="tipo_credito",
+        )
+        is True
+    )
+
+
+def test_docs_complete_for_plan_falls_back_to_legacy_tipo_credito_key():
+    c = Condition(field="credito_plan", operator="docs_complete_for_plan")
+    fields = {
+        "credito_plan": "20%",
+        "tipo_credito": "Sin Comprobantes",
+        "DOCS_INE_FRENTE": {"status": "ok"},
+        "DOCS_INE_ATRAS": {"status": "ok"},
+        "DOCS_DOMICILIO": {"status": "ok"},
+    }
+    assert (
+        evaluate_condition(
+            c,
+            fields,
+            docs_per_plan={
+                "Sin Comprobantes": [
+                    "DOCS_INE_FRENTE",
+                    "DOCS_INE_ATRAS",
+                    "DOCS_DOMICILIO",
+                ],
+            },
+        )
+        is True
+    )
+
+
+def test_docs_complete_for_plan_rejects_missing_required_doc():
+    c = Condition(field="tipo_credito", operator="docs_complete_for_plan")
+    fields = {
+        "tipo_credito": "Sin Comprobantes",
+        "DOCS_INE_FRENTE": {"status": "ok"},
+        "DOCS_INE_ATRAS": {"status": "ok"},
+    }
+    assert (
+        evaluate_condition(
+            c,
+            fields,
+            docs_per_plan={
+                "Sin Comprobantes": [
+                    "DOCS_INE_FRENTE",
+                    "DOCS_INE_ATRAS",
+                    "DOCS_DOMICILIO",
+                ],
+            },
+        )
+        is False
+    )
+
+
 # ---------- evaluate_rule_group ----------
 
 

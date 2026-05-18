@@ -20,15 +20,23 @@ paths to be updated together.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+from atendia.contracts.conversation_state import ConversationState
 from atendia.contracts.pipeline_definition import (
     DocumentSpec,
     PipelineDefinition,
 )
+from atendia.contracts.extracted_fields import ExtractedFields
+from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
+from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule, pick_flow_mode
 from atendia.state_machine.motos_credito_pipeline import (
+    MOTOS_CREDITO_AGENT_FLOW_MODE_RULES,
     MOTOS_CREDITO_DOCS_PER_PLAN,
     MOTOS_CREDITO_DOCUMENTS_CATALOG,
     MOTOS_CREDITO_PIPELINE_DEFINITION,
 )
+from atendia.state_machine.orchestrator import process_turn
 from atendia.tools.lookup_requirements import (
     RequirementsResult,
     lookup_requirements,
@@ -49,6 +57,98 @@ def test_seed_validates_as_pipeline_definition():
     ]
     # Last stage is terminal so manual handoff can't bounce backwards.
     assert pipeline.stages[-1].is_terminal is True
+
+
+def test_seed_flow_mode_rules_live_in_agent_config():
+    """The moto router rules belong to Agent IA, not the pipeline JSON."""
+    assert "flow_mode_rules" not in MOTOS_CREDITO_PIPELINE_DEFINITION
+
+    pipeline = PipelineDefinition.model_validate(MOTOS_CREDITO_PIPELINE_DEFINITION)
+    assert pipeline.flow_mode_rules
+    assert isinstance(pipeline.flow_mode_rules[-1].trigger, AlwaysTrigger)
+
+    fallback_decision = pick_flow_mode(
+        rules=pipeline.flow_mode_rules,
+        extracted=ExtractedFields(),
+        nlu=NLUResult(
+            intent=Intent.GREETING,
+            sentiment=Sentiment.NEUTRAL,
+            confidence=0.95,
+        ),
+        vision=None,
+        inbound_text="hola, quiero una moto a credito",
+        pending_confirmation=None,
+    )
+    assert fallback_decision.mode.value == "SUPPORT"
+
+    agent_rules = [
+        FlowModeRule.model_validate(rule)
+        for rule in MOTOS_CREDITO_AGENT_FLOW_MODE_RULES["rules"]
+    ]
+    assert isinstance(agent_rules[-1].trigger, AlwaysTrigger)
+
+    decision = pick_flow_mode(
+        rules=agent_rules,
+        extracted=ExtractedFields(),
+        nlu=NLUResult(
+            intent=Intent.GREETING,
+            sentiment=Sentiment.NEUTRAL,
+            confidence=0.95,
+        ),
+        vision=None,
+        inbound_text="hola, quiero una moto a credito",
+        pending_confirmation=None,
+    )
+    assert decision.mode.value == "PLAN"
+
+
+def test_seed_text_fields_can_move_out_of_nuevo_lead():
+    """First-stage text must be enough for NLU + auto-enter to qualify leads."""
+    pipeline = PipelineDefinition.model_validate(MOTOS_CREDITO_PIPELINE_DEFINITION)
+    nuevo_lead = next(s for s in pipeline.stages if s.id == "nuevo_lead")
+    required_names = {f.name for f in nuevo_lead.required_fields}
+    assert "antiguedad_laboral_meses" in required_names
+
+    calificacion = next(s for s in pipeline.stages if s.id == "calificacion_inicial")
+    assert calificacion.auto_enter_rules is not None
+    fields = {c.field for c in calificacion.auto_enter_rules.conditions}
+    assert "antiguedad_laboral_meses" in fields
+    assert "cumple_antiguedad" not in fields
+
+
+def test_every_stage_can_answer_every_classifier_intent():
+    """Every stage needs at least one executable action.
+
+    The classifier can return any Intent from any stage. The action
+    resolver should prefer the intent-specific action when available,
+    but the orchestrator must still pick an allowed fallback action when
+    the stage is intentionally narrow, such as revision_humana.
+    """
+    pipeline = PipelineDefinition.model_validate(MOTOS_CREDITO_PIPELINE_DEFINITION)
+
+    for stage in pipeline.stages:
+        assert stage.actions_allowed, f"{stage.id} has no actions_allowed"
+        for intent in Intent:
+            state = ConversationState(
+                conversation_id=f"test-{stage.id}-{intent.value}",
+                tenant_id="tenant-test",
+                current_stage=stage.id,
+                extracted_data={},
+                stage_entered_at=datetime.now(timezone.utc),
+            )
+            nlu = NLUResult(
+                intent=intent,
+                sentiment=Sentiment.NEUTRAL,
+                confidence=0.95,
+            )
+
+            decision = process_turn(pipeline, state, nlu, turn_count=1)
+
+            target_stage = next(s for s in pipeline.stages if s.id == decision.next_stage)
+            assert decision.action in target_stage.actions_allowed, (
+                f"{stage.id} + {intent.value} resolved to {decision.action!r}, "
+                f"not allowed by target stage {target_stage.id}: {target_stage.actions_allowed}"
+            )
 
 
 def test_every_doc_in_docs_per_plan_appears_in_catalog():

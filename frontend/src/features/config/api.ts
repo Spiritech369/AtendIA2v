@@ -20,6 +20,51 @@ export interface TimezoneResponse {
   timezone: string;
 }
 
+export interface QosConfig {
+  enabled: boolean;
+  debug_badges_enabled: boolean;
+  fallback_on_timeout: boolean;
+  pause_bot_on_budget_exceeded: boolean;
+  response_slo_ms: number;
+  nlu_timeout_ms: number;
+  composer_timeout_ms: number;
+  kb_timeout_ms: number;
+  max_turn_cost_usd: number;
+  daily_ai_budget_usd: number;
+  max_messages_per_turn: number;
+  inbound_rate_limit_per_min: number;
+  outbound_rate_limit_per_min: number;
+  workflow_rate_limit_per_min: number;
+  dead_letter_after_attempts: number;
+}
+
+export interface QosConfigResponse {
+  qos_config: QosConfig;
+}
+
+export interface FollowupScheduleItem {
+  kind: string;
+  delay_hours: number;
+  body: string;
+}
+
+export interface FollowupsConfig {
+  enabled: boolean;
+  schedule: FollowupScheduleItem[];
+}
+
+export interface FollowupsConfigResponse {
+  followups_config: FollowupsConfig;
+  stats: Record<string, number>;
+  pending: Array<{
+    id: string;
+    kind: string;
+    run_at: string;
+    phone_e164: string;
+    customer_name: string | null;
+  }>;
+}
+
 export interface WhatsAppDetails {
   phone_number: string | null;
   business_name: string | null;
@@ -29,6 +74,18 @@ export interface WhatsAppDetails {
   webhook_path: string;
   last_webhook_at: string | null;
   circuit_breaker_open: boolean;
+}
+
+export interface WhatsAppWebhookSandboxResponse {
+  status: string;
+  channel_message_id: string;
+  conversation_id: string | null;
+  message_id: string | null;
+  trace_id: string | null;
+  started_execution_ids: string[];
+  last_webhook_at: string;
+  request_preview: Record<string, unknown>;
+  response_preview: Record<string, unknown>;
 }
 
 export interface AIProviderInfo {
@@ -115,6 +172,15 @@ export const tenantsApi = {
   getTimezone: async () => (await api.get<TimezoneResponse>("/tenants/timezone")).data,
   putTimezone: async (timezone: string) =>
     (await api.put<TimezoneResponse>("/tenants/timezone", { timezone })).data,
+  getQosConfig: async () => (await api.get<QosConfigResponse>("/tenants/qos-config")).data,
+  putQosConfig: async (qos_config: QosConfig) =>
+    (await api.put<QosConfigResponse>("/tenants/qos-config", qos_config)).data,
+  getFollowupsConfig: async () =>
+    (await api.get<FollowupsConfigResponse>("/tenants/followups-config")).data,
+  putFollowupsConfig: async (followups_config: FollowupsConfig) =>
+    (await api.put<FollowupsConfigResponse>("/tenants/followups-config", followups_config)).data,
+  cancelPendingFollowups: async () =>
+    (await api.post<{ cancelled: number }>("/tenants/followups-config/cancel-pending", {})).data,
 };
 
 export const inboxConfigApi = {
@@ -134,5 +200,8 @@ export const inboxConfigApi = {
 export const integrationsApi = {
   getWhatsAppDetails: async () =>
     (await api.get<WhatsAppDetails>("/integrations/whatsapp/details")).data,
+  testWhatsAppWebhook: async () =>
+    (await api.post<WhatsAppWebhookSandboxResponse>("/integrations/whatsapp/test-webhook", {}))
+      .data,
   getAIProvider: async () => (await api.get<AIProviderInfo>("/integrations/ai-provider")).data,
 };

@@ -55,6 +55,31 @@ async def test_message_node_enqueues_outbound(
 
 
 @pytest.mark.asyncio
+async def test_template_message_node_enqueues_outbound_text(
+    db_session,
+    seed_tenant_factory,
+    insert_workflow,
+    stub_outbound_enqueue,
+) -> None:
+    seed = await seed_tenant_factory()
+    defn = definition_for_steps(
+        "message_received",
+        [{"type": "template_message", "config": {"text": "Plan actualizado."}}],
+    )
+    _, exec_id = await insert_workflow(
+        tenant_id=seed["tenant_id"],
+        conversation_id=seed["conversation_id"],
+        definition=defn,
+    )
+
+    await execute_workflow(db_session, exec_id)
+    await db_session.commit()
+
+    assert len(stub_outbound_enqueue) == 1
+    assert stub_outbound_enqueue[0].text == "Plan actualizado."
+
+
+@pytest.mark.asyncio
 async def test_message_node_outside_24h_window_fails(
     db_session,
     seed_tenant_factory,

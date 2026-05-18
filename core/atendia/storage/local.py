@@ -13,20 +13,37 @@ from atendia.storage.base import StorageBackend
 # agree with the extension before bytes are written.
 ALLOWED_EXTENSIONS: dict[str, set[str]] = {
     ".pdf": {"application/pdf"},
-    ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-    ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    ".docx": {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+    },
+    ".xlsx": {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/octet-stream",
+    },
+    ".xls": {"application/vnd.ms-excel", "application/octet-stream"},
     ".csv": {"text/csv", "application/csv", "application/vnd.ms-excel", "text/plain"},
     ".txt": {"text/plain"},
+    ".md": {"text/markdown", "text/plain", "application/octet-stream"},
+    ".json": {"application/json", "text/json", "text/plain", "application/octet-stream"},
+    ".jsonl": {
+        "application/jsonl",
+        "application/x-ndjson",
+        "application/json",
+        "text/plain",
+        "application/octet-stream",
+    },
 }
 
 
 def _sniff_kind(data: bytes) -> str | None:
-    """Return one of {"pdf", "zip", "text"} based on the first bytes of the
+    """Return one of {"pdf", "zip", "ole", "text"} based on the first bytes of the
     payload, or ``None`` if it doesn't match any of our allowed types.
 
     PDF: ``%PDF-`` magic.
     DOCX/XLSX: zip header (``PK\\x03\\x04`` or empty-archive ``PK\\x05\\x06``
     or spanned-archive ``PK\\x07\\x08``).
+    XLS: OLE compound document header.
     TXT/CSV: must decode as UTF-8 (best-effort) without obvious binary noise.
 
     No new dependencies — just stdlib byte inspection.
@@ -35,6 +52,8 @@ def _sniff_kind(data: bytes) -> str | None:
         return "pdf"
     if data[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
         return "zip"
+    if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        return "ole"
     try:
         head = data[:2048].decode("utf-8")
     except UnicodeDecodeError:
@@ -51,6 +70,8 @@ def _expected_kind(ext: str) -> str:
         return "pdf"
     if ext in (".docx", ".xlsx"):
         return "zip"
+    if ext == ".xls":
+        return "ole"
     return "text"
 
 

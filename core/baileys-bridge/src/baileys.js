@@ -19,6 +19,25 @@ const reconnectTimers = new Map()
 // Linked Identity IDs instead of real phone numbers; we resolve them here.
 const lidCaches = new Map()
 
+// Message IDs sent through this bridge. Baileys can later surface those same
+// sends as fromMe upserts; those are delivery echoes, not operator takeovers.
+const bridgeSentMessageIds = new Map()
+
+function rememberBridgeSentMessage(tenantId, messageId) {
+  if (!messageId) return
+  let ids = bridgeSentMessageIds.get(tenantId)
+  if (!ids) {
+    ids = new Set()
+    bridgeSentMessageIds.set(tenantId, ids)
+  }
+  ids.add(messageId)
+  setTimeout(() => ids.delete(messageId), 10 * 60 * 1000).unref?.()
+}
+
+function wasSentByBridge(tenantId, messageId) {
+  return !!messageId && bridgeSentMessageIds.get(tenantId)?.has(messageId)
+}
+
 function getLidCache(tenantId) {
   let cache = lidCaches.get(tenantId)
   if (!cache) {
@@ -48,10 +67,37 @@ function loadLidMappingsFromDisk(authDir, cache, logger) {
   } catch { /* authDir may not exist yet */ }
 }
 
-function resolveLid(fromJid, cache) {
-  if (!fromJid.includes('@lid')) return fromJid.split('@')[0]?.replace(/\D/g, '')
-  const lid = fromJid.split(':')[0]?.replace(/\D/g, '')
-  return cache.get(lid) || lid
+function digitsFromJid(jid) {
+  if (!jid || typeof jid !== 'string') return null
+  const user = jid.split('@')[0]?.split(':')[0]?.replace(/\D/g, '')
+  return user || null
+}
+
+function isPhoneJid(jid) {
+  return typeof jid === 'string' && jid.includes('@s.whatsapp.net')
+}
+
+function isLidJid(jid) {
+  return typeof jid === 'string' && jid.includes('@lid')
+}
+
+export function resolvePeerPhoneFromKey(key = {}, cache = new Map()) {
+  const remoteJid = key.remoteJid || ''
+
+  if (!isLidJid(remoteJid)) return digitsFromJid(remoteJid)
+
+  const pnCandidates = [
+    key.remoteJidAlt,
+    key.senderPn,
+    key.participantPn,
+    key.participantAlt,
+  ]
+  for (const candidate of pnCandidates) {
+    if (isPhoneJid(candidate)) return digitsFromJid(candidate)
+  }
+
+  const lid = digitsFromJid(remoteJid)
+  return lid ? cache.get(lid) || null : null
 }
 
 // Extract a human-readable text out of any of the message variants WhatsApp
@@ -82,6 +128,61 @@ function extractMessageText(m) {
   if (m.viewOnceMessage?.message) return extractMessageText(m.viewOnceMessage.message)
   if (m.viewOnceMessageV2?.message) return extractMessageText(m.viewOnceMessageV2.message)
   return null
+}
+
+function mediaNodeFromMessage(m, normalizeMessageContent = null) {
+  if (normalizeMessageContent) {
+    try {
+      const normalized = normalizeMessageContent(m)
+      if (normalized && normalized !== m) {
+        return mediaNodeFromMessage(normalized, null)
+      }
+    } catch {
+      // Fall through to the manual unwrap below.
+    }
+  }
+  if (!m) return null
+  if (m.imageMessage) return { type: 'image', node: m.imageMessage }
+  if (m.videoMessage) return { type: 'video', node: m.videoMessage }
+  if (m.documentMessage) return { type: 'document', node: m.documentMessage }
+  if (m.audioMessage) return { type: 'audio', node: m.audioMessage }
+  if (m.ephemeralMessage?.message) return mediaNodeFromMessage(m.ephemeralMessage.message)
+  if (m.viewOnceMessage?.message) return mediaNodeFromMessage(m.viewOnceMessage.message)
+  if (m.viewOnceMessageV2?.message) return mediaNodeFromMessage(m.viewOnceMessageV2.message)
+  if (m.viewOnceMessageV2Extension?.message) {
+    return mediaNodeFromMessage(m.viewOnceMessageV2Extension.message)
+  }
+  if (m.documentWithCaptionMessage?.message) {
+    return mediaNodeFromMessage(m.documentWithCaptionMessage.message)
+  }
+  return null
+}
+
+async function extractMessageMedia(msg, downloadMediaMessage, normalizeMessageContent, logger, tenantId) {
+  const media = mediaNodeFromMessage(msg.message, normalizeMessageContent)
+  if (!media) return null
+  try {
+    const buffer = await downloadMediaMessage(
+      msg,
+      'buffer',
+      {},
+      { logger },
+    )
+    if (!buffer || buffer.length === 0) return null
+    return {
+      type: media.type,
+      mime_type: media.node.mimetype || 'application/octet-stream',
+      caption: media.node.caption || null,
+      filename: media.node.fileName || null,
+      data_base64: Buffer.from(buffer).toString('base64'),
+    }
+  } catch (err) {
+    logger.warn(
+      { err, tenantId, messageId: msg.key?.id, mediaType: media.type },
+      'failed to download media',
+    )
+    return null
+  }
 }
 
 function clearReconnect(tenantId) {
@@ -129,6 +230,8 @@ export async function startSession(tenantId, logger) {
     DisconnectReason,
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
+    downloadMediaMessage,
+    normalizeMessageContent,
   } = baileys
 
   const baileysLogger = pino({ level: 'silent' })
@@ -235,14 +338,34 @@ export async function startSession(tenantId, logger) {
 
       const fromJid = msg.key.remoteJid || ''
       if (fromJid.includes('@g.us') || fromJid.includes('@broadcast')) continue
-      // LID-aware peer resolution: WhatsApp sometimes addresses by
-      // Linked Identity instead of phone — resolveLid falls back to the
-      // raw digits when no mapping is cached.
-      const peerPhone = resolveLid(fromJid, lidCache)
-      if (!peerPhone || peerPhone.length < 8) continue
+      // Only forward when we can map a LID peer to the real phone number.
+      const peerPhone = resolvePeerPhoneFromKey(msg.key, lidCache)
+      if (!peerPhone || peerPhone.length < 8) {
+        logger.warn(
+          { tenantId, remoteJid: fromJid, messageId: msg.key?.id },
+          'skipping message with unresolved LID peer',
+        )
+        continue
+      }
 
       const ts = msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : Date.now()
       const isOutbound = !!msg.key?.fromMe
+      const media = isOutbound
+        ? null
+        : await extractMessageMedia(
+            msg,
+            downloadMediaMessage,
+            normalizeMessageContent,
+            baileysLogger,
+            tenantId,
+          )
+      if (isOutbound && wasSentByBridge(tenantId, msg.key?.id)) {
+        logger.debug(
+          { tenantId, peerPhone, type, messageId: msg.key?.id },
+          'skipping bridge-originated outbound echo',
+        )
+        continue
+      }
 
       // For `append` events, only forward fresh fromMe messages.
       // Customer-side `append` is always history (their inbound came in
@@ -261,9 +384,25 @@ export async function startSession(tenantId, logger) {
       // Visible breadcrumb on every routed message so we can confirm the
       // sidecar is actually capturing fromMe events when debugging.
       logger.info(
-        { tenantId, peerPhone, isOutbound, type, messageId: msg.key?.id },
+        {
+          tenantId,
+          peerPhone,
+          isOutbound,
+          type,
+          messageId: msg.key?.id,
+          messageKeys: Object.keys(msg.message || {}),
+          hasMedia: !!media,
+          mediaType: media?.type || null,
+          mediaMimeType: media?.mime_type || null,
+        },
         isOutbound ? 'forwarding outbound echo' : 'forwarding inbound',
       )
+      if (!isOutbound && text === '[imagen]' && !media) {
+        logger.warn(
+          { tenantId, peerPhone, messageId: msg.key?.id, messageKeys: Object.keys(msg.message || {}) },
+          'image placeholder without downloadable media',
+        )
+      }
 
       try {
         if (isOutbound) {
@@ -281,6 +420,7 @@ export async function startSession(tenantId, logger) {
             text,
             ts,
             message_id: msg.key.id || null,
+            media,
           })
         }
       } catch (err) {
@@ -347,6 +487,7 @@ export async function sendText(tenantId, toPhone, text, logger) {
   }
 
   const result = await sock.sendMessage(jid, { text })
+  rememberBridgeSentMessage(tenantId, result?.key?.id)
   return {
     message_id: result?.key?.id || null,
     sent_at: new Date().toISOString(),

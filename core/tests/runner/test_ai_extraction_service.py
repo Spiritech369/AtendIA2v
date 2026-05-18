@@ -108,6 +108,61 @@ def _read_suggestions(customer_id: str) -> list[dict]:
     return asyncio.run(_do())
 
 
+def _create_field_definition(
+    tenant_id: str,
+    key: str,
+    label: str,
+    *,
+    field_type: str = "text",
+    field_options: dict | None = None,
+) -> str:
+    async def _do() -> str:
+        engine = create_async_engine(get_settings().database_url)
+        field_id = str(uuid4())
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO customer_field_definitions "
+                    "(id, tenant_id, key, label, field_type, field_options) "
+                    "VALUES (:id, :t, :k, :l, :ft, CAST(:fo AS jsonb))"
+                ),
+                {
+                    "id": field_id,
+                    "t": tenant_id,
+                    "k": key,
+                    "l": label,
+                    "ft": field_type,
+                    "fo": json.dumps(field_options or {}),
+                },
+            )
+        await engine.dispose()
+        return field_id
+
+    return asyncio.run(_do())
+
+
+def _read_field_values(customer_id: str) -> dict[str, str]:
+    async def _do() -> dict[str, str]:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT d.key, v.value "
+                        "FROM customer_field_values v "
+                        "JOIN customer_field_definitions d ON d.id = v.field_definition_id "
+                        "WHERE v.customer_id = :c "
+                        "ORDER BY d.key"
+                    ),
+                    {"c": customer_id},
+                )
+            ).fetchall()
+        await engine.dispose()
+        return {str(r._mapping["key"]): r._mapping["value"] for r in rows}
+
+    return asyncio.run(_do())
+
+
 @pytest.fixture
 def fresh_seed() -> Iterator[tuple[str, str, str]]:
     tid, cid, conv = _seed_tenant_customer()
@@ -217,6 +272,29 @@ def test_noop_when_value_already_matches(seed_with_attrs):
     asyncio.run(_run(tid, cid, conv, entities))
     assert _read_attrs(cid)["marca"] == "Honda"
     assert _read_suggestions(cid) == []
+
+
+def test_checkbox_custom_field_numeric_antiguedad_is_canonicalized(fresh_seed):
+    tid, cid, conv = fresh_seed
+    _create_field_definition(
+        tid,
+        "antiguedad",
+        "Antiguedad",
+        field_type="checkbox",
+        field_options={
+            "instructions": "Si tiene menos de 6 meses es no, si tiene 6 o mas meses trabajando, es si."
+        },
+    )
+    entities = {
+        "antiguedad": ExtractedField(value=15, confidence=0.99, source_turn=1),
+    }
+
+    applied = asyncio.run(_run(tid, cid, conv, entities))
+
+    attrs = _read_attrs(cid)
+    assert attrs["antiguedad"] is True
+    assert _read_field_values(cid)["antiguedad"] == "true"
+    assert applied[0].new_value is True
 
 
 def test_ignores_unknown_entities(fresh_seed):

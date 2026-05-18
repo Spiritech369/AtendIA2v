@@ -12,19 +12,22 @@ that can later be backed by the richer KB tables and workers.
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, demo_tenant
 from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
+from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantCatalogItem, TenantFAQ
 from atendia.db.session import get_db_session
 
@@ -42,6 +45,16 @@ def _empty_health() -> HealthResponse:
         metrics=[],
         updated_at=NOW,
     )
+
+
+async def _use_seeded_knowledge_demo(
+    session: AsyncSession, tenant_id: UUID, is_demo: bool
+) -> bool:
+    if not is_demo:
+        return False
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    config = tenant.config if tenant is not None and isinstance(tenant.config, dict) else {}
+    return config.get("knowledge_demo_seed_enabled", True) is not False
 
 
 Status = Literal["good", "warning", "critical"]
@@ -806,8 +819,10 @@ AUDIT_LOGS = [
 async def get_health(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> HealthResponse:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return _empty_health()
     return HEALTH
 
@@ -816,8 +831,10 @@ async def get_health(
 async def get_health_history(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> list[HealthHistoryPoint]:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return []
     return [
         HealthHistoryPoint(
@@ -869,8 +886,10 @@ async def get_health_history(
 async def get_risks(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> RiskResponse:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return RiskResponse(items=[], updated_at=NOW)
     return RiskResponse(items=RISKS, updated_at=NOW)
 
@@ -878,6 +897,168 @@ async def get_risks(
 @router.post("/risks/{risk_id}/resolve")
 async def resolve_risk(risk_id: str, _user: AuthenticatedUser) -> dict[str, str]:
     return {"id": risk_id, "status": "resolved"}
+
+
+def _kb_days_since(value: object) -> int:
+    if not isinstance(value, datetime):
+        return 0
+    dt_value = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return max(0, (NOW - dt_value).days)
+
+
+def _kb_freshness_label(days: int) -> str:
+    if days <= 7:
+        return "Buena"
+    if days <= 21:
+        return "Media"
+    return "Critica"
+
+
+def _kb_last_used_label(value: object) -> str:
+    days = _kb_days_since(value)
+    if days == 0:
+        return "Hoy"
+    if days == 1:
+        return "Ayer"
+    return f"Hace {days} dias"
+
+
+def _kb_status_label(value: object) -> str:
+    status = str(value or "published").lower()
+    if status == "published":
+        return "Publicado"
+    if status == "draft":
+        return "Borrador"
+    if status == "archived":
+        return "Archivado"
+    return status.replace("_", " ").title()
+
+
+def _kb_score(priority: object, base: float) -> float:
+    try:
+        priority_value = int(priority or 0)
+    except (TypeError, ValueError):
+        priority_value = 0
+    return min(0.99, round(base + (priority_value / 200), 2))
+
+
+async def _get_live_knowledge_items(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    q: str | None,
+    collection: str | None,
+    status: str | None,
+    risk: str | None,
+    page: int,
+    page_size: int,
+) -> KnowledgeItemsResponse:
+    faq_rows = (
+        await session.execute(
+            sql_text(
+                "SELECT id, question, status, priority, updated_at, created_at "
+                "FROM tenant_faqs WHERE tenant_id = :t "
+                "ORDER BY priority DESC, updated_at DESC LIMIT 100"
+            ),
+            {"t": str(tenant_id)},
+        )
+    ).mappings().all()
+    catalog_rows = (
+        await session.execute(
+            sql_text(
+                "SELECT id, sku, name, status, priority, updated_at, created_at "
+                "FROM tenant_catalogs WHERE tenant_id = :t AND active = true "
+                "ORDER BY priority DESC, updated_at DESC LIMIT 100"
+            ),
+            {"t": str(tenant_id)},
+        )
+    ).mappings().all()
+    doc_rows = (
+        await session.execute(
+            sql_text(
+                "SELECT id, filename, category, status, priority, updated_at, created_at "
+                "FROM knowledge_documents WHERE tenant_id = :t "
+                "ORDER BY priority DESC, updated_at DESC LIMIT 100"
+            ),
+            {"t": str(tenant_id)},
+        )
+    ).mappings().all()
+
+    items: list[KnowledgeItem] = []
+    for row in faq_rows:
+        updated_at = row.get("updated_at") or row.get("created_at")
+        days = _kb_days_since(updated_at)
+        items.append(
+            KnowledgeItem(
+                id=f"faq-{row['id']}",
+                title=row["question"],
+                source_type="FAQ",
+                collection="FAQs",
+                retrieval_score=_kb_score(row.get("priority"), 0.82),
+                status=_kb_status_label(row.get("status")),
+                freshness=_kb_freshness_label(days),
+                freshness_days=days,
+                conflicts=0,
+                last_used_at=_kb_last_used_label(updated_at),
+                risk_level="low",
+                owner="Dinamo Asesor IA",
+            )
+        )
+    for row in catalog_rows:
+        updated_at = row.get("updated_at") or row.get("created_at")
+        days = _kb_days_since(updated_at)
+        items.append(
+            KnowledgeItem(
+                id=f"catalog-{row['id']}",
+                title=f"SKU {row['sku']} - {row['name']}",
+                source_type="Catalogo",
+                collection="Motos",
+                retrieval_score=_kb_score(row.get("priority"), 0.88),
+                status=_kb_status_label(row.get("status")),
+                freshness=_kb_freshness_label(days),
+                freshness_days=days,
+                conflicts=0,
+                last_used_at=_kb_last_used_label(updated_at),
+                risk_level="low",
+                owner="Catalogo",
+            )
+        )
+    for row in doc_rows:
+        updated_at = row.get("updated_at") or row.get("created_at")
+        days = _kb_days_since(updated_at)
+        items.append(
+            KnowledgeItem(
+                id=f"doc-{row['id']}",
+                title=row["filename"],
+                source_type="Documento",
+                collection=row.get("category") or "Documentos",
+                retrieval_score=_kb_score(row.get("priority"), 0.75),
+                status=_kb_status_label(row.get("status")),
+                freshness=_kb_freshness_label(days),
+                freshness_days=days,
+                conflicts=0,
+                last_used_at=_kb_last_used_label(updated_at),
+                risk_level="low",
+                owner="Conocimiento",
+            )
+        )
+
+    if q:
+        needle = q.strip().lower()
+        items = [item for item in items if needle in item.title.lower()]
+    if collection and collection != "Todas":
+        items = [item for item in items if item.collection == collection]
+    if status and status != "Todos":
+        items = [item for item in items if item.status == status]
+    if risk and risk != "Todos":
+        items = [item for item in items if item.risk_level == risk]
+    start = (page - 1) * page_size
+    return KnowledgeItemsResponse(
+        items=items[start : start + page_size],
+        total=len(items),
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/items", response_model=KnowledgeItemsResponse)
@@ -893,6 +1074,17 @@ async def get_items(
     tenant_id=Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> KnowledgeItemsResponse:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
+        return await _get_live_knowledge_items(
+            session,
+            tenant_id=tenant_id,
+            q=q,
+            collection=collection,
+            status=status,
+            risk=risk,
+            page=page,
+            page_size=page_size,
+        )
     if not is_demo:
         # Real tenants get a unified view across FAQs + Catalog + Documents.
         # No risk/status filtering yet — those columns don't exist on the
@@ -1011,7 +1203,7 @@ async def get_unanswered_questions(
     tenant_id=Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> UnansweredQuestionsResponse:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         # Real tenants: read from kb_unanswered_questions table when it
         # exists. Empty for fresh tenants — the bot has to be running
         # and detect unanswered queries before rows appear here.
@@ -1047,8 +1239,10 @@ async def escalate_question(question_id: str, _user: AuthenticatedUser) -> dict[
 async def get_funnel_coverage(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> FunnelCoverageResponse:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return FunnelCoverageResponse(stages=[])
     return FunnelCoverageResponse(stages=FUNNEL)
 
@@ -1057,8 +1251,10 @@ async def get_funnel_coverage(
 async def get_dashboard_cards(
     _user: AuthenticatedUser,
     is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> DashboardCardsResponse:
-    if not is_demo:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return DashboardCardsResponse(items=[])
     return DashboardCardsResponse(items=CARDS)
 
@@ -1077,7 +1273,8 @@ async def simulate(
     # so the UI still shows a coherent message. The full embedding /
     # LLM-answer path lives at /knowledge/test in knowledge_routes.py;
     # this surface is the cockpit's lightweight preview.
-    if is_demo:
+    retrieved = await _search_tenant_kb(session, tenant_id, body.message)
+    if await _use_seeded_knowledge_demo(session, tenant_id, is_demo) and not retrieved:
         return DEFAULT_SIMULATION.model_copy(
             update={
                 "user_message": body.message,
@@ -1086,7 +1283,6 @@ async def simulate(
             }
         )
 
-    retrieved = await _search_tenant_kb(session, tenant_id, body.message)
     if not retrieved:
         return SimulationResponse(
             id="sim-stub",
@@ -1107,7 +1303,7 @@ async def simulate(
             source_summary="0 fuentes",
             mode="sources_only",
         )
-    summary = f"{len(retrieved)} fuente{'s' if len(retrieved) != 1 else ''} reales"
+    summary = _summarize_retrieved_sources(retrieved)
     return SimulationResponse(
         id=f"sim-{datetime.now(UTC).timestamp():.0f}",
         agent=body.agent,
@@ -1144,6 +1340,7 @@ async def _search_tenant_kb(
     signal source so we rank them top.
     """
     like = f"%{query.strip()}%"
+    term_likes = _kb_like_terms(query)
     chunks: list[RetrievedChunk] = []
 
     faq_rows = (
@@ -1180,7 +1377,19 @@ async def _search_tenant_kb(
                 select(TenantCatalogItem)
                 .where(
                     TenantCatalogItem.tenant_id == tenant_id,
-                    TenantCatalogItem.name.ilike(like),
+                    TenantCatalogItem.active.is_(True),
+                    or_(
+                        TenantCatalogItem.name.ilike(like),
+                        TenantCatalogItem.sku.ilike(like),
+                        *[
+                            TenantCatalogItem.name.ilike(term_like)
+                            for term_like in term_likes
+                        ],
+                        *[
+                            TenantCatalogItem.sku.ilike(term_like)
+                            for term_like in term_likes
+                        ],
+                    ),
                 )
                 .limit(3)
             )
@@ -1189,12 +1398,20 @@ async def _search_tenant_kb(
         .all()
     )
     for row in catalog_rows:
+        details = {
+            "sku": row.sku,
+            "name": row.name,
+            "attrs": row.attrs or {},
+            "price_cents": row.price_cents,
+            "stock_status": row.stock_status,
+            "payment_plans": row.payment_plans or [],
+        }
         chunks.append(
             RetrievedChunk(
                 id=str(row.id),
-                source_name=f"Catálogo: {row.name}",
+                source_name=f"Catalogo: {row.sku} - {row.name}",
                 page_number=0,
-                preview=row.name[:600],
+                preview=json.dumps(details, ensure_ascii=False)[:600],
                 retrieval_score=0.7,
                 freshness_status="fresh",
                 warnings=[],
@@ -1231,6 +1448,40 @@ async def _search_tenant_kb(
     return chunks
 
 
+def _kb_like_terms(query: str) -> list[str]:
+    stopwords = {
+        "con",
+        "del",
+        "esta",
+        "este",
+        "fuente",
+        "para",
+        "plan",
+        "planes",
+        "producto",
+        "prueba",
+        "que",
+        "sku",
+        "stock",
+    }
+    seen: set[str] = set()
+    terms: list[str] = []
+    for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9-]{1,}", query):
+        normalized = token.strip("-").lower()
+        if normalized in stopwords or normalized in seen:
+            continue
+        seen.add(normalized)
+        terms.append(f"%{normalized}%")
+    return terms[:8]
+
+
+def _summarize_retrieved_sources(retrieved: list[RetrievedChunk]) -> str:
+    catalog = [chunk.source_name for chunk in retrieved if chunk.source_name.startswith("Catalogo:")]
+    if catalog:
+        return ", ".join(catalog[:2])
+    return f"{len(retrieved)} fuente{'s' if len(retrieved) != 1 else ''} reales"
+
+
 @router.get("/simulate/{simulation_id}", response_model=SimulationResponse)
 async def get_simulation(simulation_id: str, _user: AuthenticatedUser) -> SimulationResponse:
     return DEFAULT_SIMULATION.model_copy(update={"id": simulation_id})
@@ -1264,7 +1515,29 @@ async def simulation_block_answer(simulation_id: str, _user: AuthenticatedUser) 
 
 
 @router.get("/chunks/{chunk_id}/impact", response_model=ChunkImpact)
-async def get_chunk_impact(chunk_id: str, _user: AuthenticatedUser) -> ChunkImpact:
+async def get_chunk_impact(
+    chunk_id: str,
+    _user: AuthenticatedUser,
+    is_demo: bool = Depends(demo_tenant),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ChunkImpact:
+    if not await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
+        return ChunkImpact(
+            chunk_id=chunk_id,
+            source_document="Sin contenido",
+            page_number=0,
+            chunk_text="Aun no hay chunks en Conocimiento.",
+            embedding_status="empty",
+            retrieval_score=0,
+            used_in_answers_week=0,
+            affected_active_conversations=0,
+            affected_funnel_stages=[],
+            risk_level="low",
+            related_conflicts=[],
+            last_edited_by="Sistema",
+            last_indexed_at="-",
+        )
     return CHUNK_IMPACT.model_copy(update={"chunk_id": chunk_id})
 
 
@@ -1300,7 +1573,7 @@ async def get_conflicts(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> ConflictsResponse:
-    if is_demo:
+    if await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return ConflictsResponse(items=CONFLICTS, total=len(CONFLICTS))
 
     # Real tenants — read kb_conflicts rows in `open` state ordered by
@@ -1351,7 +1624,7 @@ async def get_audit_logs(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AuditLogsResponse:
-    if is_demo:
+    if await _use_seeded_knowledge_demo(session, tenant_id, is_demo):
         return AuditLogsResponse(items=AUDIT_LOGS)
 
     # Real tenants — pull admin.kb.* events from the events table and

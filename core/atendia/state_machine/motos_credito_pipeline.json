@@ -6,7 +6,12 @@
       "label": "Nuevo lead",
       "color": "#6366f1",
       "timeout_hours": 24,
-      "required_fields": [],
+      "required_fields": [
+        {
+          "name": "antiguedad_laboral_meses",
+          "description": "Cuantos meses lleva en su empleo actual"
+        }
+      ],
       "actions_allowed": [
         "greet",
         "ask_field",
@@ -36,9 +41,9 @@
         "match": "all",
         "conditions": [
           {
-            "field": "cumple_antiguedad",
-            "operator": "equals",
-            "value": true
+            "field": "antiguedad_laboral_meses",
+            "operator": "greater_than",
+            "value": 5
           }
         ]
       }
@@ -164,7 +169,6 @@
   "composer": {
     "history_turns": 3
   },
-  "flow_mode_rules": [],
   "docs_per_plan": {
     "nomina_tarjeta_10": [
       "DOCS_INE_FRENTE",

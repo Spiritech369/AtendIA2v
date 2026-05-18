@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from atendia.config import get_settings
 from atendia.queue.enqueue import enqueue_outbound
-from atendia.runner.followup_scheduler import render_followup_body
+from atendia.runner.followup_scheduler import load_followup_config, render_followup_body
 
 # Server-time UTC hours where firing follow-ups is suppressed. 04-13 UTC
 # is roughly 22:00-07:00 America/Mexico_City - crude quiet window for the
@@ -40,6 +40,11 @@ _QUIET_HOURS_UTC: frozenset[int] = frozenset({4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
 # Hard cap on follow-ups dispatched per cron tick. arq + Meta both have
 # rate ceilings; trailing rows just wait one more minute.
 _RATE_CAP_PER_TICK: int = 50
+
+# If the worker was down for a while, old due rows must not be blasted to
+# customers when it comes back. A fresh follow-up can wait for the next real
+# outbound; stale rows are cancelled below.
+_MAX_OVERDUE_AGE = timedelta(minutes=20)
 
 
 def _quiet_hours_active(now: datetime) -> bool:
@@ -63,23 +68,67 @@ async def _pick_due_followups(
             text(
                 "SELECT f.id, f.conversation_id, f.tenant_id, f.kind, f.attempts "
                 "FROM followups_scheduled f "
+                "JOIN conversations c ON c.id = f.conversation_id "
                 "JOIN tenants t ON t.id = f.tenant_id "
                 "WHERE f.status = 'pending' "
                 "  AND f.cancelled_at IS NULL "
                 "  AND f.enqueued_at IS NULL "
                 "  AND f.run_at <= :now "
+                "  AND f.run_at >= :stale_cutoff "
+                "  AND c.deleted_at IS NULL "
                 "  AND t.followups_enabled = true "
+                "  AND NOT EXISTS ("
+                "    SELECT 1 FROM conversations newer "
+                "    WHERE newer.tenant_id = c.tenant_id "
+                "      AND newer.customer_id = c.customer_id "
+                "      AND newer.deleted_at IS NULL "
+                "      AND newer.id <> c.id "
+                "      AND newer.last_activity_at > c.last_activity_at"
+                "  ) "
                 "ORDER BY f.run_at "
                 "LIMIT :lim "
                 "FOR UPDATE SKIP LOCKED"
             ),
-            {"now": now, "lim": limit},
+            {"now": now, "stale_cutoff": now - _MAX_OVERDUE_AGE, "lim": limit},
         )
     ).fetchall()
     return [
         {"id": r[0], "conversation_id": r[1], "tenant_id": r[2], "kind": r[3], "attempts": r[4]}
         for r in rows
     ]
+
+
+async def _cancel_stale_or_superseded_followups(
+    session: AsyncSession,
+    *,
+    now: datetime,
+) -> int:
+    result = await session.execute(
+        text(
+            "UPDATE followups_scheduled f "
+            "SET status = 'cancelled', cancelled_at = :now, "
+            "    last_error = COALESCE(last_error, 'cancelled_stale_or_superseded') "
+            "FROM conversations c "
+            "WHERE c.id = f.conversation_id "
+            "  AND f.status = 'pending' "
+            "  AND f.cancelled_at IS NULL "
+            "  AND f.enqueued_at IS NULL "
+            "  AND ("
+            "    f.run_at < :stale_cutoff "
+            "    OR c.deleted_at IS NOT NULL "
+            "    OR EXISTS ("
+            "      SELECT 1 FROM conversations newer "
+            "      WHERE newer.tenant_id = c.tenant_id "
+            "        AND newer.customer_id = c.customer_id "
+            "        AND newer.deleted_at IS NULL "
+            "        AND newer.id <> c.id "
+            "        AND newer.last_activity_at > c.last_activity_at"
+            "    )"
+            "  )"
+        ),
+        {"now": now, "stale_cutoff": now - _MAX_OVERDUE_AGE},
+    )
+    return result.rowcount or 0
 
 
 async def _load_extracted_data(
@@ -113,6 +162,20 @@ async def _load_recipient_phone(
         )
     ).fetchone()
     return row[0] if row else None
+
+
+async def _load_followup_template(
+    session: AsyncSession,
+    *,
+    tenant_id: Any,
+    kind: str,
+) -> str | None:
+    cfg = await load_followup_config(session=session, tenant_id=tenant_id)
+    for item in cfg.get("schedule", []):
+        if isinstance(item, dict) and item.get("kind") == kind:
+            body = item.get("body")
+            return str(body) if body else None
+    return None
 
 
 async def _mark_in_flight(
@@ -218,10 +281,15 @@ async def poll_followups(ctx: dict) -> dict:
     sent = 0
     failed = 0
     skipped_no_phone = 0
+    cancelled_stale = 0
 
     try:
         async with sessionmaker() as session:
             async with session.begin():
+                cancelled_stale = await _cancel_stale_or_superseded_followups(
+                    session,
+                    now=now,
+                )
                 due = await _pick_due_followups(
                     session,
                     now=now,
@@ -264,6 +332,11 @@ async def poll_followups(ctx: dict) -> dict:
                             body = render_followup_body(
                                 kind=f["kind"],
                                 extracted_data=extracted,
+                                template=await _load_followup_template(
+                                    send_session,
+                                    tenant_id=f["tenant_id"],
+                                    kind=f["kind"],
+                                ),
                             )
                             from atendia.channels.base import OutboundMessage
 
@@ -272,6 +345,12 @@ async def poll_followups(ctx: dict) -> dict:
                                 to_phone_e164=phone,
                                 text=body,
                                 idempotency_key=f"followup-{f['id']}",
+                                metadata={
+                                    "source": "followup",
+                                    "followup_id": str(f["id"]),
+                                    "conversation_id": str(f["conversation_id"]),
+                                    "kind": f["kind"],
+                                },
                             )
                             await enqueue_outbound(arq_redis, outbound)
                             await _mark_sent(
@@ -306,4 +385,5 @@ async def poll_followups(ctx: dict) -> dict:
         "sent": sent,
         "failed": failed,
         "skipped_no_phone": skipped_no_phone,
+        "cancelled_stale": cancelled_stale,
     }

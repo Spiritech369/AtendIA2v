@@ -26,7 +26,18 @@ from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.config import get_settings
+from atendia.db.models.kb_agent_permission import KbAgentPermission
+from atendia.db.models.kb_collection import KbCollection
+from atendia.db.models.kb_conflict import KbConflict
+from atendia.db.models.kb_health_snapshot import KbHealthSnapshot
+from atendia.db.models.kb_safe_answer_setting import KbSafeAnswerSetting
+from atendia.db.models.kb_source_priority_rule import KbSourcePriorityRule
+from atendia.db.models.kb_test_case import KbTestCase
+from atendia.db.models.kb_test_run import KbTestRun
+from atendia.db.models.kb_unanswered_question import KbUnansweredQuestion
+from atendia.db.models.kb_version import KbVersion
 from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
+from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantCatalogItem, TenantFAQ
 from atendia.db.session import get_db_session
 from atendia.storage import get_storage_backend
@@ -144,6 +155,11 @@ class TestResponse(BaseModel):
     # the OpenAI key isn't set or the call failed and the operator must read
     # the source cards directly; ``empty`` when no relevant sources were found.
     mode: str
+
+
+class ClearKnowledgeResponse(BaseModel):
+    deleted: dict[str, int]
+    demo_seed_disabled: bool
 
 
 def _normalize_tags(tags: list[str]) -> list[str]:
@@ -713,6 +729,71 @@ async def delete_document(
         return
 
 
+@router.delete("/all", response_model=ClearKnowledgeResponse)
+async def clear_all_knowledge(
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> ClearKnowledgeResponse:
+    docs = (
+        (
+            await session.execute(
+                select(KnowledgeDocument.id, KnowledgeDocument.storage_path).where(
+                    KnowledgeDocument.tenant_id == tenant_id
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    deleted: dict[str, int] = {}
+
+    async def delete_rows(model: type, label: str) -> None:
+        result = await session.execute(delete(model).where(model.tenant_id == tenant_id))
+        deleted[label] = int(result.rowcount or 0)
+
+    await delete_rows(KbTestRun, "test_runs")
+    await delete_rows(KbTestCase, "test_cases")
+    await delete_rows(KbConflict, "conflicts")
+    await delete_rows(KbUnansweredQuestion, "unanswered_questions")
+    await delete_rows(KbHealthSnapshot, "health_snapshots")
+    await delete_rows(KbAgentPermission, "agent_permissions")
+    await delete_rows(KbSourcePriorityRule, "source_priority_rules")
+    await delete_rows(KbSafeAnswerSetting, "safe_answer_settings")
+    await delete_rows(KbVersion, "versions")
+    await delete_rows(KnowledgeChunk, "document_chunks")
+    await delete_rows(KnowledgeDocument, "documents")
+    await delete_rows(TenantFAQ, "faqs")
+    await delete_rows(TenantCatalogItem, "catalog_items")
+    await delete_rows(KbCollection, "collections")
+
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one_or_none()
+    if tenant is not None:
+        config = dict(tenant.config or {})
+        config["knowledge_demo_seed_enabled"] = False
+        tenant.config = config
+
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="kb.cleared",
+        payload={"deleted": deleted, "demo_seed_disabled": True},
+    )
+    await session.commit()
+
+    storage = get_storage_backend()
+    for doc in docs:
+        try:
+            await storage.delete(str(tenant_id), doc["storage_path"])
+        except Exception:
+            continue
+
+    return ClearKnowledgeResponse(deleted=deleted, demo_seed_disabled=True)
+
+
 @router.post("/test", response_model=TestResponse)
 async def test_knowledge(
     body: TestQuery,
@@ -734,6 +815,15 @@ async def test_knowledge(
     await _check_test_rate_limit(tenant_id)
     query = body.query.strip()
     sources: list[SourceItem] = []
+    seen_sources: set[tuple[str, UUID]] = set()
+
+    def add_source(source: SourceItem) -> None:
+        key = (source.type, source.id)
+        if key in seen_sources:
+            return
+        seen_sources.add(key)
+        sources.append(source)
+
     embedding = await _maybe_embed(query)
     if embedding is not None:
         faq_rows = (
@@ -745,7 +835,7 @@ async def test_knowledge(
             )
         ).all()
         for row, score in faq_rows:
-            sources.append(
+            add_source(
                 SourceItem(
                     type="faq",
                     id=row.id,
@@ -753,6 +843,58 @@ async def test_knowledge(
                     score=float(score or 0),
                 )
             )
+        catalog_rows = (
+            await session.execute(
+                select(
+                    TenantCatalogItem,
+                    TenantCatalogItem.embedding.cosine_distance(embedding).label("score"),
+                )
+                .where(
+                    TenantCatalogItem.tenant_id == tenant_id,
+                    TenantCatalogItem.active.is_(True),
+                    TenantCatalogItem.embedding.is_not(None),
+                )
+                .order_by("score")
+                .limit(3)
+            )
+        ).all()
+        for row, score in catalog_rows:
+            add_source(
+                SourceItem(
+                    type="catalog",
+                    id=row.id,
+                    text=f"{row.name}\n{json.dumps(row.attrs or {})}"[:600],
+                    score=float(score or 0),
+                )
+            )
+
+    like = f"%{query}%"
+    catalog_rows = (
+        (
+            await session.execute(
+                select(TenantCatalogItem)
+                .where(
+                    TenantCatalogItem.tenant_id == tenant_id,
+                    TenantCatalogItem.active.is_(True),
+                    or_(TenantCatalogItem.name.ilike(like), TenantCatalogItem.sku.ilike(like)),
+                )
+                .limit(5)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in catalog_rows:
+        add_source(
+            SourceItem(
+                type="catalog",
+                id=row.id,
+                text=f"{row.name}\n{json.dumps(row.attrs or {})}"[:600],
+                score=0,
+            )
+        )
+
+    if embedding is not None:
         chunk_rows = (
             await session.execute(
                 select(
@@ -765,11 +907,11 @@ async def test_knowledge(
             )
         ).all()
         for row, score in chunk_rows:
-            sources.append(
+            add_source(
                 SourceItem(type="document", id=row.id, text=row.text[:600], score=float(score or 0))
             )
+
     if not sources:
-        like = f"%{query}%"
         faq_rows = (
             (
                 await session.execute(
@@ -785,31 +927,9 @@ async def test_knowledge(
             .all()
         )
         for row in faq_rows:
-            sources.append(
+            add_source(
                 SourceItem(
                     type="faq", id=row.id, text=f"{row.question}\n{row.answer}"[:600], score=0
-                )
-            )
-        catalog_rows = (
-            (
-                await session.execute(
-                    select(TenantCatalogItem)
-                    .where(
-                        TenantCatalogItem.tenant_id == tenant_id, TenantCatalogItem.name.ilike(like)
-                    )
-                    .limit(5)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for row in catalog_rows:
-            sources.append(
-                SourceItem(
-                    type="catalog",
-                    id=row.id,
-                    text=f"{row.name}\n{json.dumps(row.attrs or {})}"[:600],
-                    score=0,
                 )
             )
 

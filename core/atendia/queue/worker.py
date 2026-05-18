@@ -21,6 +21,7 @@ from atendia.queue.circuit_breaker import (
     record_success,
 )
 from atendia.queue.force_summary_job import force_summary
+from atendia.queue.inbound_burst import process_inbound_burst
 from atendia.queue.index_document_job import index_document
 from atendia.queue.outbox import get_or_stage_outbound
 from atendia.queue.workflow_jobs import execute_workflow_step, poll_workflow_triggers
@@ -137,7 +138,13 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
             outbox.last_error = None
             await session.commit()
 
-            if use_baileys:
+            if msg.metadata.get("sandbox") is True:
+                receipt = DeliveryReceipt(
+                    message_id=message_id,
+                    channel_message_id=f"wamid.sandbox.out.{message_id}",
+                    status="sent",
+                )
+            elif use_baileys:
                 receipt = await _send_via_baileys(msg.tenant_id, msg, message_id)
             else:
                 cfg = await load_meta_config(session, UUID(msg.tenant_id))
@@ -218,19 +225,33 @@ async def _persist_outbound(session, msg: OutboundMessage, message_id: str, rece
             {"t": msg.tenant_id, "p": msg.to_phone_e164},
         )
     ).scalar()
+    conv_id = None
+    requested_conversation_id = msg.metadata.get("conversation_id")
+    if requested_conversation_id:
+        conv_id = (
+            await session.execute(
+                text(
+                    "SELECT id FROM conversations "
+                    "WHERE id = :cid AND tenant_id = :t AND customer_id = :c "
+                    "AND deleted_at IS NULL"
+                ),
+                {"cid": requested_conversation_id, "t": msg.tenant_id, "c": cust_id},
+            )
+        ).scalar()
     # Exclude soft-deleted conversations so a send dispatched after the
     # operator deleted the chat opens a fresh one instead of attaching
     # to the hidden tombstone.
-    conv_id = (
-        await session.execute(
-            text(
-                "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
-                "AND deleted_at IS NULL "
-                "ORDER BY last_activity_at DESC LIMIT 1"
-            ),
-            {"t": msg.tenant_id, "c": cust_id},
-        )
-    ).scalar()
+    if conv_id is None:
+        conv_id = (
+            await session.execute(
+                text(
+                    "SELECT id FROM conversations WHERE tenant_id = :t AND customer_id = :c "
+                    "AND deleted_at IS NULL "
+                    "ORDER BY last_activity_at DESC LIMIT 1"
+                ),
+                {"t": msg.tenant_id, "c": cust_id},
+            )
+        ).scalar()
     if conv_id is None:
         from atendia.state_machine.pipeline_loader import resolve_initial_stage
 
@@ -333,7 +354,13 @@ class WorkerSettings:
     from atendia.queue.appointment_reminder_worker import poll_appointment_reminders
     from atendia.queue.followup_worker import poll_followups
 
-    functions: ClassVar = [send_outbound, dispatch_outbox, index_document, force_summary]
+    functions: ClassVar = [
+        send_outbound,
+        dispatch_outbox,
+        index_document,
+        force_summary,
+        process_inbound_burst,
+    ]
     cron_jobs: ClassVar = [
         # Phase 3d — fires once a minute. unique=True prevents two ticks
         # from overlapping if a single poll takes >60s under load.

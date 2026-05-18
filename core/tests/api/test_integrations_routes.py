@@ -67,6 +67,25 @@ def _clear_redis(tenant_id: str, key: str) -> None:
     asyncio.run(_do())
 
 
+def _count_sandbox_message(tenant_id: str, channel_message_id: str) -> int:
+    async def _do() -> int:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            count = (
+                await conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM messages "
+                        "WHERE tenant_id = :tenant_id AND channel_message_id = :channel_message_id"
+                    ),
+                    {"tenant_id": tenant_id, "channel_message_id": channel_message_id},
+                )
+            ).scalar_one()
+        await engine.dispose()
+        return int(count)
+
+    return asyncio.run(_do())
+
+
 def test_whatsapp_details_basic_shape(client_tenant_admin):
     _set_meta_config(
         client_tenant_admin.tenant_id,
@@ -141,6 +160,36 @@ def test_ai_provider_info_reflects_settings(client_tenant_admin):
     assert body["has_openai_key"] is bool(settings.openai_api_key)
 
 
+def test_whatsapp_test_webhook_creates_auditable_sandbox_message(client_tenant_admin):
+    _set_meta_config(
+        client_tenant_admin.tenant_id,
+        {"phone_number_id": "PHID-SANDBOX", "verify_token": "sandbox-token"},
+    )
+
+    resp = client_tenant_admin.post(
+        "/api/v1/integrations/whatsapp/test-webhook",
+        json={
+            "from_phone": "+5215500100999",
+            "text": "Hola, quiero probar una Dinamo U5 por credito.",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["channel_message_id"].startswith("wamid.sandbox.")
+    assert body["conversation_id"]
+    assert body["message_id"]
+    assert body["last_webhook_at"]
+    assert body["request_preview"]["phone_number_id"] == "PHID-SANDBOX"
+    assert body["response_preview"]["received"] == 1
+    assert _count_sandbox_message(client_tenant_admin.tenant_id, body["channel_message_id"]) == 1
+
+
 def test_endpoints_require_auth(client):
     assert client.get("/api/v1/integrations/whatsapp/details").status_code in (401, 403)
     assert client.get("/api/v1/integrations/ai-provider").status_code in (401, 403)
+    assert client.post("/api/v1/integrations/whatsapp/test-webhook", json={}).status_code in (
+        401,
+        403,
+    )

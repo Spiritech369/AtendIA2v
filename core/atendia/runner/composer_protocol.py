@@ -7,7 +7,7 @@ Three implementations live in this package:
 Both return (ComposerOutput, UsageMetadata | None). Mocks/canned return None usage.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -30,7 +30,26 @@ class ComposerInput(BaseModel):
 
     # Phase 3c.2 — mode-based dispatch:
     flow_mode: FlowMode = FlowMode.SUPPORT
+    # Multi-tenant generalization: per-tenant guidance for the current
+    # flow_mode, sourced from PipelineDefinition.mode_prompts by the
+    # runner. When None, build_composer_prompt falls back to a generic
+    # default (NOT the moto playbook). Lets each tenant author its own
+    # vertical's script instead of inheriting hardcoded moto-credit text.
+    mode_guidance: str | None = None
+    # Operator-authored "Prompt maestro" + guardrails, sourced from the
+    # agent row by the runner. Rendered as a HIGH-PRIORITY instruction
+    # section above mode_guidance (not a passive brand_facts bullet).
+    agent_system_prompt: str | None = None
+    # Operator "reglas inviolables". Rendered ABOVE agent prompt and mode
+    # guidance and labeled non-overridable, so tenant-authored text can
+    # never soften a hard business/safety rule.
+    guardrails: list[str] = Field(default_factory=list)
     brand_facts: dict = Field(default_factory=dict)
+    # Tenant-authored customer fields from Configuracion -> Datos cliente.
+    # The runner populates this with the field definitions, current values,
+    # missing flags, and any field_options instructions/options. Composer
+    # uses it to ask for configured fields instead of hardcoded names.
+    customer_field_context: dict[str, Any] = Field(default_factory=dict)
     vision_result: VisionResult | None = None
     # turn_number: 1-indexed in production callers, but the legacy E2E
     # fixture runner passes 0-indexed enumerate() values; allow either.

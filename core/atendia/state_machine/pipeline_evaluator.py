@@ -32,6 +32,7 @@ Design choices baked in here:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -48,6 +49,7 @@ from atendia.contracts.pipeline_definition import (
 )
 from atendia.db.models.conversation import Conversation, ConversationStateRow
 from atendia.db.models.customer import Customer
+from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 
 # Hard cap for one evaluator call. The current implementation only moves
 # one stage per call, so this is informational; left here for the day we
@@ -112,6 +114,113 @@ def resolve_field_path(fields: dict[str, Any], path: str) -> Any:
     return current
 
 
+def _string_value(value: Any) -> str | None:
+    if isinstance(value, dict) and "value" in value:
+        value = value["value"]
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
+
+
+def _normalize_plan_key(value: Any) -> str:
+    text_value = _string_value(value)
+    if not text_value:
+        return ""
+    normalized = text_value.casefold()
+    normalized = (
+        normalized.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ü", "u")
+        .replace("ñ", "n")
+    )
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
+    return normalized.strip("_")
+
+
+def _resolve_docs_plan_key(
+    fields: dict[str, Any],
+    *,
+    condition_field: str,
+    docs_per_plan: dict[str, list],
+    docs_plan_field: str | None = None,
+) -> str | None:
+    """Find the docs_per_plan key for the current customer state.
+
+    Tenants can choose whether requirements are keyed by plan id,
+    percentage, income type, or a custom field. The explicit rule field
+    remains first for backwards compatibility; docs_plan_field and common
+    legacy fields are fallbacks so old pipelines keep moving while the
+    operator cleans up config in Expediente.
+    """
+    if not docs_per_plan:
+        return None
+
+    candidate_fields: list[str] = [condition_field]
+    if docs_plan_field:
+        candidate_fields.append(docs_plan_field)
+    candidate_fields.extend(["plan_credito", "credito_plan", "tipo_credito"])
+
+    candidates: list[str] = []
+    seen_fields: set[str] = set()
+    for field in candidate_fields:
+        if not field or field in seen_fields:
+            continue
+        seen_fields.add(field)
+        value = _string_value(resolve_field_path(fields, field))
+        if value and value not in candidates:
+            candidates.append(value)
+
+    if not candidates:
+        return None
+
+    for value in candidates:
+        if value in docs_per_plan:
+            return value
+
+    normalized_keys = {_normalize_plan_key(key): key for key in docs_per_plan}
+    for value in candidates:
+        normalized = _normalize_plan_key(value)
+        if normalized and normalized in normalized_keys:
+            return str(normalized_keys[normalized])
+
+    scored: list[tuple[int, str]] = []
+    candidate_norms = [_normalize_plan_key(v) for v in candidates if _normalize_plan_key(v)]
+    candidate_tokens = set()
+    candidate_digits = set()
+    for norm in candidate_norms:
+        candidate_tokens.update(t for t in norm.split("_") if t and not t.isdigit())
+        candidate_digits.update(re.findall(r"\d+", norm))
+
+    for raw_key in docs_per_plan:
+        key = str(raw_key)
+        key_norm = _normalize_plan_key(key)
+        if not key_norm:
+            continue
+        score = 0
+        for norm in candidate_norms:
+            if norm == key_norm:
+                return key
+            if norm in key_norm or key_norm in norm:
+                score += 10
+        key_tokens = set(t for t in key_norm.split("_") if t and not t.isdigit())
+        key_digits = set(re.findall(r"\d+", key_norm))
+        score += len(candidate_tokens & key_tokens) * 2
+        score += len(candidate_digits & key_digits) * 5
+        if score:
+            scored.append((score, key))
+
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    if len(scored) > 1 and scored[0][0] == scored[1][0]:
+        return None
+    return scored[0][1]
+
+
 def _is_field_payload_segment(seg: str, current: dict) -> bool:
     """Heuristic: a segment is a 'real' payload key (not a metadata key)
     if it appears directly in the current dict. Used by
@@ -125,6 +234,7 @@ def evaluate_condition(
     fields: dict[str, Any],
     *,
     docs_per_plan: dict[str, list] | None = None,
+    docs_plan_field: str | None = None,
 ) -> bool:
     """Pure operator dispatch. Mirrors the FE OperatorSelector contract.
 
@@ -172,14 +282,13 @@ def evaluate_condition(
         # `resolve_field_path`).
         if not docs_per_plan:
             return False
-        # `resolve_field_path` only unwraps the canonical
-        # `{value, confidence}` extraction shape. Customer.attrs can hold
-        # the raw value or a one-key `{value: ...}` partial. Tolerate
-        # both so the operator works in production data.
-        plan = value
-        if isinstance(plan, dict) and "value" in plan:
-            plan = plan["value"]
-        if not isinstance(plan, str) or not plan:
+        plan = _resolve_docs_plan_key(
+            fields,
+            condition_field=condition.field,
+            docs_per_plan=docs_per_plan,
+            docs_plan_field=docs_plan_field,
+        )
+        if not plan:
             return False
         required = docs_per_plan.get(plan)
         if not isinstance(required, list) or not required:
@@ -201,11 +310,20 @@ def evaluate_rule_group(
     fields: dict[str, Any],
     *,
     docs_per_plan: dict[str, list] | None = None,
+    docs_plan_field: str | None = None,
 ) -> bool:
     """Run every condition under ``rules.match`` semantics."""
     if not rules.enabled or not rules.conditions:
         return False
-    results = (evaluate_condition(c, fields, docs_per_plan=docs_per_plan) for c in rules.conditions)
+    results = (
+        evaluate_condition(
+            c,
+            fields,
+            docs_per_plan=docs_per_plan,
+            docs_plan_field=docs_plan_field,
+        )
+        for c in rules.conditions
+    )
     if rules.match == "all":
         return all(results)
     return any(results)
@@ -300,6 +418,7 @@ class EvaluationResult:
 def _merge_fields(
     customer_attrs: dict[str, Any] | None,
     extracted_data: dict[str, Any] | None,
+    customer_field_values: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the flat field dict the evaluator reads.
 
@@ -312,6 +431,8 @@ def _merge_fields(
     merged: dict[str, Any] = {}
     if customer_attrs:
         merged.update(customer_attrs)
+    if customer_field_values:
+        merged.update(customer_field_values)
     if extracted_data:
         # extracted_data values are {value, confidence, source_turn}; the
         # evaluator unwraps via resolve_field_path. Merge raw so the
@@ -321,6 +442,29 @@ def _merge_fields(
         for k, v in extracted_data.items():
             merged[k] = v
     return merged
+
+
+async def _load_customer_field_values(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    customer_id: UUID,
+) -> dict[str, str | None]:
+    rows = (
+        await session.execute(
+            select(CustomerFieldDefinition.key, CustomerFieldValue.value)
+            .select_from(CustomerFieldValue)
+            .join(
+                CustomerFieldDefinition,
+                CustomerFieldDefinition.id == CustomerFieldValue.field_definition_id,
+            )
+            .where(
+                CustomerFieldValue.customer_id == customer_id,
+                CustomerFieldDefinition.tenant_id == tenant_id,
+            )
+        )
+    ).all()
+    return {str(r.key): r.value for r in rows}
 
 
 async def evaluate_pipeline_rules(
@@ -355,6 +499,15 @@ async def evaluate_pipeline_rules(
     fields = _merge_fields(
         customer.attrs if customer else None,
         state.extracted_data if state else None,
+        (
+            await _load_customer_field_values(
+                session,
+                tenant_id=conv.tenant_id,
+                customer_id=conv.customer_id,
+            )
+            if customer
+            else None
+        ),
     )
 
     # Plan-aware aggregate operators need the docs_per_plan table to
@@ -371,7 +524,12 @@ async def evaluate_pipeline_rules(
         if not stage.auto_enter_rules:
             continue
         for idx, cond in enumerate(stage.auto_enter_rules.conditions or []):
-            passed = evaluate_condition(cond, fields, docs_per_plan=docs_per_plan)
+            passed = evaluate_condition(
+                cond,
+                fields,
+                docs_per_plan=docs_per_plan,
+                docs_plan_field=pipeline.docs_plan_field,
+            )
             rules_evaluated.append(
                 {
                     "stage_id": stage.id,
@@ -386,6 +544,7 @@ async def evaluate_pipeline_rules(
             stage.auto_enter_rules,
             fields,
             docs_per_plan=docs_per_plan,
+            docs_plan_field=pipeline.docs_plan_field,
         ):
             matching.append(stage)
 

@@ -12,8 +12,21 @@ from pathlib import Path
 
 from atendia.contracts.flow_mode import FlowMode
 from atendia.contracts.tone import Tone
-from atendia.runner.composer_prompts import build_composer_prompt
+from atendia.runner.composer_prompts import MODE_PROMPTS, build_composer_prompt as _bcp
 from atendia.runner.composer_protocol import ComposerInput
+
+
+def build_composer_prompt(ci: ComposerInput) -> list[dict[str, str]]:
+    """Snapshot wrapper. Post-generalization the composer default is the
+    generic per-mode prompt; Dinamo's moto playbook now lives in tenant
+    data (PipelineDefinition.mode_prompts). Inject it as mode_guidance —
+    exactly as test_mode_snapshot does — so fixtures keep guarding the
+    real Dinamo prompt via the data path the runner actually uses."""
+    return _bcp(
+        ci.model_copy(
+            update={"mode_guidance": ci.mode_guidance or MODE_PROMPTS[ci.flow_mode]}
+        )
+    )
 
 _DINAMO_TONE = Tone(
     register="informal_mexicano",

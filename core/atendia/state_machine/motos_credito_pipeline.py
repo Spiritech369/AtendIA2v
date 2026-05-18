@@ -151,7 +151,12 @@ MOTOS_CREDITO_STAGES: list[dict] = [
         "label": "Nuevo lead",
         "color": "#6366f1",
         "timeout_hours": 24,
-        "required_fields": [],
+        "required_fields": [
+            {
+                "name": "antiguedad_laboral_meses",
+                "description": "Cuantos meses lleva en su empleo actual",
+            },
+        ],
         "actions_allowed": ["greet", "ask_field", "ask_clarification"],
         # Fase 6 — behavior_mode pins which composer prompt block runs.
         # Nuevo lead → PLAN mode so the bot's PASO 0 hook fires
@@ -177,7 +182,11 @@ MOTOS_CREDITO_STAGES: list[dict] = [
             "enabled": True,
             "match": "all",
             "conditions": [
-                {"field": "cumple_antiguedad", "operator": "equals", "value": True},
+                {
+                    "field": "antiguedad_laboral_meses",
+                    "operator": "greater_than",
+                    "value": 5,
+                },
             ],
         },
     },
@@ -285,13 +294,62 @@ MOTOS_CREDITO_VISION_DOC_MAPPING: dict[str, list[str]] = {
 }
 
 
+MOTOS_CREDITO_FLOW_MODE_RULES: list[dict] = [
+    {"id": "doc_attachment", "trigger": {"type": "has_attachment"}, "mode": "DOC"},
+    {
+        "id": "obstacle_kw",
+        "trigger": {
+            "type": "keyword_in_text",
+            "list": [
+                "manana",
+                "ahorita",
+                "al rato",
+                "cuando llegue",
+                "luego",
+                "luego te mando",
+                "tengo que pedirlas",
+            ],
+        },
+        "mode": "OBSTACLE",
+    },
+    {
+        "id": "retention_kw",
+        "trigger": {
+            "type": "keyword_in_text",
+            "list": ["gracias", "ok gracias", "gracias por la info"],
+        },
+        "mode": "RETENTION",
+    },
+    {
+        "id": "plan_missing_tipo",
+        "trigger": {"type": "field_missing", "field": "tipo_credito"},
+        "mode": "PLAN",
+    },
+    {
+        "id": "plan_missing_plan",
+        "trigger": {"type": "field_missing", "field": "plan_credito"},
+        "mode": "PLAN",
+    },
+    {
+        "id": "sales_plan_present",
+        "trigger": {"type": "field_present", "field": "plan_credito"},
+        "mode": "SALES",
+    },
+    {"id": "fallback_support", "trigger": {"type": "always"}, "mode": "SUPPORT"},
+]
+
+
+MOTOS_CREDITO_AGENT_FLOW_MODE_RULES: dict[str, list[dict]] = {
+    "rules": MOTOS_CREDITO_FLOW_MODE_RULES
+}
+
+
 MOTOS_CREDITO_PIPELINE_DEFINITION: dict = {
     "version": 1,
     "stages": MOTOS_CREDITO_STAGES,
     "fallback": "ask_clarification",
     "nlu": {"history_turns": 3},
     "composer": {"history_turns": 3},
-    "flow_mode_rules": [],
     "docs_per_plan": MOTOS_CREDITO_DOCS_PER_PLAN,
     "documents_catalog": MOTOS_CREDITO_DOCUMENTS_CATALOG,
     "vision_doc_mapping": MOTOS_CREDITO_VISION_DOC_MAPPING,

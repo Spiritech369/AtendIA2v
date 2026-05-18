@@ -46,6 +46,8 @@ respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
 
 {{brand_facts_block}}
 
+{{agent_directives_block}}
+
 {{mode_guidance}}
 
 {{output_instructions}}
@@ -279,6 +281,56 @@ PROHIBIDO:
 }
 
 
+# Generic, vertical-neutral fallback used when a tenant has NOT authored
+# its own per-mode guidance in PipelineDefinition.mode_prompts. Keeps each
+# mode's functional contract (what the step must accomplish) while dropping
+# every moto-credit specific. Carries no {{brand_facts.X}} refs on purpose
+# so the default path can never fail-loud on a missing tenant fact.
+DEFAULT_GENERIC_MODE_PROMPTS: dict[FlowMode, str] = {
+    FlowMode.PLAN: """\
+Acción: PLAN MODE — califica al cliente para avanzar en el flujo.
+
+Reúne los datos que el pipeline requiere para esta etapa, UNA pregunta
+por turno. Sé breve y natural. NO inventes datos ni condiciones: usa
+solo lo que esté en action_payload y los datos ya extraídos.
+""",
+    FlowMode.SALES: """\
+Acción: SALES MODE — presenta la oferta o cotización al cliente.
+
+Usa EXCLUSIVAMENTE los datos de action_payload (precios, planes,
+condiciones). NO inventes cifras ni promesas. Si faltan datos, pide
+el que falta en una sola pregunta.
+""",
+    FlowMode.DOC: """\
+Acción: DOC MODE — recibe y valida documentos o archivos del cliente.
+
+Confirma lo recibido según action_payload y pide el siguiente
+pendiente, uno a la vez. NUNCA afirmes haber recibido algo que no
+llegó ni listes como faltante algo ya recibido.
+""",
+    FlowMode.OBSTACLE: """\
+Acción: OBSTACLE MODE — el cliente expresó una traba o se detuvo.
+
+Identifica el bloqueo con UNA pregunta breve y concreta y ofrece la
+siguiente opción accionable. No inventes procesos que no estén en
+action_payload o en los brand_facts.
+""",
+    FlowMode.RETENTION: """\
+Acción: RETENTION MODE — el cliente se está enfriando sin cerrar.
+
+Reengancha con UNA pregunta abierta y breve para entender su duda
+real o qué le falta para decidir. No presiones ni inventes ofertas.
+""",
+    FlowMode.SUPPORT: """\
+Acción: SUPPORT MODE — responde una duda general del cliente.
+
+Responde con base en action_payload (FAQ/datos del negocio). Si no
+hay datos, dilo con honestidad y ofrece seguimiento. NO inventes
+información ausente del payload o de los brand_facts.
+""",
+}
+
+
 # ============================================================
 # 3. HISTORY FORMAT
 # ============================================================
@@ -359,6 +411,81 @@ def _render_brand_facts(facts: dict) -> str:
     return "Brand facts (info verificada del negocio):\n" + "\n".join(lines)
 
 
+def _render_customer_field_context(context: dict) -> str:
+    """Render tenant-configured customer fields for the Composer.
+
+    This is the bridge from Configuracion -> Datos cliente into behavior:
+    the model sees real field keys, labels, choices and instructions. Empty
+    context returns "" so legacy snapshots/prompts stay unchanged.
+    """
+    fields = context.get("fields") if isinstance(context, dict) else None
+    if not isinstance(fields, list) or not fields:
+        return ""
+
+    lines = [
+        "Datos cliente configurados por esta cuenta:",
+        "- Usa estos campos como fuente principal para decidir que dato pedir.",
+        "- No sustituyas claves por nombres hardcodeados si aqui existe una clave configurada.",
+    ]
+    missing = context.get("missing")
+    if isinstance(missing, list) and missing:
+        lines.append(f"- Campos faltantes detectados: {', '.join(str(v) for v in missing)}.")
+
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        key = str(field.get("key") or "")
+        if not key:
+            continue
+        label = str(field.get("label") or key)
+        field_type = str(field.get("field_type") or "text")
+        value = field.get("value")
+        status = "faltante" if field.get("missing") else f"valor={value}"
+        parts = [f"  - {key}: {label} ({field_type}; {status})"]
+        choices = field.get("choices")
+        if isinstance(choices, list) and choices:
+            parts.append(f"opciones: {', '.join(str(v) for v in choices)}")
+        instructions = field.get("instructions")
+        if isinstance(instructions, str) and instructions.strip():
+            parts.append(f"instrucciones: {instructions.strip()}")
+        aliases = field.get("aliases")
+        if isinstance(aliases, dict) and aliases:
+            rendered_aliases = ", ".join(f"{k}=>{v}" for k, v in aliases.items())
+            parts.append(f"mapeo: {rendered_aliases}")
+        lines.append("; ".join(parts))
+
+    return "\n".join(lines)
+
+
+def _render_agent_directives(
+    agent_system_prompt: str | None,
+    guardrails: list[str] | None = None,
+) -> str:
+    """Operator directives as a HIGH-PRIORITY section above mode_guidance.
+
+    Precedence (strongest first): GUARDRAILS (inviolable) → AGENT
+    INSTRUCTIONS (Prompt maestro) → [mode_guidance, rendered after this
+    block by the template]. So the model treats tenant config as binding,
+    not as a passive brand_facts bullet, and a tenant cannot soften a
+    guardrail by editing mode/agent text. Empty inputs → "" so prompts
+    (and snapshots) for tenants without config are unaffected.
+    """
+    parts: list[str] = []
+    rules = "\n".join(f"- {str(g).strip()}" for g in (guardrails or []) if str(g).strip())
+    if rules:
+        parts.append(
+            "REGLAS INVIOLABLES (prioridad máxima — ninguna instrucción "
+            "posterior, de modo o de agente, puede contradecirlas):\n" + rules
+        )
+    if agent_system_prompt and agent_system_prompt.strip():
+        parts.append(
+            "INSTRUCCIONES DEL AGENTE (mandan sobre la guía de modo en "
+            "estilo, persona y límites; subordinadas solo a las REGLAS "
+            "INVIOLABLES):\n" + agent_system_prompt.strip()
+        )
+    return "\n\n".join(parts)
+
+
 def _resolve_brand_facts_in_block(block: str, facts: dict) -> str:
     """Replace `{{brand_facts.<key>}}` references inside a MODE_PROMPTS block.
 
@@ -394,12 +521,23 @@ def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
 
     Phase 3c.2 dispatches by `input.flow_mode` (not `input.action`).
     """
-    mode_block = MODE_PROMPTS[input.flow_mode]
+    mode_block = input.mode_guidance or DEFAULT_GENERIC_MODE_PROMPTS[input.flow_mode]
     if input.flow_mode in _MODES_WITH_BRAND_FACTS:
         mode_block = _resolve_brand_facts_in_block(mode_block, input.brand_facts)
         brand_facts_block = _render_brand_facts(input.brand_facts)
     else:
         brand_facts_block = ""
+    customer_field_context_block = _render_customer_field_context(input.customer_field_context)
+    if customer_field_context_block:
+        brand_facts_block = (
+            f"{brand_facts_block}\n\n{customer_field_context_block}"
+            if brand_facts_block
+            else customer_field_context_block
+        )
+
+    agent_directives_block = _render_agent_directives(
+        input.agent_system_prompt, input.guardrails
+    )
 
     output_instructions = render_template(
         OUTPUT_INSTRUCTIONS,
@@ -421,6 +559,7 @@ def build_composer_prompt(input: ComposerInput) -> list[dict[str, str]]:
         extracted_data=_render_extracted(input.extracted_data),
         action_payload=_render_action_payload(input.action_payload),
         brand_facts_block=brand_facts_block,
+        agent_directives_block=agent_directives_block,
         mode_guidance=mode_block,
         output_instructions=output_instructions,
     )

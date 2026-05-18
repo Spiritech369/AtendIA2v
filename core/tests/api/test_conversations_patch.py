@@ -182,6 +182,25 @@ def _set_stage_entered_at(conv_id: str, value: datetime) -> None:
     asyncio.run(_do())
 
 
+def _event_rows(conv_id: str) -> list[tuple[str, dict]]:
+    async def _do() -> list[tuple[str, dict]]:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT type, payload FROM events "
+                        "WHERE conversation_id = :c ORDER BY occurred_at, id"
+                    ),
+                    {"c": conv_id},
+                )
+            ).fetchall()
+        await engine.dispose()
+        return [(r[0], r[1]) for r in rows]
+
+    return asyncio.run(_do())
+
+
 class TestPatchConversation:
     def test_update_stage(self, client_operator):
         _ensure_pipeline(client_operator.tenant_id, ["greeting", "quoted"])
@@ -222,6 +241,33 @@ class TestPatchConversation:
         assert resp.status_code == 200
         after = _stage_entered_at(conv_id)
         assert after != before
+
+    def test_update_stage_emits_stage_workflow_events(self, client_operator):
+        _ensure_pipeline(client_operator.tenant_id, ["greeting", "quoted"])
+        conv_id = _seed_conversation(client_operator.tenant_id)
+        resp = client_operator.patch(
+            f"/api/v1/conversations/{conv_id}",
+            json={"current_stage": "quoted"},
+        )
+        assert resp.status_code == 200
+
+        rows = _event_rows(conv_id)
+        stage_events = [(typ, payload) for typ, payload in rows if typ.startswith("stage_")]
+        assert (
+            "stage_exited",
+            {"from": "greeting", "to": "quoted", "by": client_operator.user_id},
+        ) in stage_events
+        assert (
+            "stage_entered",
+            {"from": "greeting", "to": "quoted", "by": client_operator.user_id},
+        ) in stage_events
+        assert any(
+            typ == "stage_changed"
+            and payload["from"] == "greeting"
+            and payload["to"] == "quoted"
+            and payload["reason"] == "manual_stage_move"
+            for typ, payload in stage_events
+        )
 
     def test_update_tags(self, client_operator):
         conv_id = _seed_conversation(client_operator.tenant_id)

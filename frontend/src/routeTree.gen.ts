@@ -21,9 +21,13 @@ import { Route as authKnowledgeRouteImport } from './routes/(auth)/knowledge'
 import { Route as authInboxSettingsRouteImport } from './routes/(auth)/inbox-settings'
 import { Route as authHandoffsRouteImport } from './routes/(auth)/handoffs'
 import { Route as authExportsRouteImport } from './routes/(auth)/exports'
+import { Route as authExpedienteRouteImport } from './routes/(auth)/expediente'
 import { Route as authDashboardRouteImport } from './routes/(auth)/dashboard'
 import { Route as authCustomersRouteImport } from './routes/(auth)/customers'
+import { Route as authCustomerFieldsRouteImport } from './routes/(auth)/customer-fields'
+import { Route as authConversationsRouteImport } from './routes/(auth)/conversations'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
+import { Route as authComposerRouteImport } from './routes/(auth)/composer'
 import { Route as authAuditLogRouteImport } from './routes/(auth)/audit-log'
 import { Route as authAppointmentsRouteImport } from './routes/(auth)/appointments'
 import { Route as authAnalyticsRouteImport } from './routes/(auth)/analytics'
@@ -91,6 +95,11 @@ const authExportsRoute = authExportsRouteImport.update({
   path: '/exports',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authExpedienteRoute = authExpedienteRouteImport.update({
+  id: '/expediente',
+  path: '/expediente',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authDashboardRoute = authDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -101,9 +110,24 @@ const authCustomersRoute = authCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authCustomerFieldsRoute = authCustomerFieldsRouteImport.update({
+  id: '/customer-fields',
+  path: '/customer-fields',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authConversationsRoute = authConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authConfigRoute = authConfigRouteImport.update({
   id: '/config',
   path: '/config',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authComposerRoute = authComposerRouteImport.update({
+  id: '/composer',
+  path: '/composer',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authAuditLogRoute = authAuditLogRouteImport.update({
@@ -133,9 +157,9 @@ const authCustomersCustomerIdRoute = authCustomersCustomerIdRouteImport.update({
 } as any)
 const authConversationsConversationIdRoute =
   authConversationsConversationIdRouteImport.update({
-    id: '/conversations/$conversationId',
-    path: '/conversations/$conversationId',
-    getParentRoute: () => authRouteRoute,
+    id: '/$conversationId',
+    path: '/$conversationId',
+    getParentRoute: () => authConversationsRoute,
   } as any)
 const authAgentsAgentIdRoute = authAgentsAgentIdRouteImport.update({
   id: '/$agentId',
@@ -149,9 +173,13 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
+  '/composer': typeof authComposerRoute
   '/config': typeof authConfigRoute
+  '/conversations': typeof authConversationsRouteWithChildren
+  '/customer-fields': typeof authCustomerFieldsRoute
   '/customers': typeof authCustomersRouteWithChildren
   '/dashboard': typeof authDashboardRoute
+  '/expediente': typeof authExpedienteRoute
   '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
   '/inbox-settings': typeof authInboxSettingsRoute
@@ -172,9 +200,13 @@ export interface FileRoutesByTo {
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
+  '/composer': typeof authComposerRoute
   '/config': typeof authConfigRoute
+  '/conversations': typeof authConversationsRouteWithChildren
+  '/customer-fields': typeof authCustomerFieldsRoute
   '/customers': typeof authCustomersRouteWithChildren
   '/dashboard': typeof authDashboardRoute
+  '/expediente': typeof authExpedienteRoute
   '/exports': typeof authExportsRoute
   '/handoffs': typeof authHandoffsRoute
   '/inbox-settings': typeof authInboxSettingsRoute
@@ -197,9 +229,13 @@ export interface FileRoutesById {
   '/(auth)/analytics': typeof authAnalyticsRoute
   '/(auth)/appointments': typeof authAppointmentsRoute
   '/(auth)/audit-log': typeof authAuditLogRoute
+  '/(auth)/composer': typeof authComposerRoute
   '/(auth)/config': typeof authConfigRoute
+  '/(auth)/conversations': typeof authConversationsRouteWithChildren
+  '/(auth)/customer-fields': typeof authCustomerFieldsRoute
   '/(auth)/customers': typeof authCustomersRouteWithChildren
   '/(auth)/dashboard': typeof authDashboardRoute
+  '/(auth)/expediente': typeof authExpedienteRoute
   '/(auth)/exports': typeof authExportsRoute
   '/(auth)/handoffs': typeof authHandoffsRoute
   '/(auth)/inbox-settings': typeof authInboxSettingsRoute
@@ -222,9 +258,13 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/appointments'
     | '/audit-log'
+    | '/composer'
     | '/config'
+    | '/conversations'
+    | '/customer-fields'
     | '/customers'
     | '/dashboard'
+    | '/expediente'
     | '/exports'
     | '/handoffs'
     | '/inbox-settings'
@@ -245,9 +285,13 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/appointments'
     | '/audit-log'
+    | '/composer'
     | '/config'
+    | '/conversations'
+    | '/customer-fields'
     | '/customers'
     | '/dashboard'
+    | '/expediente'
     | '/exports'
     | '/handoffs'
     | '/inbox-settings'
@@ -269,9 +313,13 @@ export interface FileRouteTypes {
     | '/(auth)/analytics'
     | '/(auth)/appointments'
     | '/(auth)/audit-log'
+    | '/(auth)/composer'
     | '/(auth)/config'
+    | '/(auth)/conversations'
+    | '/(auth)/customer-fields'
     | '/(auth)/customers'
     | '/(auth)/dashboard'
+    | '/(auth)/expediente'
     | '/(auth)/exports'
     | '/(auth)/handoffs'
     | '/(auth)/inbox-settings'
@@ -378,6 +426,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authExportsRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/expediente': {
+      id: '/(auth)/expediente'
+      path: '/expediente'
+      fullPath: '/expediente'
+      preLoaderRoute: typeof authExpedienteRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/dashboard': {
       id: '/(auth)/dashboard'
       path: '/dashboard'
@@ -392,11 +447,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authCustomersRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/customer-fields': {
+      id: '/(auth)/customer-fields'
+      path: '/customer-fields'
+      fullPath: '/customer-fields'
+      preLoaderRoute: typeof authCustomerFieldsRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/conversations': {
+      id: '/(auth)/conversations'
+      path: '/conversations'
+      fullPath: '/conversations'
+      preLoaderRoute: typeof authConversationsRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/config': {
       id: '/(auth)/config'
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof authConfigRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/composer': {
+      id: '/(auth)/composer'
+      path: '/composer'
+      fullPath: '/composer'
+      preLoaderRoute: typeof authComposerRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/audit-log': {
@@ -436,10 +512,10 @@ declare module '@tanstack/react-router' {
     }
     '/(auth)/conversations/$conversationId': {
       id: '/(auth)/conversations/$conversationId'
-      path: '/conversations/$conversationId'
+      path: '/$conversationId'
       fullPath: '/conversations/$conversationId'
       preLoaderRoute: typeof authConversationsConversationIdRouteImport
-      parentRoute: typeof authRouteRoute
+      parentRoute: typeof authConversationsRoute
     }
     '/(auth)/agents/$agentId': {
       id: '/(auth)/agents/$agentId'
@@ -463,6 +539,17 @@ const authAgentsRouteWithChildren = authAgentsRoute._addFileChildren(
   authAgentsRouteChildren,
 )
 
+interface authConversationsRouteChildren {
+  authConversationsConversationIdRoute: typeof authConversationsConversationIdRoute
+}
+
+const authConversationsRouteChildren: authConversationsRouteChildren = {
+  authConversationsConversationIdRoute: authConversationsConversationIdRoute,
+}
+
+const authConversationsRouteWithChildren =
+  authConversationsRoute._addFileChildren(authConversationsRouteChildren)
+
 interface authCustomersRouteChildren {
   authCustomersCustomerIdRoute: typeof authCustomersCustomerIdRoute
 }
@@ -480,9 +567,13 @@ interface authRouteRouteChildren {
   authAnalyticsRoute: typeof authAnalyticsRoute
   authAppointmentsRoute: typeof authAppointmentsRoute
   authAuditLogRoute: typeof authAuditLogRoute
+  authComposerRoute: typeof authComposerRoute
   authConfigRoute: typeof authConfigRoute
+  authConversationsRoute: typeof authConversationsRouteWithChildren
+  authCustomerFieldsRoute: typeof authCustomerFieldsRoute
   authCustomersRoute: typeof authCustomersRouteWithChildren
   authDashboardRoute: typeof authDashboardRoute
+  authExpedienteRoute: typeof authExpedienteRoute
   authExportsRoute: typeof authExportsRoute
   authHandoffsRoute: typeof authHandoffsRoute
   authInboxSettingsRoute: typeof authInboxSettingsRoute
@@ -493,7 +584,6 @@ interface authRouteRouteChildren {
   authUsersRoute: typeof authUsersRoute
   authWorkflowsRoute: typeof authWorkflowsRoute
   authIndexRoute: typeof authIndexRoute
-  authConversationsConversationIdRoute: typeof authConversationsConversationIdRoute
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
@@ -501,9 +591,13 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authAnalyticsRoute: authAnalyticsRoute,
   authAppointmentsRoute: authAppointmentsRoute,
   authAuditLogRoute: authAuditLogRoute,
+  authComposerRoute: authComposerRoute,
   authConfigRoute: authConfigRoute,
+  authConversationsRoute: authConversationsRouteWithChildren,
+  authCustomerFieldsRoute: authCustomerFieldsRoute,
   authCustomersRoute: authCustomersRouteWithChildren,
   authDashboardRoute: authDashboardRoute,
+  authExpedienteRoute: authExpedienteRoute,
   authExportsRoute: authExportsRoute,
   authHandoffsRoute: authHandoffsRoute,
   authInboxSettingsRoute: authInboxSettingsRoute,
@@ -514,7 +608,6 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authUsersRoute: authUsersRoute,
   authWorkflowsRoute: authWorkflowsRoute,
   authIndexRoute: authIndexRoute,
-  authConversationsConversationIdRoute: authConversationsConversationIdRoute,
 }
 
 const authRouteRouteWithChildren = authRouteRoute._addFileChildren(

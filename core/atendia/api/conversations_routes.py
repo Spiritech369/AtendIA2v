@@ -27,6 +27,7 @@ from sqlalchemy.orm import aliased
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user
+from atendia.api.message_attachments import list_attachments_for_messages
 from atendia.channels.base import OutboundMessage
 from atendia.config import get_settings
 from atendia.db.models.conversation import Conversation, ConversationRead, ConversationStateRow
@@ -39,6 +40,7 @@ from atendia.db.session import get_db_session
 from atendia.queue.enqueue import enqueue_outbound
 from atendia.queue.outbox import stage_outbound
 from atendia.realtime.publisher import publish_event
+from atendia.runner.conversation_events import emit_stage_changed
 
 router = APIRouter()
 
@@ -140,6 +142,30 @@ class MessageItem(BaseModel):
 class MessageListResponse(BaseModel):
     items: list[MessageItem]
     next_cursor: str | None
+
+
+class ConversationAttachmentItem(BaseModel):
+    id: UUID
+    message_id: UUID
+    type: str
+    mime_type: str
+    url: str
+    caption: str | None = None
+    original_filename: str | None = None
+    file_size: int | None = None
+    status: str
+    sent_at: datetime | None = None
+    created_at: datetime
+
+
+def _message_metadata_with_attachments(metadata: dict, attachments: list[dict]) -> dict:
+    if not attachments:
+        return metadata
+    merged = dict(metadata or {})
+    merged["attachments"] = attachments
+    if "media" not in merged:
+        merged["media"] = attachments[0]
+    return merged
 
 
 # ---------- Cursor helpers ----------
@@ -371,8 +397,26 @@ async def _required_docs(
     docs_per_plan = definition.get("docs_per_plan")
     if not isinstance(docs_per_plan, dict):
         return []
-    plan_raw = extracted_data.get("plan_credito")
-    plan = plan_raw.get("value") if isinstance(plan_raw, dict) else plan_raw
+    plan_fields = [
+        definition.get("docs_plan_field"),
+        "plan_credito",
+        "credito_plan",
+        "tipo_credito",
+    ]
+    plan = None
+    for field in plan_fields:
+        if not isinstance(field, str) or not field:
+            continue
+        raw = None
+        if customer_attrs:
+            raw = resolve_field_path(customer_attrs, field)
+        if raw is None:
+            raw = resolve_field_path(extracted_data, field)
+        if isinstance(raw, dict):
+            raw = raw.get("value")
+        if raw not in (None, ""):
+            plan = raw
+            break
     required = docs_per_plan.get(str(plan)) or docs_per_plan.get("default") or []
     if not isinstance(required, list):
         return []
@@ -388,9 +432,29 @@ async def _required_docs(
             label = item.get("label") or field_name.replace("_", " ")
         else:
             continue
-        raw = extracted_data.get(field_name)
-        value = raw.get("value") if isinstance(raw, dict) else raw
-        items.append(RequiredDocInfo(field_name=field_name, label=label, present=bool(value)))
+        doc_key = field_name.split(".", 1)[0]
+        field_path = field_name if "." in field_name else f"{doc_key}.status"
+        value = None
+        if customer_attrs:
+            value = resolve_field_path(customer_attrs, field_path)
+            if value is None:
+                value = resolve_field_path(customer_attrs, doc_key)
+        if value is None:
+            value = resolve_field_path(extracted_data, field_path)
+            if value is None:
+                value = resolve_field_path(extracted_data, doc_key)
+        if isinstance(value, dict):
+            value = value.get("status") or value.get("value")
+        present = isinstance(value, str) and value.lower() == "ok"
+        if isinstance(value, bool):
+            present = value
+        items.append(
+            RequiredDocInfo(
+                field_name=field_path,
+                label=tenant_catalog.get(doc_key) or label,
+                present=present,
+            )
+        )
     return items
 
 
@@ -651,6 +715,49 @@ async def get_conversation(
     )
 
 
+@router.get("/{conversation_id}/attachments", response_model=list[ConversationAttachmentItem])
+async def list_conversation_attachments(
+    conversation_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[ConversationAttachmentItem]:
+    """Files sent by the customer in this conversation, newest first."""
+    own = (
+        await session.execute(
+            select(Conversation.id).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if own is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT a.id, a.message_id, a.type, a.mime_type,
+                       a.storage_url AS url, a.caption, a.original_filename,
+                       a.file_size, a.status, m.sent_at, a.created_at
+                FROM message_attachments a
+                JOIN messages m ON m.id = a.message_id
+                WHERE a.tenant_id = :tenant_id
+                  AND m.conversation_id = :conversation_id
+                  AND m.direction = 'inbound'
+                  AND m.deleted_at IS NULL
+                ORDER BY COALESCE(m.sent_at, a.created_at) DESC, a.created_at DESC, a.id DESC
+                LIMIT 100
+                """
+            ),
+            {"tenant_id": tenant_id, "conversation_id": conversation_id},
+        )
+    ).mappings()
+    return [ConversationAttachmentItem(**row) for row in rows]
+
+
 @router.get("/{conversation_id}/messages", response_model=MessageListResponse)
 async def list_messages(
     conversation_id: UUID,
@@ -712,6 +819,10 @@ async def list_messages(
     rows = (await session.execute(stmt)).all()
     has_more = len(rows) > limit
     page = rows[:limit]
+    attachments_by_message = await list_attachments_for_messages(
+        session,
+        message_ids=[r.id for r in page],
+    )
 
     items = [
         MessageItem(
@@ -719,7 +830,10 @@ async def list_messages(
             conversation_id=r.conversation_id,
             direction=r.direction,
             text=r.text,
-            metadata=r.metadata_json or {},
+            metadata=_message_metadata_with_attachments(
+                r.metadata_json or {},
+                attachments_by_message.get(r.id) or [],
+            ),
             created_at=r.created_at,
             sent_at=r.sent_at,
             delivery_status=r.delivery_status,
@@ -1152,6 +1266,8 @@ async def patch_conversation(
 
     values: dict = {}
     update_stage_entered_at = False
+    stage_before: str | None = None
+    stage_after: str | None = None
     fields = body.model_fields_set
 
     if "current_stage" in fields and body.current_stage is not None:
@@ -1162,6 +1278,9 @@ async def patch_conversation(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown pipeline stage")
         values["current_stage"] = body.current_stage
         update_stage_entered_at = body.current_stage != own.current_stage
+        if update_stage_entered_at:
+            stage_before = own.current_stage
+            stage_after = body.current_stage
 
     if "assigned_user_id" in fields:
         if body.assigned_user_id is not None:
@@ -1240,6 +1359,37 @@ async def patch_conversation(
             event_type=EventType.CONVERSATION_UPDATED,
             payload={"fields": list(values.keys()), "by": str(user.user_id)},
         )
+        if stage_before is not None and stage_after is not None:
+            await emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.STAGE_EXITED,
+                payload={
+                    "from": stage_before,
+                    "to": stage_after,
+                    "by": str(user.user_id),
+                },
+            )
+            await emitter.emit(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                event_type=EventType.STAGE_ENTERED,
+                payload={
+                    "from": stage_before,
+                    "to": stage_after,
+                    "by": str(user.user_id),
+                },
+            )
+            await emit_stage_changed(
+                session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                from_stage=stage_before,
+                to_stage=stage_after,
+                from_label=stage_before,
+                to_label=stage_after,
+                reason="manual_stage_move",
+            )
         if closing:
             # Separate trigger event so workflows can react to the transition
             # specifically. The payload carries the operator-supplied reason

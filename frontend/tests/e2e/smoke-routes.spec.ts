@@ -19,14 +19,15 @@
  * * Router re-entry from a clean tab (TanStack Router's
  *   `beforeLoad` guards, type-narrowed search params).
  *
- * Prerequisites: backend running on :8001 with the seed user from
- * `core/scripts/seed_zored_user.py` already inserted. See README.md
+ * Prerequisites: backend running on :8001 with the beta user from
+ * `core/scripts/prepare_beta_tenant.py` already inserted. See README.md
  * in this directory.
  */
+/// <reference types="node" />
 import { expect, test } from "@playwright/test";
 
-const SEED_EMAIL = process.env.E2E_USER_EMAIL ?? "dele.zored@hotmail.com";
-const SEED_PASSWORD = process.env.E2E_USER_PASSWORD ?? "dinamo123";
+const SEED_EMAIL = process.env.E2E_USER_EMAIL ?? "test@test.com";
+const SEED_PASSWORD = process.env.E2E_USER_PASSWORD ?? "test123";
 
 const ROUTES = [
   { path: "/conversations", label: "Conversaciones" },

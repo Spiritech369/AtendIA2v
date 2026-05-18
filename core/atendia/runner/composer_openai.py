@@ -83,6 +83,7 @@ class OpenAIComposer:
         json_schema = _composer_schema(input.max_messages)
         t0 = time.perf_counter()
 
+        last_exc: Exception | None = None
         for delay_ms in self._delays:
             if delay_ms:
                 await asyncio.sleep(delay_ms / 1000)
@@ -113,9 +114,11 @@ class OpenAIComposer:
                     fallback_used=False,
                 )
                 return output, usage
-            except _RETRIABLE:
+            except _RETRIABLE as exc:
+                last_exc = exc
                 continue
-            except _NON_RETRIABLE:
+            except _NON_RETRIABLE as exc:
+                last_exc = exc
                 break
 
         # Exhausted or non-retriable: fall back to canned, signal via fallback_used.
@@ -127,5 +130,6 @@ class OpenAIComposer:
             cost_usd=Decimal("0"),
             latency_ms=int((time.perf_counter() - t0) * 1000),
             fallback_used=True,
+            error_type=type(last_exc).__name__ if last_exc else "Unknown",
         )
         return canned_output, usage

@@ -21,12 +21,16 @@ function baseDraft(overrides: Partial<PipelineDraft> = {}): PipelineDraft {
     timeout_hours: 0,
     is_terminal: false,
     color: "#10b981",
+    actions_allowed: ["ask_field", "ask_clarification"],
   };
   return {
     stages: [stage, ...(overrides.stages ?? [])].slice(0, 1),
     docs_per_plan: {},
     documents_catalog: [],
     vision_doc_mapping: {},
+    mode_prompts: {},
+    mode_labels: {},
+    hidden_modes: [],
     extra: {},
     ...overrides,
   };
@@ -162,6 +166,45 @@ describe("parsePipeline → serialise roundtrip for new fields", () => {
     const out = serialisePipelineDraft(draft) as Record<string, unknown>;
     expect("vision_doc_mapping" in out).toBe(false);
   });
+
+  it("preserves stage actions_allowed", () => {
+    const parsed = parsePipeline({
+      stages: [
+        {
+          id: "plan_seleccionado",
+          label: "Plan seleccionado",
+          color: "#0ea5e9",
+          actions_allowed: ["ask_field", "lookup_faq"],
+        },
+      ],
+    });
+    expect(parsed.stages[0]!.actions_allowed).toEqual(["ask_field", "lookup_faq"]);
+    const stages = (serialisePipelineDraft(parsed) as { stages: Array<Record<string, unknown>> }).stages;
+    expect(stages[0]!.actions_allowed).toEqual(["ask_field", "lookup_faq"]);
+  });
+
+  it("preserves tenant-visible mode labels and hidden modes", () => {
+    const parsed = parsePipeline({
+      stages: [{ id: "stage1", label: "S", color: "#000" }],
+      mode_labels: {
+        PLAN: "Calificación de crédito",
+        SALES: "Cotización",
+        NOPE: "No debe pasar",
+      },
+      hidden_modes: ["RETENTION", "SUPPORT", "NOPE", "SUPPORT"],
+    });
+    expect(parsed.mode_labels).toEqual({
+      PLAN: "Calificación de crédito",
+      SALES: "Cotización",
+    });
+    expect(parsed.hidden_modes).toEqual(["RETENTION", "SUPPORT"]);
+    const out = serialisePipelineDraft(parsed) as Record<string, unknown>;
+    expect(out.mode_labels).toEqual({
+      PLAN: "Calificación de crédito",
+      SALES: "Cotización",
+    });
+    expect(out.hidden_modes).toEqual(["RETENTION", "SUPPORT"]);
+  });
 });
 
 describe("validate rejects misconfigurations", () => {
@@ -170,6 +213,12 @@ describe("validate rejects misconfigurations", () => {
     draft.stages[0]!.handoff_reason = "docs_complete_for_plan";
     draft.stages[0]!.pause_bot_on_enter = false;
     expect(validatePipelineDraft(draft)).toMatch(/handoff_reason solo aplica/);
+  });
+
+  it("flags stages with no allowed actions", () => {
+    const draft = baseDraft();
+    draft.stages[0]!.actions_allowed = [];
+    expect(validatePipelineDraft(draft)).toMatch(/accion permitida/);
   });
 
   it("flags vision_doc_mapping referencing a doc not in catalog", () => {

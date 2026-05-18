@@ -79,7 +79,7 @@ The board now appends a synthetic group with `is_orphan: true` and
   Picking one calls the same PATCH the regular cards use.
 
 Frontend code:
-[`PipelineKanbanPage.tsx`](frontend/src/features/pipeline/components/PipelineKanbanPage.tsx).
+[`PipelineKanbanPage.tsx`](../../frontend/src/features/pipeline/components/PipelineKanbanPage.tsx).
 
 ---
 

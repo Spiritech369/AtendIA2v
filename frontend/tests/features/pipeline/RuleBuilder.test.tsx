@@ -260,6 +260,26 @@ describe("RuleBuilder", () => {
     );
     expect(screen.getByText(/cliente potencial/i)).toBeInTheDocument();
   });
+
+  it("renders configurable customer fields in field suggestions", () => {
+    const rules: AutoEnterRulesDraft = {
+      enabled: true,
+      match: "all",
+      conditions: [{ field: "", operator: "exists" }],
+    };
+    const { container } = render(
+      <RuleBuilder
+        stageLabel="X"
+        rules={rules}
+        onChange={() => {}}
+        fieldCatalog={[
+          { id: "interes_servicio", label: "Interes de servicio", group: "Datos del cliente" },
+        ]}
+      />,
+    );
+
+    expect(container.querySelector('option[value="interes_servicio"]')).toBeInTheDocument();
+  });
 });
 
 // ── Operator switch semantics ──────────────────────────────────────────

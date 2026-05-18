@@ -55,7 +55,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { inboxConfigApi, tenantsApi } from "@/features/config/api";
-import type { ConversationListItem, MessageItem } from "@/features/conversations/api";
+import type {
+  ConversationListItem,
+  MessageItem,
+  MessageMedia,
+} from "@/features/conversations/api";
 import { conversationsApi } from "@/features/conversations/api";
 import { useConversationStream } from "@/features/conversations/hooks/useConversationStream";
 import {
@@ -65,6 +69,10 @@ import {
 } from "@/features/conversations/hooks/useConversations";
 import { useTenantStream } from "@/features/conversations/hooks/useTenantStream";
 import {
+  cleanInternalNotes,
+  shouldSkipText,
+} from "@/features/conversations/lib/cleanInternalNotes";
+import {
   DEFAULT_INBOX_CONFIG,
   type FilterChip,
   type StageRing,
@@ -73,6 +81,7 @@ import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { type AuthUser, useAuthStore } from "@/stores/auth";
 import { ContactPanel } from "./ContactPanel";
+import { MediaContent } from "./MediaContent";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 200;
@@ -1154,16 +1163,26 @@ function DeliveryTick({ status }: { status: MessageItem["delivery_status"] }) {
   }
 }
 
+function extractMedia(metadata: Record<string, unknown>): MessageMedia | null {
+  const media = metadata?.media;
+  if (!media || typeof media !== "object") return null;
+  const m = media as Record<string, unknown>;
+  if (typeof m.type !== "string" || typeof m.url !== "string") return null;
+  return m as unknown as MessageMedia;
+}
+
 function MessageBubble({ message }: { message: MessageItem }) {
   const isInbound = message.direction === "inbound";
   const isSystem = message.direction === "system";
-  const text = message.text?.trim() || "Mensaje sin texto";
+  const media = extractMedia(message.metadata);
+  const text = cleanInternalNotes(message.text);
+  const showText = text && !shouldSkipText(text, !!media);
 
   if (isSystem) {
     return (
       <div className="flex justify-center">
         <div className="max-w-[78%] rounded-md border bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-          {text}
+          {text || "Mensaje sin texto"}
         </div>
       </div>
     );
@@ -1179,7 +1198,8 @@ function MessageBubble({ message }: { message: MessageItem }) {
             : "border-primary/20 bg-primary text-primary-foreground",
         )}
       >
-        <div className="whitespace-pre-wrap leading-5">{text}</div>
+        {media && <MediaContent media={media} />}
+        {showText && <div className="whitespace-pre-wrap leading-5">{text}</div>}
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px] tabular-nums",

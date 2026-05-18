@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { tenantsApi } from "@/features/config/api";
 import {
   Table,
   TableBody,
@@ -23,6 +24,10 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
     queryKey: ["turn-traces", conversationId],
     queryFn: () => turnTracesApi.list(conversationId),
   });
+  const qosQuery = useQuery({
+    queryKey: ["tenants", "qos-config"],
+    queryFn: tenantsApi.getQosConfig,
+  });
 
   if (query.isLoading) return <Skeleton className="h-64 w-full" />;
   if (query.isError) {
@@ -36,6 +41,8 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
   }
 
   const items = query.data?.items ?? [];
+  const qos = qosQuery.data?.qos_config;
+  const showQosBadges = qos?.debug_badges_enabled !== false;
 
   return (
     <Card>
@@ -71,11 +78,24 @@ export function TurnTraceList({ conversationId }: { conversationId: string }) {
                 >
                   <TableCell className="font-mono text-xs">{t.turn_number}</TableCell>
                   <TableCell>
-                    {t.bot_paused ? (
-                      <Badge variant="secondary">paused</Badge>
-                    ) : (
-                      <FlowModeBadge mode={t.flow_mode} />
-                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {t.bot_paused ? (
+                        <Badge variant="secondary">paused</Badge>
+                      ) : (
+                        <FlowModeBadge mode={t.flow_mode} />
+                      )}
+                      {showQosBadges &&
+                        qos &&
+                        t.total_latency_ms != null &&
+                        t.total_latency_ms > qos.response_slo_ms && (
+                          <Badge variant="destructive">lento</Badge>
+                        )}
+                      {showQosBadges &&
+                        qos &&
+                        Number(t.total_cost_usd) > qos.max_turn_cost_usd && (
+                          <Badge variant="outline">costo alto</Badge>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell className="max-w-[260px] truncate text-xs text-muted-foreground">
                     {t.inbound_preview ?? <span className="italic">(sin texto)</span>}

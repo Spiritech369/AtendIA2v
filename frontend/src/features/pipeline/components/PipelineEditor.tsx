@@ -40,13 +40,14 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantsApi } from "@/features/config/api";
+import { fieldsApi } from "@/features/customers/api";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 
 import { AuditLogDrawer } from "./AuditLogDrawer";
 import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { PipelineVersionHistoryButton } from "./PipelineVersionHistoryDrawer";
-import { RuleBuilder } from "./RuleBuilder";
+import { FIELD_CATALOG, RuleBuilder, type RuleFieldOption } from "./RuleBuilder";
 import { StageDeleteDialog } from "./StageDeleteDialog";
 import { StageDependencyView } from "./StageDependencyView";
 import { UnsavedChangesGuard } from "./UnsavedChangesGuard";
@@ -107,6 +108,7 @@ export interface StageDraft {
   // matching reason string is persisted on `human_handoffs.reason`.
   pause_bot_on_enter?: boolean;
   handoff_reason?: string;
+  actions_allowed: string[];
 }
 
 // P11 — long pipelines are unwieldy to scan. The roadmap pain point is
@@ -145,6 +147,20 @@ export const HANDOFF_REASON_PRESETS: Array<{ value: string; label: string }> = [
   { value: "papeleria_completa_form_pending", label: "Falta formulario después de papelería" },
 ];
 
+export const ACTION_OPTIONS: Array<{ value: string; label: string; hint: string }> = [
+  { value: "greet", label: "Saludar", hint: "Primer contacto o reenganche suave." },
+  { value: "ask_field", label: "Pedir dato", hint: "Solicita campos faltantes del cliente." },
+  { value: "ask_clarification", label: "Aclarar", hint: "Responde cuando el mensaje no encaja." },
+  { value: "lookup_faq", label: "Usar KB", hint: "Busca politicas, requisitos o respuestas guardadas." },
+  { value: "search_catalog", label: "Buscar catalogo", hint: "Consulta productos, precios o inventario." },
+  { value: "quote", label: "Cotizar", hint: "Da precio, plan o condiciones comerciales." },
+  { value: "book_appointment", label: "Agendar", hint: "Propone o confirma una cita." },
+  { value: "close", label: "Cerrar venta", hint: "Avanza cuando el cliente acepta comprar." },
+  { value: "escalate_to_human", label: "Handoff humano", hint: "Pausa o deriva a asesor humano." },
+];
+
+const DEFAULT_ACTIONS_ALLOWED = ACTION_OPTIONS.map((action) => action.value);
+
 export interface DocumentSpecDraft {
   key: string;
   label: string;
@@ -159,6 +175,11 @@ export interface PipelineDraft {
   // editable so each business decides whether `ine` → DOCS_INE (single)
   // or DOCS_INE_FRENTE + DOCS_INE_REVERSO (split).
   vision_doc_mapping: Record<string, string[]>;
+  // Per-flow-mode composer guidance, keyed by UPPERCASE FlowMode. Empty
+  // / missing entry → composer falls back to its generic default.
+  mode_prompts: Record<string, string>;
+  mode_labels: Record<string, string>;
+  hidden_modes: string[];
   fallback?: string;
   extra: Record<string, unknown>;
 }
@@ -187,8 +208,83 @@ const VISION_CATEGORY_LABELS: Record<VisionCategoryKey, string> = {
   imss: "IMSS",
 };
 
+// The 6 composer flow modes (mirror core/atendia/contracts/flow_mode.py
+// — keys are UPPERCASE). Per-mode guidance is tenant-authored; an empty
+// box means the composer uses its generic, vertical-neutral default
+// (NOT the moto-credit playbook).
+export const FLOW_MODES = [
+  "PLAN",
+  "SALES",
+  "DOC",
+  "OBSTACLE",
+  "RETENTION",
+  "SUPPORT",
+] as const;
+export type FlowModeKey = (typeof FLOW_MODES)[number];
+
+export const FLOW_MODE_LABELS: Record<FlowModeKey, string> = {
+  PLAN: "PLAN — calificar al cliente",
+  SALES: "SALES — cotizar / ofertar",
+  DOC: "DOC — recibir y validar documentos",
+  OBSTACLE: "OBSTACLE — destrabar una objeción",
+  RETENTION: "RETENTION — reenganchar si se enfría",
+  SUPPORT: "SUPPORT — responder dudas generales",
+};
+
+export const FLOW_MODE_PURPOSES: Record<FlowModeKey, string> = {
+  PLAN: "calificar al cliente",
+  SALES: "cotizar u ofertar",
+  DOC: "recibir y validar documentos",
+  OBSTACLE: "destrabar una objecion",
+  RETENTION: "reenganchar si se enfria",
+  SUPPORT: "responder dudas generales",
+};
+
+export const FLOW_MODE_ALIAS_PLACEHOLDERS: Record<FlowModeKey, string> = {
+  PLAN: "Calificacion de credito",
+  SALES: "Cotizacion de moto",
+  DOC: "Papeleria",
+  OBSTACLE: "Objeciones",
+  RETENTION: "Seguimiento",
+  SUPPORT: "Dudas generales",
+};
+
+function modeAlias(draft: PipelineDraft, mode: FlowModeKey): string {
+  return (draft.mode_labels?.[mode] ?? "").trim();
+}
+
+export function modeDisplayLabel(draft: PipelineDraft, mode: FlowModeKey): string {
+  const alias = modeAlias(draft, mode);
+  return alias ? `${alias} (${mode})` : FLOW_MODE_LABELS[mode];
+}
+
 // Mirrors the backend regex in pipeline_definition.py — uppercase, must
 // start with DOCS_, identifier-shaped suffix.
+function buildRuleFieldCatalog(
+  fieldDefinitions: Array<{ key: string; label: string }> | undefined,
+  documentsCatalog: DocumentSpecDraft[],
+): RuleFieldOption[] {
+  const byId = new Map<string, RuleFieldOption>();
+  const add = (option: RuleFieldOption) => {
+    if (!byId.has(option.id)) byId.set(option.id, option);
+  };
+
+  for (const definition of fieldDefinitions ?? []) {
+    add({ id: definition.key, label: definition.label, group: "Datos del cliente" });
+  }
+  for (const option of FIELD_CATALOG.filter((field) => !field.id.startsWith("DOCS_"))) {
+    add(option);
+  }
+  for (const doc of documentsCatalog) {
+    add({ id: `${doc.key}.status`, label: `${doc.label} - status`, group: "Documentos" });
+  }
+  for (const option of FIELD_CATALOG.filter((field) => field.id.startsWith("DOCS_"))) {
+    add(option);
+  }
+
+  return Array.from(byId.values());
+}
+
 const DOC_KEY_RE = /^DOCS_[A-Z][A-Z0-9_]*$/;
 
 const STAGE_ID_RE = /^[a-z][a-z0-9_]{2,29}$/;
@@ -290,6 +386,9 @@ export function parsePipeline(raw: Record<string, unknown> | undefined): Pipelin
         behavior_mode: behaviorMode,
         pause_bot_on_enter: obj.pause_bot_on_enter === true,
         handoff_reason: typeof obj.handoff_reason === "string" ? obj.handoff_reason : "",
+        actions_allowed: Array.isArray(obj.actions_allowed)
+          ? obj.actions_allowed.filter((action): action is string => typeof action === "string")
+          : [...DEFAULT_ACTIONS_ALLOWED],
       },
     ];
   });
@@ -325,17 +424,53 @@ export function parsePipeline(raw: Record<string, unknown> | undefined): Pipelin
       (k): k is string => typeof k === "string" && DOC_KEY_RE.test(k),
     );
   }
+  // mode_prompts: { "PLAN": "...", ... }. Keep only known UPPERCASE
+  // modes with string bodies; ignore operator-edited noise.
+  const rawMp =
+    typeof def.mode_prompts === "object" && def.mode_prompts !== null
+      ? (def.mode_prompts as Record<string, unknown>)
+      : {};
+  const mode_prompts: Record<string, string> = {};
+  for (const [mode, txt] of Object.entries(rawMp)) {
+    if ((FLOW_MODES as readonly string[]).includes(mode) && typeof txt === "string") {
+      mode_prompts[mode] = txt;
+    }
+  }
+  const rawModeLabels =
+    typeof def.mode_labels === "object" && def.mode_labels !== null
+      ? (def.mode_labels as Record<string, unknown>)
+      : {};
+  const mode_labels: Record<string, string> = {};
+  for (const [mode, label] of Object.entries(rawModeLabels)) {
+    if ((FLOW_MODES as readonly string[]).includes(mode) && typeof label === "string") {
+      mode_labels[mode] = label;
+    }
+  }
+  const rawHiddenModes = Array.isArray(def.hidden_modes) ? def.hidden_modes : [];
+  const hiddenSet = new Set(
+    rawHiddenModes.filter(
+      (mode): mode is FlowModeKey =>
+        typeof mode === "string" && (FLOW_MODES as readonly string[]).includes(mode),
+    ),
+  );
+  const hidden_modes = FLOW_MODES.filter((mode) => hiddenSet.has(mode));
   const extra: Record<string, unknown> = { ...def };
   delete extra.stages;
   delete extra.docs_per_plan;
   delete extra.documents_catalog;
   delete extra.fallback;
   delete extra.vision_doc_mapping;
+  delete extra.mode_prompts;
+  delete extra.mode_labels;
+  delete extra.hidden_modes;
   return {
     stages,
     docs_per_plan: docs,
     documents_catalog,
     vision_doc_mapping,
+    mode_prompts,
+    mode_labels,
+    hidden_modes,
     fallback,
     extra,
   };
@@ -352,6 +487,19 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
   for (const [cat, keys] of Object.entries(draft.vision_doc_mapping ?? {})) {
     if (Array.isArray(keys) && keys.length > 0) visionMapping[cat] = keys;
   }
+  // Drop empty mode_prompts so a blank box means "use the generic
+  // default" rather than persisting an empty string.
+  const modePrompts: Record<string, string> = {};
+  for (const [m, t] of Object.entries(draft.mode_prompts ?? {})) {
+    if (typeof t === "string" && t.trim().length > 0) modePrompts[m] = t;
+  }
+  const modeLabels: Record<string, string> = {};
+  for (const mode of FLOW_MODES) {
+    const label = (draft.mode_labels?.[mode] ?? "").trim();
+    if (label.length > 0) modeLabels[mode] = label;
+  }
+  const hiddenSet = new Set(draft.hidden_modes ?? []);
+  const hiddenModes = FLOW_MODES.filter((mode) => hiddenSet.has(mode));
   return {
     ...draft.extra,
     stages: draft.stages.map((s) => {
@@ -368,6 +516,7 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
         ...(s.behavior_mode ? { behavior_mode: s.behavior_mode } : {}),
         ...(s.pause_bot_on_enter ? { pause_bot_on_enter: true } : {}),
         ...(handoffReason ? { handoff_reason: handoffReason } : {}),
+        actions_allowed: s.actions_allowed,
       };
     }),
     docs_per_plan: draft.docs_per_plan,
@@ -377,6 +526,9 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
       ...(d.hint ? { hint: d.hint } : {}),
     })),
     ...(Object.keys(visionMapping).length > 0 ? { vision_doc_mapping: visionMapping } : {}),
+    ...(Object.keys(modePrompts).length > 0 ? { mode_prompts: modePrompts } : {}),
+    ...(Object.keys(modeLabels).length > 0 ? { mode_labels: modeLabels } : {}),
+    ...(hiddenModes.length > 0 ? { hidden_modes: hiddenModes } : {}),
     ...(draft.fallback ? { fallback: draft.fallback } : {}),
   };
 }
@@ -420,6 +572,9 @@ function validate(draft: PipelineDraft): string | null {
     }
     // Fase 6 — behavior_mode is open-set on the type but pinned to the
     // 6 known modes; reject typed-in JSON drift before save.
+    if (s.actions_allowed.length === 0) {
+      return `"${s.id}": selecciona al menos una accion permitida.`;
+    }
     if (s.behavior_mode && !(BEHAVIOR_MODES as readonly string[]).includes(s.behavior_mode)) {
       return `"${s.id}": behavior_mode "${s.behavior_mode}" no es uno de ${BEHAVIOR_MODES.join(", ")}.`;
     }
@@ -475,6 +630,16 @@ function validate(draft: PipelineDraft): string | null {
       }
     }
   }
+  for (const mode of Object.keys(draft.mode_labels ?? {})) {
+    if (!(FLOW_MODES as readonly string[]).includes(mode)) {
+      return `Alias de modo "${mode}" no es válido (debe ser uno de ${FLOW_MODES.join(", ")}).`;
+    }
+  }
+  for (const mode of draft.hidden_modes ?? []) {
+    if (!(FLOW_MODES as readonly string[]).includes(mode)) {
+      return `Modo oculto "${mode}" no es válido (debe ser uno de ${FLOW_MODES.join(", ")}).`;
+    }
+  }
   return null;
 }
 
@@ -504,6 +669,10 @@ export function PipelineEditor({ onClose }: Props) {
     queryFn: tenantsApi.getPipeline,
     retry: false,
   });
+  const customerFieldDefinitions = useQuery({
+    queryKey: ["field-definitions"],
+    queryFn: fieldsApi.listDefinitions,
+  });
 
   const [draft, setDraft] = useState<PipelineDraft | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -511,6 +680,7 @@ export function PipelineEditor({ onClose }: Props) {
   const [showDocsByPlan, setShowDocsByPlan] = useState(false);
   const [showDocsCatalog, setShowDocsCatalog] = useState(true);
   const [showVisionMapping, setShowVisionMapping] = useState(false);
+  const [showModePrompts, setShowModePrompts] = useState(false);
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocHint, setNewDocHint] = useState("");
   const [newPlanName, setNewPlanName] = useState("");
@@ -532,6 +702,7 @@ export function PipelineEditor({ onClose }: Props) {
             timeout_hours: 24,
             is_terminal: false,
             color: "#6366f1",
+            actions_allowed: [...DEFAULT_ACTIONS_ALLOWED],
           },
           {
             id: "en_conversacion",
@@ -539,6 +710,7 @@ export function PipelineEditor({ onClose }: Props) {
             timeout_hours: 12,
             is_terminal: false,
             color: "#3b82f6",
+            actions_allowed: [...DEFAULT_ACTIONS_ALLOWED],
           },
           {
             id: "propuesta",
@@ -546,11 +718,15 @@ export function PipelineEditor({ onClose }: Props) {
             timeout_hours: 48,
             is_terminal: false,
             color: "#f59e0b",
+            actions_allowed: [...DEFAULT_ACTIONS_ALLOWED],
           },
         ],
         docs_per_plan: {},
         documents_catalog: [],
         vision_doc_mapping: {},
+        mode_prompts: {},
+        mode_labels: {},
+        hidden_modes: [],
         fallback: "escalate_to_human",
         extra: {},
       };
@@ -811,6 +987,7 @@ export function PipelineEditor({ onClose }: Props) {
             timeout_hours: 24,
             is_terminal: false,
             color: defaultColor(newIdx),
+            actions_allowed: [...DEFAULT_ACTIONS_ALLOWED],
           },
         ],
       };
@@ -870,6 +1047,55 @@ export function PipelineEditor({ onClose }: Props) {
   const selected = selectedIdx !== null ? (draft.stages[selectedIdx] ?? null) : null;
   const idError = selected ? validateStageId(selected.id) : null;
   const timeoutError = selected ? validateTimeout(selected.timeout_hours) : null;
+  const hiddenModeSet = new Set(draft.hidden_modes ?? []);
+  const configuredModeCount = FLOW_MODES.filter(
+    (mode) => (draft.mode_prompts?.[mode] ?? "").trim().length > 0,
+  ).length;
+  const visibleModeCount = FLOW_MODES.filter((mode) => !hiddenModeSet.has(mode)).length;
+  const behaviorModeOptions = selected
+    ? FLOW_MODES.filter((mode) => !hiddenModeSet.has(mode) || selected.behavior_mode === mode)
+    : FLOW_MODES.filter((mode) => !hiddenModeSet.has(mode));
+  const ruleFieldCatalog = buildRuleFieldCatalog(
+    customerFieldDefinitions.data,
+    draft.documents_catalog,
+  );
+
+  const updateModeLabel = (mode: FlowModeKey, value: string) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev.mode_labels };
+      if (value.trim().length > 0) next[mode] = value;
+      else delete next[mode];
+      return { ...prev, mode_labels: next };
+    });
+  };
+
+  const updateModePrompt = (mode: FlowModeKey, value: string) => {
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            mode_prompts: {
+              ...prev.mode_prompts,
+              [mode]: value,
+            },
+          }
+        : prev,
+    );
+  };
+
+  const setModeVisible = (mode: FlowModeKey, visible: boolean) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = new Set(prev.hidden_modes ?? []);
+      if (visible) next.delete(mode);
+      else next.add(mode);
+      return {
+        ...prev,
+        hidden_modes: FLOW_MODES.filter((m) => next.has(m)),
+      };
+    });
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -1006,6 +1232,125 @@ export function PipelineEditor({ onClose }: Props) {
             {globalError}
           </div>
         )}
+
+        {/* Pipeline-wide composer-mode labels and prompts. This lives above
+            stages so operators understand these are reusable internal
+            modes, while each stage can optionally pin one below. */}
+        <div className="hidden" data-section="mode_prompts">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium"
+            onClick={() => setShowModePrompts((v) => !v)}
+          >
+            {showModePrompts ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
+            Modo Composer: nombres y guiones (
+            {configuredModeCount}/6 configurados · {visibleModeCount}/6 visibles)
+          </button>
+
+          {showModePrompts && (
+            <div className="space-y-3 px-4 pb-4">
+              <div className="rounded-md border bg-muted/20 p-3 text-[10px] leading-relaxed text-muted-foreground">
+                <strong className="text-foreground">PLAN es un modo interno.</strong>{" "}
+                Puedes llamarlo como quieras para este negocio; el nombre visible ayuda al operador,
+                pero el runner conserva PLAN, SALES, DOC, OBSTACLE, RETENTION y SUPPORT. Las reglas
+                de etapa se editan en <strong>Auto-entrada</strong>, y este bloque define lo que el
+                agente dice cuando cae en cada modo.
+              </div>
+
+              {FLOW_MODES.map((mode) => {
+                const hidden = hiddenModeSet.has(mode);
+                return (
+                  <div
+                    key={mode}
+                    className={cn(
+                      "space-y-2 rounded-md border bg-muted/10 p-3",
+                      hidden && "bg-muted/5 opacity-75",
+                    )}
+                    data-mode-prompt={mode}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <code className="rounded bg-background px-1.5 py-0.5 text-[10px]">
+                            {mode}
+                          </code>
+                          <span className="text-xs font-medium">
+                            {modeDisplayLabel(draft!, mode)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Uso base: {FLOW_MODE_PURPOSES[mode]}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!hidden}
+                        onClick={() => setModeVisible(mode, hidden)}
+                        disabled={!canEdit}
+                        className={cn(
+                          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          hidden ? "bg-muted" : "bg-primary",
+                          !canEdit && "cursor-not-allowed opacity-50",
+                        )}
+                        title={hidden ? "Mostrar modo en el editor" : "Ocultar modo no usado"}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block size-4 rounded-full bg-white shadow-lg transition-transform",
+                            hidden ? "translate-x-0" : "translate-x-4",
+                          )}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-[10px]" htmlFor={`ml-${mode}`}>
+                          Nombre visible para este negocio
+                        </Label>
+                        <Input
+                          id={`ml-${mode}`}
+                          value={draft!.mode_labels?.[mode] ?? ""}
+                          onChange={(e) => updateModeLabel(mode, e.target.value)}
+                          placeholder={FLOW_MODE_ALIAS_PLACEHOLDERS[mode]}
+                          className="h-8 text-xs"
+                          disabled={!canEdit}
+                        />
+                      </div>
+
+                      {hidden ? (
+                        <div className="flex items-center rounded-md border border-dashed bg-background/40 px-3 py-2 text-[10px] text-muted-foreground">
+                          Oculto en el editor y selectores. No borra su prompt ni invalida etapas
+                          existentes que ya lo usen.
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-[10px]" htmlFor={`mp-${mode}`}>
+                            Prompt del modo
+                          </Label>
+                          <Textarea
+                            id={`mp-${mode}`}
+                            rows={4}
+                            className="text-xs"
+                            placeholder="Vacio = guion generico neutral para este modo"
+                            value={draft!.mode_prompts?.[mode] ?? ""}
+                            onChange={(e) => updateModePrompt(mode, e.target.value)}
+                            disabled={!canEdit}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Stage list section */}
         <div className="px-4 pb-2 pt-4">
@@ -1367,12 +1712,18 @@ export function PipelineEditor({ onClose }: Props) {
                   }
                 >
                   <option value="">— Usar reglas del router (default) —</option>
-                  {BEHAVIOR_MODES.map((m) => (
+                  {behaviorModeOptions.map((m) => (
                     <option key={m} value={m}>
-                      {m}
+                      {modeDisplayLabel(draft, m)}
+                      {hiddenModeSet.has(m) ? " — oculto" : ""}
                     </option>
                   ))}
                 </select>
+                <p className="text-[10px] leading-relaxed text-muted-foreground">
+                  {selected.behavior_mode
+                    ? `${selected.behavior_mode} es el modo interno; el nombre visible se edita en "Guion del agente por modo".`
+                    : "Si no fijas modo, mandan las reglas del router. Puedes renombrar y ocultar modos abajo sin cambiar el contrato interno."}
+                </p>
               </div>
 
               {/* Fase 4 — pause_bot_on_enter toggle + handoff_reason input.
@@ -1381,6 +1732,63 @@ export function PipelineEditor({ onClose }: Props) {
                   selected reason, and emits the BOT_PAUSED + HUMAN_HANDOFF
                   events. The reason input becomes editable only when the
                   toggle is on. */}
+              <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label className="text-xs">Acciones permitidas</Label>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
+                      El clasificador detecta la intencion; esta lista decide que puede ejecutar el
+                      bot dentro de esta etapa.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                    {selected.actions_allowed.length}
+                  </Badge>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {ACTION_OPTIONS.map((action) => {
+                    const checked = selected.actions_allowed.includes(action.value);
+                    return (
+                      <button
+                        key={action.value}
+                        type="button"
+                        disabled={!canEdit}
+                        aria-pressed={checked}
+                        onClick={() => {
+                          const next = checked
+                            ? selected.actions_allowed.filter((value) => value !== action.value)
+                            : [...selected.actions_allowed, action.value];
+                          updateStage(selectedIdx, { actions_allowed: next });
+                        }}
+                        className={cn(
+                          "min-h-12 rounded-md border px-2 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                          checked
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-border bg-background hover:border-primary/30",
+                        )}
+                      >
+                        <span className="flex items-center gap-1.5 text-[11px] font-medium">
+                          <span
+                            className={cn(
+                              "flex size-3.5 items-center justify-center rounded border",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input",
+                            )}
+                          >
+                            {checked && <Check className="size-2.5" />}
+                          </span>
+                          {action.label}
+                        </span>
+                        <span className="mt-0.5 block pl-5 text-[10px] leading-snug text-muted-foreground">
+                          {action.value}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex items-center gap-3" data-field="pause_bot_on_enter">
                 <button
                   type="button"
@@ -1491,6 +1899,7 @@ export function PipelineEditor({ onClose }: Props) {
                 rules={selected.auto_enter_rules}
                 onChange={(next) => updateStage(selectedIdx, { auto_enter_rules: next })}
                 disabled={!canEdit}
+                fieldCatalog={ruleFieldCatalog}
               />
             </div>
 

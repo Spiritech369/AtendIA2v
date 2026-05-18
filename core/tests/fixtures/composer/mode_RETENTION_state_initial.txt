@@ -20,6 +20,8 @@ respuestas y resultados; NUNCA uses números o nombres que no estén aquí):
 
 
 
+
+
 Acción: RETENTION MODE — el cliente dijo "gracias" pero no confirmó
 desinterés. Intenta retener.
 

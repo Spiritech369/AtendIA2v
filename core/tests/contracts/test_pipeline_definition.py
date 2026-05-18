@@ -34,6 +34,90 @@ def test_pipeline_minimal_valid():
     assert [f.name for f in p.stages[1].required_fields] == ["interes_producto", "ciudad"]
 
 
+def test_pipeline_accepts_mode_prompts():
+    p = PipelineDefinition(
+        version=1,
+        stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+        tone={},
+        fallback="escalate_to_human",
+        mode_prompts={"PLAN": "Mi guion PLAN del tenant", "SUPPORT": "Mi guion SUPPORT"},
+    )
+    assert p.mode_prompts["PLAN"] == "Mi guion PLAN del tenant"
+
+
+def test_pipeline_mode_prompts_defaults_empty():
+    p = PipelineDefinition(
+        version=1,
+        stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+        tone={},
+        fallback="escalate_to_human",
+    )
+    assert p.mode_prompts == {}
+
+
+def test_stage_missing_actions_allowed_gets_runtime_defaults():
+    p = PipelineDefinition.model_validate(
+        {
+            "version": 1,
+            "stages": [{"id": "nuevos", "behavior_mode": "PLAN"}],
+            "fallback": "ask_clarification",
+        }
+    )
+    assert "greet" in p.stages[0].actions_allowed
+    assert "ask_field" in p.stages[0].actions_allowed
+
+
+def test_stage_explicit_empty_actions_allowed_stays_empty():
+    stage = StageDefinition(id="terminal", actions_allowed=[])
+    assert stage.actions_allowed == []
+
+
+def test_pipeline_mode_prompts_rejects_unknown_mode():
+    with pytest.raises(ValidationError):
+        PipelineDefinition(
+            version=1,
+            stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+            tone={},
+            fallback="escalate_to_human",
+            mode_prompts={"not_a_real_mode": "x"},
+        )
+
+
+def test_pipeline_accepts_mode_labels_and_hidden_modes():
+    p = PipelineDefinition(
+        version=1,
+        stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+        tone={},
+        fallback="escalate_to_human",
+        mode_labels={"PLAN": "Calificación de crédito", "DOC": "Papelería"},
+        hidden_modes=["RETENTION", "SUPPORT", "SUPPORT"],
+    )
+    assert p.mode_labels["PLAN"] == "Calificación de crédito"
+    assert p.hidden_modes == ["RETENTION", "SUPPORT"]
+
+
+def test_pipeline_mode_labels_reject_unknown_mode():
+    with pytest.raises(ValidationError):
+        PipelineDefinition(
+            version=1,
+            stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+            tone={},
+            fallback="escalate_to_human",
+            mode_labels={"not_a_real_mode": "x"},
+        )
+
+
+def test_pipeline_hidden_modes_reject_unknown_mode():
+    with pytest.raises(ValidationError):
+        PipelineDefinition(
+            version=1,
+            stages=[StageDefinition(id="greeting", actions_allowed=["greet"], transitions=[])],
+            tone={},
+            fallback="escalate_to_human",
+            hidden_modes=["NOPE"],
+        )
+
+
 def test_pipeline_duplicate_stage_id_raises():
     with pytest.raises(ValidationError):
         PipelineDefinition(
@@ -73,6 +157,11 @@ def test_field_spec_from_dict():
     f = FieldSpec.model_validate({"name": "ciudad", "description": "Ciudad del cliente"})
     assert f.name == "ciudad"
     assert f.description == "Ciudad del cliente"
+
+
+def test_field_spec_accepts_uppercase_document_key():
+    f = FieldSpec.model_validate({"name": "DOCS_INE_ATRAS", "description": "INE atras"})
+    assert f.name == "DOCS_INE_ATRAS"
 
 
 def test_field_spec_rejects_invalid_name():

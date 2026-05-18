@@ -81,6 +81,42 @@ async def test_save_accepts_csv_text(backend: LocalStorageBackend) -> None:
 
 
 @pytest.mark.asyncio
+async def test_save_accepts_markdown_json_and_jsonl_text(backend: LocalStorageBackend) -> None:
+    tid = uuid4().hex
+    markdown = b"# Requisitos\n\n- INE\n- Comprobante\n"
+    json_body = b'{"plan":"nomina","plazo":24}\n'
+    jsonl_body = b'{"modelo":"R4"}\n{"modelo":"U5"}\n'
+
+    md_key = await backend.save(tid, "requisitos.md", markdown, "text/markdown")
+    json_key = await backend.save(tid, "catalogo.json", json_body, "application/json")
+    jsonl_key = await backend.save(tid, "catalogo.jsonl", jsonl_body, "application/x-ndjson")
+
+    assert (await backend.read(tid, md_key)) == markdown
+    assert (await backend.read(tid, json_key)) == json_body
+    assert (await backend.read(tid, jsonl_key)) == jsonl_body
+
+
+@pytest.mark.asyncio
+async def test_save_accepts_excel_extensions(backend: LocalStorageBackend) -> None:
+    tid = uuid4().hex
+    xlsx_key = await backend.save(
+        tid,
+        "catalogo.xlsx",
+        ZIP_HEADER,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    xls_key = await backend.save(
+        tid,
+        "catalogo.xls",
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 32,
+        "application/vnd.ms-excel",
+    )
+
+    assert xlsx_key.endswith(".xlsx")
+    assert xls_key.endswith(".xls")
+
+
+@pytest.mark.asyncio
 async def test_save_rejects_disallowed_extension(backend: LocalStorageBackend) -> None:
     with pytest.raises(HTTPException) as exc:
         await backend.save(uuid4().hex, "evil.exe", b"MZ\x90\x00", None)

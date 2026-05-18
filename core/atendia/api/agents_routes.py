@@ -651,7 +651,11 @@ def _item(row: Agent) -> AgentItem:
         return_to_flow=row.return_to_flow,
         is_default=row.is_default,
         system_prompt=row.system_prompt,
-        active_intents=row.active_intents or [],
+        # Heal-on-read: legacy/seeded rows may carry non-NLU values
+        # (e.g. flow-mode words written by prepare_beta_tenant). Drop
+        # them so the UI never loads intents it can't save back through
+        # the AgentPatch validator.
+        active_intents=[i for i in (row.active_intents or []) if i in NLU_INTENTS],
         extraction_config=row.extraction_config or {},
         auto_actions=row.auto_actions or {},
         knowledge_config=row.knowledge_config or {},

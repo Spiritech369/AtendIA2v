@@ -44,6 +44,8 @@ Brand facts (info verificada del negocio):
   - human_agent_name: Francisco
   - post_completion_form: https://forms.gle/U1MEueL63vgftiuZ8
 
+
+
 Acción: SALES MODE — cotizar al cliente con datos REALES del catálogo.
 
 action_payload contiene UNA de estas formas:

@@ -22,9 +22,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.db.models.conversation import Conversation
 from atendia.db.models.customer import Customer
 from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 from atendia.db.session import get_db_session
+from atendia.state_machine.pipeline_evaluator import evaluate_pipeline_rules
+from atendia.state_machine.pipeline_loader import PipelineNotFoundError, load_active_pipeline
 
 definitions_router = APIRouter()
 values_router = APIRouter()
@@ -39,7 +42,7 @@ FIELD_TYPES: frozenset[str] = frozenset(
         "multiselect",
     }
 )
-_FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+_FIELD_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{1,63}$")
 
 
 # ── Definitions schemas ──────────────────────────────────────────────
@@ -70,7 +73,7 @@ class FieldDefCreate(BaseModel):
     def _valid_key(cls, value: str) -> str:
         normalized = value.strip()
         if not _FIELD_KEY_RE.fullmatch(normalized):
-            raise ValueError("key must be snake_case and start with a letter")
+            raise ValueError("key must use letters, numbers, underscores, and start with a letter")
         return normalized
 
     @field_validator("field_type")
@@ -456,6 +459,30 @@ async def put_field_values(
                     field_definition_id=defn.id,
                     value=canonical,
                 )
+            )
+
+    await session.flush()
+    try:
+        pipeline = await load_active_pipeline(session, tenant_id)
+    except PipelineNotFoundError:
+        pipeline = None
+    if pipeline is not None:
+        conversation_ids = (
+            await session.execute(
+                select(Conversation.id).where(
+                    Conversation.customer_id == customer_id,
+                    Conversation.tenant_id == tenant_id,
+                    Conversation.deleted_at.is_(None),
+                    Conversation.status == "active",
+                )
+            )
+        ).scalars()
+        for conversation_id in conversation_ids:
+            await evaluate_pipeline_rules(
+                session,
+                conversation_id,
+                pipeline,
+                trigger_event="customer_field_updated",
             )
 
     await session.commit()

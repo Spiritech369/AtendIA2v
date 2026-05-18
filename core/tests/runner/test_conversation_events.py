@@ -99,9 +99,8 @@ async def test_emit_system_event_inserts_message_row(fake_session):
 
 
 @pytest.mark.asyncio
-async def test_emit_field_updated_skips_non_timeline_fields(fake_session):
-    """Only fields in _TIMELINE_WORTHY_FIELDS produce a chat bubble —
-    'city', 'marca', etc. would spam the operator's timeline."""
+async def test_emit_field_updated_emits_event_without_chat_for_non_timeline_fields(fake_session):
+    """Custom/low-signal fields wake workflows without spamming chat."""
     await emit_field_updated(
         fake_session,
         tenant_id=uuid4(),
@@ -112,7 +111,10 @@ async def test_emit_field_updated_skips_non_timeline_fields(fake_session):
         confidence=0.95,
     )
     assert fake_session.messages() == []
-    fake_session._fake_emitter.emit.assert_not_awaited()
+    fake_session._fake_emitter.emit.assert_awaited_once()
+    payload = fake_session._fake_emitter.emit.await_args.kwargs["payload"]
+    assert payload["field"] == "city"
+    assert payload["new_value"] == "Guadalajara"
 
 
 @pytest.mark.asyncio

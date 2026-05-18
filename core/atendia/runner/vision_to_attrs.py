@@ -23,12 +23,13 @@ muddle the behaviour the operator can reason about.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.contracts.pipeline_definition import PipelineDefinition
@@ -38,6 +39,7 @@ from atendia.contracts.vision_result import (
     VisionResult,
 )
 from atendia.db.models.customer import Customer
+from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 
 _log = logging.getLogger(__name__)
 
@@ -63,6 +65,84 @@ DOC_CATEGORIES: frozenset[VisionCategory] = frozenset(
 # two paths (event emission + attrs write) agree on what counts as
 # "accepted".
 ACCEPT_CONFIDENCE_FLOOR = 0.60
+
+
+def _fold_text(value: str) -> str:
+    return (
+        value.casefold()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ü", "u")
+        .replace("ñ", "n")
+    )
+
+
+def _catalog_text(doc: Any) -> str:
+    key = str(getattr(doc, "key", "") or "")
+    label = str(getattr(doc, "label", "") or "")
+    hint = str(getattr(doc, "hint", "") or "")
+    return _fold_text(f"{key} {label} {hint}")
+
+
+def _catalog_key(doc: Any) -> str | None:
+    key = getattr(doc, "key", None)
+    return key if isinstance(key, str) and key.startswith("DOCS_") else None
+
+
+def _catalog_category_match(category: VisionCategory, text: str) -> bool:
+    if category == VisionCategory.INE:
+        return "ine" in text
+    if category == VisionCategory.COMPROBANTE:
+        return "comprobante" in text or "domicilio" in text
+    if category == VisionCategory.RECIBO_NOMINA:
+        return "recibo" in text and "nomina" in text
+    if category == VisionCategory.ESTADO_CUENTA:
+        return "estado" in text and "cuenta" in text
+    if category == VisionCategory.CONSTANCIA_SAT:
+        return "constancia" in text or "sat" in text
+    if category == VisionCategory.FACTURA:
+        return "factura" in text
+    if category == VisionCategory.IMSS:
+        return "imss" in text or "pension" in text
+    return False
+
+
+def _infer_doc_keys_from_catalog(
+    *,
+    category: VisionCategory,
+    pipeline: PipelineDefinition,
+    metadata: dict[str, Any],
+    side: str | None,
+) -> list[str]:
+    matches: list[tuple[str, str]] = []
+    for doc in getattr(pipeline, "documents_catalog", []) or []:
+        key = _catalog_key(doc)
+        if not key:
+            continue
+        text = _catalog_text(doc)
+        if _catalog_category_match(category, text):
+            matches.append((key, text))
+    if not matches:
+        return []
+    if category != VisionCategory.INE or len(matches) == 1:
+        return [matches[0][0]]
+
+    front = [key for key, text in matches if re.search(r"\b(frente|front|delante)\b", text)]
+    back = [key for key, text in matches if re.search(r"\b(atras|reverso|reverse|back)\b", text)]
+    ambos_lados = bool(metadata.get("ambos_lados"))
+    if side == DocumentSide.FRONT.value:
+        return [front[0] if front else matches[0][0]]
+    if side == DocumentSide.BACK.value:
+        if back:
+            return [back[0]]
+        return [matches[1][0] if len(matches) > 1 else matches[0][0]]
+    if ambos_lados:
+        ordered = [*(front[:1] or [matches[0][0]]), *(back[:1] or [])]
+        return list(dict.fromkeys(ordered or [key for key, _ in matches]))
+    return [front[0] if front else matches[0][0]]
 
 
 @dataclass(frozen=True)
@@ -131,7 +211,12 @@ def _decide_doc_keys(
     """
     keys = pipeline.vision_doc_mapping.get(category.value) or []
     if not keys:
-        return []
+        return _infer_doc_keys_from_catalog(
+            category=category,
+            pipeline=pipeline,
+            metadata=metadata,
+            side=side,
+        )
     # Single-key mapping is the common case — comprobante, estado_cuenta,
     # etc. — no disambiguation needed.
     if len(keys) == 1:
@@ -291,5 +376,65 @@ async def apply_vision_to_attrs(
     if dirty:
         customer.attrs = next_attrs
         session.add(customer)
+        await _sync_configured_customer_field(
+            session=session,
+            customer=customer,
+            doc_keys=[write.doc_key for write in writes],
+            accepted=accepted,
+        )
 
     return writes
+
+
+async def _sync_configured_customer_field(
+    *,
+    session: AsyncSession,
+    customer: Customer,
+    doc_keys: list[str],
+    accepted: bool,
+) -> None:
+    tenant_id = getattr(customer, "tenant_id", None)
+    customer_id = getattr(customer, "id", None)
+    if tenant_id is None or customer_id is None or not doc_keys:
+        return
+    try:
+        result = await session.execute(
+            select(CustomerFieldDefinition).where(
+                CustomerFieldDefinition.tenant_id == tenant_id,
+                or_(
+                    CustomerFieldDefinition.key.in_(doc_keys),
+                    func.upper(CustomerFieldDefinition.key).in_(doc_keys),
+                ),
+            )
+        )
+    except Exception:
+        _log.exception("failed to load configured customer fields for doc sync")
+        return
+
+    if not hasattr(result, "scalars"):
+        return
+    definitions = list(result.scalars().all())
+    for definition in definitions:
+        value = "true" if accepted else "false"
+        if definition.field_type not in {"checkbox", "text", "select"}:
+            continue
+        if definition.field_type in {"text", "select"}:
+            value = "ok" if accepted else "rejected"
+        existing = (
+            await session.execute(
+                select(CustomerFieldValue).where(
+                    CustomerFieldValue.customer_id == customer_id,
+                    CustomerFieldValue.field_definition_id == definition.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            session.add(
+                CustomerFieldValue(
+                    customer_id=customer_id,
+                    field_definition_id=definition.id,
+                    value=value,
+                )
+            )
+        else:
+            existing.value = value

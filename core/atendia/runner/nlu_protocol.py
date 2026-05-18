@@ -24,6 +24,7 @@ class UsageMetadata(BaseModel):
     cost_usd: Decimal = Field(ge=0)
     latency_ms: int = Field(ge=0)
     fallback_used: bool = False
+    error_type: str | None = None
 
 
 class NLUProvider(Protocol):

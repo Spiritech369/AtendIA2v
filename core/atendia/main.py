@@ -77,6 +77,7 @@ from atendia.api.workflows_routes import (
 from atendia.api.workflows_routes import (
     router as workflows_router,
 )
+from atendia.config import get_settings
 from atendia.realtime.ws_routes import router as ws_router
 from atendia.tools import register_all_tools
 from atendia.webhooks.meta_routes import router as meta_webhook_router
@@ -171,6 +172,11 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+_UPLOAD_DIR = Path(get_settings().upload_dir)
+_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_UPLOAD_DIR)), name="uploads")
 
 
 # Phase 4 T59 — serve the built React SPA from FastAPI in production.

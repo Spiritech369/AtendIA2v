@@ -15,7 +15,10 @@ Design: `docs/plans/2026-05-13-baileys-integration-design.md`.
 from __future__ import annotations
 
 import json as _json
+import base64
+import mimetypes
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -216,6 +219,7 @@ class BaileysInboundBody(BaseModel):
     text: str
     ts: int
     message_id: str | None = None
+    media: dict | None = None
 
 
 class BaileysOutboundEchoBody(BaseModel):
@@ -228,6 +232,89 @@ class BaileysOutboundEchoBody(BaseModel):
     text: str
     ts: int
     message_id: str | None = None
+
+
+def _persist_baileys_media(body: BaileysInboundBody) -> tuple[dict | None, list]:
+    """Store a Baileys media payload locally and return UI + runner metadata.
+
+    The sidecar sends base64 bytes because WhatsApp media URLs are not
+    durable. We persist under settings.upload_dir so the dashboard can render
+    the image later, while Vision gets a data URL it can read immediately.
+    """
+    from atendia.contracts.message import Attachment as CanonicalAttachment
+
+    media = body.media if isinstance(body.media, dict) else None
+    if not media:
+        return None, []
+    data_b64 = media.get("data_base64")
+    mime_type = str(media.get("mime_type") or "application/octet-stream")
+    media_type = str(media.get("type") or "document")
+    if not isinstance(data_b64, str) or not data_b64:
+        return None, []
+    try:
+        raw = base64.b64decode(data_b64, validate=True)
+    except Exception:
+        return None, []
+
+    settings = get_settings()
+    suffix = mimetypes.guess_extension(mime_type) or ".bin"
+    safe_message_id = "".join(
+        ch for ch in str(body.message_id or datetime.now(UTC).timestamp()) if ch.isalnum() or ch in "-_"
+    )[:120]
+    rel_path = Path(str(body.tenant_id)) / f"{safe_message_id}{suffix}"
+    target = Path(settings.upload_dir) / rel_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(raw)
+
+    public_url = f"/uploads/{rel_path.as_posix()}"
+    caption = media.get("caption")
+    if caption is not None:
+        caption = str(caption)
+    metadata = {
+        "type": media_type,
+        "url": public_url,
+        "mime_type": mime_type,
+        "caption": caption,
+        "original_filename": media.get("filename"),
+        "file_size": len(raw),
+    }
+    data_url = f"data:{mime_type};base64,{data_b64}"
+    attachment = CanonicalAttachment(
+        media_id=str(body.message_id or safe_message_id),
+        mime_type=mime_type,
+        url=data_url,
+        caption=caption,
+    )
+    return metadata, [attachment]
+
+
+def _attachments_from_media_metadata(message_metadata: dict | None) -> list:
+    """Build runner attachments from persisted media metadata as a fallback."""
+    from atendia.contracts.message import Attachment as CanonicalAttachment
+
+    if not isinstance(message_metadata, dict):
+        return []
+    media = message_metadata.get("media")
+    if not isinstance(media, dict):
+        return []
+    mime_type = str(media.get("mime_type") or "")
+    public_url = str(media.get("url") or "")
+    if not mime_type.startswith("image/") or not public_url.startswith("/uploads/"):
+        return []
+
+    rel_path = Path(*public_url.removeprefix("/uploads/").split("/"))
+    target = Path(get_settings().upload_dir) / rel_path
+    if not target.exists():
+        return []
+    data_b64 = base64.b64encode(target.read_bytes()).decode("ascii")
+    return [
+        CanonicalAttachment(
+            media_id=target.stem,
+            mime_type=mime_type,
+            url=f"data:{mime_type};base64,{data_b64}",
+            caption=media.get("caption"),
+        )
+    ]
 
 
 async def _validate_internal_token(
@@ -303,6 +390,12 @@ async def baileys_inbound(
         )
 
     sent_at = datetime.fromtimestamp(body.ts / 1000, tz=UTC)
+    media_metadata, canonical_attachments = _persist_baileys_media(body)
+    message_metadata = {"channel": "baileys"}
+    if media_metadata is not None:
+        message_metadata["media"] = media_metadata
+    if not canonical_attachments:
+        canonical_attachments = _attachments_from_media_metadata(message_metadata)
     inserted = (
         await session.execute(
             text(
@@ -320,7 +413,7 @@ async def baileys_inbound(
                 "txt": body.text,
                 "cmid": body.message_id,
                 "ts": sent_at,
-                "meta": _json.dumps({"channel": "baileys"}),
+                "meta": _json.dumps(message_metadata),
             },
         )
     ).scalar_one_or_none()
@@ -330,22 +423,79 @@ async def baileys_inbound(
         await session.commit()
         return {"status": "duplicate"}
 
+    if media_metadata is not None:
+        from atendia.api.message_attachments import insert_message_attachment
+
+        await insert_message_attachment(
+            session,
+            message_id=inserted,
+            tenant_id=body.tenant_id,
+            media=media_metadata,
+        )
+
     await session.execute(
-        text("UPDATE conversations SET unread_count = unread_count + 1 WHERE id = :c"),
-        {"c": conv_id},
+        text(
+            "UPDATE conversations "
+            "SET unread_count = unread_count + 1, last_activity_at = :ts "
+            "WHERE id = :c"
+        ),
+        {"c": conv_id, "ts": sent_at},
+    )
+    await session.execute(
+        text("UPDATE customers SET last_activity_at = :ts WHERE id = :c"),
+        {"c": cust_id, "ts": sent_at},
     )
 
     started_executions = await _run_inbound_pipeline(
         session=session,
         tenant_id=body.tenant_id,
         conversation_id=conv_id,
+        message_id=inserted,
         channel_message_id=body.message_id,
         from_phone_e164=phone,
         text_body=body.text,
+        message_metadata=message_metadata,
+        attachments=canonical_attachments,
+        run_runner=False,
     )
     await session.commit()
 
-    # Dispatch workflow executions outside the request transaction.
+    # The first realtime event is emitted before the runner starts so the
+    # dashboard feels live. It can race this transaction's commit, so publish a
+    # committed copy as a refetch safety net. This is especially visible for
+    # media: without metadata, the UI can only render WhatsApp's "[imagen]"
+    # placeholder.
+    try:
+        from redis.asyncio import Redis as _Redis
+
+        from atendia.realtime.publisher import publish_event
+
+        redis = _Redis.from_url(get_settings().redis_url)
+        try:
+            await publish_event(
+                redis,
+                tenant_id=str(body.tenant_id),
+                conversation_id=str(conv_id),
+                event={
+                    "type": "message_received",
+                    "data": {
+                        "message_id": str(inserted),
+                        "channel_message_id": body.message_id,
+                        "text": body.text,
+                        "metadata": message_metadata,
+                        "conversation_id": str(conv_id),
+                        "committed": True,
+                    },
+                },
+            )
+        finally:
+            await redis.aclose()
+    except Exception:  # pragma: no cover
+        pass
+
+    # Dispatch workflow executions and the burst runner outside the request
+    # transaction. The runner job will collapse rapid inbound messages into
+    # one turn and uses a per-conversation lock.
     if started_executions:
         from arq.connections import RedisSettings, create_pool
 
@@ -359,6 +509,24 @@ async def baileys_inbound(
                 await arq_pool.aclose()
         except Exception:  # pragma: no cover
             pass
+    from arq.connections import RedisSettings, create_pool
+
+    from atendia.queue.inbound_burst import enqueue_inbound_burst
+
+    try:
+        arq_pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
+        try:
+            await enqueue_inbound_burst(
+                arq_pool,
+                tenant_id=body.tenant_id,
+                conversation_id=conv_id,
+                latest_message_id=inserted,
+                from_phone_e164=phone,
+            )
+        finally:
+            await arq_pool.aclose()
+    except Exception:  # pragma: no cover
+        pass
 
     return {
         "status": "ok",
@@ -372,9 +540,13 @@ async def _run_inbound_pipeline(
     session: AsyncSession,
     tenant_id: UUID,
     conversation_id,
+    message_id,
     channel_message_id: str | None,
     from_phone_e164: str,
     text_body: str,
+    message_metadata: dict | None = None,
+    attachments: list | None = None,
+    run_runner: bool = True,
 ) -> list:
     """Event emission + workflow evaluation + runner turn + realtime publish.
 
@@ -401,6 +573,13 @@ async def _run_inbound_pipeline(
     from atendia.workflows.engine import evaluate_event
 
     settings = get_settings()
+    from atendia.api.message_attachments import load_runner_attachments
+
+    db_attachments = await load_runner_attachments(session, message_id=message_id)
+    if db_attachments:
+        attachments = db_attachments
+    if not attachments:
+        attachments = _attachments_from_media_metadata(message_metadata)
 
     # 1. Emit MESSAGE_RECEIVED event so workflows + analytics see it.
     emitter = EventEmitter(session)
@@ -409,8 +588,10 @@ async def _run_inbound_pipeline(
         tenant_id=tenant_id,
         event_type=EventType.MESSAGE_RECEIVED,
         payload={
+            "message_id": str(message_id),
             "channel_message_id": channel_message_id,
             "text": text_body,
+            "metadata": message_metadata or {},
         },
     )
 
@@ -429,8 +610,10 @@ async def _run_inbound_pipeline(
                 event={
                     "type": "message_received",
                     "data": {
+                        "message_id": str(message_id),
                         "channel_message_id": channel_message_id,
                         "text": text_body,
+                        "metadata": message_metadata or {},
                         "conversation_id": str(conversation_id),
                     },
                 },
@@ -439,6 +622,9 @@ async def _run_inbound_pipeline(
             await redis.aclose()
     except Exception:  # pragma: no cover
         pass
+
+    if not run_runner:
+        return started_executions
 
     # 4. Run the conversation turn. The runner short-circuits on
     #    `bot_paused`, so if the operator already took control we just
@@ -463,7 +649,7 @@ async def _run_inbound_pipeline(
         direction=MessageDirection.INBOUND,
         text=text_body,
         sent_at=_dt.now(UTC),
-        attachments=[],
+        attachments=attachments or [],
     )
 
     try:
@@ -572,11 +758,6 @@ async def baileys_outbound_echo(
 
     # The operator just took control from their phone — pause the bot so
     # the runner doesn't reply on top of them.
-    await session.execute(
-        text("UPDATE conversation_state SET bot_paused = TRUE WHERE conversation_id = :c"),
-        {"c": conv_id},
-    )
-
     sent_at = datetime.fromtimestamp(body.ts / 1000, tz=UTC)
     inserted = (
         await session.execute(
@@ -604,6 +785,14 @@ async def baileys_outbound_echo(
     if inserted is None:
         await session.commit()
         return {"status": "duplicate"}
+
+    # The operator just took control from their phone. Pause only after we
+    # know this is a new operator-device message; duplicate echoes of messages
+    # that AtendIA itself sent through Baileys must not pause the bot.
+    await session.execute(
+        text("UPDATE conversation_state SET bot_paused = TRUE WHERE conversation_id = :c"),
+        {"c": conv_id},
+    )
 
     await session.execute(
         text("UPDATE conversations SET last_activity_at = :ts WHERE id = :c"),

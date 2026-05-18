@@ -63,11 +63,14 @@ async def test_override_visible_to_runner_then_rolled_back():
             apply_overrides=_override,
         )
 
-        # (a) the runner loaded the OVERRIDDEN prompt within the sandbox txn
+        # (a) the runner loaded the OVERRIDDEN prompt within the sandbox txn.
+        # Post-generalization the operator prompt is a first-class
+        # ComposerInput field (a dedicated high-priority section), no
+        # longer buried as a brand_facts bullet.
         assert composer.last_input is not None
-        assert composer.last_input.brand_facts.get("agent_system_prompt") == "PROMPT_B", (
+        assert composer.last_input.agent_system_prompt == "PROMPT_B", (
             f"runner did not see the override: "
-            f"{composer.last_input.brand_facts.get('agent_system_prompt')!r}"
+            f"{composer.last_input.agent_system_prompt!r}"
         )
 
         # (b) production row is UNTOUCHED — the override was rolled back

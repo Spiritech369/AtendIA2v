@@ -30,14 +30,13 @@ export default defineConfig({
       // En Docker → BACKEND_URL=http://backend:8001 (desde docker-compose)
       // Local sin Docker → fallback a localhost:8001
       "/api": process.env.BACKEND_URL ?? "http://localhost:8001",
+      "/uploads": process.env.BACKEND_URL ?? "http://localhost:8001",
       "/ws": { target: process.env.BACKEND_WS_URL ?? "ws://localhost:8001", ws: true },
     },
-    // Docker Desktop + Windows bind-mounts can emit transient EIO errors
-    // from /app and crash Vite's watcher, leaving the browser on a blank
-    // page. In Docker we keep the dev server stable and restart the
-    // frontend container manually after code changes.
-    watch: isDockerDev
-      ? { ignored: ["**/*"], ignoreInitial: true }
-      : { usePolling: true, interval: 300 },
+    // Docker Desktop + Windows bind-mounts break native fs events (transient
+    // EIO from /app crashes Vite's native watcher). Stat-based polling avoids
+    // native events entirely, so HMR works in Docker without crashing or
+    // needing a manual container restart after every edit.
+    watch: { usePolling: true, interval: 300 },
   },
 });

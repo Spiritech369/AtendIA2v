@@ -65,6 +65,7 @@ from atendia.queue.outbox import stage_outbound
 TRIGGERS: frozenset[str] = frozenset(
     {
         "message_received",
+        "manual",
         "field_extracted",
         "field_updated",
         "stage_entered",
@@ -819,7 +820,7 @@ async def _execute_node(
     node_type = node.get("type")
     config = node.get("config") or {}
 
-    if node_type == "message":
+    if node_type in {"message", "template_message"}:
         await _node_message(session, workflow, execution, node, config)
     elif node_type == "move_stage":
         await _node_move_stage(session, workflow, execution, node, config)

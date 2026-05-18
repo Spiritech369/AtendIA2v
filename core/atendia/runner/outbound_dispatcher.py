@@ -18,6 +18,7 @@ COMPOSED_ACTIONS: set[str] = {
     "ask_field",
     "lookup_faq",
     "ask_clarification",
+    "agent_response",
     "quote",
     "explain_payment_options",
     "close",
@@ -41,16 +42,20 @@ async def enqueue_messages(
     conversation_id: UUID,
     turn_number: int,
     action: str,
+    extra_metadata: dict | None = None,
 ) -> list[str]:
     """Enqueue N OutboundMessage jobs (one per message)."""
     job_ids: list[str] = []
     for i, text in enumerate(messages):
+        metadata = {"action": action, "message_index": i, "of": len(messages)}
+        if extra_metadata:
+            metadata.update(extra_metadata)
         msg = OutboundMessage(
             tenant_id=str(tenant_id),
             to_phone_e164=to_phone_e164,
             text=text,
             idempotency_key=f"out:{conversation_id}:{turn_number}:{i}",
-            metadata={"action": action, "message_index": i, "of": len(messages)},
+            metadata=metadata,
         )
         if session is not None:
             job_ids.append(str(await stage_outbound(session, msg)))

@@ -45,7 +45,13 @@ import {
 // DOCS_* uppercase convention the AI Field Extraction sprint already
 // emits into customer.attrs.
 
-export const FIELD_CATALOG: ReadonlyArray<{ id: string; label: string; group: string }> = [
+export interface RuleFieldOption {
+  id: string;
+  label: string;
+  group: string;
+}
+
+export const FIELD_CATALOG: ReadonlyArray<RuleFieldOption> = [
   // Identity
   { id: "nombre", label: "Nombre del cliente", group: "Identidad" },
   { id: "telefono", label: "Teléfono", group: "Identidad" },
@@ -141,12 +147,12 @@ export function FieldSelector({
 
 // One <datalist> mounted once per RuleBuilder serves every FieldSelector
 // inside. Cheap to render, dramatically cleaner DOM than per-row.
-function FieldDatalist() {
+function FieldDatalist({ fieldCatalog }: { fieldCatalog: ReadonlyArray<RuleFieldOption> }) {
   return (
     <datalist id={FIELD_DATALIST_ID}>
-      {FIELD_CATALOG.map((f) => (
+      {fieldCatalog.map((f) => (
         <option key={f.id} value={f.id}>
-          {f.label}
+          {f.group ? `${f.label} (${f.group})` : f.label}
         </option>
       ))}
     </datalist>
@@ -340,11 +346,13 @@ export function RuleBuilder({
   rules,
   onChange,
   disabled,
+  fieldCatalog = FIELD_CATALOG,
 }: {
   stageLabel: string;
   rules: AutoEnterRulesDraft | undefined;
   onChange: (next: AutoEnterRulesDraft | undefined) => void;
   disabled?: boolean;
+  fieldCatalog?: ReadonlyArray<RuleFieldOption>;
 }) {
   // Normalise: an "off and empty" state is represented as undefined on the
   // wire so save payloads don't carry empty rule blocks. The UI keeps a
@@ -389,7 +397,7 @@ export function RuleBuilder({
 
   return (
     <div className="space-y-3">
-      <FieldDatalist />
+      <FieldDatalist fieldCatalog={fieldCatalog} />
 
       <div className="flex items-center justify-between">
         <div>

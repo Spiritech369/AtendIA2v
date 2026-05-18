@@ -6,7 +6,7 @@
 | Last updated | 2026-05-12 |
 | Backend code | `core/atendia/api/knowledge_routes.py` (819 lines) + `core/atendia/api/_kb/` sub-routers |
 | Frontend code | `frontend/src/features/knowledge/` — `KnowledgeBasePage.tsx` (2,261 lines, 9 tabs) + `api.ts` (326 lines) |
-| Design doc | [docs/plans/2026-05-10-knowledge-base-module-design.md](../plans/2026-05-10-knowledge-base-module-design.md) |
+| Design doc | [archived KB design](../_archive/plans/2026-05-10-knowledge-base-module-design.md) |
 | Demo/mock convention | [§3](#3-demomock-isolation-convention) — `tenant.is_demo` flag (migration 041) + `_demo: true` on API responses + `DemoBadge` / `NYIButton` in UI |
 
 > **Honest status.** The 9-tab Command Center frontend ships against a typed mock surface in `_kb/command_center.py`. The mocks are **stable contracts**: the FE can develop and ship UX while individual GETs flip from fixture to real one by one. Foundations (FAQ/Catalog/Document CRUD, RAG `/test-query`, unified `/search`, collections) are real and persist to Postgres. The four worker jobs that turn the Command Center "real" (conflict detection, daily health snapshot, content expiry, regression suite, CSV importer) are still TODO. See [§4 Roadmap](#4-roadmap-flipping-mock--real) for the priority order.
@@ -72,7 +72,7 @@ All in `core/atendia/api/_kb/command_center.py`. Frontend calls these from the 9
 
 ### 1.3 NYI in frontend (no backend mounted yet)
 
-These are UI stubs in `KnowledgeBasePage.tsx` with no `onClick` handler. Replace with `<NYIButton />` for consistency with the rest of the app (per `docs/plans/2026-05-12-placeholder-elimination-*`).
+These are UI stubs in `KnowledgeBasePage.tsx` with no `onClick` handler. Replace with `<NYIButton />` for consistency with the rest of the app (per the archived placeholder-elimination plans under `docs/_archive/plans/`).
 
 | UI element | What it would require |
 |---|---|

@@ -84,3 +84,37 @@ def test_normal_flow_picks_action_and_transitions(pipeline):
     assert decision.next_stage == "quote"
     # action_resolver should pick from the NEXT stage's allowed actions
     assert decision.action == "quote"
+
+
+def test_stage_without_matching_intent_action_still_replies():
+    pipeline = PipelineDefinition(
+        version=1,
+        stages=[
+            StageDefinition(
+                id="cliente_potencial",
+                actions_allowed=["lookup_faq"],
+                transitions=[],
+            ),
+        ],
+        tone={},
+        fallback="ask_clarification",
+    )
+    state = ConversationState(
+        conversation_id="c3",
+        tenant_id="t1",
+        current_stage="cliente_potencial",
+        extracted_data={},
+        stage_entered_at=datetime.now(timezone.utc),
+    )
+    nlu = NLUResult(
+        intent=Intent.ASK_PRICE,
+        entities={},
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
+
+    decision = process_turn(pipeline, state, nlu, turn_count=4)
+
+    assert decision.next_stage == "cliente_potencial"
+    assert decision.action == "lookup_faq"

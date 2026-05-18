@@ -43,12 +43,10 @@ LOGIN_PASSWORD = "dinamo123"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_MASTER_PATH = REPO_ROOT / "docs" / "Prompt master.txt"
 
-# Operator-realistic flow_mode_rules. NOTE (confirmed bug, recorded in
-# FINDINGS): the runner reads flow routing ONLY from
-# pipeline.flow_mode_rules (conversation_runner.py:766; comment :749).
-# agent.flow_mode_rules is stored + returned by the API but never read by
-# the runner/router — so setting it here is operator-realistic but DEAD for
-# routing. The real routing rules go into the pipeline (a later task).
+# Operator-realistic flow_mode_rules. Sprint 1 hardening made these live:
+# the runner prefers agent.flow_mode_rules and only falls back to pipeline
+# defaults for legacy tenants. Pipeline JSON stays focused on stages/docs
+# so Agent IA is the single operator-facing owner of routing.
 AGENT_FLOW_MODE_RULES: dict[str, Any] = {
     "rules": [
         {

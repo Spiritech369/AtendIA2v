@@ -94,6 +94,26 @@ def _make_inbound(conversation_id, tenant_id, txt: str) -> Message:
     )
 
 
+class SpyNLU:
+    def __init__(self, result: NLUResult) -> None:
+        self.result = result
+        self.required_fields: list[FieldSpec] = []
+        self.optional_fields: list[FieldSpec] = []
+
+    async def classify(
+        self,
+        *,
+        text: str,
+        current_stage: str,
+        required_fields: list[FieldSpec],
+        optional_fields: list[FieldSpec],
+        history: list[tuple[str, str]],
+    ) -> tuple[NLUResult, UsageMetadata | None]:
+        self.required_fields = required_fields
+        self.optional_fields = optional_fields
+        return self.result, None
+
+
 @pytest.mark.asyncio
 async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t37_main")
@@ -145,14 +165,70 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     ).scalar()
     assert final_stage == "quote"
 
-    # Verify turn_traces has 2 rows
+
+@pytest.mark.asyncio
+async def test_runner_exposes_customer_field_definitions_to_nlu(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session, f"test_custom_fields_to_nlu_{uuid4().hex}"
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO customer_field_definitions "
+            "(id, tenant_id, key, label, field_type, ordering) "
+            "VALUES (gen_random_uuid(), :t, 'plancredito', 'Plan credito', 'text', 1)"
+        ),
+        {"t": tid},
+    )
+    await db_session.commit()
+
+    nlu_result = NLUResult(
+        intent=Intent.ASK_INFO,
+        entities={
+            "plancredito": {
+                "value": "por fuera",
+                "confidence": 0.95,
+                "source_turn": 1,
+            }
+        },
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        ambiguities=[],
+    )
+    nlu_provider = SpyNLU(nlu_result)
+    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
+
+    inbound = _make_inbound(conv_id, tid, "Por fuera")
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert "plancredito" in {f.name for f in nlu_provider.optional_fields}
+    assert trace.state_after["extracted_data"]["plancredito"]["value"] == "por fuera"
+
+    saved_value = (
+        await db_session.execute(
+            text(
+                "SELECT cfv.value FROM customer_field_values cfv "
+                "JOIN customer_field_definitions cfd ON cfd.id = cfv.field_definition_id "
+                "JOIN conversations c ON c.customer_id = cfv.customer_id "
+                "WHERE c.id = :c AND cfd.key = 'plancredito'"
+            ),
+            {"c": conv_id},
+        )
+    ).scalar_one()
+    assert saved_value == "por fuera"
+
     trace_count = (
         await db_session.execute(
             text("SELECT COUNT(*) FROM turn_traces WHERE conversation_id = :c"),
             {"c": conv_id},
         )
     ).scalar()
-    assert trace_count == 2
+    assert trace_count == 1
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
@@ -390,6 +466,89 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
         )
     ).scalar()
     assert handoff_count == 0
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+# ============================================================================
+# Generalization wiring: runner feeds composer from pipeline + agent
+# ============================================================================
+@pytest.mark.asyncio
+async def test_runner_feeds_composer_from_pipeline_and_agent(db_session):
+    """The runner must pass the tenant's pipeline.mode_prompts +
+    agent.system_prompt + active guardrails into the ComposerInput, and
+    STOP burying the agent prompt inside brand_facts."""
+    pipeline_def = {
+        **PIPELINE_QUALIFY_QUOTE,
+        "mode_prompts": {"SUPPORT": "<<GUION SUPPORT DEL TENANT>>"},
+    }
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+            {"n": f"test_general_wiring_{uuid4().hex[:8]}"},
+        )
+    ).scalar()
+    await db_session.execute(
+        text(
+            "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+            "VALUES (:t, 1, :d\\:\\:jsonb, true)"
+        ),
+        {"t": tid, "d": json.dumps(pipeline_def)},
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO agents (tenant_id, name, is_default, system_prompt, ops_config) "
+            "VALUES (:t, 'Asesor', true, :sp, :ops\\:\\:jsonb)"
+        ),
+        {
+            "t": tid,
+            "sp": "<<PROMPT MAESTRO DEL AGENTE>>",
+            "ops": json.dumps(
+                {"guardrails": [{"rule_text": "NUNCA prometas aprobacion", "active": True}]}
+            ),
+        },
+    )
+    cid = (
+        await db_session.execute(
+            text(
+                "INSERT INTO customers (tenant_id, phone_e164) "
+                "VALUES (:t, '+5215555550099') RETURNING id"
+            ),
+            {"t": tid},
+        )
+    ).scalar()
+    conv_id = (
+        await db_session.execute(
+            text(
+                "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                "VALUES (:t, :c, 'qualify') RETURNING id"
+            ),
+            {"t": tid, "c": cid},
+        )
+    ).scalar()
+    await db_session.execute(
+        text("INSERT INTO conversation_state (conversation_id) VALUES (:c)"),
+        {"c": conv_id},
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer(messages=["ok"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    await runner.run_turn(
+        conversation_id=conv_id, tenant_id=tid, inbound=inbound, turn_number=1
+    )
+    await db_session.commit()
+
+    assert composer.last_input is not None, "composer was not invoked by this turn"
+    ci = composer.last_input
+    assert ci.mode_guidance == "<<GUION SUPPORT DEL TENANT>>"
+    assert ci.agent_system_prompt == "<<PROMPT MAESTRO DEL AGENTE>>"
+    assert "NUNCA prometas aprobacion" in ci.guardrails
+    assert "agent_system_prompt" not in ci.brand_facts
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
@@ -840,6 +999,96 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
 # ============================================================================
 # Phase 3c.2 — pending_confirmation binary handling (T22)
 # ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_runner_prefers_agent_flow_mode_rules_over_pipeline_rules(db_session):
+    """Agent Manager rules must be live config, not decorative JSONB."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_t21_agent_rules",
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO agents (tenant_id, name, is_default, flow_mode_rules) "
+            "VALUES (:t, 'Dinamo', true, :rules\\:\\:jsonb)"
+        ),
+        {
+            "t": tid,
+            "rules": json.dumps(
+                {
+                    "rules": [
+                        {
+                            "id": "agent_retention",
+                            "trigger": {"type": "keyword_in_text", "list": ["gracias"]},
+                            "mode": "RETENTION",
+                        },
+                        {
+                            "id": "agent_always_support",
+                            "trigger": {"type": "always"},
+                            "mode": "SUPPORT",
+                        },
+                    ]
+                }
+            ),
+        },
+    )
+    await db_session.commit()
+
+    runner = ConversationRunner(
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
+    )
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "muchas gracias por la info"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert trace.flow_mode == "RETENTION"
+    assert trace.router_trigger == "agent_retention:keyword_in_text"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_runner_handles_explicit_empty_pipeline_flow_mode_rules(db_session):
+    """Legacy saved definitions with flow_mode_rules=[] should not crash."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_t21_empty_pipeline_rules",
+    )
+    await db_session.execute(
+        text(
+            "UPDATE tenant_pipelines SET definition = :d\\:\\:jsonb "
+            "WHERE tenant_id = :t AND active = true"
+        ),
+        {"t": tid, "d": json.dumps({**PIPELINE_QUALIFY_QUOTE, "flow_mode_rules": []})},
+    )
+    await db_session.commit()
+
+    runner = ConversationRunner(
+        db_session,
+        _FakeNLUWithCost(Decimal("0.000050")),
+        CannedComposer(),
+    )
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "hola"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert trace.flow_mode == "SUPPORT"
+    assert trace.router_trigger == "default_always_support:always"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
 
 
 async def _seed_pending_confirmation(

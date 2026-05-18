@@ -16,6 +16,7 @@ import {
   Globe,
   Info,
   Lock,
+  Loader2,
   Mail,
   MessageCircle,
   RefreshCw,
@@ -101,6 +102,7 @@ function resolveProvider(provider: string): ProviderMeta {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type WAStatus = "connected" | "needs_attention" | "disconnected" | "paused";
+const META_ACTIVE_MS = 5 * 60_000;
 
 const WA_STATUS_META: Record<
   WAStatus,
@@ -114,7 +116,7 @@ const WA_STATUS_META: Record<
     border: "border-emerald-500/30",
   },
   needs_attention: {
-    label: "Requiere atención",
+    label: "Sin actividad",
     icon: AlertTriangle,
     bg: "bg-amber-500/10",
     fg: "text-amber-700 dark:text-amber-300",
@@ -160,7 +162,8 @@ function waStatus(d: WhatsAppDetails): WAStatus {
   if (!d.phone_number_id) return "disconnected";
   if (d.circuit_breaker_open) return "paused";
   if (d.last_webhook_at) {
-    if (Date.now() - new Date(d.last_webhook_at).getTime() < 24 * 60 * 60_000) return "connected";
+    if (Date.now() - new Date(d.last_webhook_at).getTime() < META_ACTIVE_MS) return "connected";
+    return "needs_attention";
   }
   return "needs_attention";
 }
@@ -381,10 +384,27 @@ function WhatsAppHeroCard({
   details: WhatsAppDetails | undefined;
   loading: boolean;
 }) {
+  const qc = useQueryClient();
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [techOpen, setTechOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "tenant_admin" || user?.role === "superadmin";
+  const testWebhook = useMutation({
+    mutationFn: integrationsApi.testWhatsAppWebhook,
+    onSuccess: (result) => {
+      toast.success("Webhook sandbox recibido", {
+        description: result.conversation_id
+          ? `Conversacion ${result.conversation_id.slice(0, 8)} · trace ${result.trace_id?.slice(0, 8) ?? "pendiente"}`
+          : "La prueba llego al backend, pero no creo conversacion.",
+      });
+      void qc.invalidateQueries({ queryKey: ["integrations", "whatsapp"] });
+      void qc.invalidateQueries({ queryKey: ["channel-status"] });
+      void qc.invalidateQueries({ queryKey: ["conversations"] });
+      void qc.invalidateQueries({ queryKey: ["turn-traces"] });
+    },
+    onError: (e) =>
+      toast.error("No se pudo ejecutar el sandbox", { description: e.message }),
+  });
 
   if (loading || !details) {
     return (
@@ -434,6 +454,14 @@ function WhatsAppHeroCard({
       ? `${window.location.origin}${details.webhook_path}`
       : details.webhook_path;
   const allOk = checklist.every((s) => s.ok);
+  const statusMessage =
+    status === "connected"
+      ? "Operando con normalidad"
+      : status === "needs_attention"
+        ? "Sin actividad reciente"
+        : allOk
+          ? "Configurado"
+          : "Requiere configuracion";
 
   return (
     <>
@@ -485,16 +513,16 @@ function WhatsAppHeroCard({
                 size="sm"
                 variant="outline"
                 className="text-xs"
-                onClick={() =>
-                  toast.info(
-                    "Para probar el webhook, envía una solicitud GET desde Meta Business Manager.",
-                    { duration: 6000 },
-                  )
-                }
+                onClick={() => testWebhook.mutate()}
+                disabled={!isAdmin || testWebhook.isPending}
                 title="Probar webhook"
               >
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                Probar webhook
+                {testWebhook.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {testWebhook.isPending ? "Probando..." : "Probar webhook"}
               </Button>
 
               <Button
@@ -519,7 +547,7 @@ function WhatsAppHeroCard({
                 <StatusIcon className={`h-4 w-4 shrink-0 ${sm.fg}`} />
                 <div>
                   <div className={`text-xs font-medium ${sm.fg}`}>
-                    {allOk ? "Operando con normalidad" : "Requiere configuración"}
+                    {statusMessage}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     Última actualización: {relativeFromNow(details.last_webhook_at)}
@@ -662,15 +690,16 @@ function WhatsAppHeroCard({
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                toast.info(
-                  "Para probar el webhook, envía una solicitud GET desde Meta Business Manager.",
-                );
-              }}
+              onClick={() => testWebhook.mutate()}
+              disabled={!isAdmin || testWebhook.isPending}
               title="Probar webhook"
             >
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              Probar webhook
+              {testWebhook.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {testWebhook.isPending ? "Probando..." : "Probar webhook"}
             </Button>
           </DialogFooter>
         </DialogContent>

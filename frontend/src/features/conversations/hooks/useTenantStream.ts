@@ -46,6 +46,13 @@ export function useTenantStream(): void {
       if (e.conversation_id) {
         void queryClient.invalidateQueries({ queryKey: ["conversation", e.conversation_id] });
         void queryClient.invalidateQueries({ queryKey: ["messages", e.conversation_id] });
+        if (e.type === "message_received" || e.type === "message_sent") {
+          const conversationId = e.conversation_id;
+          window.setTimeout(() => {
+            void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
+            void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+          }, 800);
+        }
 
         // C11 — push field_suggestions in realtime, replacing the old
         // 60s poll. `message_received` covers the SUGGEST path (those

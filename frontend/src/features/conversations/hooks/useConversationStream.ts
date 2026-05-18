@@ -34,6 +34,12 @@ export function useConversationStream(
       if (e.conversation_id !== conversationId) return;
       void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
       void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      if (e.type === "message_received" || e.type === "message_sent") {
+        window.setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
+          void queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+        }, 800);
+      }
       onMatch?.(e);
     },
     [conversationId, onMatch, queryClient],

@@ -112,24 +112,29 @@ en México. Recibes una imagen y devuelves JSON con cuatro campos:
     category es "moto" o "unrelated".
 
 quality_check tiene EXACTAMENTE estos campos:
-    * four_corners_visible (bool): true sólo si las 4 esquinas del
-      documento están visibles dentro de la foto (sin cortes).
+    * four_corners_visible (bool): true si el documento se ve completo
+      para fines de expediente. NO rechaces por esquinas redondeadas,
+      sombras, inclinación leve o una orilla apenas fuera de cuadro si
+      no falta información importante.
     * legible (bool): true sólo si los datos clave (nombre, fecha,
       número) se leen claramente.
     * not_blurry (bool): true sólo si la imagen está enfocada.
     * no_flash_glare (bool): true sólo si NO hay reflejo del flash
       que tape datos importantes.
-    * not_cut (bool): true sólo si no falta una parte del documento.
+    * not_cut (bool): true si no falta información importante del
+      documento. Bordes muy pegados al marco o esquinas redondeadas no
+      cuentan como corte.
     * side ("front" | "back" | "unknown"): para INE, qué lado se ve;
       "unknown" si no aplica o no se distingue.
-    * valid_for_credit_file (bool): TU veredicto final — true sólo si
-      TODAS las anteriores son true Y el documento sirve para
-      expediente de crédito.
+    * valid_for_credit_file (bool): TU veredicto final — true si el
+      documento sirve para expediente de crédito: categoría correcta,
+      lado identificable cuando aplique, datos clave legibles y sin
+      reflejos/borrosidad que tapen información importante.
     * rejection_reason (str|null): cuando valid_for_credit_file=false,
       escribe UNA frase corta y accionable en español que el bot pueda
       reusar para pedirle al cliente que mande la foto de nuevo
-      (ej. "se ve con reflejo y no se leen los datos", "está cortada
-      por una esquina"). Si valid_for_credit_file=true, devuelve null.
+      (ej. "se ve con reflejo y no se leen los datos", "está demasiado
+      borrosa"). Si valid_for_credit_file=true, devuelve null.
 
 Reglas:
 - Sé objetivo: clasifica lo que VES en la imagen, no lo que crees que el usuario quiso mandar.
@@ -138,6 +143,8 @@ Reglas:
 - "moto" para foto de motocicleta (no scooter eléctrico ni bici).
 - "unrelated" para selfies, screenshots, paisajes, comida, cualquier otra cosa.
 - confidence < 0.5 si la imagen está borrosa, oscura o muy alejada.
+- No rechaces un documento completo y legible sólo porque el borde está
+  cerca del marco o las esquinas redondeadas no son rectangulares.
 - En quality_check, no inventes razones de rechazo si todo se ve bien;
   null es la respuesta correcta.
 """

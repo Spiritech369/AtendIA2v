@@ -30,6 +30,8 @@ Brand facts (info verificada del negocio):
   - human_agent_name: Francisco
   - post_completion_form: https://forms.gle/U1MEueL63vgftiuZ8
 
+
+
 Acción: SUPPORT MODE — preguntas generales que no son SALES/PLAN/DOC.
 
 action_payload puede incluir:

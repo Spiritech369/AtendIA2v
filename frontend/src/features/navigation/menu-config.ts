@@ -1,8 +1,10 @@
 import {
   BarChart3,
+  BotMessageSquare,
   BookOpen,
   Bug,
   CalendarDays,
+  ClipboardCheck,
   Columns3,
   Database,
   FileText,
@@ -13,6 +15,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  TableProperties,
   UserRound,
   Users,
 } from "lucide-react";
@@ -94,6 +97,27 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Agentes IA",
         to: "/agents",
         icon: Sparkles,
+        roles: TENANT_ADMIN_PLUS,
+      },
+      {
+        id: "composer",
+        label: "Composer IA",
+        to: "/composer",
+        icon: BotMessageSquare,
+        roles: TENANT_ADMIN_PLUS,
+      },
+      {
+        id: "customer-fields",
+        label: "Datos cliente",
+        to: "/customer-fields",
+        icon: TableProperties,
+        roles: TENANT_ADMIN_PLUS,
+      },
+      {
+        id: "ai-requirements",
+        label: "Expediente",
+        to: "/expediente",
+        icon: ClipboardCheck,
         roles: TENANT_ADMIN_PLUS,
       },
       {

@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <NotificationsDropdown />
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );

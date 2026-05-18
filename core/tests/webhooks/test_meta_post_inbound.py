@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -223,3 +224,23 @@ def test_meta_webhook_post_400_when_body_not_json(setup_tenant):
             headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
         )
         assert r.status_code == 400
+
+
+def test_meta_webhook_post_404_for_unknown_tenant_without_db_side_effects():
+    tid = uuid4()
+    msg_id = "wamid.T13_UNKNOWN_TENANT"
+    payload = _inbound_payload(channel_msg_id=msg_id)
+    body = json.dumps(payload).encode("utf-8")
+    sig = _sign(body)
+
+    _clear_dedup_sync(msg_id)
+
+    with TestClient(app) as client:
+        r = client.post(
+            f"/webhooks/meta/{tid}",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Hub-Signature-256": sig},
+        )
+        assert r.status_code == 404
+
+    assert _count_messages(tid, msg_id) == 0

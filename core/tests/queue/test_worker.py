@@ -107,6 +107,38 @@ async def test_send_outbound_persists_outbound_row_on_success(setup_tenant):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_send_outbound_sandbox_marks_sent_without_meta_call(setup_tenant):
+    tid = setup_tenant
+    route = respx.post("https://graph.facebook.com/v21.0/PID_T17/messages").mock(
+        return_value=httpx.Response(
+            500,
+            json={"error": {"message": "should not be called"}},
+        )
+    )
+
+    result = await send_outbound(
+        {},
+        {
+            "tenant_id": str(tid),
+            "to_phone_e164": "+5215555550170",
+            "text": "respuesta sandbox",
+            "idempotency_key": "test_t17_idem_sandbox",
+            "metadata": {"sandbox": True},
+        },
+    )
+
+    assert result["status"] == "sent"
+    assert route.call_count == 0
+    rows = await _read_messages(tid)
+    assert len(rows) == 1
+    _, text, channel_message_id, status = rows[0]
+    assert text == "respuesta sandbox"
+    assert channel_message_id.startswith("wamid.sandbox.out.")
+    assert status == "sent"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_send_outbound_idempotency_key_does_not_resend(setup_tenant):
     tid = setup_tenant
     route = respx.post("https://graph.facebook.com/v21.0/PID_T17/messages").mock(

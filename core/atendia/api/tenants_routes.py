@@ -34,6 +34,7 @@ from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
 from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
 from atendia.realtime.publisher import publish_tenant_event
+from atendia.runner.followup_scheduler import normalize_followup_config
 
 
 async def _broadcast_pipeline_change(
@@ -172,19 +173,30 @@ async def put_pipeline(
         )
     ).scalar_one_or_none()
 
+    # Defensive: the stage editor (and other partial clients) PUT a
+    # definition WITHOUT `mode_prompts`. A full replace would wipe the
+    # tenant's per-mode composer guidance and silently regress the bot
+    # to the generic default. Preserve it when the incoming body omits
+    # it; an explicit non-empty value still overrides.
+    definition = dict(body.definition)
+    if not definition.get("mode_prompts") and existing is not None:
+        prior = (existing.definition or {}).get("mode_prompts")
+        if prior:
+            definition["mode_prompts"] = prior
+
     if existing is None:
         new_row = TenantPipeline(
             tenant_id=tenant_id,
             version=1,
-            definition=body.definition,
+            definition=definition,
             active=True,
-            history=_push_history([], definition=body.definition, user=user),
+            history=_push_history([], definition=definition, user=user),
         )
         session.add(new_row)
         new_version = 1
     else:
-        existing.history = _push_history(existing.history, definition=body.definition, user=user)
-        existing.definition = body.definition
+        existing.history = _push_history(existing.history, definition=definition, user=user)
+        existing.definition = definition
         existing.active = True
         new_row = existing
         new_version = existing.version
@@ -202,7 +214,7 @@ async def put_pipeline(
     # cheap to scan.
     stage_ids = [
         str(s.get("id"))
-        for s in (body.definition.get("stages") or [])
+        for s in (definition.get("stages") or [])
         if isinstance(s, dict) and isinstance(s.get("id"), str)
     ]
     await emit_admin_event(
@@ -652,6 +664,54 @@ class TimezonePutBody(BaseModel):
     timezone: str = Field(min_length=1, max_length=40)
 
 
+DEFAULT_QOS_CONFIG: dict[str, Any] = {
+    "enabled": False,
+    "debug_badges_enabled": True,
+    "fallback_on_timeout": False,
+    "pause_bot_on_budget_exceeded": False,
+    "response_slo_ms": 8000,
+    "nlu_timeout_ms": 3000,
+    "composer_timeout_ms": 5000,
+    "kb_timeout_ms": 2500,
+    "max_turn_cost_usd": 0.05,
+    "daily_ai_budget_usd": 25.0,
+    "max_messages_per_turn": 2,
+    "inbound_rate_limit_per_min": 60,
+    "outbound_rate_limit_per_min": 60,
+    "workflow_rate_limit_per_min": 120,
+    "dead_letter_after_attempts": 4,
+}
+
+
+class QosConfigBody(BaseModel):
+    enabled: bool = False
+    debug_badges_enabled: bool = True
+    fallback_on_timeout: bool = False
+    pause_bot_on_budget_exceeded: bool = False
+    response_slo_ms: int = Field(default=8000, ge=1000, le=120000)
+    nlu_timeout_ms: int = Field(default=3000, ge=500, le=60000)
+    composer_timeout_ms: int = Field(default=5000, ge=500, le=60000)
+    kb_timeout_ms: int = Field(default=2500, ge=500, le=60000)
+    max_turn_cost_usd: float = Field(default=0.05, ge=0, le=100)
+    daily_ai_budget_usd: float = Field(default=25.0, ge=0, le=10000)
+    max_messages_per_turn: int = Field(default=2, ge=1, le=3)
+    inbound_rate_limit_per_min: int = Field(default=60, ge=1, le=10000)
+    outbound_rate_limit_per_min: int = Field(default=60, ge=1, le=10000)
+    workflow_rate_limit_per_min: int = Field(default=120, ge=1, le=10000)
+    dead_letter_after_attempts: int = Field(default=4, ge=1, le=20)
+
+
+class QosConfigResponse(BaseModel):
+    qos_config: QosConfigBody
+
+
+def normalize_qos_config(config: object) -> dict[str, Any]:
+    merged = dict(DEFAULT_QOS_CONFIG)
+    if isinstance(config, dict):
+        merged.update({key: value for key, value in config.items() if key in merged})
+    return QosConfigBody.model_validate(merged).model_dump()
+
+
 async def _ensure_branding(session: AsyncSession, tenant_id: UUID) -> TenantBranding:
     """Fetch the branding row, creating an empty one if missing.
     Idempotent — safe to call from both GET and PUT."""
@@ -750,6 +810,198 @@ async def put_timezone(
     )
     await session.commit()
     return TimezoneResponse(timezone=body.timezone)
+
+
+# ---------- Quality of Service ----------
+
+
+@router.get("/qos-config", response_model=QosConfigResponse)
+async def get_qos_config(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> QosConfigResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    return QosConfigResponse(qos_config=normalize_qos_config((tenant.config or {}).get("qos")))
+
+
+@router.put("/qos-config", response_model=QosConfigResponse)
+async def put_qos_config(
+    body: QosConfigBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> QosConfigResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    qos_config = normalize_qos_config(body.model_dump())
+    new_config = dict(tenant.config or {})
+    new_config["qos"] = qos_config
+    await session.execute(update(Tenant).where(Tenant.id == tenant_id).values(config=new_config))
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="qos_config.saved",
+        payload={
+            "enabled": qos_config["enabled"],
+            "response_slo_ms": qos_config["response_slo_ms"],
+            "max_messages_per_turn": qos_config["max_messages_per_turn"],
+        },
+    )
+    await session.commit()
+    return QosConfigResponse(qos_config=QosConfigBody.model_validate(qos_config))
+
+
+# ---------- Follow-ups ----------
+
+
+class FollowupScheduleItem(BaseModel):
+    kind: str = Field(..., max_length=40)
+    delay_hours: int = Field(..., ge=1, le=23)
+    body: str = Field(..., min_length=1, max_length=700)
+
+
+class FollowupsConfigBody(BaseModel):
+    enabled: bool = True
+    schedule: list[FollowupScheduleItem] = Field(default_factory=list, max_length=5)
+
+
+class FollowupsConfigResponse(BaseModel):
+    followups_config: dict
+    stats: dict[str, int]
+    pending: list[dict[str, Any]]
+
+
+async def _followup_stats(session: AsyncSession, tenant_id: UUID) -> dict[str, int]:
+    rows = (
+        await session.execute(
+            text(
+                "SELECT status, COUNT(*) "
+                "FROM followups_scheduled "
+                "WHERE tenant_id = :tenant_id "
+                "GROUP BY status"
+            ),
+            {"tenant_id": tenant_id},
+        )
+    ).fetchall()
+    stats = {"pending": 0, "sent": 0, "cancelled": 0, "failed": 0}
+    for status_value, count in rows:
+        stats[str(status_value)] = int(count)
+    return stats
+
+
+async def _pending_followups(session: AsyncSession, tenant_id: UUID) -> list[dict[str, Any]]:
+    rows = (
+        await session.execute(
+            text(
+                "SELECT f.id, f.kind, f.run_at, cu.phone_e164, cu.name "
+                "FROM followups_scheduled f "
+                "JOIN conversations c ON c.id = f.conversation_id "
+                "JOIN customers cu ON cu.id = c.customer_id "
+                "WHERE f.tenant_id = :tenant_id "
+                "  AND f.status = 'pending' "
+                "  AND f.cancelled_at IS NULL "
+                "ORDER BY f.run_at ASC "
+                "LIMIT 25"
+            ),
+            {"tenant_id": tenant_id},
+        )
+    ).fetchall()
+    return [
+        {
+            "id": str(row[0]),
+            "kind": row[1],
+            "run_at": row[2],
+            "phone_e164": row[3],
+            "customer_name": row[4],
+        }
+        for row in rows
+    ]
+
+
+@router.get("/followups-config", response_model=FollowupsConfigResponse)
+async def get_followups_config(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> FollowupsConfigResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    cfg = normalize_followup_config(
+        (tenant.config or {}).get("followups"),
+        enabled=bool(tenant.followups_enabled),
+    )
+    return FollowupsConfigResponse(
+        followups_config=cfg,
+        stats=await _followup_stats(session, tenant_id),
+        pending=await _pending_followups(session, tenant_id),
+    )
+
+
+@router.put("/followups-config", response_model=FollowupsConfigResponse)
+async def put_followups_config(
+    body: FollowupsConfigBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> FollowupsConfigResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    cfg = normalize_followup_config(body.model_dump(), enabled=body.enabled)
+    cfg["enabled"] = body.enabled
+    new_config = dict(tenant.config or {})
+    new_config["followups"] = cfg
+    await session.execute(
+        update(Tenant)
+        .where(Tenant.id == tenant_id)
+        .values(config=new_config, followups_enabled=body.enabled)
+    )
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="followups_config.saved",
+        payload={
+            "enabled": cfg["enabled"],
+            "schedule": [
+                {"kind": item["kind"], "delay_hours": item["delay_hours"]}
+                for item in cfg["schedule"]
+            ],
+        },
+    )
+    await session.commit()
+    return FollowupsConfigResponse(
+        followups_config=cfg,
+        stats=await _followup_stats(session, tenant_id),
+        pending=await _pending_followups(session, tenant_id),
+    )
+
+
+@router.post("/followups-config/cancel-pending")
+async def cancel_tenant_followups(
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, int]:
+    result = await session.execute(
+        text(
+            "UPDATE followups_scheduled "
+            "SET status = 'cancelled', cancelled_at = :now, "
+            "    last_error = COALESCE(last_error, 'cancelled_by_operator') "
+            "WHERE tenant_id = :tenant_id "
+            "  AND status = 'pending' "
+            "  AND cancelled_at IS NULL"
+        ),
+        {"tenant_id": tenant_id, "now": datetime.now(UTC)},
+    )
+    cancelled = result.rowcount or 0
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="followups.cancel_pending",
+        payload={"cancelled": cancelled},
+    )
+    await session.commit()
+    return {"cancelled": cancelled}
 
 
 # ---------- Inbox Config ----------

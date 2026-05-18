@@ -42,6 +42,8 @@ Brand facts (info verificada del negocio):
   - human_agent_name: Francisco
   - post_completion_form: https://forms.gle/U1MEueL63vgftiuZ8
 
+
+
 Acción: DOC MODE — recibir, validar (vía Vision) y avanzar la papelería.
 
 action_payload incluye (cuando aplique):

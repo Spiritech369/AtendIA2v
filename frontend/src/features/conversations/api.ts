@@ -54,6 +54,20 @@ export interface MessageMedia {
   caption?: string;
 }
 
+export interface ConversationAttachment {
+  id: string;
+  message_id: string;
+  type: string;
+  mime_type: string;
+  url: string;
+  caption: string | null;
+  original_filename: string | null;
+  file_size: number | null;
+  status: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
 export interface MessageItem {
   id: string;
   conversation_id: string;
@@ -99,6 +113,10 @@ export const conversationsApi = {
     const { data } = await api.get<MessageListResponse>(`/conversations/${id}/messages`, {
       params,
     });
+    return data;
+  },
+  listAttachments: async (id: string): Promise<ConversationAttachment[]> => {
+    const { data } = await api.get<ConversationAttachment[]>(`/conversations/${id}/attachments`);
     return data;
   },
   patchConversation: async (

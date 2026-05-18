@@ -12,6 +12,8 @@ sure the backend keeps the contract the UI relies on:
 
 from __future__ import annotations
 
+from atendia.state_machine.motos_credito_pipeline import MOTOS_CREDITO_AGENT_FLOW_MODE_RULES
+
 
 def _create(client, **overrides):
     body = {
@@ -54,6 +56,20 @@ def test_full_crud_roundtrip(client_tenant_admin):
     assert client_tenant_admin.get(f"/api/v1/agents/{aid}").status_code == 404
 
 
+def test_moto_flow_mode_rules_roundtrip_on_agent(client_tenant_admin):
+    created = _create(
+        client_tenant_admin,
+        name="Dinamo Moto",
+        flow_mode_rules=MOTOS_CREDITO_AGENT_FLOW_MODE_RULES,
+    )
+    assert created.status_code == 201, created.text
+    aid = created.json()["id"]
+
+    detail = client_tenant_admin.get(f"/api/v1/agents/{aid}")
+    assert detail.status_code == 200
+    assert detail.json()["flow_mode_rules"] == MOTOS_CREDITO_AGENT_FLOW_MODE_RULES
+
+
 def test_creating_second_default_clears_previous(client_tenant_admin):
     first = _create(client_tenant_admin, name="A", is_default=True).json()
     second = _create(client_tenant_admin, name="B", is_default=True).json()
@@ -71,6 +87,55 @@ def test_invalid_role_rejected(client_tenant_admin):
 def test_unknown_intents_rejected(client_tenant_admin):
     resp = _create(client_tenant_admin, active_intents=["GREETING", "NOT_REAL"])
     assert resp.status_code == 422
+
+
+def test_legacy_seeded_invalid_intents_load_and_save(client_tenant_admin):
+    """Repro of the prepare_beta_tenant seed bug: an agent row whose
+    active_intents are flow-mode words (not NLU intents) must still load
+    via GET with the invalid ones dropped, so the UI can round-trip a
+    save without the 'unknown intents' validation error."""
+    import asyncio
+
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from atendia.config import get_settings
+
+    tid = client_tenant_admin.tenant_id  # set by the fixture
+
+    async def _insert_poisoned() -> str:
+        engine = create_async_engine(get_settings().database_url)
+        try:
+            async with engine.begin() as conn:
+                aid = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO agents (tenant_id, name, active_intents) "
+                            "VALUES (:t, 'Legacy Seeded', CAST(:ai AS jsonb)) RETURNING id"
+                        ),
+                        {
+                            "t": tid,
+                            "ai": '["sales","plan","doc","obstacle","retention","support"]',
+                        },
+                    )
+                ).scalar()
+            return str(aid)
+        finally:
+            await engine.dispose()
+
+    aid = asyncio.run(_insert_poisoned())
+
+    got = client_tenant_admin.get(f"/api/v1/agents/{aid}")
+    assert got.status_code == 200
+    # Invalid (flow-mode) values dropped on read so the UI never holds them.
+    assert got.json()["active_intents"] == []
+
+    # The UI round-trips what it loaded; this must NOT 422.
+    resp = client_tenant_admin.patch(
+        f"/api/v1/agents/{aid}",
+        json={"name": "Renombrado", "active_intents": got.json()["active_intents"]},
+    )
+    assert resp.status_code == 200, resp.text
 
 
 def test_operator_cannot_mutate(client_operator, client_tenant_admin):

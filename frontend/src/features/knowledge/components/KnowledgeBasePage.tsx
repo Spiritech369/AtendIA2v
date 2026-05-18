@@ -145,15 +145,15 @@ const SEVERITY_STYLES: Record<Severity, { label: string; className: string; dot:
 };
 
 const TAB_DEFS = [
-  { value: "faqs", label: "FAQs", count: 156, sourceTypes: ["FAQ"] },
-  { value: "catalog", label: "Catalogo", count: 642, sourceTypes: ["Catalogo"] },
-  { value: "documents", label: "Documentos", count: 412, sourceTypes: ["Documento"] },
-  { value: "promos", label: "Promociones", count: 28, sourceTypes: ["Promocion"] },
-  { value: "credit", label: "Reglas de credito", count: 24, sourceTypes: ["FAQ", "Documento"] },
-  { value: "unanswered", label: "Preguntas sin respuesta", count: 118, sourceTypes: [] },
-  { value: "conflicts", label: "Conflictos", count: 32, sourceTypes: [] },
-  { value: "tests", label: "Pruebas", count: 30, sourceTypes: [] },
-  { value: "metrics", label: "Metricas", count: 9, sourceTypes: [] },
+  { value: "faqs", label: "FAQs", sourceTypes: ["FAQ"] },
+  { value: "catalog", label: "Catalogo", sourceTypes: ["Catalogo"] },
+  { value: "documents", label: "Documentos", sourceTypes: ["Documento"] },
+  { value: "promos", label: "Promociones", sourceTypes: ["Promocion"] },
+  { value: "credit", label: "Reglas de credito", sourceTypes: ["FAQ", "Documento"] },
+  { value: "unanswered", label: "Preguntas sin respuesta", sourceTypes: [] },
+  { value: "conflicts", label: "Conflictos", sourceTypes: [] },
+  { value: "tests", label: "Pruebas", sourceTypes: [] },
+  { value: "metrics", label: "Metricas", sourceTypes: [] },
 ] as const;
 
 const QUERY_KEYS = {
@@ -165,6 +165,16 @@ const QUERY_KEYS = {
   cards: ["knowledge", "command-center", "cards"] as const,
   simulation: ["knowledge", "command-center", "simulation"] as const,
 };
+
+function buildSourceTestMessage(item: KnowledgeCommandItem): string {
+  if (item.source_type === "Catalogo") {
+    return `Prueba esta fuente de catalogo: ${item.title}. Que producto, SKU, stock y planes aparecen?`;
+  }
+  if (item.source_type === "FAQ") {
+    return item.title;
+  }
+  return `Prueba esta fuente: ${item.title}`;
+}
 
 export function KnowledgeBasePage() {
   const queryClient = useQueryClient();
@@ -239,6 +249,26 @@ export function KnowledgeBasePage() {
     onError: (err) => toast.error(extractErrorDetail(err, "No se pudo reindexar.")),
   });
 
+  const clearKnowledge = useMutation({
+    mutationFn: knowledgeApi.clearAll,
+    onSuccess: (data) => {
+      const total = Object.values(data.deleted).reduce((sum, value) => sum + value, 0);
+      toast.success(`Conocimiento vaciado: ${total} registros eliminados`);
+      setSelectedRows(new Set());
+      void queryClient.invalidateQueries({ queryKey: ["knowledge"] });
+    },
+    onError: (err) => toast.error(extractErrorDetail(err, "No se pudo vaciar Conocimiento.")),
+  });
+
+  const uploadDocument = useMutation({
+    mutationFn: (file: File) => knowledgeApi.uploadDocument(file, "Documentos"),
+    onSuccess: (doc) => {
+      toast.success(`Documento subido: ${doc.filename}`);
+      void queryClient.invalidateQueries({ queryKey: ["knowledge"] });
+    },
+    onError: (err) => toast.error(extractErrorDetail(err, "No se pudo subir el documento.")),
+  });
+
   const itemAction = useMutation({
     mutationFn: ({ id, action }: { id: string; action: ItemAction }) => {
       if (action === "publish") return knowledgeApi.publishItem(id);
@@ -294,6 +324,16 @@ export function KnowledgeBasePage() {
     },
     onError: (err) => toast.error(extractErrorDetail(err, "No se pudo ejecutar la simulacion.")),
   });
+
+  const testSource = (item: KnowledgeCommandItem) => {
+    const message = buildSourceTestMessage(item);
+    setSimulationMessage(message);
+    runSimulation.mutate({
+      message,
+      agent: selectedAgent,
+      model: selectedModel,
+    });
+  };
 
   const markSimulation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: SimulationAction }) => {
@@ -360,6 +400,32 @@ export function KnowledgeBasePage() {
     });
   }, [activeTab, freshness, itemsQuery.data?.items, sortDirection, sortKey]);
 
+  const tabCounts = useMemo(() => {
+    const rows = itemsQuery.data?.items ?? [];
+    const countSources = (sourceTypes: readonly string[]) =>
+      rows.filter((item) => sourceTypes.includes(item.source_type)).length;
+    return {
+      faqs: countSources(["FAQ"]),
+      catalog: countSources(["Catalogo"]),
+      documents: countSources(["Documento"]),
+      promos: countSources(["Promocion"]),
+      credit: rows.filter(
+        (item) =>
+          (item.source_type === "FAQ" || item.source_type === "Documento") &&
+          item.collection.toLowerCase().includes("credito"),
+      ).length,
+      unanswered: unansweredQuery.data?.total ?? 0,
+      conflicts: risksQuery.data?.items.length ?? 0,
+      tests: 0,
+      metrics: healthQuery.data?.metrics.length ?? 0,
+    } satisfies Record<(typeof TAB_DEFS)[number]["value"], number>;
+  }, [
+    healthQuery.data?.metrics.length,
+    itemsQuery.data?.items,
+    risksQuery.data?.items.length,
+    unansweredQuery.data?.total,
+  ]);
+
   const simulation = runSimulation.data ?? defaultSimulationQuery.data;
 
   function toggleRow(id: string) {
@@ -396,7 +462,16 @@ export function KnowledgeBasePage() {
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
           reindexing={reindexAll.isPending}
+          uploading={uploadDocument.isPending}
+          onUploadDocument={(file) => uploadDocument.mutate(file)}
           onReindex={() => reindexAll.mutate()}
+          clearing={clearKnowledge.isPending}
+          onClearKnowledge={() => {
+            const confirmed = window.confirm(
+              "Esto borrara FAQs, catalogo, documentos, colecciones, pruebas, conflictos y preguntas sin respuesta de este tenant. Continuar?",
+            );
+            if (confirmed) clearKnowledge.mutate();
+          }}
           onRunSimulation={() =>
             runSimulation.mutate({
               message: simulationMessage,
@@ -414,6 +489,7 @@ export function KnowledgeBasePage() {
               <div className="min-w-0 space-y-3">
                 <KnowledgeTabs
                   activeTab={activeTab}
+                  counts={tabCounts}
                   onTabChange={(value) => setActiveTab(value as (typeof TAB_DEFS)[number]["value"])}
                 />
                 <KnowledgeTableFilters
@@ -452,6 +528,7 @@ export function KnowledgeBasePage() {
                   onTogglePage={toggleCurrentPage}
                   onAction={(id, action) => itemAction.mutate({ id, action })}
                   onOpenChunk={openChunk}
+                  onTestSource={testSource}
                 />
               </div>
 
@@ -523,7 +600,11 @@ function TopCommandBar({
   selectedModel,
   setSelectedModel,
   reindexing,
+  uploading,
+  onUploadDocument,
+  clearing,
   onReindex,
+  onClearKnowledge,
   onRunSimulation,
 }: {
   search: string;
@@ -531,7 +612,11 @@ function TopCommandBar({
   selectedModel: string;
   setSelectedModel: (value: string) => void;
   reindexing: boolean;
+  uploading: boolean;
+  onUploadDocument: (file: File) => void;
+  clearing: boolean;
   onReindex: () => void;
+  onClearKnowledge: () => void;
   onRunSimulation: () => void;
 }) {
   return (
@@ -556,12 +641,23 @@ function TopCommandBar({
           variant="outline"
           size="sm"
           className="border-slate-700 bg-slate-950/80 text-slate-200"
+          disabled={uploading}
           asChild
         >
           <label>
-            <Upload className="h-4 w-4" />
-            Importar
-            <input className="hidden" type="file" accept=".pdf,.docx,.xlsx,.csv,.json,.txt" />
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {uploading ? "Subiendo..." : "Importar"}
+            <input
+              className="hidden"
+              type="file"
+              accept=".pdf,.docx,.xlsx,.xls,.csv,.json,.jsonl,.txt,.md"
+              disabled={uploading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onUploadDocument(file);
+                event.target.value = "";
+              }}
+            />
           </label>
         </Button>
 
@@ -595,6 +691,17 @@ function TopCommandBar({
             <RefreshCcw className="h-4 w-4" />
           )}
           Reindexar
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+          disabled={clearing}
+          onClick={onClearKnowledge}
+        >
+          {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+          Vaciar
         </Button>
 
         <Button
@@ -721,9 +828,11 @@ function HealthScoreCard({ metric }: { metric: KnowledgeHealthMetric }) {
 
 function KnowledgeTabs({
   activeTab,
+  counts,
   onTabChange,
 }: {
   activeTab: string;
+  counts: Record<(typeof TAB_DEFS)[number]["value"], number>;
   onTabChange: (value: string) => void;
 }) {
   return (
@@ -737,7 +846,7 @@ function KnowledgeTabs({
           >
             {tab.label}
             <span className="rounded-sm border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] text-slate-400">
-              {tab.count}
+              {counts[tab.value]}
             </span>
           </TabsTrigger>
         ))}
@@ -892,6 +1001,7 @@ function KnowledgeTable({
   onTogglePage,
   onAction,
   onOpenChunk,
+  onTestSource,
 }: {
   query: UseQueryResult<{
     items: KnowledgeCommandItem[];
@@ -908,6 +1018,7 @@ function KnowledgeTable({
   onTogglePage: (checked: boolean) => void;
   onAction: (id: string, action: ItemAction) => void;
   onOpenChunk: (id: string) => void;
+  onTestSource: (item: KnowledgeCommandItem) => void;
 }) {
   const allSelected = items.length > 0 && items.every((item) => selectedRows.has(item.id));
 
@@ -1012,6 +1123,7 @@ function KnowledgeTable({
                         <KnowledgeTableRowActions
                           item={item}
                           onAction={onAction}
+                          onTestSource={onTestSource}
                           onOpenChunk={() =>
                             onOpenChunk(
                               item.id === "doc-credit-policy" ? "chunk-credit-policy-p5" : item.id,
@@ -1099,10 +1211,12 @@ function SortableHead({
 function KnowledgeTableRowActions({
   item,
   onAction,
+  onTestSource,
   onOpenChunk,
 }: {
   item: KnowledgeCommandItem;
   onAction: (id: string, action: ItemAction) => void;
+  onTestSource: (item: KnowledgeCommandItem) => void;
   onOpenChunk: () => void;
 }) {
   return (
@@ -1114,6 +1228,7 @@ function KnowledgeTableRowActions({
             variant="ghost"
             className="text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-200"
             aria-label="Probar fuente"
+            onClick={() => onTestSource(item)}
           >
             <Play className="h-3 w-3" />
           </Button>
@@ -1397,7 +1512,7 @@ function RagSimulationPanel({
         <QueryBoundary
           query={initialQuery}
           loadingLabel="Preparando simulador"
-          empty={(data) => data.retrieved_chunks.length === 0}
+          empty={() => !simulation || simulation.retrieved_chunks.length === 0}
         >
           {() => (
             <div className="space-y-3">

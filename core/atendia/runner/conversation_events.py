@@ -168,25 +168,41 @@ async def emit_field_updated(
     callers should still emit the underlying FIELD_EXTRACTED to keep
     analytics intact (see runner). Here we only handle the chat bubble.
     """
-    if not is_timeline_worthy_field(attr_key):
-        return
     label = _FIELD_LABELS.get(attr_key, attr_key)
-    text = f"Sistema: {label} actualizado a {_format_value(new_value)}"
-    await emit_system_event(
-        session,
-        tenant_id=tenant_id,
-        conversation_id=conversation_id,
-        event_type=EventType.FIELD_UPDATED,
-        text=text,
-        payload={
-            "field": attr_key,
-            "label": label,
-            "old_value": old_value,
-            "new_value": new_value,
-            "confidence": confidence,
-            "source": source,
-        },
-    )
+    payload = {
+        "field": attr_key,
+        "label": label,
+        "old_value": old_value,
+        "new_value": new_value,
+        "confidence": confidence,
+        "source": source,
+    }
+    if is_timeline_worthy_field(attr_key):
+        text = f"Sistema: {label} actualizado a {_format_value(new_value)}"
+        await emit_system_event(
+            session,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            event_type=EventType.FIELD_UPDATED,
+            text=text,
+            payload=payload,
+        )
+        return
+
+    emitter = EventEmitter(session)
+    try:
+        await emitter.emit(
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            event_type=EventType.FIELD_UPDATED,
+            payload=payload,
+        )
+    except Exception:
+        _log.exception(
+            "emit_field_updated: events-row insert failed for conv=%s field=%s",
+            conversation_id,
+            attr_key,
+        )
 
 
 async def emit_stage_changed(
@@ -202,7 +218,9 @@ async def emit_stage_changed(
 ) -> None:
     """Convenience wrapper for STAGE_CHANGED events."""
     to_display = to_label or to_stage
-    text = f"Sistema: Conversación movida a {to_display}"
+    from_display = from_label or from_stage
+    reason_display = f" · motivo: {reason}" if reason else ""
+    text = f"Sistema · Etapa: {from_display} -> {to_display}{reason_display}"
     await emit_system_event(
         session,
         tenant_id=tenant_id,

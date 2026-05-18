@@ -2,7 +2,7 @@
 
 The conversational core of AtendIA — Python package implementing the data-driven state machine, WhatsApp Cloud API transport, realtime layer, RAG pipeline, and operator REST API.
 
-> ⓘ Para un mapa de "qué hace cada módulo y dónde vive el código" mira [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md).
+> Para un mapa de qué hace cada módulo y dónde vive el código, mira [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md).
 
 ## Setup
 
@@ -35,8 +35,8 @@ uv run uvicorn atendia.main:app --reload --port 8001
 | `ATENDIA_V2_NLU_PROVIDER` | `keyword` (set `openai` para `gpt-4o-mini`) |
 | `ATENDIA_V2_NLU_MODEL` | `gpt-4o-mini` |
 | `ATENDIA_V2_NLU_TIMEOUT_S` | `8.0` |
-| `ATENDIA_V2_COMPOSER_PROVIDER` | `canned` (set `openai` para `gpt-4o`) |
-| `ATENDIA_V2_COMPOSER_MODEL` | `gpt-4o` |
+| `ATENDIA_V2_COMPOSER_PROVIDER` | `canned` (set `openai` para LLM real) |
+| `ATENDIA_V2_COMPOSER_MODEL` | `gpt-4o-mini` |
 | `ATENDIA_V2_COMPOSER_MAX_MESSAGES` | `2` |
 | `ATENDIA_V2_KB_PROVIDER` | `openai` (auto-fallback a `mock` si no hay API key) |
 | `ATENDIA_V2_AUTH_SESSION_SECRET` | (override en prod) |
@@ -202,4 +202,4 @@ Phase 3d.2 (WhatsApp Templates >24h) + 3d.3 (outbound multimedia) — ⏳ pendie
 Phase 4 / V1 parity sprint (frontend operator workspace) — ✅ scaffolded; per-module parity verification still pending.
 Knowledge Base module B2 — ⚠️ **partial** (backend Phase 1+2 + 3 endpoints + seed/runbook; frontend rebuild + ~44 endpoints + 5 workers diferidos). Ver [`../docs/runbooks/knowledge-base.md`](../docs/runbooks/knowledge-base.md).
 
-Status detallado por módulo en [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md) y [`../docs/plans/2026-05-08-v1-parity-modular-plan.md`](../docs/plans/2026-05-08-v1-parity-modular-plan.md).
+Status detallado por módulo en [`../docs/PROJECT_MAP.md`](../docs/PROJECT_MAP.md) y [`../docs/ESTADO-Y-GAPS.md`](../docs/ESTADO-Y-GAPS.md). Planes históricos en [`../docs/_archive/README.md`](../docs/_archive/README.md).

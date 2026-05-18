@@ -9,6 +9,7 @@ function stage(overrides: Partial<StageDraft> = {}): StageDraft {
     timeout_hours: 0,
     is_terminal: false,
     color: "#3b82f6",
+    actions_allowed: ["ask_field", "ask_clarification"],
     ...overrides,
   };
 }

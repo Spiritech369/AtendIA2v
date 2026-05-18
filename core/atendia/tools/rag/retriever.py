@@ -304,15 +304,15 @@ async def _fetch_document_chunk_candidates(
             KnowledgeChunk.tenant_id == tenant_id,
             KnowledgeChunk.embedding.is_not(None),
             KnowledgeChunk.chunk_status.notin_(["excluded", "error"]),
-            KnowledgeDocument.status == "ready",
+            KnowledgeDocument.status.in_(["indexed", "ready"]),
         )
         .order_by("distance")
         .limit(limit)
     )
     if not include_drafts:
         # Document-level publication state lives on KnowledgeDocument.status,
-        # which is already filtered above to 'ready'. No KB-module status
-        # field on documents in B2.
+        # which is already filtered above to retrievable indexed/ready states.
+        # No KB-module status field on documents in B2.
         pass
     stmt = stmt.where(
         or_(

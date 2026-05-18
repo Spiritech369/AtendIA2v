@@ -9,13 +9,17 @@ poison sibling cases.
 from __future__ import annotations
 
 import asyncio
+import json
 from io import BytesIO
 from uuid import uuid4
 
 import pytest
 import redis.asyncio as redis_async
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from atendia.config import get_settings
+from atendia.tools.rag.mock_provider import MockProvider
 
 PDF_HEADER = b"%PDF-1.7\n%minimal\n"
 
@@ -152,6 +156,40 @@ def test_reindex_cooldown(client_tenant_admin) -> None:
     assert second.status_code == 429
 
 
+def test_command_center_items_returns_live_catalog_rows(client_tenant_admin) -> None:
+    async def _seed() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_faqs "
+                    "(tenant_id, question, answer, status, priority) "
+                    "VALUES (:t, 'Que documentos piden?', 'INE y comprobante.', 'published', 5)"
+                ),
+                {"t": client_tenant_admin.tenant_id},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_catalogs "
+                    "(tenant_id, sku, name, attrs, active, status, priority) "
+                    "VALUES (:t, 'DINM-U5-TEST', 'Dinamo U5', :a\\:\\:jsonb, true, 'published', 10)"
+                ),
+                {"t": client_tenant_admin.tenant_id, "a": json.dumps({"stock": "ok"})},
+            )
+        await engine.dispose()
+
+    asyncio.run(_seed())
+
+    resp = client_tenant_admin.get("/api/v1/knowledge/items")
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    assert any(item["source_type"] == "FAQ" for item in items)
+    catalog = [item for item in items if item["source_type"] == "Catalogo"]
+    assert catalog
+    assert catalog[0]["title"] == "SKU DINM-U5-TEST - Dinamo U5"
+    assert catalog[0]["risk_level"] == "low"
+
+
 def test_delete_document_db_first(client_tenant_admin) -> None:
     doc = _upload_pdf(client_tenant_admin)
     resp = client_tenant_admin.delete(
@@ -163,4 +201,66 @@ def test_delete_document_db_first(client_tenant_admin) -> None:
             f"/api/v1/knowledge/documents/{doc['id']}",
         ).status_code
         == 404
+    )
+
+
+def test_test_endpoint_returns_catalog_even_when_semantic_faq_matches(
+    client_tenant_admin,
+    monkeypatch,
+) -> None:
+    async def _seed() -> list[float]:
+        provider = MockProvider()
+        embedding = await provider.create_embedding("Rayo 150 credito")
+        embedding_lit = "[" + ",".join(f"{x:.6f}" for x in embedding) + "]"
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_faqs "
+                    "(tenant_id, question, answer, embedding) "
+                    "VALUES (:t, :q, :a, CAST(:e AS halfvec))"
+                ),
+                {
+                    "t": client_tenant_admin.tenant_id,
+                    "q": f"FAQ {uuid4()} Rayo",
+                    "a": "Tenemos opciones de credito para motos.",
+                    "e": embedding_lit,
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_catalogs "
+                    "(tenant_id, sku, name, attrs, active, embedding) "
+                    "VALUES (:t, :s, 'Rayo 150', :a\\:\\:jsonb, true, CAST(:e AS halfvec))"
+                ),
+                {
+                    "t": client_tenant_admin.tenant_id,
+                    "s": f"RAYO-{uuid4().hex[:8]}",
+                    "a": json.dumps({"enganche": "desde 10%", "precio": 39999}),
+                    "e": embedding_lit,
+                },
+            )
+        await engine.dispose()
+        return embedding
+
+    embedding = asyncio.run(_seed())
+
+    async def _fake_embed(query: str) -> list[float]:
+        return embedding
+
+    async def _fake_answer(query: str, sources_text: str) -> tuple[str, str]:
+        return "ok", "sources_only"
+
+    monkeypatch.setattr("atendia.api.knowledge_routes._maybe_embed", _fake_embed)
+    monkeypatch.setattr("atendia.api.knowledge_routes._generate_kb_answer", _fake_answer)
+
+    resp = client_tenant_admin.post(
+        "/api/v1/knowledge/test",
+        json={"query": "Rayo 150 credito"},
+    )
+    assert resp.status_code == 200, resp.text
+    sources = resp.json()["sources"]
+    assert any(source["type"] == "faq" for source in sources)
+    assert any(
+        source["type"] == "catalog" and "Rayo 150" in source["text"] for source in sources
     )

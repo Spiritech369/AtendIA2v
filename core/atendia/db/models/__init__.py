@@ -27,6 +27,7 @@ from atendia.db.models.kb_unanswered_question import KbUnansweredQuestion
 from atendia.db.models.kb_version import KbVersion
 from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
 from atendia.db.models.lifecycle import FollowupScheduled, HumanHandoff
+from atendia.db.models.message_attachment import MessageAttachmentRow
 from atendia.db.models.message import MessageRow
 from atendia.db.models.notification import Notification
 from atendia.db.models.outbound_outbox import OutboundOutbox
@@ -96,6 +97,7 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeDocument",
     "MessageRow",
+    "MessageAttachmentRow",
     "Notification",
     "OutboundOutbox",
     "SafetyRule",

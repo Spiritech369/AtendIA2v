@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Iterator
 from uuid import uuid4
 
@@ -113,6 +114,24 @@ def test_create_definition(seed):
     assert body["field_type"] == "select"
     assert body["tenant_id"] == tid
     assert body["ordering"] == 1
+
+
+def test_create_definition_accepts_uppercase_key(seed):
+    _, _, _, email, plain = seed
+    c = TestClient(app)
+    csrf = _login(c, email, plain)
+    c.headers["X-CSRF-Token"] = csrf
+
+    resp = c.post(
+        "/api/v1/customer-fields/definitions",
+        json={
+            "key": "DOCS_INE_FRENTE",
+            "label": "INE - frente",
+            "field_type": "text",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["key"] == "DOCS_INE_FRENTE"
 
 
 def test_create_definition_rejects_unknown_field_type(seed):
@@ -343,6 +362,95 @@ def test_put_values_canonicalizes_typed_fields(seed):
     assert by_key["signed"] == "true"
     assert by_key["visit"] == "2026-05-08"
     assert by_key["interests"] == '["moto","credito"]'
+
+
+def test_put_values_can_trigger_pipeline_stage_move(seed):
+    tid, _, cust_id, email, plain = seed
+
+    async def _seed_pipeline_and_conversation() -> str:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            definition = {
+                "version": 1,
+                "fallback": "escalate_to_human",
+                "stages": [
+                    {"id": "nuevo", "label": "Nuevo"},
+                    {
+                        "id": "calificado",
+                        "label": "Calificado",
+                        "auto_enter_rules": {
+                            "enabled": True,
+                            "match": "all",
+                            "conditions": [
+                                {
+                                    "field": "interes_servicio",
+                                    "operator": "equals",
+                                    "value": "consulta",
+                                }
+                            ],
+                        },
+                    },
+                ],
+            }
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, definition, active) "
+                    "VALUES (:t, 1, CAST(:d AS jsonb), true)"
+                ),
+                {"t": tid, "d": json.dumps(definition)},
+            )
+            conv_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations (tenant_id, customer_id, current_stage, status) "
+                        "VALUES (:t, :c, 'nuevo', 'active') RETURNING id"
+                    ),
+                    {"t": tid, "c": cust_id},
+                )
+            ).scalar()
+            await conn.execute(
+                text(
+                    "INSERT INTO conversation_state (conversation_id, extracted_data) "
+                    "VALUES (:c, '{}'::jsonb)"
+                ),
+                {"c": conv_id},
+            )
+        await engine.dispose()
+        return str(conv_id)
+
+    conv_id = asyncio.run(_seed_pipeline_and_conversation())
+    c = TestClient(app)
+    csrf = _login(c, email, plain)
+    c.headers["X-CSRF-Token"] = csrf
+
+    c.post(
+        "/api/v1/customer-fields/definitions",
+        json={
+            "key": "interes_servicio",
+            "label": "Interés de servicio",
+            "field_type": "select",
+            "field_options": {"choices": ["consulta", "solo_info"]},
+        },
+    )
+    resp = c.put(
+        f"/api/v1/customers/{cust_id}/field-values",
+        json={"values": {"interes_servicio": "consulta"}},
+    )
+    assert resp.status_code == 200, resp.text
+
+    async def _read_stage() -> str:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            stage = (
+                await conn.execute(
+                    text("SELECT current_stage FROM conversations WHERE id = :c"),
+                    {"c": conv_id},
+                )
+            ).scalar_one()
+        await engine.dispose()
+        return stage
+
+    assert asyncio.run(_read_stage()) == "calificado"
 
 
 def test_put_values_rejects_invalid_typed_values(seed):

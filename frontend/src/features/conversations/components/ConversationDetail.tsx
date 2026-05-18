@@ -90,8 +90,8 @@ export function ConversationDetail({ conversationId }: { conversationId: string 
   const c = conv.data;
 
   return (
-    <div className="flex h-full gap-4">
-      <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 gap-4 overflow-hidden">
+      <Card className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>

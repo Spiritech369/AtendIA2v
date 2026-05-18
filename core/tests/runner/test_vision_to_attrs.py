@@ -64,6 +64,20 @@ def _make_pipeline(mapping: dict[str, list[str]] | None = None) -> PipelineDefin
     )
 
 
+def _make_pipeline_with_catalog(
+    *,
+    mapping: dict[str, list[str]] | None,
+    catalog: list[DocumentSpec],
+) -> PipelineDefinition:
+    return PipelineDefinition(
+        version=1,
+        stages=[StageDefinition(id="nuevo", actions_allowed=["ask_field"])],
+        fallback="ask_clarification",
+        documents_catalog=catalog,
+        vision_doc_mapping=mapping or {},
+    )
+
+
 class _FakeSession:
     def __init__(self, customer_attrs: dict[str, Any] | None = None) -> None:
         self.customer = MagicMock()
@@ -138,8 +152,8 @@ async def test_skips_non_doc_categories():
 
 @pytest.mark.asyncio
 async def test_skips_when_mapping_empty():
-    """A tenant with no vision_doc_mapping configured stays in manual mode."""
-    pipeline = _make_pipeline(mapping={})
+    """No mapping and no matching catalog entry stays in manual mode."""
+    pipeline = _make_pipeline_with_catalog(mapping={}, catalog=[])
     session = _FakeSession()
     result = VisionResult(
         category=VisionCategory.COMPROBANTE,
@@ -154,6 +168,32 @@ async def test_skips_when_mapping_empty():
         vision_result=result,
     )
     assert writes == []
+
+
+@pytest.mark.asyncio
+async def test_infers_ine_back_from_configured_catalog_when_mapping_empty():
+    pipeline = _make_pipeline_with_catalog(
+        mapping={},
+        catalog=[
+            DocumentSpec(key="DOCS_INE_FRENTE", label="INE - frente"),
+            DocumentSpec(key="DOCS_INE_ATRAS", label="INE - ATRAS"),
+        ],
+    )
+    session = _FakeSession()
+    result = VisionResult(
+        category=VisionCategory.INE,
+        confidence=0.95,
+        metadata={"ambos_lados": False},
+        quality_check=_ok_qc(side=DocumentSide.BACK),
+    )
+    writes = await apply_vision_to_attrs(
+        session=session,
+        customer_id=session.customer.id,
+        pipeline=pipeline,
+        vision_result=result,
+    )
+    assert [w.doc_key for w in writes] == ["DOCS_INE_ATRAS"]
+    assert session.customer.attrs["DOCS_INE_ATRAS"]["status"] == "ok"
 
 
 @pytest.mark.asyncio

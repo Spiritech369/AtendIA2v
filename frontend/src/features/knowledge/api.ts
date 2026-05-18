@@ -44,6 +44,11 @@ export interface KnowledgeTestResponse {
   sources: KnowledgeSource[];
 }
 
+export interface ClearKnowledgeResponse {
+  deleted: Record<string, number>;
+  demo_seed_disabled: boolean;
+}
+
 const statusSchema = z.enum(["good", "warning", "critical"]);
 const severitySchema = z.enum(["low", "medium", "high", "critical"]);
 
@@ -267,6 +272,7 @@ export const knowledgeApi = {
   deleteDocument: async (id: string) => api.delete(`/knowledge/documents/${id}`),
   retryDocument: async (id: string) =>
     (await api.post<DocumentItem>(`/knowledge/documents/${id}/retry`)).data,
+  clearAll: async () => (await api.delete<ClearKnowledgeResponse>("/knowledge/all")).data,
   // Returns the raw bytes; the caller turns it into a download. We use blob
   // response type so binary content (PDF/DOCX/...) round-trips intact.
   downloadDocumentUrl: (id: string) => `/api/v1/knowledge/documents/${id}/download`,

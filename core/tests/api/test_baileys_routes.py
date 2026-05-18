@@ -225,3 +225,87 @@ def test_internal_inbound_runs_conversation_runner(client_tenant_admin):
         f"expected at least 1 turn_trace row for conv {conv_id} after Baileys "
         f"inbound (proves the conversation_runner executed), got {count}"
     )
+
+
+def test_outbound_echo_duplicate_does_not_pause_bot(client_tenant_admin):
+    """An AtendIA-originated Baileys send can echo back as `fromMe`.
+
+    If the message already exists by channel_message_id, it is a delivery echo,
+    not an operator-device takeover, so it must not flip bot_paused.
+    """
+    settings = get_settings()
+    tenant_id = client_tenant_admin.tenant_id
+    channel_message_id = f"wa-echo-{uuid4().hex[:8]}"
+
+    async def _seed() -> str:
+        engine = create_async_engine(settings.database_url)
+        try:
+            async with engine.begin() as conn:
+                cust_id = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO customers (tenant_id, phone_e164) "
+                            "VALUES (:t, :p) RETURNING id"
+                        ),
+                        {"t": tenant_id, "p": "+5215552223344"},
+                    )
+                ).scalar_one()
+                conv_id = (
+                    await conn.execute(
+                        text(
+                            "INSERT INTO conversations (tenant_id, customer_id, current_stage) "
+                            "VALUES (:t, :c, 'nuevos') RETURNING id"
+                        ),
+                        {"t": tenant_id, "c": cust_id},
+                    )
+                ).scalar_one()
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversation_state (conversation_id, bot_paused) "
+                        "VALUES (:c, FALSE)"
+                    ),
+                    {"c": conv_id},
+                )
+                await conn.execute(
+                    text(
+                        "INSERT INTO messages "
+                        "(conversation_id, tenant_id, direction, text, channel_message_id, "
+                        " delivery_status, sent_at) "
+                        "VALUES (:c, :t, 'outbound', 'hola', :cmid, 'sent', now())"
+                    ),
+                    {"c": conv_id, "t": tenant_id, "cmid": channel_message_id},
+                )
+                return str(conv_id)
+        finally:
+            await engine.dispose()
+
+    conv_id = asyncio.run(_seed())
+
+    resp = client_tenant_admin.post(
+        "/api/v1/internal/baileys/outbound-echo",
+        json={
+            "tenant_id": tenant_id,
+            "to_phone": "5215552223344",
+            "text": "hola",
+            "ts": 1700000000000,
+            "message_id": channel_message_id,
+        },
+        headers={"X-Internal-Token": settings.baileys_internal_token},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "duplicate"
+
+    async def _paused() -> bool:
+        engine = create_async_engine(settings.database_url)
+        try:
+            async with engine.begin() as conn:
+                return (
+                    await conn.execute(
+                        text("SELECT bot_paused FROM conversation_state WHERE conversation_id = :c"),
+                        {"c": conv_id},
+                    )
+                ).scalar_one()
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(_paused()) is False

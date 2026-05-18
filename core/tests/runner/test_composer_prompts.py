@@ -113,6 +113,38 @@ def test_build_composer_prompt_renders_turn_number() -> None:
     assert "Turno actual: 7" in msgs[0]["content"]
 
 
+def test_build_composer_prompt_renders_customer_field_context() -> None:
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="ask_field",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            tone=Tone(),
+            customer_field_context={
+                "fields": [
+                    {
+                        "key": "plancredito",
+                        "label": "Plan credito",
+                        "field_type": "select",
+                        "choices": ["1", "2", "3"],
+                        "instructions": "Si responde con numero, guarda ese numero.",
+                        "aliases": {"2": "opcion dos"},
+                        "value": None,
+                        "missing": True,
+                    }
+                ],
+                "missing": ["plancredito"],
+            },
+        )
+    )
+
+    content = msgs[0]["content"]
+    assert "Datos cliente configurados por esta cuenta" in content
+    assert "plancredito: Plan credito" in content
+    assert "opciones: 1, 2, 3" in content
+    assert "Si responde con numero" in content
+
+
 def test_build_composer_prompt_no_history_no_user_message() -> None:
     """Composer prompt does NOT append a user message at the end."""
     msgs = build_composer_prompt(
@@ -155,6 +187,7 @@ def test_dispatch_picks_mode_specific_block() -> None:
             action="unused",
             flow_mode=FlowMode.SALES,
             current_stage="sales",
+            mode_guidance=MODE_PROMPTS[FlowMode.SALES],
             action_payload={"status": "ok", "name": "Adventure", "price_contado_mxn": "29900"},
             brand_facts={"catalog_url": "https://x", "buro_max_amount": "$50 mil"},
             tone=Tone(),
@@ -165,6 +198,7 @@ def test_dispatch_picks_mode_specific_block() -> None:
             action="unused",
             flow_mode=FlowMode.PLAN,
             current_stage="plan",
+            mode_guidance=MODE_PROMPTS[FlowMode.PLAN],
             brand_facts={
                 "catalog_url": "https://x",
                 "buro_max_amount": "$50 mil",
@@ -215,6 +249,95 @@ def test_brand_facts_block_present_for_support() -> None:
     assert "Benito Juárez 801" in msgs[0]["content"]
     # Sorted keys → address comes before human_agent_name
     assert msgs[0]["content"].index("address") < msgs[0]["content"].index("human_agent_name")
+
+
+# ============================================================
+# Generalization (multi-tenant): mode guidance from data
+# ============================================================
+
+
+def test_mode_guidance_from_input_overrides_hardcoded_moto() -> None:
+    """A non-moto tenant's mode guidance must be used verbatim, and the
+    hardcoded moto PLAN script must NOT leak into another vertical."""
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            mode_guidance="GUION DENTISTA: agenda una limpieza dental, una pregunta por turno.",
+            tone=Tone(),
+        )
+    )
+    content = msgs[0]["content"]
+    assert "GUION DENTISTA: agenda una limpieza dental, una pregunta por turno." in content
+    assert "$3,500" not in content
+    assert "enganche" not in content
+
+
+def test_no_mode_guidance_uses_generic_default_not_moto() -> None:
+    """A tenant that has not authored mode prompts (e.g. a brand-new
+    tenant) gets a generic, vertical-neutral default — never the
+    hardcoded moto-credit script."""
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            mode_guidance=None,
+            tone=Tone(),
+        )
+    )
+    content = msgs[0]["content"]
+    assert "$3,500" not in content
+    assert "Me depositan nómina en tarjeta" not in content  # moto credit-type menu
+    # Generic PLAN default still carries the mode's functional contract.
+    assert "Reúne los datos que el pipeline requiere" in content
+
+
+def test_agent_system_prompt_is_top_priority_section_not_brand_fact() -> None:
+    """The operator's Prompt maestro must render as a labeled high-priority
+    instruction section ABOVE the mode guidance — not buried as a
+    brand_facts bullet (which the model treats as passive data)."""
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            agent_system_prompt="Eres un asesor legal. Nunca des consejo médico.",
+            mode_guidance="GUIA NEUTRAL: ayuda con trámites.",
+            tone=Tone(),
+        )
+    )
+    content = msgs[0]["content"]
+    assert "Eres un asesor legal. Nunca des consejo médico." in content
+    assert "INSTRUCCIONES DEL AGENTE" in content
+    assert content.index("Eres un asesor legal") < content.index("GUIA NEUTRAL: ayuda con trámites.")
+    assert "agent_system_prompt:" not in content  # not a brand_facts bullet
+
+
+def test_guardrails_rank_above_agent_prompt_and_mode_guidance() -> None:
+    """Operator guardrails are inviolable: rendered ABOVE both the agent
+    prompt and the mode guidance, so a tenant cannot soften them by
+    editing mode/agent text (safety-critical for a credit bot)."""
+    msgs = build_composer_prompt(
+        ComposerInput(
+            action="unused",
+            flow_mode=FlowMode.PLAN,
+            current_stage="plan",
+            guardrails=["No prometas aprobaciones", "No inventes precios"],
+            agent_system_prompt="Eres simpático y vendes agresivo.",
+            mode_guidance="GUIA: cierra la venta.",
+            tone=Tone(),
+        )
+    )
+    content = msgs[0]["content"]
+    assert "No prometas aprobaciones" in content
+    assert "No inventes precios" in content
+    assert "REGLAS INVIOLABLES" in content
+    g = content.index("No prometas aprobaciones")
+    a = content.index("Eres simpático y vendes agresivo.")
+    m = content.index("GUIA: cierra la venta.")
+    assert g < a < m
 
 
 # ============================================================
@@ -522,6 +645,12 @@ _SNAPSHOT_CASES: list[tuple[str, dict]] = [
     ids=[name for name, _ in _SNAPSHOT_CASES],
 )
 def test_mode_snapshot(fixture_name: str, kwargs: dict) -> None:
+    # Generalization: Dinamo's moto playbook now lives in tenant data
+    # (PipelineDefinition.mode_prompts), no longer the composer default.
+    # Inject it as mode_guidance so these byte-equality snapshots keep
+    # guarding the exact Dinamo prompt via the real data path the runner
+    # uses for an existing (migrated) tenant.
+    kwargs = {**kwargs, "mode_guidance": MODE_PROMPTS[kwargs["flow_mode"]]}
     expected = (_FIXTURES / f"{fixture_name}.txt").read_text(encoding="utf-8")
     msgs = build_composer_prompt(ComposerInput(**kwargs))
     assert msgs[0]["content"] == expected

@@ -20,6 +20,15 @@ describe("hasStructuredSystemEvent", () => {
   it("returns false when event_type is not a string", () => {
     expect(hasStructuredSystemEvent({ event_type: 42 })).toBe(false);
   });
+
+  it("detects operational legacy text when metadata is missing", () => {
+    expect(hasStructuredSystemEvent(null, "SISTEMA: workflow SEND_REQUIREMENTS ejecutado")).toBe(
+      true,
+    );
+    expect(hasStructuredSystemEvent(undefined, "SISTEMA: KB usada #document.REQUISITOS")).toBe(
+      true,
+    );
+  });
 });
 
 describe("SystemEventBubble", () => {
@@ -112,5 +121,15 @@ describe("SystemEventBubble", () => {
       <SystemEventBubble text="Sistema: legacy" metadata={null} />,
     );
     expect(container.textContent).toContain("Sistema: legacy");
+  });
+
+  it("renders workflow legacy messages as structured system events", () => {
+    const { container } = render(
+      <SystemEventBubble text="SISTEMA: Workflow SEND_REQUIREMENTS ejecutado" metadata={null} />,
+    );
+    expect(container.querySelector("[data-event-type]")?.getAttribute("data-event-type")).toBe(
+      "workflow_triggered",
+    );
+    expect(screen.getByText("Workflow SEND_REQUIREMENTS ejecutado")).toBeInTheDocument();
   });
 });

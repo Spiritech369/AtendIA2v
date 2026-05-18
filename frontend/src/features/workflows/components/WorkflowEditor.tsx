@@ -439,6 +439,12 @@ interface TriggerDef {
 
 const TRIGGER_CATALOG: TriggerDef[] = [
   {
+    value: "manual",
+    label: "Manual",
+    description: "No se dispara solo. Se ejecuta desde el editor, pruebas o una acciÃ³n manual.",
+    fields: [],
+  },
+  {
     value: "message_received",
     label: "Mensaje entrante",
     description: "Cualquier mensaje que envíe el lead a la conversación.",
@@ -614,6 +620,10 @@ function triggerLabel(value: string): string {
   return TRIGGER_CATALOG.find((t) => t.value === value)?.label ?? value;
 }
 
+const SELECT_DARK_CLASS =
+  "mt-1 h-8 w-full rounded-md border border-white/10 bg-[#172330] px-2 text-xs text-slate-100 [color-scheme:dark] [&>option]:bg-[#172330] [&>option]:text-slate-100 [&>option:disabled]:text-slate-400";
+const OPTION_DARK_CLASS = "bg-[#172330] text-slate-100";
+
 function nodeMetrics(workflow: WorkflowItem, nodeId: string) {
   const ops = workflow.definition.ops as
     | { node_metrics?: Record<string, Record<string, unknown>> }
@@ -658,8 +668,14 @@ export function WorkflowEditor({
     if (!selectedNode) return;
     setSelectedNodeId(selectedNode.id);
     setTitleDraft(selectedNode.title ?? "");
-    setConfigDraft(JSON.stringify(selectedNode.config ?? {}, null, 2));
-  }, [selectedNode?.id]);
+    setConfigDraft(
+      JSON.stringify(
+        selectedNode.type === "trigger" ? workflow.trigger_config : (selectedNode.config ?? {}),
+        null,
+        2,
+      ),
+    );
+  }, [selectedNode?.id, selectedNode?.type, workflow.trigger_config]);
 
   useEffect(() => {
     if (focusNodeId && nodes.some((n) => n.id === focusNodeId)) {
@@ -1060,7 +1076,7 @@ export function WorkflowEditor({
                       Tipo de disparador
                     </Label>
                     <select
-                      className="mt-1 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100"
+                      className={SELECT_DARK_CLASS}
                       value={workflow.trigger_type}
                       disabled={readOnly}
                       onChange={(event) => {
@@ -1071,7 +1087,7 @@ export function WorkflowEditor({
                       }}
                     >
                       {TRIGGER_CATALOG.map((trigger) => (
-                        <option key={trigger.value} value={trigger.value}>
+                        <option className={OPTION_DARK_CLASS} key={trigger.value} value={trigger.value}>
                           {trigger.label}
                         </option>
                       ))}

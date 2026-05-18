@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import {
+  type ConversationAttachment,
   type ConversationDetail,
   type ConversationListResponse,
   conversationsApi,
@@ -23,6 +24,14 @@ export function useConversation(id: string) {
     queryKey: ["conversation", id],
     queryFn: () => conversationsApi.getOne(id),
     enabled: !!id,
+  });
+}
+
+export function useConversationAttachments(conversationId: string) {
+  return useQuery<ConversationAttachment[], Error>({
+    queryKey: ["conversation-attachments", conversationId],
+    queryFn: () => conversationsApi.listAttachments(conversationId),
+    enabled: !!conversationId,
   });
 }
 

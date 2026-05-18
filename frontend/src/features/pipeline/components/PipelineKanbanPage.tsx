@@ -1000,7 +1000,7 @@ export function PipelineKanbanPage() {
   const user = useAuthStore((s) => s.user);
   const [scope, setScope] = useState<"all" | "mine">("all");
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null);
-  const [showEditor, setShowEditor] = useState(true);
+  const [showEditor, setShowEditor] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedCard, setSelectedCard] = useState<PipelineConversationCard | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -1331,7 +1331,7 @@ export function PipelineKanbanPage() {
               onClick={() => setShowEditor((v) => !v)}
             >
               <Settings className="mr-1.5 size-3" />
-              Configurar etapas
+              {showEditor ? "Ocultar editor" : "Configurar etapas"}
             </Button>
           </div>
         </div>

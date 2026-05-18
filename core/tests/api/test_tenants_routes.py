@@ -139,6 +139,40 @@ def test_put_pipeline_stores_history_snapshots(operator_seed_local):
     assert hist == 2  # both v1 and v2 captured as history entries
 
 
+def test_put_pipeline_preserves_mode_prompts_when_omitted(operator_seed_local):
+    """The frontend stage editor does not know about `mode_prompts`. A
+    PUT that omits it must NOT wipe the tenant's per-mode composer
+    guidance — otherwise editing stages silently regresses the bot to
+    the generic default."""
+    _, _, email, plain = operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    with_prompts = {
+        "version": 1,
+        "stages": [{"id": "qualify"}],
+        "mode_prompts": {"PLAN": "GUION PLAN DEL TENANT"},
+    }
+    r1 = client.put(
+        "/api/v1/tenants/pipeline",
+        json={"definition": with_prompts},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r1.status_code == 200
+
+    without = {"version": 1, "stages": [{"id": "qualify"}, {"id": "quote"}]}
+    r2 = client.put(
+        "/api/v1/tenants/pipeline",
+        json={"definition": without},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r2.status_code == 200
+
+    cur = client.get("/api/v1/tenants/pipeline").json()["definition"]
+    assert cur["stages"] == without["stages"]  # stage edit applied
+    assert cur.get("mode_prompts") == {"PLAN": "GUION PLAN DEL TENANT"}  # preserved
+
+
 def test_pipeline_versions_list_endpoint(operator_seed_local):
     _, _, email, plain = operator_seed_local
     client = TestClient(app)
@@ -344,7 +378,38 @@ def test_tone_round_trip(operator_seed_local):
     assert g["voice"] == voice
 
 
-def test_operator_cannot_put_brand_facts_or_tone(plain_operator_seed_local):
+def test_qos_config_round_trip(operator_seed_local):
+    _, _, email, plain = operator_seed_local
+    client = TestClient(app)
+    csrf = _login(client, email, plain)
+
+    initial = client.get("/api/v1/tenants/qos-config")
+    assert initial.status_code == 200
+    assert initial.json()["qos_config"]["enabled"] is False
+    assert initial.json()["qos_config"]["max_messages_per_turn"] == 2
+
+    qos = {
+        **initial.json()["qos_config"],
+        "enabled": True,
+        "response_slo_ms": 6000,
+        "max_messages_per_turn": 1,
+    }
+    saved = client.put(
+        "/api/v1/tenants/qos-config",
+        json=qos,
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["qos_config"]["enabled"] is True
+    assert saved.json()["qos_config"]["response_slo_ms"] == 6000
+    assert saved.json()["qos_config"]["max_messages_per_turn"] == 1
+
+    fetched = client.get("/api/v1/tenants/qos-config").json()["qos_config"]
+    assert fetched["enabled"] is True
+    assert fetched["max_messages_per_turn"] == 1
+
+
+def test_operator_cannot_put_brand_facts_tone_or_qos(plain_operator_seed_local):
     _, _, email, plain = plain_operator_seed_local
     client = TestClient(app)
     csrf = _login(client, email, plain)
@@ -359,8 +424,14 @@ def test_operator_cannot_put_brand_facts_or_tone(plain_operator_seed_local):
         json={"voice": {"register": "formal"}},
         headers={"X-CSRF-Token": csrf},
     )
+    qos = client.put(
+        "/api/v1/tenants/qos-config",
+        json={"enabled": True},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert facts.status_code == 403
     assert tone.status_code == 403
+    assert qos.status_code == 403
 
 
 def test_brand_facts_tenant_scoped(operator_seed_local):

@@ -1,5 +1,5 @@
-/**
- * ContactPanel — panel lateral de contacto en la vista de conversación.
+﻿/**
+ * ContactPanel - panel lateral de contacto en la vista de conversación.
  *
  * Diseño denso que replica el espíritu del mockup AtendIA v2:
  *  - Identidad del contacto (avatar, nombre, teléfono, badge de estado)
@@ -27,6 +27,7 @@ import {
   Copy,
   ExternalLink,
   FileText,
+  Image as ImageIcon,
   Info,
   Mail,
   MessageCircle,
@@ -63,10 +64,14 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { tenantsApi } from "@/features/config/api";
-import { type ConversationDetail, conversationsApi } from "@/features/conversations/api";
+import {
+  type ConversationAttachment,
+  type ConversationDetail,
+  conversationsApi,
+} from "@/features/conversations/api";
 import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
 import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
-import { FieldSuggestionsPanel } from "@/features/conversations/components/FieldSuggestionsPanel";
+import { useConversationAttachments } from "@/features/conversations/hooks/useConversations";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -87,18 +92,18 @@ import type {
 } from "@/features/customers/api";
 import { cn } from "@/lib/utils";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Props
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Props {
   customerId: string | undefined;
   conversation?: ConversationDetail;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Tiny helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getInitials(name: string | null, phone: string): string {
   if (name) {
@@ -225,6 +230,13 @@ function formatShortDateTime(iso: string | null | undefined): string | null {
   });
 }
 
+function formatFileSize(bytes: number | null | undefined): string | null {
+  if (!bytes || bytes <= 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function formatElapsed(iso: string | null | undefined): string | null {
   if (!iso) return null;
   try {
@@ -253,9 +265,9 @@ function stageLabel(stage: string | null | undefined): string {
     .join(" ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // CopyBtn
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -277,9 +289,9 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Section label
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SectionLabel({
   children,
@@ -296,9 +308,9 @@ function SectionLabel({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ScoreBar — compact horizontal progress
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ScoreBar â€” compact horizontal progress
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ScoreBar({ value }: { value: number }) {
   const pct = Math.min(100, Math.max(0, value));
@@ -313,9 +325,9 @@ function ScoreBar({ value }: { value: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ContactIdentitySection
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ContactIdentitySection({ customerId }: { customerId: string }) {
   const customer = useCustomerDetail(customerId);
@@ -484,9 +496,9 @@ function ContactIdentitySection({ customerId }: { customerId: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // QuickActionsSection
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function QuickActionsSection({ phone }: { phone: string }) {
   // wa.me accepts the E.164 number with no leading '+' and opens the
@@ -610,20 +622,19 @@ function DetailRow({
 }
 
 const CREDIT_TYPE_OPTIONS = [
-  { value: "sin_dato", label: "Sin dato" },
-  { value: "nomina_tarjeta", label: "Nómina tarjeta" },
-  { value: "nomina_recibos", label: "Nómina recibos" },
-  { value: "pensionado_imss", label: "Pensionado IMSS" },
-  { value: "negocio_sat", label: "Negocio SAT" },
-  { value: "sin_comprobantes", label: "Sin comprobantes" },
+  { value: "Nómina Tarjeta", label: "Nómina Tarjeta" },
+  { value: "Nómina Recibos", label: "Nómina Recibos" },
+  { value: "Pensionados", label: "Pensionados" },
+  { value: "Negocio SAT", label: "Negocio SAT" },
+  { value: "Sin Comprobantes", label: "Sin Comprobantes" },
+  { value: "Guardia de Seguridad", label: "Guardia de Seguridad" },
 ];
 
 const PLAN_OPTIONS = [
-  { value: "10", label: "10" },
-  { value: "15", label: "15" },
-  { value: "20", label: "20" },
-  { value: "25", label: "25" },
-  { value: "30", label: "30" },
+  { value: "10%", label: "10%" },
+  { value: "15%", label: "15%" },
+  { value: "20%", label: "20%" },
+  { value: "30%", label: "30%" },
 ];
 
 // Keys that the canonical 5 attr-backed cards already render; the ad-hoc
@@ -635,6 +646,7 @@ const CANONICAL_ATTR_KEYS = new Set([
   "tipo_de_credito",
   "plan_credito",
   "plan_de_credito",
+  "credito_plan",
   "modelo_interes",
   "producto",
   "modelo_moto",
@@ -642,11 +654,71 @@ const CANONICAL_ATTR_KEYS = new Set([
   "ciudad",
   "advisor_label",
 ]);
-// Internal seed metadata — hide from ad-hoc grid.
+// Internal seed metadata â€” hide from ad-hoc grid.
 const META_ATTR_KEYS = new Set(["mock_seed", "slug", "model_sku", "campaign"]);
+
+const CANONICAL_FIELD_ALIASES: Record<string, string[]> = {
+  estimated_value: ["estimated_value", "valor_estimado", "valor estimado"],
+  tipo_credito: ["tipo_credito", "tipo_de_credito", "tipo credito", "tipo de credito"],
+  plan_credito: [
+    "plan_credito",
+    "plan_de_credito",
+    "credito_plan",
+    "plan credito",
+    "plan de credito",
+    "credito plan",
+  ],
+  modelo_interes: ["modelo_interes", "modelo_moto", "modelo moto", "producto", "product"],
+  city: ["city", "ciudad", "ubicacion", "ubicación"],
+  advisor_label: ["advisor_label", "asesor", "advisor"],
+};
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeFieldKey(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function aliasSetFor(canonicalKey: string): Set<string> {
+  return new Set((CANONICAL_FIELD_ALIASES[canonicalKey] ?? [canonicalKey]).map(normalizeFieldKey));
+}
+
+function canonicalAttrKeysFor(canonicalKey: string): string[] {
+  return CANONICAL_FIELD_ALIASES[canonicalKey]?.filter((key) => !key.includes(" ")) ?? [
+    canonicalKey,
+  ];
+}
+
+function isDocumentFieldKey(key: string): boolean {
+  return /^DOCS_[A-Z0-9_]+$/.test(key);
+}
+
+function valueFromAttrs(attrs: unknown, key: string): string | null {
+  if (!isPlainRecord(attrs)) return null;
+  const raw = attrs[key];
+  if (isDocumentFieldKey(key)) {
+    if (isPlainRecord(raw)) return toDisplayValue(raw.status);
+    if (typeof raw === "boolean") return raw ? "ok" : "missing";
+  }
+  return toDisplayValue(raw);
+}
+
+function valueForDefinition(
+  definition: FieldDefinition,
+  configuredValues: Map<string, string | null>,
+  attrs: unknown,
+): string | null {
+  if (isDocumentFieldKey(definition.key)) {
+    return valueFromAttrs(attrs, definition.key) ?? configuredValues.get(definition.key) ?? null;
+  }
+  return configuredValues.get(definition.key) ?? valueFromAttrs(attrs, definition.key);
 }
 
 function ContactDetailGridSection({
@@ -661,6 +733,9 @@ function ContactDetailGridSection({
   const patchCustomer = usePatchCustomer(customerId);
   const patchConversation = usePatchConversation(conversation?.id);
   const { patchAttr, deleteAttr } = useCustomerAttrs(customerId);
+  const fieldDefinitions = useFieldDefinitions();
+  const fieldValues = useFieldValues(customerId);
+  const putFieldValues = usePutFieldValues(customerId);
   const pipeline = useQuery({
     queryKey: ["tenants", "pipeline"],
     queryFn: tenantsApi.getPipeline,
@@ -678,6 +753,59 @@ function ContactDetailGridSection({
   }
 
   const sources = getDetailSources(customer, conversation);
+  const configuredValueEntries = [
+    ...(conversation?.customer_fields ?? []).map((field) => [field.key, field.value] as const),
+    ...(fieldValues.data ?? []).map((field) => [field.key, field.value] as const),
+  ];
+  const configuredValues = new Map<string, string | null>(configuredValueEntries);
+  const configuredValuesByNormalizedKey = new Map(
+    configuredValueEntries.map(([key, value]) => [normalizeFieldKey(key), value]),
+  );
+  const fieldDefinitionsByNormalizedKey = new Map(
+    (fieldDefinitions.data ?? []).map((definition) => [
+      normalizeFieldKey(definition.key),
+      definition,
+    ]),
+  );
+  const configuredDefinitionFor = (canonicalKey: string): FieldDefinition | undefined =>
+    [...aliasSetFor(canonicalKey)]
+      .map((key) => fieldDefinitionsByNormalizedKey.get(key))
+      .find((definition): definition is FieldDefinition => !!definition);
+  const configuredFieldFor = (
+    canonicalKey: string,
+  ): { definition: FieldDefinition; value: string | null } | null => {
+    const definition = configuredDefinitionFor(canonicalKey);
+    if (!definition) return null;
+    return { definition, value: configuredValues.get(definition.key) ?? null };
+  };
+  const displayValueFor = (canonicalKey: string, fallback: string | null): string | null => {
+    const field = configuredFieldFor(canonicalKey);
+    if (field?.value) return field.value;
+    return fallback;
+  };
+  const displayLabelFor = (canonicalKey: string, fallback: string): string =>
+    configuredDefinitionFor(canonicalKey)?.label ?? fallback;
+  const saveConfiguredOrAttr = (
+    canonicalKey: string,
+    attrKey: string,
+    value: string | number | null,
+  ) => {
+    const definition = configuredDefinitionFor(canonicalKey);
+    if (definition) return putFieldValues.mutateAsync({ [definition.key]: value });
+    return patchAttr.mutateAsync({ key: attrKey, value });
+  };
+  const deleteConfiguredOrAttr = (canonicalKey: string, attrKey: string) => {
+    const definition = configuredDefinitionFor(canonicalKey);
+    const duplicateAttrKeys = canonicalAttrKeysFor(canonicalKey).filter((key) => {
+      const attrs = customer.attrs ?? {};
+      return isPlainRecord(attrs) && Object.prototype.hasOwnProperty.call(attrs, key);
+    });
+    const tasks: Array<Promise<unknown>> = [];
+    if (definition) tasks.push(putFieldValues.mutateAsync({ [definition.key]: null }));
+    tasks.push(...duplicateAttrKeys.map((key) => deleteAttr.mutateAsync(key)));
+    if (tasks.length === 0) return deleteAttr.mutateAsync(attrKey);
+    return Promise.all(tasks);
+  };
   const source =
     pickValue(sources, [
       "source",
@@ -703,10 +831,11 @@ function ContactDetailGridSection({
     "price",
   ]);
   const estimatedDisplay =
-    formatMoney(estimatedRaw) ??
-    pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
-  const creditType = pickValue(sources, ["tipo_credito", "tipo_de_credito", "credit_type"]);
-  const creditPlan = pickValue(sources, ["plan_credito", "plan_de_credito", "credit_plan"]);
+    formatMoney(estimatedRaw) ?? pickValue(sources, ["valor_estimado_label", "estimated_value_label"]);
+  const creditType =
+    pickValue(sources, ["tipo_credito", "tipo_de_credito", "credit_type"]);
+  const creditPlan =
+    pickValue(sources, ["plan_credito", "plan_de_credito", "credito_plan", "credit_plan"]);
   const product = pickValue(sources, [
     "modelo_interes",
     "modelo_moto",
@@ -727,16 +856,29 @@ function ContactDetailGridSection({
     label: s.label ?? s.id,
   }));
 
+  const hiddenCustomKeys = new Set<string>([
+    ...Object.values(CANONICAL_FIELD_ALIASES).flat().map(normalizeFieldKey),
+    ...(fieldDefinitions.data ?? []).map((definition) => normalizeFieldKey(definition.key)),
+  ]);
   const customAttrs = isPlainRecord(customer.attrs)
     ? Object.entries(customer.attrs).filter(
-        ([k]) => !CANONICAL_ATTR_KEYS.has(k) && !META_ATTR_KEYS.has(k),
+        ([k]) =>
+          !CANONICAL_ATTR_KEYS.has(k) &&
+          !META_ATTR_KEYS.has(k) &&
+          !hiddenCustomKeys.has(normalizeFieldKey(k)),
       )
     : [];
+  const additionalConfiguredFields = (fieldDefinitions.data ?? []).filter((definition) => {
+    const normalized = normalizeFieldKey(definition.key);
+    return !Object.keys(CANONICAL_FIELD_ALIASES).some((canonicalKey) =>
+      aliasSetFor(canonicalKey).has(normalized),
+    );
+  });
 
   return (
     <div className="px-3 py-3 space-y-2.5">
       <div className="flex items-center justify-between">
-        <SectionLabel icon={Info}>Datos de contacto</SectionLabel>
+        <SectionLabel icon={Info}>Datos del cliente</SectionLabel>
         <Button
           variant="ghost"
           size="sm"
@@ -768,64 +910,61 @@ function ContactDetailGridSection({
           onDelete={() => patchCustomer.mutateAsync({ source: null })}
         />
         <EditableDetailRow
-          label="Asesor"
-          value={advisor}
+          label={displayLabelFor("advisor_label", "Asesor")}
+          value={displayValueFor("advisor_label", advisor)}
           icon={UserCheck}
           editable
           deletable
-          onSave={(v) => patchAttr.mutateAsync({ key: "advisor_label", value: v })}
-          onDelete={() => deleteAttr.mutateAsync("advisor_label")}
+          onSave={(v) => saveConfiguredOrAttr("advisor_label", "advisor_label", v)}
+          onDelete={() => deleteConfiguredOrAttr("advisor_label", "advisor_label")}
         />
         <EditableDetailRow
-          label="Valor estimado"
-          value={estimatedDisplay}
+          label={displayLabelFor("estimated_value", "Valor estimado")}
+          value={displayValueFor("estimated_value", estimatedDisplay)}
           icon={Zap}
           editable
           deletable
           inputType="number"
           onSave={(v) =>
-            patchAttr.mutateAsync({
-              key: "estimated_value",
-              value: v == null ? null : Number(v),
-            })
+            saveConfiguredOrAttr("estimated_value", "estimated_value", v == null ? null : Number(v))
           }
-          onDelete={() => deleteAttr.mutateAsync("estimated_value")}
+          onDelete={() => deleteConfiguredOrAttr("estimated_value", "estimated_value")}
         />
         <EditableDetailRow
-          label="Tipo de crédito"
-          value={creditType}
+          label={displayLabelFor("tipo_credito", "Tipo de crédito")}
+          value={displayValueFor("tipo_credito", creditType)}
           editable
           deletable
           inputType="select"
           options={CREDIT_TYPE_OPTIONS}
-          onSave={(v) => patchAttr.mutateAsync({ key: "tipo_credito", value: v })}
-          onDelete={() => deleteAttr.mutateAsync("tipo_credito")}
+          onSave={(v) => saveConfiguredOrAttr("tipo_credito", "tipo_credito", v)}
+          onDelete={() => deleteConfiguredOrAttr("tipo_credito", "tipo_credito")}
         />
         <EditableDetailRow
-          label="Plan de crédito"
-          value={creditPlan}
+          label={displayLabelFor("plan_credito", "Plan de crédito")}
+          value={displayValueFor("plan_credito", creditPlan)}
           editable
           deletable
           inputType="select"
           options={PLAN_OPTIONS}
-          onSave={(v) => patchAttr.mutateAsync({ key: "plan_credito", value: v })}
-          onDelete={() => deleteAttr.mutateAsync("plan_credito")}
+          onSave={(v) => saveConfiguredOrAttr("plan_credito", "plan_credito", v)}
+          onDelete={() => deleteConfiguredOrAttr("plan_credito", "plan_credito")}
         />
         <EditableDetailRow
-          label="Producto"
-          value={product}
+          label={displayLabelFor("modelo_interes", "Producto")}
+          value={displayValueFor("modelo_interes", product)}
           editable
           deletable
-          onSave={(v) => patchAttr.mutateAsync({ key: "modelo_interes", value: v })}
-          onDelete={() => deleteAttr.mutateAsync("modelo_interes")}
+          onSave={(v) => saveConfiguredOrAttr("modelo_interes", "modelo_interes", v)}
+          onDelete={() => deleteConfiguredOrAttr("modelo_interes", "modelo_interes")}
         />
         <EditableDetailRow
-          label="Ubicación"
-          value={city}
+          label={displayLabelFor("city", "Ubicación")}
+          value={displayValueFor("city", city)}
           editable
           deletable
-          onSave={(v) => patchAttr.mutateAsync({ key: "city", value: v })}
-          onDelete={() => deleteAttr.mutateAsync("city")}
+          onSave={(v) => saveConfiguredOrAttr("city", "city", v)}
+          onDelete={() => deleteConfiguredOrAttr("city", "city")}
         />
       </div>
 
@@ -851,8 +990,47 @@ function ContactDetailGridSection({
         />
       </div>
 
-      {customAttrs.length > 0 && (
+      {(additionalConfiguredFields.length > 0 || customAttrs.length > 0) && (
         <div className="grid grid-cols-2 gap-1.5 pt-1">
+          {additionalConfiguredFields.map((definition) => {
+            const value = valueForDefinition(definition, configuredValues, customer.attrs) ?? null;
+            const inputType =
+              definition.field_type === "number"
+                ? "number"
+                : definition.field_type === "select"
+                  ? "select"
+                  : "text";
+            const options =
+              definition.field_type === "select"
+                ? ((definition.field_options as { choices?: string[] } | null)?.choices ?? []).map(
+                    (choice) => ({ value: choice, label: choice }),
+                  )
+                : undefined;
+            return (
+              <EditableDetailRow
+                key={definition.id}
+                label={definition.label}
+                value={value}
+                editable
+                deletable
+                inputType={inputType}
+                options={options}
+                onSave={(next) =>
+                  isDocumentFieldKey(definition.key)
+                    ? patchAttr.mutateAsync({
+                        key: definition.key,
+                        value: next ? { status: next } : { status: "missing" },
+                      })
+                    : putFieldValues.mutateAsync({ [definition.key]: next })
+                }
+                onDelete={() =>
+                  isDocumentFieldKey(definition.key)
+                    ? deleteAttr.mutateAsync(definition.key)
+                    : putFieldValues.mutateAsync({ [definition.key]: null })
+                }
+              />
+            );
+          })}
           {customAttrs.map(([k, v]) => (
             <EditableDetailRow
               key={k}
@@ -971,6 +1149,81 @@ function MissingDocumentsSection({
   );
 }
 
+function attachmentLabel(item: ConversationAttachment): string {
+  return item.original_filename || item.caption || item.mime_type || "Archivo";
+}
+
+function MultimediaSection({ conversationId }: { conversationId: string | undefined }) {
+  const attachments = useConversationAttachments(conversationId ?? "");
+  const items = attachments.data ?? [];
+
+  return (
+    <div className="px-3 py-3">
+      <div className="rounded-lg border border-border bg-background/60 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
+            Multimedia
+          </div>
+          {items.length > 0 && (
+            <span className="rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {items.length}
+            </span>
+          )}
+        </div>
+
+        {attachments.isLoading ? (
+          <div className="mt-3 space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : items.length === 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">Sin archivos recibidos.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {items.slice(0, 6).map((item) => {
+              const isImage = item.mime_type?.startsWith("image/");
+              const size = formatFileSize(item.file_size);
+              const when = formatShortDateTime(item.sent_at || item.created_at);
+
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-w-0 items-center gap-2 rounded-md border border-border/70 bg-muted/25 p-2 transition-colors hover:bg-muted/50"
+                >
+                  {isImage ? (
+                    <img
+                      src={item.url}
+                      alt={attachmentLabel(item)}
+                      className="h-9 w-9 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-background text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-medium">
+                      {attachmentLabel(item)}
+                    </span>
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {[item.type, size, when].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function suggestedNextAction(
   customer: CustomerRecord | undefined,
   conversation: ConversationDetail | undefined,
@@ -1022,10 +1275,10 @@ function NextBestActionSection({
         <Button
           size="sm"
           className="mt-3 h-7 w-full gap-1.5 text-xs"
-          onClick={() => toast.success("Accion preparada", { description: action })}
+          onClick={() => toast.success("Acción preparada", { description: action })}
         >
           <Send className="h-3 w-3" />
-          Ejecutar accion
+          Ejecutar acción
         </Button>
       </div>
     </div>
@@ -1044,10 +1297,10 @@ function buildRisks(
     risks.push("Tiempo sin respuesta mayor a 2 horas.");
   }
   if (conversation?.assigned_user_id === null && conversation?.assigned_agent_id === null) {
-    risks.push("Conversacion sin asesor asignado.");
+    risks.push("Conversación sin asesor asignado.");
   }
   if (conversation?.has_pending_handoff) {
-    risks.push("Handoff pendiente de revision.");
+    risks.push("Handoff pendiente de revisión.");
   }
   if (conversation?.bot_paused) {
     risks.push("IA pausada; el seguimiento depende del operador.");
@@ -1128,7 +1381,7 @@ function RisksDetectedSection({
 function EventTimelineSection({ conversation }: { conversation: ConversationDetail | undefined }) {
   const entries = [
     {
-      label: "Conversacion iniciada",
+      label: "Conversación iniciada",
       time: formatShortDateTime(conversation?.created_at),
       tone: "bg-blue-500",
     },
@@ -1147,7 +1400,7 @@ function EventTimelineSection({ conversation }: { conversation: ConversationDeta
     {
       label: conversation?.last_intent
         ? `${normalizeIntent(conversation.last_intent)} detectado`
-        : "Intencion pendiente",
+        : "Intención pendiente",
       time: formatShortDateTime(conversation?.last_inbound_at ?? conversation?.last_activity_at),
       tone: "bg-amber-500",
     },
@@ -1176,9 +1429,9 @@ function EventTimelineSection({ conversation }: { conversation: ConversationDeta
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ConversationSummarySection
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ConversationSummarySection({ conversation }: { conversation: ConversationDetail }) {
   const qc = useQueryClient();
@@ -1269,198 +1522,9 @@ function ConversationSummarySection({ conversation }: { conversation: Conversati
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CustomFieldsSection — full CRUD preserved
-// ─────────────────────────────────────────────────────────────────────────────
-
-function CustomFieldsSection({ customerId }: { customerId: string }) {
-  const defs = useFieldDefinitions();
-  const vals = useFieldValues(customerId);
-  const putValues = usePutFieldValues(customerId);
-  const [draft, setDraft] = useState<Record<string, string | null>>({});
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    if (vals.data) {
-      const map: Record<string, string | null> = {};
-      for (const v of vals.data) map[v.key] = v.value;
-      setDraft(map);
-      setDirty(false);
-    }
-  }, [vals.data]);
-
-  if (defs.isLoading || vals.isLoading) {
-    return (
-      <div className="px-3 py-3 space-y-2">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="h-7 w-full" />
-        <Skeleton className="h-7 w-full" />
-      </div>
-    );
-  }
-
-  if (!defs.data?.length) {
-    return (
-      <div className="px-3 py-3 space-y-1">
-        <SectionLabel>Campos personalizados</SectionLabel>
-        <p className="text-[11px] text-muted-foreground">Sin campos definidos.</p>
-      </div>
-    );
-  }
-
-  const update = (key: string, value: string | null) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-    setDirty(true);
-  };
-
-  const save = () => {
-    putValues.mutate(draft, { onSuccess: () => setDirty(false) });
-  };
-
-  return (
-    <div className="px-3 py-3 space-y-2.5">
-      <SectionLabel>Campos personalizados</SectionLabel>
-      <div className="space-y-2">
-        {defs.data.map((d) => (
-          <FieldInput key={d.id} definition={d} value={draft[d.key] ?? ""} onChange={update} />
-        ))}
-      </div>
-      {dirty && (
-        <Button
-          size="sm"
-          className="h-7 px-2 text-xs"
-          onClick={save}
-          disabled={putValues.isPending}
-        >
-          <Save className="mr-1 h-3 w-3" />
-          {putValues.isPending ? "Guardando…" : "Guardar campos"}
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function FieldInput({
-  definition,
-  value,
-  onChange,
-}: {
-  definition: FieldDefinition;
-  value: string;
-  onChange: (key: string, value: string | null) => void;
-}) {
-  const { key, label, field_type, field_options } = definition;
-  const choices = (field_options as { choices?: string[] } | null)?.choices ?? [];
-
-  if (field_type === "select") {
-    return (
-      <div>
-        <Label className="text-[11px]">{label}</Label>
-        <Select value={value || ""} onValueChange={(v) => onChange(key, v)}>
-          <SelectTrigger className="mt-0.5 h-7 text-xs">
-            <SelectValue placeholder="Seleccionar…" />
-          </SelectTrigger>
-          <SelectContent>
-            {choices.map((c) => (
-              <SelectItem key={c} value={c} className="text-xs">
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
-
-  if (field_type === "multiselect") {
-    let selected: string[] = [];
-    if (value) {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed))
-          selected = parsed.filter((v): v is string => typeof v === "string");
-      } catch {
-        selected = [];
-      }
-    }
-    const toggle = (choice: string) => {
-      const next = selected.includes(choice)
-        ? selected.filter((s) => s !== choice)
-        : [...selected, choice];
-      onChange(key, next.length > 0 ? JSON.stringify(next) : null);
-    };
-    return (
-      <div>
-        <Label className="text-[11px]">{label}</Label>
-        <div className="mt-0.5 flex flex-wrap gap-1">
-          {choices.length === 0 ? (
-            <span className="text-[10px] text-muted-foreground">(sin opciones)</span>
-          ) : (
-            choices.map((c) => {
-              const checked = selected.includes(c);
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => toggle(c)}
-                  aria-pressed={checked}
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[11px] transition-colors",
-                    checked
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-muted text-muted-foreground hover:border-primary/40",
-                  )}
-                >
-                  {c}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (field_type === "checkbox") {
-    const checked = value === "true";
-    return (
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(key, checked ? "false" : "true")}
-          aria-pressed={checked}
-          className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded border text-xs transition-colors",
-            checked
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input hover:border-primary/60",
-          )}
-        >
-          {checked && <Check className="h-2.5 w-2.5" />}
-        </button>
-        <Label className="text-[11px] cursor-pointer">{label}</Label>
-      </div>
-    );
-  }
-
-  const inputType = field_type === "number" ? "number" : field_type === "date" ? "date" : "text";
-
-  return (
-    <div>
-      <Label className="text-[11px]">{label}</Label>
-      <Input
-        type={inputType}
-        value={value}
-        onChange={(e) => onChange(key, e.target.value)}
-        className="mt-0.5 h-7 text-xs"
-      />
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NotesSection — full logic preserved, improved visuals
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// NotesSection â€” full logic preserved, improved visuals
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function NotesSection({
   customerId,
@@ -1755,9 +1819,9 @@ function NoteCard({ note, customerId }: { note: CustomerNote; customerId: string
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Main export
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const COLLAPSE_KEY = "atendia.contactPanel.collapsed";
 
@@ -1779,7 +1843,7 @@ export function ContactPanel({ customerId, conversation }: Props) {
     try {
       window.localStorage.setItem(COLLAPSE_KEY, v ? "1" : "0");
     } catch {
-      /* storage disabled / over quota — non-fatal */
+      /* storage disabled / over quota â€” non-fatal */
     }
   };
   const customer = useCustomerDetail(customerId ?? "");
@@ -1798,13 +1862,13 @@ export function ContactPanel({ customerId, conversation }: Props) {
   }
 
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground">
-      {/* ── Panel header ─────────────────────────────────────────────── */}
+    <div className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground">
+      {/* â”€â”€ Panel header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
         <div className="min-w-0">
           <span className="block truncate text-xs font-semibold">Inteligencia del cliente</span>
           <span className="block truncate text-[10px] text-muted-foreground">
-            contacto, riesgo y siguiente accion
+            contacto, riesgo y siguiente acción
           </span>
         </div>
         <div className="flex items-center gap-0.5">
@@ -1829,8 +1893,8 @@ export function ContactPanel({ customerId, conversation }: Props) {
         </div>
       </div>
 
-      {/* ── Scrollable body ───────────────────────────────────────────── */}
-      <ScrollArea className="flex-1">
+      {/* â”€â”€ Scrollable body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden">
         <div>
           {customerId ? (
             <>
@@ -1844,9 +1908,6 @@ export function ContactPanel({ customerId, conversation }: Props) {
               <IntelligenceScoreSection customer={customer.data} />
 
               <Separator />
-              <FieldSuggestionsPanel customerId={customerId} />
-
-              <Separator />
               <ContactDetailGridSection
                 customerId={customerId}
                 customer={customer.data}
@@ -1855,6 +1916,9 @@ export function ContactPanel({ customerId, conversation }: Props) {
 
               <Separator />
               <MissingDocumentsSection customerId={customerId} conversation={conversation} />
+
+              <Separator />
+              <MultimediaSection conversationId={conversation?.id} />
 
               <Separator />
               <NextBestActionSection customer={customer.data} conversation={conversation} />
@@ -1872,10 +1936,6 @@ export function ContactPanel({ customerId, conversation }: Props) {
                   <ConversationSummarySection conversation={conversation} />
                 </>
               )}
-
-              {/* Custom fields */}
-              <Separator />
-              <CustomFieldsSection customerId={customerId} />
 
               {/* Notes */}
               <Separator />

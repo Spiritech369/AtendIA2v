@@ -48,8 +48,14 @@ export function MessageBubble({
   // doc accepted/rejected) carry `metadata.event_type` and deserve a
   // richer bubble (icon + color + secondary line). Legacy system
   // messages without event_type keep the original plain italic look.
-  if (isSystem && hasStructuredSystemEvent(message.metadata)) {
-    return <SystemEventBubble text={message.text} metadata={message.metadata} />;
+  if (isSystem && hasStructuredSystemEvent(message.metadata, message.text)) {
+    return (
+      <SystemEventBubble
+        text={message.text}
+        metadata={message.metadata}
+        sentAt={message.sent_at ?? message.created_at}
+      />
+    );
   }
 
   const media = extractMedia(message.metadata);

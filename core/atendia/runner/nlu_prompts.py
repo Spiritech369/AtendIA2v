@@ -52,6 +52,11 @@ Reglas de salida:
   en "ambiguities" (ej: "intent_borderline_buy_vs_ask_price").
 - NO inventes valores. Si el cliente no dijo un dato, NO lo incluyas en entities.
 - Para entities numéricas, devuelve número (no string).
+- Si el ultimo mensaje corrige, cambia o menciona de nuevo un campo opcional,
+  incluyelo en entities aunque ya existiera un valor anterior.
+- Si el cliente menciona varios valores posibles para el mismo campo singular,
+  extrae solo el valor principal si es inequivoco; si esta pidiendo comparar
+  varios, no reemplaces el campo singular y deja la comparacion al composer.
 - intent: greeting | ask_info | ask_price | buy | schedule | complain |
           off_topic | unclear.
 - sentiment: positive, neutral, negative.
