@@ -155,9 +155,83 @@ def test_ai_provider_info_reflects_settings(client_tenant_admin):
     settings = get_settings()
     assert body["nlu_provider"] == settings.nlu_provider
     assert body["nlu_model"] == settings.nlu_model
+    assert body["nlu_fallback_provider"] == settings.nlu_fallback_provider
+    assert body["nlu_fallback_model"] == settings.nlu_fallback_model
     assert body["composer_provider"] == settings.composer_provider
     assert body["composer_model"] == settings.composer_model
     assert body["has_openai_key"] is bool(settings.openai_api_key)
+    assert body["has_anthropic_key"] is bool(settings.anthropic_api_key)
+
+
+def test_ai_provider_can_be_saved_per_tenant_without_wiping_meta(client_tenant_admin):
+    _set_meta_config(
+        client_tenant_admin.tenant_id,
+        {"phone_number": "+5215512345678", "phone_number_id": "PHID-AI"},
+    )
+
+    resp = client_tenant_admin.put(
+        "/api/v1/integrations/ai-provider",
+        json={
+            "nlu_provider": "openai",
+            "nlu_model": "gpt-4o-mini",
+            "composer_provider": "openai",
+            "composer_model": "gpt-4o-mini",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["nlu_provider"] == "openai"
+    assert body["composer_provider"] == "openai"
+
+    reread = client_tenant_admin.get("/api/v1/integrations/ai-provider").json()
+    assert reread["nlu_provider"] == "openai"
+    assert reread["composer_provider"] == "openai"
+
+    whatsapp = client_tenant_admin.get("/api/v1/integrations/whatsapp/details").json()
+    assert whatsapp["phone_number"] == "+5215512345678"
+    assert whatsapp["phone_number_id"] == "PHID-AI"
+
+
+def test_nlu_topics_can_be_saved_per_tenant_without_wiping_meta(client_tenant_admin):
+    _set_meta_config(
+        client_tenant_admin.tenant_id,
+        {"phone_number": "+5215512345678", "phone_number_id": "PHID-TOPICS"},
+    )
+
+    resp = client_tenant_admin.put(
+        "/api/v1/tenants/nlu-topics",
+        json={
+            "topics": [
+                {
+                    "key": "bureau",
+                    "label": "Buró de crédito",
+                    "description": "Preguntas sobre buró o historial crediticio",
+                    "examples": ["aceptan buro malo"],
+                    "sub_intents": [
+                        {
+                            "key": "ask_bad_credit_allowed",
+                            "label": "Pregunta si aceptan buró malo",
+                            "description": "",
+                            "examples": [],
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["topics"][0]["key"] == "bureau"
+    assert body["topics"][0]["sub_intents"][0]["key"] == "ask_bad_credit_allowed"
+
+    reread = client_tenant_admin.get("/api/v1/tenants/nlu-topics").json()
+    assert reread == body
+
+    whatsapp = client_tenant_admin.get("/api/v1/integrations/whatsapp/details").json()
+    assert whatsapp["phone_number"] == "+5215512345678"
+    assert whatsapp["phone_number_id"] == "PHID-TOPICS"
 
 
 def test_whatsapp_test_webhook_creates_auditable_sandbox_message(client_tenant_admin):

@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,8 +21,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from atendia.config import get_settings
 from atendia.contracts.message import Message, MessageDirection
+from atendia.runner.composer_protocol import ComposerOutput
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
+
+
+class _TestComposer:
+    async def compose(self, *, input):
+        return ComposerOutput(messages=["ok"]), None
 
 PIPELINE_DEF = {
     "version": 1,
@@ -97,12 +103,12 @@ TURN_TEXTS = [
 
 async def main() -> int:
     engine = create_async_engine(get_settings().database_url)
-    Session = async_sessionmaker(engine, expire_on_commit=False)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     fixture_path = Path(__file__).parent / "_smoke_nlu.yaml"
     fixture_path.write_text(SMOKE_NLU_FIXTURE, encoding="utf-8")
 
-    async with Session() as session:
+    async with session_factory() as session:
         # Seed tenant + pipeline + customer + conversation
         tenant_name = f"smoke_phase1_{uuid4().hex[:8]}"
         tid = (
@@ -121,7 +127,8 @@ async def main() -> int:
         cid = (
             await session.execute(
                 text(
-                    "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550039') RETURNING id"
+                    "INSERT INTO customers (tenant_id, phone_e164) "
+                    "VALUES (:t, '+5215555550039') RETURNING id"
                 ),
                 {"t": tid},
             )
@@ -142,10 +149,7 @@ async def main() -> int:
         await session.commit()
 
         print(f"Tenant {tenant_name} ({tid}) seeded with 4-stage pipeline")
-
-        from atendia.runner.composer_canned import CannedComposer
-
-        runner = ConversationRunner(session, CannedNLU(fixture_path), CannedComposer())
+        runner = ConversationRunner(session, CannedNLU(fixture_path), _TestComposer())
         for i, text_msg in enumerate(TURN_TEXTS, start=1):
             inbound = Message(
                 id=str(uuid4()),
@@ -153,7 +157,7 @@ async def main() -> int:
                 tenant_id=str(tid),
                 direction=MessageDirection.INBOUND,
                 text=text_msg,
-                sent_at=datetime.now(timezone.utc),
+                sent_at=datetime.now(UTC),
             )
             trace = await runner.run_turn(
                 conversation_id=conv_id,
@@ -197,3 +201,4 @@ async def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
+

@@ -568,6 +568,7 @@ async def _run_inbound_pipeline(
     )
     from atendia.realtime.publisher import publish_event
     from atendia.runner.conversation_runner import ConversationRunner
+    from atendia.runner.provider_factory import load_tenant_ai_selection
     from atendia.state_machine.event_emitter import EventEmitter
     from atendia.webhooks.meta_routes import build_composer, build_nlu
     from atendia.workflows.engine import evaluate_event
@@ -639,8 +640,9 @@ async def _run_inbound_pipeline(
         )
     ).scalar()
 
-    nlu = build_nlu(settings)
-    composer = build_composer(settings)
+    selection = await load_tenant_ai_selection(session, tenant_id, settings)
+    nlu = build_nlu(settings, selection)
+    composer = build_composer(settings, selection)
     runner = ConversationRunner(session, nlu, composer)
     inbound_canonical = CanonicalMessage(
         id=str(_uuid4()),

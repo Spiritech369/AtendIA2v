@@ -9,12 +9,10 @@ from openai import AsyncOpenAI
 
 from atendia.contracts.handoff_summary import HandoffReason
 from atendia.runner._openai_errors import _NON_RETRIABLE, _RETRIABLE
-from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.composer_prompts import build_composer_prompt
 from atendia.runner.composer_protocol import (
     ComposerInput,
     ComposerOutput,
-    ComposerProvider,
     UsageMetadata,
 )
 from atendia.runner.nlu.pricing import compute_cost
@@ -58,7 +56,7 @@ def _composer_schema(max_messages: int) -> dict:
 
 
 class OpenAIComposer:
-    """gpt-4o classifier with strict structured outputs, retry + canned fallback."""
+    """gpt-4o composer with strict structured outputs and retry."""
 
     def __init__(
         self,
@@ -67,12 +65,10 @@ class OpenAIComposer:
         model: str = "gpt-4o",
         timeout_s: float = 8.0,
         retry_delays_ms: tuple[int, ...] = (500, 2000),
-        fallback: ComposerProvider | None = None,
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key, max_retries=0, timeout=timeout_s)
         self._model = model
         self._delays = (0, *retry_delays_ms)
-        self._fallback = fallback or CannedComposer()
 
     async def compose(
         self,
@@ -121,15 +117,19 @@ class OpenAIComposer:
                 last_exc = exc
                 break
 
-        # Exhausted or non-retriable: fall back to canned, signal via fallback_used.
-        canned_output, _ = await self._fallback.compose(input=input)
         usage = UsageMetadata(
             model=self._model,
             tokens_in=0,
             tokens_out=0,
             cost_usd=Decimal("0"),
             latency_ms=int((time.perf_counter() - t0) * 1000),
-            fallback_used=True,
+            fallback_used=False,
             error_type=type(last_exc).__name__ if last_exc else "Unknown",
         )
-        return canned_output, usage
+        raise ComposerProviderError("openai composer failed", usage=usage) from last_exc
+
+
+class ComposerProviderError(RuntimeError):
+    def __init__(self, message: str, *, usage: UsageMetadata) -> None:
+        super().__init__(message)
+        self.usage = usage

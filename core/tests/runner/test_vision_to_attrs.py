@@ -152,26 +152,7 @@ async def test_skips_non_doc_categories():
 
 @pytest.mark.asyncio
 async def test_skips_when_mapping_empty():
-    """No mapping and no matching catalog entry stays in manual mode."""
-    pipeline = _make_pipeline_with_catalog(mapping={}, catalog=[])
-    session = _FakeSession()
-    result = VisionResult(
-        category=VisionCategory.COMPROBANTE,
-        confidence=0.9,
-        metadata={},
-        quality_check=_ok_qc(),
-    )
-    writes = await apply_vision_to_attrs(
-        session=session,
-        customer_id=session.customer.id,
-        pipeline=pipeline,
-        vision_result=result,
-    )
-    assert writes == []
-
-
-@pytest.mark.asyncio
-async def test_infers_ine_back_from_configured_catalog_when_mapping_empty():
+    """No legacy Vision mapping stays manual, even with matching catalog docs."""
     pipeline = _make_pipeline_with_catalog(
         mapping={},
         catalog=[
@@ -192,8 +173,7 @@ async def test_infers_ine_back_from_configured_catalog_when_mapping_empty():
         pipeline=pipeline,
         vision_result=result,
     )
-    assert [w.doc_key for w in writes] == ["DOCS_INE_ATRAS"]
-    assert session.customer.attrs["DOCS_INE_ATRAS"]["status"] == "ok"
+    assert writes == []
 
 
 @pytest.mark.asyncio

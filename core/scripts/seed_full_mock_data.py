@@ -2501,7 +2501,7 @@ async def seed_traces_for_conversation(
                 "composer_output": dumps(
                     {"text": "Respuesta mock con fuentes y guardrails.", "confidence": 0.83}
                 ),
-                "composer_model": "canned-mock",
+                "composer_model": "mock-openai",
                 "composer_tokens_in": 180 + turn_idx * 21,
                 "composer_tokens_out": 54 + turn_idx * 9,
                 "composer_cost": Decimal("0.00090") + Decimal(turn_idx) / Decimal("100000"),

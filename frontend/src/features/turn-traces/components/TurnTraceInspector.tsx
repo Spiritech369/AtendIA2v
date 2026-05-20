@@ -13,6 +13,7 @@ import { FlowModeBadge } from "./FlowModeBadge";
 import {
   AgentBadge,
   AnomalyChips,
+  ComposerInputPanel,
   CostBreakdown,
   EntityPills,
   ErrorBanner,
@@ -67,6 +68,8 @@ export function TurnTraceInspector({
             <StateDiff trace={query.data} />
             <Separator />
             <RulesEvaluatedPanel trace={query.data} />
+            <Separator />
+            <ComposerInputPanel trace={query.data} />
             <Separator />
             <LatencyStackedBar trace={query.data} />
             <CostBreakdown trace={query.data} />

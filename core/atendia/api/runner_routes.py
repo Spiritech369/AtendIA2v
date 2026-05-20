@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.config import get_settings
 from atendia.contracts.message import Message, MessageDirection
 from atendia.db.session import get_db_session
-from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
+from atendia.runner.provider_factory import build_composer
 
 router = APIRouter()
 
@@ -38,14 +39,18 @@ async def run_turn(
     if not fp.exists():
         raise HTTPException(status_code=404, detail=f"fixture not found: {fp}")
 
-    runner = ConversationRunner(session, CannedNLU(fp), CannedComposer())
+    try:
+        composer = build_composer(get_settings())
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    runner = ConversationRunner(session, CannedNLU(fp), composer)
     inbound = Message(
         id=str(uuid4()),
         conversation_id=str(req.conversation_id),
         tenant_id=str(req.tenant_id),
         direction=MessageDirection.INBOUND,
         text=req.text,
-        sent_at=datetime.now(timezone.utc),
+        sent_at=datetime.now(UTC),
     )
     trace = await runner.run_turn(
         conversation_id=req.conversation_id,

@@ -96,10 +96,12 @@ class OpenAINLU:
         model: str = "gpt-4o-mini",
         timeout_s: float = 8.0,
         retry_delays_ms: tuple[int, ...] = (500, 2000),
+        topics: list[dict] | None = None,
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key, max_retries=0, timeout=timeout_s)
         self._model = model
         self._delays = (0, *retry_delays_ms)
+        self._topics = topics or []
 
     async def classify(
         self,
@@ -116,6 +118,7 @@ class OpenAINLU:
             required_fields=required_fields,
             optional_fields=optional_fields,
             history=history,
+            topics=self._topics,
         )
         field_names = [f.name for f in required_fields] + [f.name for f in optional_fields]
         json_schema = _build_strict_schema(field_names)
@@ -174,6 +177,9 @@ class OpenAINLU:
         name = type(exc).__name__ if exc else "Unknown"
         return NLUResult(
             intent=Intent.UNCLEAR,
+            topic=None,
+            sub_intent=None,
+            sales_signal="none",
             entities={},
             sentiment=Sentiment.NEUTRAL,
             confidence=0.0,

@@ -23,6 +23,7 @@ from atendia.contracts.message import (
     MessageDirection,
 )
 from atendia.runner.conversation_runner import ConversationRunner
+from atendia.runner.provider_factory import load_tenant_ai_selection
 from atendia.webhooks.meta_routes import build_composer, build_nlu
 
 BURST_DEFER_SECONDS = 5
@@ -222,11 +223,17 @@ async def process_inbound_burst(
                     {"conversation_id": conversation_id},
                 )
             ).scalar()
-            runner = ConversationRunner(session, build_nlu(settings), build_composer(settings))
+            tenant_uuid = UUID(tenant_id)
+            selection = await load_tenant_ai_selection(session, tenant_uuid, settings)
+            runner = ConversationRunner(
+                session,
+                build_nlu(settings, selection),
+                build_composer(settings, selection),
+            )
             try:
                 await runner.run_turn(
                     conversation_id=UUID(conversation_id),
-                    tenant_id=UUID(tenant_id),
+                    tenant_id=tenant_uuid,
                     inbound=inbound,
                     turn_number=next_turn,
                     arq_pool=arq_pool,

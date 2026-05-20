@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,9 @@ class Sentiment(str, Enum):
 
 class NLUResult(BaseModel):
     intent: Intent
+    topic: str | None = None
+    sub_intent: str | None = None
+    sales_signal: Literal["none", "low", "medium", "high"] = "none"
     entities: dict[str, ExtractedField] = Field(default_factory=dict)
     sentiment: Sentiment
     confidence: float = Field(ge=0.0, le=1.0)

@@ -45,7 +45,6 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 
 import { AuditLogDrawer } from "./AuditLogDrawer";
-import { DocumentRuleBuilder } from "./DocumentRuleBuilder";
 import { PipelineVersionHistoryButton } from "./PipelineVersionHistoryDrawer";
 import { FIELD_CATALOG, RuleBuilder, type RuleFieldOption } from "./RuleBuilder";
 import { StageDeleteDialog } from "./StageDeleteDialog";
@@ -123,9 +122,7 @@ const STAGE_SEARCH_MIN = 8;
 export function stageMatchesQuery(stage: StageDraft, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (q === "") return true;
-  return (
-    stage.label.toLowerCase().includes(q) || stage.id.toLowerCase().includes(q)
-  );
+  return stage.label.toLowerCase().includes(q) || stage.id.toLowerCase().includes(q);
 }
 
 // Mirror of FlowMode in core/atendia/contracts/flow_mode.py. Kept as a
@@ -151,15 +148,18 @@ export const ACTION_OPTIONS: Array<{ value: string; label: string; hint: string 
   { value: "greet", label: "Saludar", hint: "Primer contacto o reenganche suave." },
   { value: "ask_field", label: "Pedir dato", hint: "Solicita campos faltantes del cliente." },
   { value: "ask_clarification", label: "Aclarar", hint: "Responde cuando el mensaje no encaja." },
-  { value: "lookup_faq", label: "Usar KB", hint: "Busca politicas, requisitos o respuestas guardadas." },
-  { value: "search_catalog", label: "Buscar catalogo", hint: "Consulta productos, precios o inventario." },
-  { value: "quote", label: "Cotizar", hint: "Da precio, plan o condiciones comerciales." },
+  {
+    value: "lookup_faq",
+    label: "Usar KB",
+    hint: "Busca politicas, requisitos o respuestas guardadas.",
+  },
   { value: "book_appointment", label: "Agendar", hint: "Propone o confirma una cita." },
   { value: "close", label: "Cerrar venta", hint: "Avanza cuando el cliente acepta comprar." },
   { value: "escalate_to_human", label: "Handoff humano", hint: "Pausa o deriva a asesor humano." },
 ];
 
 const DEFAULT_ACTIONS_ALLOWED = ACTION_OPTIONS.map((action) => action.value);
+const ACTIVE_ACTION_VALUES = new Set(ACTION_OPTIONS.map((action) => action.value));
 
 export interface DocumentSpecDraft {
   key: string;
@@ -171,9 +171,9 @@ export interface PipelineDraft {
   stages: StageDraft[];
   docs_per_plan: Record<string, string[]>;
   documents_catalog: DocumentSpecDraft[];
-  // Fase 3 — Vision category → list of DOCS_* keys to write. Tenant-
-  // editable so each business decides whether `ine` → DOCS_INE (single)
-  // or DOCS_INE_FRENTE + DOCS_INE_REVERSO (split).
+  // Legacy: Vision auto-mapping used to live in this editor. Keep the
+  // draft field so old persisted payloads can be loaded, but the UI and
+  // serialiser intentionally clear it now.
   vision_doc_mapping: Record<string, string[]>;
   // Per-flow-mode composer guidance, keyed by UPPERCASE FlowMode. Empty
   // / missing entry → composer falls back to its generic default.
@@ -184,42 +184,11 @@ export interface PipelineDraft {
   extra: Record<string, unknown>;
 }
 
-// Categories the Vision classifier produces. Mirror of
-// core/atendia/contracts/vision_result.py VisionCategory; new entries
-// need to match both sides or the editor silently swallows them.
-export const VISION_CATEGORIES = [
-  "ine",
-  "comprobante",
-  "recibo_nomina",
-  "estado_cuenta",
-  "constancia_sat",
-  "factura",
-  "imss",
-] as const;
-export type VisionCategoryKey = (typeof VISION_CATEGORIES)[number];
-
-const VISION_CATEGORY_LABELS: Record<VisionCategoryKey, string> = {
-  ine: "INE",
-  comprobante: "Comprobante de domicilio",
-  recibo_nomina: "Recibo de nómina",
-  estado_cuenta: "Estado de cuenta",
-  constancia_sat: "Constancia SAT",
-  factura: "Factura",
-  imss: "IMSS",
-};
-
 // The 6 composer flow modes (mirror core/atendia/contracts/flow_mode.py
 // — keys are UPPERCASE). Per-mode guidance is tenant-authored; an empty
 // box means the composer uses its generic, vertical-neutral default
 // (NOT the moto-credit playbook).
-export const FLOW_MODES = [
-  "PLAN",
-  "SALES",
-  "DOC",
-  "OBSTACLE",
-  "RETENTION",
-  "SUPPORT",
-] as const;
+export const FLOW_MODES = ["PLAN", "SALES", "DOC", "OBSTACLE", "RETENTION", "SUPPORT"] as const;
 export type FlowModeKey = (typeof FLOW_MODES)[number];
 
 export const FLOW_MODE_LABELS: Record<FlowModeKey, string> = {
@@ -258,8 +227,8 @@ export function modeDisplayLabel(draft: PipelineDraft, mode: FlowModeKey): strin
   return alias ? `${alias} (${mode})` : FLOW_MODE_LABELS[mode];
 }
 
-// Mirrors the backend regex in pipeline_definition.py — uppercase, must
-// start with DOCS_, identifier-shaped suffix.
+// Documents are tenant-configured identifiers. Legacy DOCS_* keys still
+// work, but new tenants can use clean names like INE_FRENTE.
 function buildRuleFieldCatalog(
   fieldDefinitions: Array<{ key: string; label: string }> | undefined,
   documentsCatalog: DocumentSpecDraft[],
@@ -272,20 +241,17 @@ function buildRuleFieldCatalog(
   for (const definition of fieldDefinitions ?? []) {
     add({ id: definition.key, label: definition.label, group: "Datos del cliente" });
   }
-  for (const option of FIELD_CATALOG.filter((field) => !field.id.startsWith("DOCS_"))) {
+  for (const option of FIELD_CATALOG) {
     add(option);
   }
   for (const doc of documentsCatalog) {
     add({ id: `${doc.key}.status`, label: `${doc.label} - status`, group: "Documentos" });
   }
-  for (const option of FIELD_CATALOG.filter((field) => field.id.startsWith("DOCS_"))) {
-    add(option);
-  }
 
   return Array.from(byId.values());
 }
 
-const DOC_KEY_RE = /^DOCS_[A-Z][A-Z0-9_]*$/;
+const DOC_KEY_RE = /^[A-Z][A-Z0-9_]*$/;
 
 const STAGE_ID_RE = /^[a-z][a-z0-9_]{2,29}$/;
 const STAGE_COLORS = [
@@ -387,7 +353,10 @@ export function parsePipeline(raw: Record<string, unknown> | undefined): Pipelin
         pause_bot_on_enter: obj.pause_bot_on_enter === true,
         handoff_reason: typeof obj.handoff_reason === "string" ? obj.handoff_reason : "",
         actions_allowed: Array.isArray(obj.actions_allowed)
-          ? obj.actions_allowed.filter((action): action is string => typeof action === "string")
+          ? obj.actions_allowed.filter(
+              (action): action is string =>
+                typeof action === "string" && ACTIVE_ACTION_VALUES.has(action),
+            )
           : [...DEFAULT_ACTIONS_ALLOWED],
       },
     ];
@@ -411,19 +380,7 @@ export function parsePipeline(raw: Record<string, unknown> | undefined): Pipelin
       })
     : [];
   const fallback = typeof def.fallback === "string" ? def.fallback : undefined;
-  // Fase 3 — vision_doc_mapping shape: { "ine": ["DOCS_INE_FRENTE", ...], ... }
-  // Tolerate operator-edited noise: skip non-string values and non-array entries.
-  const rawVdm =
-    typeof def.vision_doc_mapping === "object" && def.vision_doc_mapping !== null
-      ? (def.vision_doc_mapping as Record<string, unknown>)
-      : {};
   const vision_doc_mapping: Record<string, string[]> = {};
-  for (const [cat, keys] of Object.entries(rawVdm)) {
-    if (!Array.isArray(keys)) continue;
-    vision_doc_mapping[cat] = keys.filter(
-      (k): k is string => typeof k === "string" && DOC_KEY_RE.test(k),
-    );
-  }
   // mode_prompts: { "PLAN": "...", ... }. Keep only known UPPERCASE
   // modes with string bodies; ignore operator-edited noise.
   const rawMp =
@@ -481,12 +438,6 @@ export function serialisePipelineDraft(draft: PipelineDraft): Record<string, unk
 }
 
 function serialise(draft: PipelineDraft): Record<string, unknown> {
-  // Strip empty vision_doc_mapping entries so the persisted JSONB
-  // doesn't accumulate noise after toggling.
-  const visionMapping: Record<string, string[]> = {};
-  for (const [cat, keys] of Object.entries(draft.vision_doc_mapping ?? {})) {
-    if (Array.isArray(keys) && keys.length > 0) visionMapping[cat] = keys;
-  }
   // Drop empty mode_prompts so a blank box means "use the generic
   // default" rather than persisting an empty string.
   const modePrompts: Record<string, string> = {};
@@ -525,7 +476,6 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
       label: d.label,
       ...(d.hint ? { hint: d.hint } : {}),
     })),
-    ...(Object.keys(visionMapping).length > 0 ? { vision_doc_mapping: visionMapping } : {}),
     ...(Object.keys(modePrompts).length > 0 ? { mode_prompts: modePrompts } : {}),
     ...(Object.keys(modeLabels).length > 0 ? { mode_labels: modeLabels } : {}),
     ...(hiddenModes.length > 0 ? { hidden_modes: hiddenModes } : {}),
@@ -534,7 +484,7 @@ function serialise(draft: PipelineDraft): Record<string, unknown> {
 }
 
 // Mirrors backend _RULE_FIELD_RE in pipeline_definition.py. Accepts
-// dot-separated identifiers (DOCS_INE.status, modelo_interes).
+// dot-separated identifiers (INE_FRENTE.status, modelo_interes).
 const RULE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 
 export function validatePipelineDraft(draft: PipelineDraft): string | null {
@@ -546,7 +496,7 @@ function validate(draft: PipelineDraft): string | null {
   const docKeys = new Set<string>();
   for (const d of draft.documents_catalog) {
     if (!DOC_KEY_RE.test(d.key)) {
-      return `Documento "${d.key || "(vacío)"}": el ID debe iniciar con DOCS_ y usar solo letras mayúsculas, números y guion bajo.`;
+      return `Documento "${d.key || "(vacío)"}": el ID debe iniciar con letra y usar solo letras mayúsculas, números y guion bajo.`;
     }
     if (docKeys.has(d.key)) {
       return `Documento duplicado: ${d.key}`;
@@ -613,23 +563,6 @@ function validate(draft: PipelineDraft): string | null {
       }
     }
   }
-  // Fase 3 — vision_doc_mapping: every referenced DOCS_* must exist
-  // in documents_catalog. Catching this here is friendlier than
-  // letting the runtime helper silently skip the write.
-  const catalogKeys = new Set(draft.documents_catalog.map((d) => d.key));
-  for (const [cat, keys] of Object.entries(draft.vision_doc_mapping ?? {})) {
-    if (!(VISION_CATEGORIES as readonly string[]).includes(cat)) {
-      return `Mapeo Vision: categoría "${cat}" no es válida (debe ser una de ${VISION_CATEGORIES.join(", ")}).`;
-    }
-    for (const key of keys) {
-      if (!DOC_KEY_RE.test(key)) {
-        return `Mapeo Vision (${cat}): "${key}" no es un DOCS_* válido.`;
-      }
-      if (!catalogKeys.has(key)) {
-        return `Mapeo Vision (${cat}): el documento "${key}" no está en el catálogo.`;
-      }
-    }
-  }
   for (const mode of Object.keys(draft.mode_labels ?? {})) {
     if (!(FLOW_MODES as readonly string[]).includes(mode)) {
       return `Alias de modo "${mode}" no es válido (debe ser uno de ${FLOW_MODES.join(", ")}).`;
@@ -679,7 +612,6 @@ export function PipelineEditor({ onClose }: Props) {
   const [showJson, setShowJson] = useState(false);
   const [showDocsByPlan, setShowDocsByPlan] = useState(false);
   const [showDocsCatalog, setShowDocsCatalog] = useState(true);
-  const [showVisionMapping, setShowVisionMapping] = useState(false);
   const [showModePrompts, setShowModePrompts] = useState(false);
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocHint, setNewDocHint] = useState("");
@@ -692,7 +624,7 @@ export function PipelineEditor({ onClose }: Props) {
     if (query.data) {
       const parsed = parsePipeline(query.data.definition);
       setDraft(parsed);
-      if (parsed.stages.length > 0 && selectedIdx === null) setSelectedIdx(0);
+      if (parsed.stages.length > 0) setSelectedIdx((prev) => prev ?? 0);
     } else if (query.isError) {
       const seed: PipelineDraft = {
         stages: [
@@ -733,7 +665,7 @@ export function PipelineEditor({ onClose }: Props) {
       setDraft(seed);
       setSelectedIdx(0);
     }
-  }, [query.data, query.isError]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query.data, query.isError]);
 
   const globalError = useMemo(() => (draft ? validate(draft) : null), [draft]);
   // Dirty detection: serialise the draft and compare against the loaded
@@ -802,9 +734,11 @@ export function PipelineEditor({ onClose }: Props) {
     return (
       <div className="flex flex-col gap-3 p-4">
         <Skeleton className="h-5 w-40" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
+        {["stage-skeleton-1", "stage-skeleton-2", "stage-skeleton-3", "stage-skeleton-4"].map(
+          (key) => (
+            <Skeleton key={key} className="h-10 w-full" />
+          ),
+        )}
       </div>
     );
   }
@@ -817,7 +751,7 @@ export function PipelineEditor({ onClose }: Props) {
   };
 
   // Document catalog CRUD. Operator types only the human name; we
-  // derive the stable `DOCS_<UPPER>` identifier the auto_enter_rules
+  // derive the stable uppercase identifier the auto_enter_rules
   // conditions reference. The derived key is fixed at create-time:
   // renaming the label later doesn't break existing rules.
   const deriveDocKey = (label: string): string => {
@@ -830,7 +764,7 @@ export function PipelineEditor({ onClose }: Props) {
       .replace(/[^A-Z0-9_]+/g, "_")
       .replace(/^_+|_+$/g, "")
       .replace(/_+/g, "_");
-    return clean ? `DOCS_${clean}` : "";
+    return clean;
   };
 
   // Live preview of the key the operator would get, so they can see
@@ -917,39 +851,6 @@ export function PipelineEditor({ onClose }: Props) {
       return {
         ...prev,
         docs_per_plan: { ...prev.docs_per_plan, [plan]: next },
-      };
-    });
-  };
-
-  // Fase 3 — vision_doc_mapping mutations. Each Vision category maps
-  // to an ordered list of DOCS_* keys. For INE (multi-side doc) order
-  // matters: index 0 = front-side key, index 1 = back-side key. For
-  // single-key categories we just append/remove from the list.
-  const toggleVisionDocKey = (category: VisionCategoryKey, docKey: string) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const current = prev.vision_doc_mapping[category] ?? [];
-      const next = current.includes(docKey)
-        ? current.filter((k) => k !== docKey)
-        : [...current, docKey];
-      const mapping = { ...prev.vision_doc_mapping };
-      if (next.length === 0) delete mapping[category];
-      else mapping[category] = next;
-      return { ...prev, vision_doc_mapping: mapping };
-    });
-  };
-
-  const moveVisionDocKey = (category: VisionCategoryKey, idx: number, delta: -1 | 1) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const current = prev.vision_doc_mapping[category] ?? [];
-      const target = idx + delta;
-      if (target < 0 || target >= current.length) return prev;
-      const next = [...current];
-      [next[idx], next[target]] = [next[target] as string, next[idx] as string];
-      return {
-        ...prev,
-        vision_doc_mapping: { ...prev.vision_doc_mapping, [category]: next },
       };
     });
   };
@@ -1243,17 +1144,17 @@ export function PipelineEditor({ onClose }: Props) {
             ) : (
               <ChevronRight className="size-3.5" />
             )}
-            Modo Composer: nombres y guiones (
-            {configuredModeCount}/6 configurados · {visibleModeCount}/6 visibles)
+            Modo Composer: nombres y guiones ({configuredModeCount}/6 configurados ·{" "}
+            {visibleModeCount}/6 visibles)
           </button>
 
           {showModePrompts && (
             <div className="space-y-3 px-4 pb-4">
               <div className="rounded-md border bg-muted/20 p-3 text-[10px] leading-relaxed text-muted-foreground">
-                <strong className="text-foreground">PLAN es un modo interno.</strong>{" "}
-                Puedes llamarlo como quieras para este negocio; el nombre visible ayuda al operador,
-                pero el runner conserva PLAN, SALES, DOC, OBSTACLE, RETENTION y SUPPORT. Las reglas
-                de etapa se editan en <strong>Auto-entrada</strong>, y este bloque define lo que el
+                <strong className="text-foreground">PLAN es un modo interno.</strong> Puedes
+                llamarlo como quieras para este negocio; el nombre visible ayuda al operador, pero
+                el runner conserva PLAN, SALES, DOC, OBSTACLE, RETENTION y SUPPORT. Las reglas de
+                etapa se editan en <strong>Auto-entrada</strong>, y este bloque define lo que el
                 agente dice cuando cae en cada modo.
               </div>
 
@@ -1382,116 +1283,129 @@ export function PipelineEditor({ onClose }: Props) {
             {draft.stages.map((stage, idx) => {
               if (!stageMatchesQuery(stage, stageFilter)) return null;
               return (
-              <div
-                key={`${stage.id}-${idx}`}
-                draggable
-                onDragStart={() => handleDragStart(idx)}
-                onDragOver={(e) => handleDragOver(e, idx)}
-                onDrop={(e) => handleDrop(e, idx)}
-                onDragEnd={handleDragEnd}
-                onClick={() => setSelectedIdx(idx)}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 transition-colors",
-                  selectedIdx === idx
-                    ? "border-primary/40 bg-primary/5"
-                    : "border-transparent hover:border-border hover:bg-muted/40",
-                  dragOver === idx && draggingIdx !== idx && "border-primary bg-primary/10",
-                  draggingIdx === idx && "opacity-40",
-                )}
-              >
-                <GripVertical
-                  className="size-3.5 shrink-0 cursor-grab text-muted-foreground/50 active:cursor-grabbing"
-                  aria-hidden
-                />
+                // biome-ignore lint/a11y/useSemanticElements: this row is draggable and contains nested menu buttons.
                 <div
-                  className="size-2.5 shrink-0 rounded-full border-2"
-                  style={{ backgroundColor: stage.color, borderColor: stage.color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{stage.label}</p>
-                  <p className="truncate font-mono text-[9px] text-muted-foreground">{stage.id}</p>
-                </div>
-                {stage.is_terminal && (
-                  <Badge variant="secondary" className="shrink-0 text-[9px] px-1 py-0">
-                    terminal
-                  </Badge>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-                      title="Opciones de etapa"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => moveStage(idx, -1)} disabled={idx === 0}>
-                      Subir
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => moveStage(idx, 1)}
-                      disabled={idx === draft.stages.length - 1}
-                    >
-                      Bajar
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => {
-                        void navigator.clipboard.writeText(stage.id);
-                        toast.success("stage_id copiado", { description: stage.id });
-                      }}
-                    >
-                      Copiar stage_id
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        // Duplicate by appending "(copia)" to the label and a
-                        // numeric suffix to the id until unique. Save-on-edit
-                        // will reject duplicates anyway, but we pre-empt that.
-                        const existingIds = new Set(draft.stages.map((s) => s.id));
-                        let suffix = 2;
-                        let newId = `${stage.id}_copia`;
-                        while (existingIds.has(newId)) {
-                          newId = `${stage.id}_copia_${suffix++}`;
+                  key={stage.id}
+                  draggable
+                  role="button"
+                  tabIndex={0}
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDrop={(e) => handleDrop(e, idx)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => setSelectedIdx(idx)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedIdx(idx);
+                    }
+                  }}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 transition-colors",
+                    selectedIdx === idx
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-transparent hover:border-border hover:bg-muted/40",
+                    dragOver === idx && draggingIdx !== idx && "border-primary bg-primary/10",
+                    draggingIdx === idx && "opacity-40",
+                  )}
+                >
+                  <GripVertical
+                    className="size-3.5 shrink-0 cursor-grab text-muted-foreground/50 active:cursor-grabbing"
+                    aria-hidden
+                  />
+                  <div
+                    className="size-2.5 shrink-0 rounded-full border-2"
+                    style={{ backgroundColor: stage.color, borderColor: stage.color }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{stage.label}</p>
+                    <p className="truncate font-mono text-[9px] text-muted-foreground">
+                      {stage.id}
+                    </p>
+                  </div>
+                  {stage.is_terminal && (
+                    <Badge variant="secondary" className="shrink-0 text-[9px] px-1 py-0">
+                      terminal
+                    </Badge>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Opciones de etapa"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => moveStage(idx, -1)} disabled={idx === 0}>
+                        Subir
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => moveStage(idx, 1)}
+                        disabled={idx === draft.stages.length - 1}
+                      >
+                        Bajar
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          void navigator.clipboard.writeText(stage.id);
+                          toast.success("stage_id copiado", { description: stage.id });
+                        }}
+                      >
+                        Copiar stage_id
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          // Duplicate by appending "(copia)" to the label and a
+                          // numeric suffix to the id until unique. Save-on-edit
+                          // will reject duplicates anyway, but we pre-empt that.
+                          const existingIds = new Set(draft.stages.map((s) => s.id));
+                          let suffix = 2;
+                          let newId = `${stage.id}_copia`;
+                          while (existingIds.has(newId)) {
+                            newId = `${stage.id}_copia_${suffix++}`;
+                          }
+                          setDraft((prev) => {
+                            if (!prev) return prev;
+                            const copy: StageDraft = {
+                              ...stage,
+                              id: newId,
+                              label: `${stage.label} (copia)`,
+                            };
+                            const stages = [
+                              ...prev.stages.slice(0, idx + 1),
+                              copy,
+                              ...prev.stages.slice(idx + 1),
+                            ];
+                            return { ...prev, stages };
+                          });
+                          setSelectedIdx(idx + 1);
+                        }}
+                        disabled={!canEdit}
+                      >
+                        Duplicar etapa
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setStagePendingDelete(idx)}
+                        disabled={!canEdit || draft.stages.length === 1}
+                        title={
+                          draft.stages.length === 1
+                            ? "No puedes eliminar la última etapa"
+                            : undefined
                         }
-                        setDraft((prev) => {
-                          if (!prev) return prev;
-                          const copy: StageDraft = {
-                            ...stage,
-                            id: newId,
-                            label: `${stage.label} (copia)`,
-                          };
-                          const stages = [
-                            ...prev.stages.slice(0, idx + 1),
-                            copy,
-                            ...prev.stages.slice(idx + 1),
-                          ];
-                          return { ...prev, stages };
-                        });
-                        setSelectedIdx(idx + 1);
-                      }}
-                      disabled={!canEdit}
-                    >
-                      Duplicar etapa
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setStagePendingDelete(idx)}
-                      disabled={!canEdit || draft.stages.length === 1}
-                      title={
-                        draft.stages.length === 1 ? "No puedes eliminar la última etapa" : undefined
-                      }
-                    >
-                      <Trash2 className="mr-2 size-3.5" /> Eliminar etapa
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                      >
+                        <Trash2 className="mr-2 size-3.5" /> Eliminar etapa
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               );
             })}
             {draft.stages.length > STAGE_SEARCH_MIN &&
@@ -1899,22 +1813,6 @@ export function PipelineEditor({ onClose }: Props) {
               />
             </div>
 
-            {/* M4: shorthand for "Papelería completa"-style stages. Outputs
-                the same auto_enter_rules shape as RuleBuilder — picking
-                docs in this checklist generates `DOCS_*.status equals
-                "ok"` conditions, all combined with match="all". When the
-                stage already has non-doc conditions, this section locks
-                and points the operator to RuleBuilder instead. */}
-            <div className="mt-4 border-t pt-3">
-              <DocumentRuleBuilder
-                stageLabel={selected.label || selected.id}
-                rules={selected.auto_enter_rules}
-                catalog={draft.documents_catalog}
-                onChange={(next) => updateStage(selectedIdx, { auto_enter_rules: next })}
-                disabled={!canEdit}
-              />
-            </div>
-
             {/* P6: read-only dependency view. Surfaces the same
                 impacted-references data the delete dialog uses, but
                 here so an operator sees how many conversations sit in
@@ -1962,9 +1860,8 @@ export function PipelineEditor({ onClose }: Props) {
           )}
         </div>
 
-        {/* Document catalog — tenant-configurable list of `DOCS_*` keys
-            the operator can reference from any stage's auto_enter_rules
-            via the DocumentRuleBuilder checklist. */}
+        {/* Document catalog — tenant-configurable list of document keys
+            the operator can reference from any stage's auto_enter_rules. */}
         <div className="border-t">
           <button
             type="button"
@@ -1982,9 +1879,9 @@ export function PipelineEditor({ onClose }: Props) {
           {showDocsCatalog && (
             <div className="space-y-3 px-4 pb-4">
               <p className="text-[11px] text-muted-foreground">
-                Define los documentos que tus clientes deben subir. Cada entrada se vuelve un
-                checkbox en la sección "Documentos requeridos" de cada etapa y aparece en el panel
-                "Documentos" del contacto.
+                Define los documentos que tus clientes deben subir. Cada entrada se puede usar en
+                reglas de auto-entrada como <code>{`<DOCUMENTO>.status`}</code> y aparece en el
+                panel "Documentos" del contacto.
               </p>
 
               {/* List of existing entries */}
@@ -2043,7 +1940,7 @@ export function PipelineEditor({ onClose }: Props) {
               )}
 
               {/* Add-row — single primary field + optional hint. The
-                  internal DOCS_* key is auto-derived from the name. */}
+                  internal document key is auto-derived from the name. */}
               {canEdit && (
                 <div className="rounded-md border border-dashed bg-muted/20 p-2">
                   <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -2264,162 +2161,6 @@ export function PipelineEditor({ onClose }: Props) {
                   </Button>
                 </div>
               )}
-            </div>
-          )}
-        </div>
-
-        {/* Fase 3 — Vision auto-write mapping. Each Vision category maps
-            to the DOCS_* customer-attrs keys the runner should write
-            when an image classifies as that category. Empty list per
-            category = manual operator marking (legacy behaviour). */}
-        <div className="border-t" data-section="vision_doc_mapping">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium"
-            onClick={() => setShowVisionMapping((v) => !v)}
-          >
-            {showVisionMapping ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )}
-            Auto-marcado de documentos con Vision (
-            {Object.values(draft.vision_doc_mapping ?? {}).reduce(
-              (acc, list) => acc + (Array.isArray(list) ? list.length : 0),
-              0,
-            )}{" "}
-            mapeos)
-          </button>
-
-          {showVisionMapping && (
-            <div className="space-y-3 px-4 pb-4">
-              <p className="text-[10px] text-muted-foreground">
-                Cuando Vision clasifica una imagen como una de estas categorías, el bot escribe
-                automáticamente los DOCS_* seleccionados con <code>status=ok</code> (o{" "}
-                <code>rejected</code>+motivo si la calidad falla). Si dejas la lista vacía, el bot
-                solo emite el evento y el operador marca manualmente. <strong>Para INE</strong>: el
-                primer DOCS_* en orden = lado frente, el segundo = lado reverso (Vision detecta el
-                lado).
-              </p>
-
-              {VISION_CATEGORIES.map((cat) => {
-                const assigned = draft.vision_doc_mapping[cat] ?? [];
-                return (
-                  <div
-                    key={cat}
-                    className="rounded-md border bg-muted/10 p-2"
-                    data-vision-category={cat}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-medium">{VISION_CATEGORY_LABELS[cat]}</span>
-                        <span className="ml-2 font-mono text-[9px] text-muted-foreground">
-                          {cat}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">
-                        {assigned.length === 0
-                          ? "Sin mapear (manual)"
-                          : `${assigned.length} doc${assigned.length === 1 ? "" : "s"}`}
-                      </span>
-                    </div>
-
-                    {/* Ordered list of currently-assigned DOCS_*. For INE
-                        we show the order indicator (frente/reverso) so
-                        operators know which side maps to which key. */}
-                    {assigned.length > 0 && (
-                      <ol className="mt-2 space-y-1">
-                        {assigned.map((docKey, idx) => {
-                          const spec = draft.documents_catalog.find((d) => d.key === docKey);
-                          const sideHint =
-                            cat === "ine"
-                              ? idx === 0
-                                ? "lado frente"
-                                : idx === 1
-                                  ? "lado reverso"
-                                  : `lado ${idx + 1}`
-                              : null;
-                          return (
-                            <li
-                              key={docKey}
-                              className="flex items-center gap-2 rounded border bg-background px-2 py-1 text-[11px]"
-                            >
-                              <span className="flex-1">
-                                {spec?.label ?? docKey}
-                                <span className="ml-1 font-mono text-[9px] text-muted-foreground">
-                                  {docKey}
-                                </span>
-                                {sideHint && (
-                                  <span className="ml-2 inline-flex items-center rounded bg-indigo-100 px-1.5 py-0 text-[9px] text-indigo-900">
-                                    {sideHint}
-                                  </span>
-                                )}
-                              </span>
-                              {assigned.length > 1 && canEdit && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="rounded p-0.5 hover:bg-muted disabled:opacity-30"
-                                    disabled={idx === 0}
-                                    onClick={() => moveVisionDocKey(cat, idx, -1)}
-                                    title="Subir (más prioridad / lado frente para INE)"
-                                  >
-                                    <ChevronRight className="size-3 -rotate-90" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="rounded p-0.5 hover:bg-muted disabled:opacity-30"
-                                    disabled={idx === assigned.length - 1}
-                                    onClick={() => moveVisionDocKey(cat, idx, 1)}
-                                    title="Bajar"
-                                  >
-                                    <ChevronRight className="size-3 rotate-90" />
-                                  </button>
-                                </>
-                              )}
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  className="rounded p-0.5 hover:bg-rose-100"
-                                  onClick={() => toggleVisionDocKey(cat, docKey)}
-                                  title="Quitar mapeo"
-                                >
-                                  <X className="size-3 text-rose-600" />
-                                </button>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    )}
-
-                    {/* Available documents from the catalog the operator
-                        can add. We hide the ones already assigned. */}
-                    {canEdit && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {draft.documents_catalog
-                          .filter((d) => !assigned.includes(d.key))
-                          .map((d) => (
-                            <button
-                              type="button"
-                              key={d.key}
-                              className="rounded-full border border-dashed bg-background px-2 py-0.5 text-[10px] hover:bg-muted"
-                              onClick={() => toggleVisionDocKey(cat, d.key)}
-                              title={d.hint || undefined}
-                            >
-                              + {d.label}
-                            </button>
-                          ))}
-                        {draft.documents_catalog.length === 0 && (
-                          <span className="text-[10px] italic text-muted-foreground">
-                            Primero agrega documentos al catálogo arriba.
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
           )}
         </div>

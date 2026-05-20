@@ -4,7 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrandFactsEditor } from "@/features/config/components/BrandFactsEditor";
 import { FollowupsConfigEditor } from "@/features/config/components/FollowupsConfigEditor";
 import { IntegrationsTab } from "@/features/config/components/IntegrationsTab";
+import { NLUConfigEditor } from "@/features/config/components/NLUConfigEditor";
 import { QosConfigEditor } from "@/features/config/components/QosConfigEditor";
+import { RunnerRulesEditor } from "@/features/config/components/RunnerRulesEditor";
 import { ToneEditor } from "@/features/config/components/ToneEditor";
 import { requireRole } from "@/lib/auth-guards";
 
@@ -13,20 +15,20 @@ export const Route = createFileRoute("/(auth)/config")({
   component: ConfigPage,
 });
 
-// Pipeline editing used to live here as the first tab. It now lives on the
-// `/pipeline` page itself (single source of truth for everything pipeline-
-// related: board, editor, first-time setup). Configuración keeps tone/brand
-// facts/integrations only.
+// Pipeline editing lives on `/pipeline`; Configuracion keeps tenant-level
+// controls such as decision rules, tone, NLU, followups and integrations.
 function ConfigPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Configuración</h1>
-      <Tabs defaultValue="brand-facts">
+      <Tabs defaultValue="runner-rules">
         <TabsList>
           <TabsTrigger value="brand-facts">Brand facts</TabsTrigger>
           <TabsTrigger value="qos">QoS</TabsTrigger>
           <TabsTrigger value="followups">Seguimientos</TabsTrigger>
           <TabsTrigger value="tone">Tono</TabsTrigger>
+          <TabsTrigger value="nlu">NLU</TabsTrigger>
+          <TabsTrigger value="runner-rules">Motor de decisión</TabsTrigger>
           <TabsTrigger value="integrations">Integraciones</TabsTrigger>
         </TabsList>
         <TabsContent value="brand-facts" className="mt-4">
@@ -40,6 +42,12 @@ function ConfigPage() {
         </TabsContent>
         <TabsContent value="tone" className="mt-4">
           <ToneEditor />
+        </TabsContent>
+        <TabsContent value="nlu" className="mt-4">
+          <NLUConfigEditor />
+        </TabsContent>
+        <TabsContent value="runner-rules" className="mt-4">
+          <RunnerRulesEditor />
         </TabsContent>
         <TabsContent value="integrations" className="mt-4">
           <IntegrationsTab />

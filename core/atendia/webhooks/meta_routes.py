@@ -17,12 +17,13 @@ from atendia.channels.tenant_config import (
 )
 from atendia.config import get_settings
 from atendia.db.session import get_db_session
-from atendia.runner.composer_canned import CannedComposer
-from atendia.runner.composer_openai import OpenAIComposer
 from atendia.runner.composer_protocol import ComposerProvider
-from atendia.runner.nlu_keywords import KeywordNLU
-from atendia.runner.nlu_openai import OpenAINLU
 from atendia.runner.nlu_protocol import NLUProvider
+from atendia.runner.provider_factory import (
+    AIProviderSelection,
+    build_composer as _build_composer,
+    build_nlu as _build_nlu,
+)
 from atendia.webhooks.deduplication import mark_processed
 
 router = APIRouter()
@@ -37,36 +38,12 @@ class InboundPersistResult:
     from_phone_e164: str
 
 
-def build_nlu(settings) -> NLUProvider:
-    """Construct the NLU provider based on settings.nlu_provider.
-
-    "keyword" -> in-memory keyword matcher (default fallback).
-    "openai"  -> real LLM call via OpenAINLU. Requires openai_api_key.
-    """
-    if settings.nlu_provider == "openai":
-        return OpenAINLU(
-            api_key=settings.openai_api_key,
-            model=settings.nlu_model,
-            timeout_s=settings.nlu_timeout_s,
-            retry_delays_ms=tuple(settings.nlu_retry_delays_ms),
-        )
-    return KeywordNLU()
+def build_nlu(settings, selection: AIProviderSelection | None = None) -> NLUProvider:
+    return _build_nlu(settings, selection)
 
 
-def build_composer(settings) -> ComposerProvider:
-    """Construct the Composer provider based on settings.composer_provider.
-
-    "canned" -> CannedComposer (Phase 2 hardcoded text behavior, default fallback).
-    "openai" -> OpenAIComposer (gpt-4o real LLM). Requires openai_api_key.
-    """
-    if settings.composer_provider == "openai":
-        return OpenAIComposer(
-            api_key=settings.openai_api_key,
-            model=settings.composer_model,
-            timeout_s=settings.composer_timeout_s,
-            retry_delays_ms=tuple(settings.composer_retry_delays_ms),
-        )
-    return CannedComposer()
+def build_composer(settings, selection: AIProviderSelection | None = None) -> ComposerProvider:
+    return _build_composer(settings, selection)
 
 
 @router.get("/webhooks/meta/{tenant_id}", response_class=PlainTextResponse)

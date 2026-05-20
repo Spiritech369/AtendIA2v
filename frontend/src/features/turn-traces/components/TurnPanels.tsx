@@ -53,6 +53,61 @@ function formatScalar(v: unknown): string {
   }
 }
 
+function readTraceObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function formatMoney(value: unknown): string | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const n = Number(String(value).replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(n)) return null;
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function payloadValue(payload: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    if (payload[key] != null) return payload[key];
+  }
+  return null;
+}
+
+function humanPayloadItems(payload: Record<string, unknown>): Array<{ label: string; value: string }> {
+  const items: Array<{ label: string; value: string }> = [];
+  const product = payloadValue(payload, ["name", "modelo_moto", "modelo_interes", "interes_producto", "sku"]);
+  const price = payloadValue(payload, ["price_contado_mxn", "precio_contado_mxn", "price", "precio"]);
+  const plan = payloadValue(payload, ["plan_credito", "credito_plan", "tipo_credito"]);
+  const enganche = payloadValue(payload, ["enganche_mxn", "enganche"]);
+  const pago = payloadValue(payload, ["pago_quincenal_mxn", "pago_quincenal", "pago"]);
+  const source = payloadValue(payload, ["source", "source_type", "collection", "catalog"]);
+  const status = payload.status;
+
+  if (product) items.push({ label: "Producto detectado", value: formatScalar(product) });
+  if (price) items.push({ label: "Precio contado", value: formatMoney(price) ?? formatScalar(price) });
+  if (plan) items.push({ label: "Plan aplicable", value: formatScalar(plan) });
+  if (enganche) items.push({ label: "Enganche", value: formatMoney(enganche) ?? formatScalar(enganche) });
+  if (pago) items.push({ label: "Pago quincenal", value: formatMoney(pago) ?? formatScalar(pago) });
+  if (source) items.push({ label: "Fuente", value: formatScalar(source) });
+  if (status) {
+    items.push({
+      label: "Estado",
+      value: status === "ok" ? "Completo" : status === "no_data" ? "Información faltante" : formatScalar(status),
+    });
+  }
+
+  if (items.length === 0) {
+    return Object.entries(payload)
+      .slice(0, 6)
+      .map(([key, value]) => ({ label: key, value: formatScalar(value) }));
+  }
+  return items;
+}
+
 function PanelHeader({
   icon: Icon,
   title,
@@ -552,6 +607,147 @@ export function FactPackCard({ trace }: { trace: TurnTraceDetail }) {
           )}
         </pre>
       </details>
+    </div>
+  );
+}
+
+export function ComposerInputPanel({ trace }: { trace: TurnTraceDetail }) {
+  const input = readTraceObject(trace.composer_input);
+  const output = readTraceObject(trace.composer_output);
+  const stateAfter = readTraceObject(trace.state_after);
+  const score = readTraceObject(stateAfter?.composer_score);
+  if (!input && !output && !score) return null;
+
+  const actionPayload = readTraceObject(input?.action_payload);
+  const guardrails = Array.isArray(input?.guardrails) ? input.guardrails : [];
+  const messages = Array.isArray(output?.messages) ? output.messages : trace.outbound_messages ?? [];
+  const scoreRows: Array<[string, boolean | unknown]> = score
+    ? [
+        ["policy_passed", score.policy_passed],
+        ["used_action_payload", score.used_action_payload],
+        ["invented_data", score.invented_data],
+        ["followed_mode", score.followed_mode],
+        ["needs_handoff", score.needs_handoff],
+      ]
+    : [];
+
+  return (
+    <div className="space-y-2">
+      <PanelHeader icon={Bot} title="Composer input" />
+      <div className="grid gap-2 text-xs sm:grid-cols-2">
+        <div className="rounded-md border bg-card p-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Acción que hará la IA
+          </div>
+          <div className="mt-1 font-mono font-medium">{formatScalar(input?.action)}</div>
+        </div>
+        <div className="rounded-md border bg-card p-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Modo de respuesta
+          </div>
+          <div className="mt-1 font-mono font-medium">{formatScalar(input?.flow_mode)}</div>
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-card p-2 text-xs">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Instrucciones para este modo
+        </div>
+        <div className="mt-1 line-clamp-4 whitespace-pre-wrap text-muted-foreground">
+          {typeof input?.mode_guidance === "string" && input.mode_guidance.trim()
+            ? input.mode_guidance
+            : "Guía predeterminada del modo."}
+        </div>
+      </div>
+
+      {actionPayload && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Datos que usará la IA
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {humanPayloadItems(actionPayload).map((item) => (
+              <div key={item.label} className="rounded-md border bg-card p-2 text-xs">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {item.label}
+                </div>
+                <div className="mt-1 font-medium">{item.value}</div>
+              </div>
+            ))}
+          </div>
+          <details className="rounded-md border bg-card text-xs">
+            <summary className="cursor-pointer px-2 py-1.5 text-muted-foreground hover:text-foreground">
+              Ver datos técnicos
+            </summary>
+            <pre className="max-h-48 overflow-auto border-t bg-muted/30 p-2 text-[10px]">
+              {JSON.stringify({ action_payload: actionPayload }, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
+
+      <div className="grid gap-2 text-xs sm:grid-cols-2">
+        <div className="rounded-md border bg-card p-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Reglas de seguridad
+          </div>
+          {guardrails.length > 0 ? (
+            <ul className="mt-1 space-y-1">
+              {guardrails.slice(0, 4).map((rule) => (
+                <li key={String(rule)} className="line-clamp-2">
+                  {formatScalar(rule)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-1 text-muted-foreground">Sin reglas adicionales.</div>
+          )}
+        </div>
+        <div className="rounded-md border bg-card p-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Tono
+          </div>
+          <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap text-[10px] text-muted-foreground">
+            {JSON.stringify(input?.tone ?? {}, null, 2)}
+          </pre>
+        </div>
+      </div>
+
+      {messages.length > 0 && (
+        <div className="rounded-md border bg-card p-2 text-xs">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Mensajes generados
+          </div>
+          <ul className="mt-1 space-y-1">
+            {messages.map((message) => (
+              <li
+                key={String(message)}
+                className="rounded bg-muted/40 p-1.5"
+              >
+                {formatScalar(message)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {scoreRows.length > 0 && (
+        <div className="rounded-md border bg-card p-2 text-xs">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Composer score
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            {scoreRows.map(([key, value]) => (
+              <div key={String(key)} className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] text-muted-foreground">{key}</span>
+                <Badge variant={value === true ? "secondary" : "outline"} className="rounded-sm">
+                  {String(value)}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

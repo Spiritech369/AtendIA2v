@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -178,7 +178,7 @@ def _normalize_doc_value(
     value: dict[str, Any] = {
         "status": "ok" if accepted else "rejected",
         "confidence": confidence,
-        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "verified_at": datetime.now(UTC).isoformat(),
         "source": "vision",
     }
     if not accepted and rejection_reason:
@@ -211,12 +211,7 @@ def _decide_doc_keys(
     """
     keys = pipeline.vision_doc_mapping.get(category.value) or []
     if not keys:
-        return _infer_doc_keys_from_catalog(
-            category=category,
-            pipeline=pipeline,
-            metadata=metadata,
-            side=side,
-        )
+        return []
     # Single-key mapping is the common case — comprobante, estado_cuenta,
     # etc. — no disambiguation needed.
     if len(keys) == 1:

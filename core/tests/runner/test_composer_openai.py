@@ -1,29 +1,24 @@
-"""Tests for OpenAIComposer (happy + retries + fallback + tone passthrough)."""
-
 import json
 from decimal import Decimal
 
+import pytest
 import respx
 from httpx import Response
 
 from atendia.contracts.tone import Tone
-from atendia.runner.composer_canned import CannedComposer
-from atendia.runner.composer_openai import OpenAIComposer
+from atendia.runner.composer_openai import ComposerProviderError, OpenAIComposer
 from atendia.runner.composer_protocol import ComposerInput
 
 
 def _ok_composer_response(messages=None, model="gpt-4o", tokens_in=450, tokens_out=80):
-    payload = {"messages": messages or ["¡Qué onda!", "¿En qué te ayudo?"]}
+    payload = {"messages": messages or ["Hola", "¿En qué te ayudo?"], "suggested_handoff": None}
     return Response(
         200,
         json={
             "id": "chatcmpl-cmp",
-            "object": "chat.completion",
-            "created": 0,
             "model": model,
             "choices": [
                 {
-                    "index": 0,
                     "message": {"role": "assistant", "content": json.dumps(payload)},
                     "finish_reason": "stop",
                 }
@@ -37,34 +32,22 @@ def _ok_composer_response(messages=None, model="gpt-4o", tokens_in=450, tokens_o
     )
 
 
-# T14 — happy path
-
-
 @respx.mock
 async def test_compose_happy_path_returns_messages_and_usage():
     respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=_ok_composer_response(
-            messages=["¡Qué onda, Frank!", "¿Te ayudo con tu moto?"],
-        )
+        return_value=_ok_composer_response(messages=["Hola, Frank", "¿Te ayudo?"])
     )
     composer = OpenAIComposer(api_key="sk-test")
     out, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
-        )
+        input=ComposerInput(action="greet", current_stage="greeting", tone=Tone())
     )
-    assert out.messages == ["¡Qué onda, Frank!", "¿Te ayudo con tu moto?"]
+    assert out.messages == ["Hola, Frank", "¿Te ayudo?"]
     assert usage is not None
     assert usage.tokens_in == 450
     assert usage.tokens_out == 80
     assert usage.cost_usd == Decimal("0.001925")
     assert usage.fallback_used is False
     assert usage.model == "gpt-4o"
-
-
-# T15 — strict-mode schema invariants
 
 
 def test_composer_schema_required_matches_properties():
@@ -83,30 +66,14 @@ def test_composer_schema_max_items_respects_input():
     assert _composer_schema(3)["schema"]["properties"]["messages"]["maxItems"] == 3
 
 
-def test_composer_schema_min_items_is_1():
-    from atendia.runner.composer_openai import _composer_schema
-
-    assert _composer_schema(2)["schema"]["properties"]["messages"]["minItems"] == 1
-
-
-# T16 — retry + fallback
-
-
 @respx.mock
 async def test_compose_retries_on_503_then_succeeds():
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        side_effect=[
-            Response(503, json={"error": {"message": "boom"}}),
-            _ok_composer_response(),
-        ]
+        side_effect=[Response(503, json={"error": {"message": "boom"}}), _ok_composer_response()]
     )
     composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(50,))
     _out, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
-        )
+        input=ComposerInput(action="greet", current_stage="greeting", tone=Tone())
     )
     assert route.call_count == 2
     assert usage is not None
@@ -115,97 +82,44 @@ async def test_compose_retries_on_503_then_succeeds():
 
 
 @respx.mock
-async def test_compose_falls_back_to_canned_on_exhaustion():
+async def test_compose_raises_on_exhaustion_without_canned_fallback():
     respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=Response(503, json={"error": {"message": "down"}})
     )
-    fallback = CannedComposer()
-    composer = OpenAIComposer(
-        api_key="sk-test",
-        retry_delays_ms=(10, 20),
-        fallback=fallback,
-    )
-    out, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
+    composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
+    with pytest.raises(ComposerProviderError) as exc_info:
+        await composer.compose(
+            input=ComposerInput(action="greet", current_stage="greeting", tone=Tone())
         )
-    )
-    # Output is the canned text
-    assert "hola" in out.messages[0].lower()
-    # Usage signals fallback
-    assert usage is not None
-    assert usage.fallback_used is True
-    assert usage.tokens_in == 0
-    assert usage.cost_usd == Decimal("0")
+    assert exc_info.value.usage.fallback_used is False
+    assert exc_info.value.usage.tokens_in == 0
+    assert exc_info.value.usage.cost_usd == Decimal("0")
 
 
+@pytest.mark.parametrize("status_code", [400, 401, 422])
 @respx.mock
-async def test_compose_does_not_retry_on_401():
+async def test_compose_does_not_retry_on_non_retriable(status_code):
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=Response(401, json={"error": {"message": "bad key"}})
+        return_value=Response(status_code, json={"error": {"message": "bad"}})
     )
     composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
-    _out, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
+    with pytest.raises(ComposerProviderError) as exc_info:
+        await composer.compose(
+            input=ComposerInput(action="greet", current_stage="greeting", tone=Tone())
         )
-    )
     assert route.call_count == 1
-    assert usage.fallback_used is True
-
-
-@respx.mock
-async def test_compose_does_not_retry_on_400():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=Response(400, json={"error": {"message": "bad req"}})
-    )
-    composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
-    _, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
-        )
-    )
-    assert route.call_count == 1
-    assert usage.fallback_used is True
-
-
-@respx.mock
-async def test_compose_does_not_retry_on_422():
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=Response(422, json={"error": {"message": "unprocessable"}})
-    )
-    composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
-    _, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
-        )
-    )
-    assert route.call_count == 1
-    assert usage.fallback_used is True
+    assert exc_info.value.usage.fallback_used is False
 
 
 @respx.mock
 async def test_compose_treats_malformed_json_as_validation_error():
-    """Output JSON that doesn't satisfy ComposerOutput → ValidationError → fail fast → fallback."""
     bad = Response(
         200,
         json={
             "id": "x",
-            "object": "chat.completion",
-            "created": 0,
             "model": "gpt-4o",
             "choices": [
                 {
-                    "index": 0,
-                    # empty list violates min_length
                     "message": {"role": "assistant", "content": '{"messages": []}'},
                     "finish_reason": "stop",
                 }
@@ -213,22 +127,14 @@ async def test_compose_treats_malformed_json_as_validation_error():
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
         },
     )
-    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
-        return_value=bad,
-    )
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(return_value=bad)
     composer = OpenAIComposer(api_key="sk-test", retry_delays_ms=(10, 20))
-    _, usage = await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
+    with pytest.raises(ComposerProviderError) as exc_info:
+        await composer.compose(
+            input=ComposerInput(action="greet", current_stage="greeting", tone=Tone())
         )
-    )
-    assert route.call_count == 1  # ValidationError is non-retriable
-    assert usage.fallback_used is True
-
-
-# T17 — tone passes through to system prompt
+    assert route.call_count == 1
+    assert exc_info.value.usage.fallback_used is False
 
 
 @respx.mock
@@ -255,9 +161,6 @@ async def test_compose_passes_tone_to_prompt():
     assert "frase_prohibida_z" in system
 
 
-# T18 — max_messages caps schema
-
-
 @respx.mock
 async def test_compose_request_uses_max_messages_in_schema():
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
@@ -265,19 +168,11 @@ async def test_compose_request_uses_max_messages_in_schema():
     )
     composer = OpenAIComposer(api_key="sk-test")
     await composer.compose(
-        input=ComposerInput(
-            action="greet",
-            current_stage="greeting",
-            tone=Tone(),
-            max_messages=3,
-        )
+        input=ComposerInput(action="greet", current_stage="greeting", tone=Tone(), max_messages=3)
     )
     req_body = json.loads(route.calls[0].request.content.decode("utf-8"))
     schema = req_body["response_format"]["json_schema"]["schema"]
     assert schema["properties"]["messages"]["maxItems"] == 3
-
-
-# T19 — quote action with no_data payload
 
 
 @respx.mock
@@ -299,6 +194,6 @@ async def test_compose_quote_with_no_data_includes_no_inventes():
         )
     )
     req_body = json.loads(route.calls[0].request.content.decode("utf-8"))
-    system = req_body["messages"][0]["content"]
-    assert "NO INVENTES precios" in system
-    assert "150Z" in system  # extracted_data shows up
+    rendered = "\n".join(str(message["content"]) for message in req_body["messages"])
+    assert "catalog not connected" in rendered
+    assert "150Z" in rendered

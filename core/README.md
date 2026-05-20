@@ -32,10 +32,12 @@ uv run uvicorn atendia.main:app --reload --port 8001
 | `ATENDIA_V2_REDIS_URL` | `redis://localhost:6380/0` |
 | `ATENDIA_V2_LOG_LEVEL` | `INFO` |
 | `ATENDIA_V2_OPENAI_API_KEY` | _(empty — set para activar real NLU/Composer/KB)_ |
-| `ATENDIA_V2_NLU_PROVIDER` | `keyword` (set `openai` para `gpt-4o-mini`) |
+| `ATENDIA_V2_NLU_PROVIDER` | `openai` |
+| `ATENDIA_V2_NLU_FALLBACK_PROVIDER` | `haiku` (requires `ATENDIA_V2_ANTHROPIC_API_KEY`) |
+| `ATENDIA_V2_NLU_FALLBACK_MODEL` | `claude-haiku-4-5-20251001` |
 | `ATENDIA_V2_NLU_MODEL` | `gpt-4o-mini` |
 | `ATENDIA_V2_NLU_TIMEOUT_S` | `8.0` |
-| `ATENDIA_V2_COMPOSER_PROVIDER` | `canned` (set `openai` para LLM real) |
+| `ATENDIA_V2_COMPOSER_PROVIDER` | `openai` |
 | `ATENDIA_V2_COMPOSER_MODEL` | `gpt-4o-mini` |
 | `ATENDIA_V2_COMPOSER_MAX_MESSAGES` | `2` |
 | `ATENDIA_V2_KB_PROVIDER` | `openai` (auto-fallback a `mock` si no hay API key) |

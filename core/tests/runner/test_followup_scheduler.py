@@ -7,12 +7,18 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
+from atendia.runner.composer_protocol import ComposerOutput
 from atendia.runner.followup_scheduler import (
     FOLLOWUP_KINDS,
     cancel_pending_followups,
     render_followup_body,
     schedule_followups_after_outbound,
 )
+
+
+class _TestComposer:
+    async def compose(self, *, input):
+        return ComposerOutput(messages=["ok"]), None
 
 
 async def _seed_tenant_conv(db_session) -> tuple:
@@ -322,7 +328,6 @@ async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
 
     from atendia.contracts.message import Message, MessageDirection
     from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
-    from atendia.runner.composer_canned import CannedComposer
     from atendia.runner.conversation_runner import ConversationRunner
     from atendia.runner.nlu_protocol import UsageMetadata
 
@@ -371,7 +376,7 @@ async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
     )
     await db_session.commit()
 
-    runner = ConversationRunner(db_session, _StubNLU(), CannedComposer())
+    runner = ConversationRunner(db_session, _StubNLU(), _TestComposer())
     inbound = Message(
         id=str(uuid4()),
         conversation_id=str(conv),
@@ -399,3 +404,6 @@ async def test_inbound_via_runner_cancels_pending_followups(db_session) -> None:
     ).scalar()
     assert pending == 0
     await _cleanup(db_session, tid)
+
+
+

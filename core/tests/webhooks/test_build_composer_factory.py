@@ -1,20 +1,18 @@
+import pytest
+
 from atendia.config import Settings
-from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.composer_openai import OpenAIComposer
 from atendia.webhooks.meta_routes import build_composer
 
 
-def test_build_composer_returns_canned_when_provider_canned():
-    s = Settings(_env_file=None, composer_provider="canned")  # type: ignore[arg-type]
-    assert isinstance(build_composer(s), CannedComposer)
+def test_build_composer_requires_openai_key():
+    s = Settings(_env_file=None, openai_api_key="")  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError, match="OpenAI API key is required"):
+        build_composer(s)
 
 
-def test_build_composer_returns_openai_when_provider_openai():
-    s = Settings(
-        _env_file=None,  # type: ignore[arg-type]
-        composer_provider="openai",
-        openai_api_key="sk-test",
-    )
+def test_build_composer_returns_openai():
+    s = Settings(_env_file=None, openai_api_key="sk-test")  # type: ignore[arg-type]
     composer = build_composer(s)
     assert isinstance(composer, OpenAIComposer)
 
@@ -22,7 +20,6 @@ def test_build_composer_returns_openai_when_provider_openai():
 def test_build_composer_passes_through_settings():
     s = Settings(
         _env_file=None,  # type: ignore[arg-type]
-        composer_provider="openai",
         openai_api_key="sk-test",
         composer_model="gpt-4o",
         composer_timeout_s=4.0,

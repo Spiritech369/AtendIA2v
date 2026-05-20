@@ -12,6 +12,7 @@ MODEL_PRICING: dict[str, tuple[Decimal, Decimal]] = {
     "gpt-4o-mini-2024-07-18": (Decimal("0.150"), Decimal("0.600")),
     "gpt-4o": (Decimal("2.500"), Decimal("10.000")),
     "gpt-4o-2024-08-06": (Decimal("2.500"), Decimal("10.000")),
+    "claude-haiku-4-5-20251001": (Decimal("1.000"), Decimal("5.000")),
 }
 
 

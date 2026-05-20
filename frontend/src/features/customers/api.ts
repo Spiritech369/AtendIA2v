@@ -243,7 +243,8 @@ export type FieldDefinitionType =
   | "number"
   | "date"
   | "checkbox"
-  | "multiselect";
+  | "multiselect"
+  | "document";
 
 export interface FieldDefinitionCreate {
   key: string;

@@ -1,6 +1,6 @@
 # AtendIA v2 - Detailed Project Map
 
-Last manual update: 2026-05-18.
+Last manual update: 2026-05-20.
 
 This document is the implementation map for the repo. It explains where each
 runtime piece lives and how the configurable tenant model is wired. The current
@@ -112,7 +112,7 @@ pipeline/docs configuration and by agent validation. It catches:
 - `docs_ine_frente` style legacy/lowercase keys instead of `DOCS_INE_FRENTE`.
 - `docs_per_plan` entries that reference missing document catalog keys.
 - `docs_per_plan` plan names that are not exact choices of `docs_plan_field`.
-- Vision mappings that point at removed or misspelled `DOCS_*`.
+- Legacy Vision mappings that point at removed or misspelled `DOCS_*`.
 - `docs_complete_for_plan` rules whose field does not match `docs_plan_field`.
 - Prompt references to missing customer fields or missing KB documents.
 
@@ -173,9 +173,9 @@ Current important behavior:
 - `DOCS_*` fields display the actual document status from `customer.attrs`.
 - Editing a `DOCS_*` field writes back to the structured customer attrs shape.
 
-### Expedediente / Documents
+### Expediente / Documents
 
-- `frontend/src/features/expediente/`: document catalog, docs-per-plan and Vision mapping UI.
+- `frontend/src/features/expediente/`: document catalog and docs-per-plan UI.
 - `frontend/src/routes/(auth)/expediente.tsx`: route.
 - `frontend/src/features/pipeline/components/PipelineEditor.tsx`: also exposes document config.
 
@@ -187,7 +187,6 @@ Python as business constants.
 - `frontend/src/features/pipeline/components/PipelineKanbanPage.tsx`
 - `PipelineEditor.tsx`
 - `RuleBuilder.tsx`
-- `DocumentRuleBuilder.tsx`
 - `PipelineVersionHistoryDrawer.tsx`
 
 ### Config
@@ -261,7 +260,8 @@ Important keys:
 - `documents_catalog`
 - `docs_per_plan`
 - `docs_plan_field`
-- `vision_doc_mapping`
+- `vision_doc_mapping` (legacy; kept for compatibility, not edited from the
+  Expediente or Pipeline UI)
 
 For docs completion, prefer:
 
@@ -294,8 +294,14 @@ Canonical customer attrs shape:
 }
 ```
 
-`vision_doc_mapping` maps Vision categories to the `DOCS_*` keys to update.
-For INE split into two sides, order matters:
+Document requirements are configured from `documents_catalog`, `docs_per_plan`
+and document-type customer fields. The old `vision_doc_mapping` field is kept in
+the pipeline schema for compatibility with older tenants, but current operator
+interfaces no longer ask operators to maintain a separate Vision matrix. New
+document behavior should be modeled from Datos de cliente document fields and
+expediente rules, not from a parallel Vision category table.
+
+Legacy example only:
 
 ```json
 {
@@ -326,8 +332,7 @@ When adding behavior for a new vertical:
 3. Configure agent mode prompts.
 4. Configure pipeline stages and rules.
 5. Configure document catalog and docs-per-plan.
-6. Configure Vision mapping.
-7. Run tests and a sandbox conversation.
+6. Run tests and a sandbox conversation.
 
 Only add Python code when a generic capability is missing.
 

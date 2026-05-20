@@ -8,7 +8,7 @@ in tenant configuration instead of being hardcoded for one vertical.
 
 ## Current Status
 
-Last manual update: 2026-05-18.
+Last manual update: 2026-05-20.
 
 | Area | Status |
 |---|---|
@@ -17,7 +17,7 @@ Last manual update: 2026-05-18.
 | Conversation runner with NLU, flow router, tools, composer and turn traces | Active |
 | Configurable PLAN/SALES/DOC/OBSTACLE/RETENTION/SUPPORT modes | Active |
 | Knowledge Base for documents, catalog, FAQ and RAG evidence | Active |
-| Pipeline editor, document catalog, docs-per-plan and Vision mapping | Active |
+| Pipeline editor, document catalog and docs-per-plan | Active |
 | Customer data panel with editable tenant-defined fields and DOCS_* statuses | Active |
 | Deterministic docs_complete_for_plan pipeline rule | Active |
 | Deterministic quote rendering from retrieved catalog evidence | Active |
@@ -28,7 +28,7 @@ Last manual update: 2026-05-18.
 | Need | Read |
 |---|---|
 | New laptop setup and clean tenant configuration | [docs/runbooks/laptop-new-tenant-setup.md](docs/runbooks/laptop-new-tenant-setup.md) |
-| High-level repository map | [docs/PROJECT_MAP.md](docs/PROJECT_MAP.md) |
+| Frontend interface map | [docs/FRONTEND_INTERFACE_MAP.md](docs/FRONTEND_INTERFACE_MAP.md) |
 | Detailed technical map | [docs/PROJECT_MAP_DETAILED.md](docs/PROJECT_MAP_DETAILED.md) |
 | Backend setup details | [core/README.md](core/README.md) |
 | Knowledge Base operations | [docs/runbooks/knowledge-base.md](docs/runbooks/knowledge-base.md) |
@@ -57,8 +57,8 @@ SQL/API calls.
 
 The tenant owns the behavior:
 
-- `tenant_pipelines.definition`: stages, rules, document catalog, docs-per-plan,
-  Vision mapping and `docs_plan_field`.
+- `tenant_pipelines.definition`: stages, rules, document catalog, docs-per-plan
+  and `docs_plan_field`.
 - `customer_field_definitions`: fields visible in Datos de cliente and available
   to AI extraction.
 - `tenant_branding` and agent mode prompts: voice, tone and workflow behavior.

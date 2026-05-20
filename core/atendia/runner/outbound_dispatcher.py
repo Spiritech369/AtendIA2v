@@ -1,7 +1,7 @@
 """Enqueue outbound messages onto the arq queue.
 
-Phase 3b: dispatcher no longer holds canned text. The Composer (canned or
-OpenAI) produces the messages; the dispatcher just enqueues them.
+Phase 3b: dispatcher does not hold response text. The OpenAI Composer
+produces the messages; the dispatcher just enqueues them.
 """
 
 from uuid import UUID

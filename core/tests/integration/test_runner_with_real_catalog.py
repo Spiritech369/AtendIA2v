@@ -9,7 +9,7 @@ the runner directly with:
   * 1 real catalog row (Adventure 150 CC, alias=["adventure"]) inserted via
     SQLAlchemy ORM so the halfvec column round-trips cleanly
   * A fake NLU that returns intent=ask_price + interes_producto=Adventure
-  * A fake Composer that records the ComposerInput and returns canned text
+  * A fake Composer that records the ComposerInput and returns test text
 
 The assertion is that `composer_input.action_payload` has:
   status='ok', price_contado_mxn='29900', name='Adventure 150 CC'
@@ -108,10 +108,10 @@ class _FakeNLU(NLUProvider):
 
 
 class _RecordingComposer(ComposerProvider):
-    """Captures the ComposerInput it received; returns canned ComposerOutput."""
+    """Captures the ComposerInput it received; returns test ComposerOutput."""
 
-    def __init__(self, canned_messages: list[str]) -> None:
-        self._messages = canned_messages
+    def __init__(self, test_messages: list[str]) -> None:
+        self._messages = test_messages
         self.last_input: ComposerInput | None = None
 
     async def compose(
@@ -226,7 +226,7 @@ def test_runner_dispatches_real_quote_via_alias(adventure_catalog) -> None:
     async def _run() -> None:
         engine = create_async_engine(get_settings().database_url)
         SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-        composer = _RecordingComposer(canned_messages=["¡Qué onda! El Adventure cuesta $29,900."])
+        composer = _RecordingComposer(test_messages=["¡Qué onda! El Adventure cuesta $29,900."])
         async with SessionLocal() as session:
             runner = ConversationRunner(
                 session=session,
@@ -283,7 +283,7 @@ def test_runner_dispatches_no_data_for_unknown_model(adventure_catalog) -> None:
     async def _run() -> None:
         engine = create_async_engine(get_settings().database_url)
         SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-        composer = _RecordingComposer(canned_messages=["Déjame revisar ese modelo."])
+        composer = _RecordingComposer(test_messages=["Déjame revisar ese modelo."])
         async with SessionLocal() as session:
             runner = ConversationRunner(
                 session=session,
@@ -315,3 +315,4 @@ def test_runner_dispatches_no_data_for_unknown_model(adventure_catalog) -> None:
     payload = composer.last_input.action_payload
     assert payload.get("status") == "no_data"
     assert "lambretta" in payload.get("hint", "").lower()
+

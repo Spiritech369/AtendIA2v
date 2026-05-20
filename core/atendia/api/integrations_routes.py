@@ -17,7 +17,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
@@ -27,6 +27,12 @@ from atendia.config import get_settings
 from atendia.db.models.tenant import Tenant
 from atendia.db.session import get_db_session
 from atendia.queue.circuit_breaker import is_open
+from atendia.runner.provider_factory import (
+    AIProviderSelection,
+    ComposerProviderName,
+    NLUProviderName,
+    selection_from_config,
+)
 from atendia.webhooks.meta_routes import _get_redis, _persist_inbound
 
 router = APIRouter()
@@ -70,15 +76,36 @@ class WhatsAppWebhookSandboxResponse(BaseModel):
 
 
 class AIProviderInfo(BaseModel):
-    """Read-only view of which LLM/NLU providers are wired up. Useful for
-    triage when the agent stops responding — ops want to know whether the
-    deployment is on the keyword fallback or hitting OpenAI."""
+    """Read-only view of which LLM/NLU providers are wired up."""
 
     nlu_provider: str
     nlu_model: str
+    nlu_fallback_provider: str
+    nlu_fallback_model: str
     composer_provider: str
     composer_model: str
     has_openai_key: bool
+    has_anthropic_key: bool
+
+
+class AIProviderPutBody(BaseModel):
+    nlu_provider: NLUProviderName
+    nlu_model: str = Field(default="gpt-4o-mini", min_length=1, max_length=80)
+    composer_provider: ComposerProviderName
+    composer_model: str = Field(default="gpt-4o-mini", min_length=1, max_length=80)
+
+
+def _ai_provider_info(settings, selection: AIProviderSelection) -> AIProviderInfo:
+    return AIProviderInfo(
+        nlu_provider=selection.nlu_provider,
+        nlu_model=selection.nlu_model,
+        nlu_fallback_provider=settings.nlu_fallback_provider,
+        nlu_fallback_model=settings.nlu_fallback_model,
+        composer_provider=selection.composer_provider,
+        composer_model=selection.composer_model,
+        has_openai_key=bool(settings.openai_api_key),
+        has_anthropic_key=bool(settings.anthropic_api_key),
+    )
 
 
 @router.get("/whatsapp/details", response_model=WhatsAppDetails)
@@ -232,12 +259,29 @@ async def test_whatsapp_webhook(
 async def get_ai_provider_info(
     user: AuthUser = Depends(current_user),
     tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
 ) -> AIProviderInfo:
     settings = get_settings()
-    return AIProviderInfo(
-        nlu_provider=settings.nlu_provider,
-        nlu_model=settings.nlu_model,
-        composer_provider=settings.composer_provider,
-        composer_model=settings.composer_model,
-        has_openai_key=bool(settings.openai_api_key),
-    )
+    row = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    return _ai_provider_info(settings, selection_from_config(settings, row.config))
+
+
+@router.put("/ai-provider", response_model=AIProviderInfo)
+async def put_ai_provider_info(
+    body: AIProviderPutBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> AIProviderInfo:
+    settings = get_settings()
+    row = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    config = dict(row.config or {})
+    config["ai"] = {
+        "nlu_provider": body.nlu_provider,
+        "nlu_model": body.nlu_model.strip(),
+        "composer_provider": body.composer_provider,
+        "composer_model": body.composer_model.strip(),
+    }
+    await session.execute(update(Tenant).where(Tenant.id == tenant_id).values(config=config))
+    await session.commit()
+    return _ai_provider_info(settings, selection_from_config(settings, config))

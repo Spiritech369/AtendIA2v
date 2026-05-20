@@ -26,8 +26,10 @@ import { Route as authDashboardRouteImport } from './routes/(auth)/dashboard'
 import { Route as authCustomersRouteImport } from './routes/(auth)/customers'
 import { Route as authCustomerFieldsRouteImport } from './routes/(auth)/customer-fields'
 import { Route as authConversationsRouteImport } from './routes/(auth)/conversations'
+import { Route as authConfigLinterRouteImport } from './routes/(auth)/config-linter'
 import { Route as authConfigRouteImport } from './routes/(auth)/config'
 import { Route as authComposerRouteImport } from './routes/(auth)/composer'
+import { Route as authCatalogRouteImport } from './routes/(auth)/catalog'
 import { Route as authAuditLogRouteImport } from './routes/(auth)/audit-log'
 import { Route as authAppointmentsRouteImport } from './routes/(auth)/appointments'
 import { Route as authAnalyticsRouteImport } from './routes/(auth)/analytics'
@@ -120,6 +122,11 @@ const authConversationsRoute = authConversationsRouteImport.update({
   path: '/conversations',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authConfigLinterRoute = authConfigLinterRouteImport.update({
+  id: '/config-linter',
+  path: '/config-linter',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authConfigRoute = authConfigRouteImport.update({
   id: '/config',
   path: '/config',
@@ -128,6 +135,11 @@ const authConfigRoute = authConfigRouteImport.update({
 const authComposerRoute = authComposerRouteImport.update({
   id: '/composer',
   path: '/composer',
+  getParentRoute: () => authRouteRoute,
+} as any)
+const authCatalogRoute = authCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
   getParentRoute: () => authRouteRoute,
 } as any)
 const authAuditLogRoute = authAuditLogRouteImport.update({
@@ -173,8 +185,10 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
+  '/catalog': typeof authCatalogRoute
   '/composer': typeof authComposerRoute
   '/config': typeof authConfigRoute
+  '/config-linter': typeof authConfigLinterRoute
   '/conversations': typeof authConversationsRouteWithChildren
   '/customer-fields': typeof authCustomerFieldsRoute
   '/customers': typeof authCustomersRouteWithChildren
@@ -200,8 +214,10 @@ export interface FileRoutesByTo {
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
   '/audit-log': typeof authAuditLogRoute
+  '/catalog': typeof authCatalogRoute
   '/composer': typeof authComposerRoute
   '/config': typeof authConfigRoute
+  '/config-linter': typeof authConfigLinterRoute
   '/conversations': typeof authConversationsRouteWithChildren
   '/customer-fields': typeof authCustomerFieldsRoute
   '/customers': typeof authCustomersRouteWithChildren
@@ -229,8 +245,10 @@ export interface FileRoutesById {
   '/(auth)/analytics': typeof authAnalyticsRoute
   '/(auth)/appointments': typeof authAppointmentsRoute
   '/(auth)/audit-log': typeof authAuditLogRoute
+  '/(auth)/catalog': typeof authCatalogRoute
   '/(auth)/composer': typeof authComposerRoute
   '/(auth)/config': typeof authConfigRoute
+  '/(auth)/config-linter': typeof authConfigLinterRoute
   '/(auth)/conversations': typeof authConversationsRouteWithChildren
   '/(auth)/customer-fields': typeof authCustomerFieldsRoute
   '/(auth)/customers': typeof authCustomersRouteWithChildren
@@ -258,8 +276,10 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/appointments'
     | '/audit-log'
+    | '/catalog'
     | '/composer'
     | '/config'
+    | '/config-linter'
     | '/conversations'
     | '/customer-fields'
     | '/customers'
@@ -285,8 +305,10 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/appointments'
     | '/audit-log'
+    | '/catalog'
     | '/composer'
     | '/config'
+    | '/config-linter'
     | '/conversations'
     | '/customer-fields'
     | '/customers'
@@ -313,8 +335,10 @@ export interface FileRouteTypes {
     | '/(auth)/analytics'
     | '/(auth)/appointments'
     | '/(auth)/audit-log'
+    | '/(auth)/catalog'
     | '/(auth)/composer'
     | '/(auth)/config'
+    | '/(auth)/config-linter'
     | '/(auth)/conversations'
     | '/(auth)/customer-fields'
     | '/(auth)/customers'
@@ -461,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authConversationsRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/config-linter': {
+      id: '/(auth)/config-linter'
+      path: '/config-linter'
+      fullPath: '/config-linter'
+      preLoaderRoute: typeof authConfigLinterRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/config': {
       id: '/(auth)/config'
       path: '/config'
@@ -473,6 +504,13 @@ declare module '@tanstack/react-router' {
       path: '/composer'
       fullPath: '/composer'
       preLoaderRoute: typeof authComposerRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(auth)/catalog': {
+      id: '/(auth)/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof authCatalogRouteImport
       parentRoute: typeof authRouteRoute
     }
     '/(auth)/audit-log': {
@@ -567,8 +605,10 @@ interface authRouteRouteChildren {
   authAnalyticsRoute: typeof authAnalyticsRoute
   authAppointmentsRoute: typeof authAppointmentsRoute
   authAuditLogRoute: typeof authAuditLogRoute
+  authCatalogRoute: typeof authCatalogRoute
   authComposerRoute: typeof authComposerRoute
   authConfigRoute: typeof authConfigRoute
+  authConfigLinterRoute: typeof authConfigLinterRoute
   authConversationsRoute: typeof authConversationsRouteWithChildren
   authCustomerFieldsRoute: typeof authCustomerFieldsRoute
   authCustomersRoute: typeof authCustomersRouteWithChildren
@@ -591,8 +631,10 @@ const authRouteRouteChildren: authRouteRouteChildren = {
   authAnalyticsRoute: authAnalyticsRoute,
   authAppointmentsRoute: authAppointmentsRoute,
   authAuditLogRoute: authAuditLogRoute,
+  authCatalogRoute: authCatalogRoute,
   authComposerRoute: authComposerRoute,
   authConfigRoute: authConfigRoute,
+  authConfigLinterRoute: authConfigLinterRoute,
   authConversationsRoute: authConversationsRouteWithChildren,
   authCustomerFieldsRoute: authCustomerFieldsRoute,
   authCustomersRoute: authCustomersRouteWithChildren,

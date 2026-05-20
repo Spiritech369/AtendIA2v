@@ -255,6 +255,114 @@ def test_publish_captures_full_config_snapshot(client_tenant_admin):
     assert snap["max_sentences"] == 4
 
 
+def test_publish_lints_pipeline_mode_required_fields_and_catalog(client_tenant_admin):
+    aid = _create_publishable(client_tenant_admin, name="LintedAgent")
+
+    import asyncio
+
+    from sqlalchemy import text as sql_text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from atendia.config import get_settings
+
+    async def _seed_bad_pipeline_and_catalog() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                sql_text(
+                    "INSERT INTO tenant_pipelines (tenant_id, version, active, definition) "
+                    "VALUES (:t, 1, true, CAST(:definition AS jsonb))"
+                ),
+                {
+                    "t": client_tenant_admin.tenant_id,
+                    "definition": """
+                    {
+                      "version": 1,
+                      "fallback": "ask_clarification",
+                      "stages": [
+                        {
+                          "id": "quote",
+                          "required_fields": [{"name": "campo_fantasma"}],
+                          "actions_allowed": ["quote"],
+                          "behavior_mode": "SALES",
+                          "is_terminal": true
+                        }
+                      ],
+                      "mode_prompts": {}
+                    }
+                    """,
+                },
+            )
+            await conn.execute(
+                sql_text(
+                    "INSERT INTO tenant_catalogs (tenant_id, sku, name, active, status) "
+                    "VALUES (:t, 'SKU-NOPRICE', 'Moto sin precio', true, 'published')"
+                ),
+                {"t": client_tenant_admin.tenant_id},
+            )
+        await engine.dispose()
+
+    asyncio.run(_seed_bad_pipeline_and_catalog())
+
+    resp = client_tenant_admin.post(f"/api/v1/agents/{aid}/publish")
+    assert resp.status_code == 409, resp.text
+    codes = {issue["code"] for issue in resp.json()["detail"]["issues"]}
+    assert "REQUIRED_FIELD_UNKNOWN" in codes
+    assert "MODE_WITHOUT_GUIDANCE" in codes
+    assert "CATALOG_WITHOUT_PRICE" in codes
+    assert "QUOTE_WITHOUT_OFFICIAL_SOURCE" in codes
+
+
+def test_publish_lints_workflow_loop_and_dead_end(client_tenant_admin):
+    aid = _create_publishable(client_tenant_admin, name="WorkflowLintedAgent")
+
+    import asyncio
+
+    from sqlalchemy import text as sql_text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from atendia.config import get_settings
+
+    async def _seed_invalid_active_workflow() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                sql_text(
+                    "INSERT INTO workflows "
+                    "(tenant_id, name, trigger_type, active, definition) "
+                    "VALUES (:t, 'Loop con agente', 'message_received', true, "
+                    "CAST(:definition AS jsonb))"
+                ),
+                {
+                    "t": client_tenant_admin.tenant_id,
+                    "definition": f"""
+                    {{
+                      "nodes": [
+                        {{"id": "trigger", "type": "trigger", "config": {{"event": "message_received"}}}},
+                        {{"id": "assign", "type": "assign_agent", "config": {{"agent_id": "{aid}"}}}},
+                        {{"id": "msg", "type": "message", "config": {{"text": "Hola"}}}},
+                        {{"id": "dead", "type": "message", "config": {{"text": "Sin salida"}}}}
+                      ],
+                      "edges": [
+                        {{"from": "trigger", "to": "assign"}},
+                        {{"from": "assign", "to": "msg"}},
+                        {{"from": "msg", "to": "assign"}}
+                      ]
+                    }}
+                    """,
+                },
+            )
+        await engine.dispose()
+
+    asyncio.run(_seed_invalid_active_workflow())
+
+    resp = client_tenant_admin.post(f"/api/v1/agents/{aid}/publish")
+    assert resp.status_code == 409, resp.text
+    codes = {issue["code"] for issue in resp.json()["detail"]["issues"]}
+    assert "WORKFLOW_LOOP_OR_INVALID" in codes
+    assert "WORKFLOW_STAGE_WITHOUT_EXIT" in codes
+
+
 def test_rollback_to_specific_version_restores_snapshot(client_tenant_admin):
     """Operator picks an exact version_id from the history → the row's
     config fields are replaced with that version's snapshot."""

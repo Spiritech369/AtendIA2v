@@ -20,10 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.contracts.flow_mode import FlowMode
 from atendia.db.models.customer_fields import CustomerFieldDefinition
 from atendia.db.models.knowledge_document import KnowledgeDocument
+from atendia.db.models.tenant_config import TenantCatalogItem, TenantPipeline
+from atendia.db.models.workflow import Workflow
+from atendia.workflows.engine import WorkflowValidationError, validate_definition
 
-DOC_KEY_RE = re.compile(r"^DOCS_[A-Z][A-Z0-9_]*$")
+DOC_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 CONTACT_TOKEN_RE = re.compile(r"\{\{\s*contact\.([A-Za-z][A-Za-z0-9_]*)\s*\}\}")
 DOCUMENT_REF_RE = re.compile(r"(?:#|@)(?:documento?|document)\.([\w.-]+)", re.I)
+QUOTE_GUIDANCE_RE = re.compile(r"\b(cotiz|precio|enganche|pago|quincenal|mensual)\w*", re.I)
 
 DOC_STATUS_CHOICES = {"missing", "ok", "rejected"}
 KNOWN_RUNTIME_FIELDS = {
@@ -264,7 +268,7 @@ async def validate_pipeline_config(
             result.add(
                 "DOC_KEY_INVALID",
                 "critical",
-                "La llave del documento debe iniciar con DOCS_ y usar mayusculas, numeros y guion bajo.",
+                "La llave del documento debe usar mayusculas, numeros y guion bajo.",
                 f"documents_catalog.{index}.key",
             )
             continue
@@ -445,3 +449,333 @@ async def validate_agent_config(
         )
 
     return result
+
+
+async def validate_agent_activation_config(
+    session: AsyncSession,
+    tenant_id: UUID,
+    data: dict[str, Any],
+    *,
+    agent_id: UUID | None = None,
+) -> ConfigValidationResult:
+    """Cross-config linter that runs before an agent can go live.
+
+    Draft saves may hold incomplete references while the operator is still
+    wiring things together. Activation is stricter: workflow loops, dead-end
+    stages, missing required fields, unavailable required KB docs and unsafe
+    quote/catalog setups should block production.
+    """
+
+    result = ConfigValidationResult()
+    result.merge(await validate_agent_config(session, tenant_id, data))
+
+    fields = await _customer_field_defs(session, tenant_id)
+    filenames = await _knowledge_filenames(session, tenant_id)
+
+    pipeline = (
+        await session.execute(
+            select(TenantPipeline)
+            .where(TenantPipeline.tenant_id == tenant_id, TenantPipeline.active.is_(True))
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    can_quote = False
+    if pipeline is not None and isinstance(pipeline.definition, dict):
+        _lint_pipeline_activation(result, pipeline.definition, fields, filenames)
+        can_quote = _pipeline_can_quote(pipeline.definition)
+
+    workflows = (
+        (
+            await session.execute(
+                select(Workflow).where(
+                    Workflow.tenant_id == tenant_id,
+                    Workflow.active.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    _lint_workflows(result, workflows, agent_id=agent_id)
+
+    _lint_decision_map_required_fields(result, data, fields)
+
+    if _agent_can_quote(data):
+        can_quote = True
+    await _lint_catalog_for_quotes(session, tenant_id, result, can_quote=can_quote)
+
+    system_prompt = data.get("system_prompt")
+    if isinstance(system_prompt, str):
+        _validate_required_document_refs(
+            result=result,
+            text=system_prompt,
+            path="system_prompt",
+            filenames=filenames,
+        )
+
+    return result
+
+
+def _lint_pipeline_activation(
+    result: ConfigValidationResult,
+    definition: dict[str, Any],
+    fields: dict[str, CustomerFieldDefinition],
+    filenames: list[str],
+) -> None:
+    stages = definition.get("stages") if isinstance(definition, dict) else None
+    if not isinstance(stages, list):
+        return
+
+    for index, stage in enumerate(stages):
+        if not isinstance(stage, dict):
+            continue
+        required = stage.get("required_fields") or []
+        for field_index, item in enumerate(required):
+            name = item.get("name") if isinstance(item, dict) else item
+            if isinstance(name, str) and name and not _is_known_field(name, fields):
+                result.add(
+                    "REQUIRED_FIELD_UNKNOWN",
+                    "critical",
+                    f"El campo requerido {name} no existe en Datos de cliente.",
+                    f"stages.{index}.required_fields.{field_index}",
+                )
+
+        mode = stage.get("behavior_mode")
+        if isinstance(mode, str):
+            _lint_mode_guidance(result, definition, mode, f"stages.{index}.behavior_mode")
+
+    for mode in _flow_rule_modes(definition.get("flow_mode_rules")):
+        _lint_mode_guidance(result, definition, mode, f"flow_mode_rules.{mode}")
+
+    for mode, prompt in (definition.get("mode_prompts") or {}).items():
+        if isinstance(prompt, str):
+            _validate_required_document_refs(
+                result=result,
+                text=prompt,
+                path=f"mode_prompts.{mode}",
+                filenames=filenames,
+            )
+
+
+def _flow_rule_modes(raw_rules: Any) -> set[str]:
+    modes: set[str] = set()
+    if not isinstance(raw_rules, list):
+        return modes
+    for rule in raw_rules:
+        if isinstance(rule, dict) and isinstance(rule.get("mode"), str):
+            modes.add(rule["mode"])
+    return modes
+
+
+def _lint_mode_guidance(
+    result: ConfigValidationResult,
+    definition: dict[str, Any],
+    mode: str,
+    path: str,
+) -> None:
+    if mode not in {flow_mode.value for flow_mode in FlowMode}:
+        return
+    prompts = definition.get("mode_prompts") or {}
+    prompt = prompts.get(mode) if isinstance(prompts, dict) else None
+    if not isinstance(prompt, str) or not prompt.strip():
+        result.add(
+            "MODE_WITHOUT_GUIDANCE",
+            "critical",
+            f"El modo {mode} se usa, pero no tiene guia de Composer.",
+            path,
+        )
+
+
+def _validate_required_document_refs(
+    *,
+    result: ConfigValidationResult,
+    text: str,
+    path: str,
+    filenames: list[str],
+) -> None:
+    normalized_files = [name.replace("_", " ").replace("-", " ").casefold() for name in filenames]
+    for ref in DOCUMENT_REF_RE.findall(text or ""):
+        needle = ref.replace("_", " ").replace("-", " ").casefold()
+        if not normalized_files or not any(needle in item for item in normalized_files):
+            result.add(
+                "REQUIRED_DOCUMENT_NOT_LOADED",
+                "critical",
+                f"El documento requerido #document.{ref} no esta cargado en Knowledge Base.",
+                path,
+            )
+
+
+def _lint_workflows(
+    result: ConfigValidationResult,
+    workflows: list[Workflow],
+    *,
+    agent_id: UUID | None,
+) -> None:
+    relevant = [workflow for workflow in workflows if _workflow_references_agent(workflow, agent_id)]
+    if agent_id is None:
+        relevant = workflows
+    for workflow in relevant:
+        definition = workflow.definition or {}
+        _lint_workflow_dead_ends(result, workflow)
+        try:
+            validate_definition(definition)
+        except WorkflowValidationError as exc:
+            result.add(
+                "WORKFLOW_LOOP_OR_INVALID",
+                "critical",
+                f"Workflow {workflow.name} invalido: {exc}",
+                f"workflows.{workflow.id}",
+            )
+
+    for workflow_id, cycle in _trigger_workflow_cycles(workflows).items():
+        workflow = next((item for item in workflows if item.id == workflow_id), None)
+        if workflow is None or workflow not in relevant:
+            continue
+        result.add(
+            "WORKFLOW_TRIGGER_LOOP",
+            "critical",
+            f"Workflow {workflow.name} crea un loop: {' -> '.join(cycle)}.",
+            f"workflows.{workflow.id}",
+        )
+
+
+def _workflow_references_agent(workflow: Workflow, agent_id: UUID | None) -> bool:
+    if agent_id is None:
+        return True
+    target = str(agent_id)
+    for node in (workflow.definition or {}).get("nodes", []):
+        if (
+            isinstance(node, dict)
+            and node.get("type") == "assign_agent"
+            and isinstance(node.get("config"), dict)
+            and str(node["config"].get("agent_id")) == target
+        ):
+            return True
+    return False
+
+
+def _lint_workflow_dead_ends(result: ConfigValidationResult, workflow: Workflow) -> None:
+    definition = workflow.definition or {}
+    nodes = [node for node in definition.get("nodes", []) if isinstance(node, dict)]
+    edges = [edge for edge in definition.get("edges", []) if isinstance(edge, dict)]
+    outgoing = {str(edge.get("from")) for edge in edges if edge.get("from") and edge.get("to")}
+    terminal_types = {"end", "delay", "trigger_workflow"}
+    for node in nodes:
+        node_id = str(node.get("id") or "")
+        node_type = str(node.get("type") or "")
+        if node_type in terminal_types or node_id in outgoing:
+            continue
+        result.add(
+            "WORKFLOW_STAGE_WITHOUT_EXIT",
+            "critical",
+            f"Workflow {workflow.name} tiene un stage/nodo sin salida: {node_id}.",
+            f"workflows.{workflow.id}.nodes.{node_id}",
+        )
+
+
+def _trigger_workflow_cycles(workflows: list[Workflow]) -> dict[UUID, list[str]]:
+    by_id = {str(workflow.id): workflow for workflow in workflows}
+    graph: dict[str, set[str]] = {str(workflow.id): set() for workflow in workflows}
+    for workflow in workflows:
+        for node in (workflow.definition or {}).get("nodes", []):
+            config = node.get("config") if isinstance(node, dict) else None
+            target = config.get("target_workflow_id") if isinstance(config, dict) else None
+            if target and str(target) in by_id:
+                graph[str(workflow.id)].add(str(target))
+
+    cycles: dict[UUID, list[str]] = {}
+
+    def dfs(start: str, current: str, seen: list[str]) -> None:
+        for nxt in graph.get(current, set()):
+            if nxt == start:
+                cycles[by_id[start].id] = [by_id[item].name for item in [*seen, nxt]]
+                return
+            if nxt not in seen:
+                dfs(start, nxt, [*seen, nxt])
+
+    for workflow_id in graph:
+        dfs(workflow_id, workflow_id, [workflow_id])
+    return cycles
+
+
+def _lint_decision_map_required_fields(
+    result: ConfigValidationResult,
+    data: dict[str, Any],
+    fields: dict[str, CustomerFieldDefinition],
+) -> None:
+    decision_map = data.get("decision_map") or {}
+    rules = decision_map.get("rules") if isinstance(decision_map, dict) else None
+    if not isinstance(rules, list):
+        return
+    for rule_index, rule in enumerate(rules):
+        required = rule.get("required_fields") if isinstance(rule, dict) else None
+        if not isinstance(required, list):
+            continue
+        for field_index, field in enumerate(required):
+            if isinstance(field, str) and field and not _is_known_field(field, fields):
+                result.add(
+                    "REQUIRED_FIELD_UNKNOWN",
+                    "critical",
+                    f"El campo requerido {field} no existe en Datos de cliente.",
+                    f"decision_map.rules.{rule_index}.required_fields.{field_index}",
+                )
+
+
+def _pipeline_can_quote(definition: dict[str, Any]) -> bool:
+    stages = definition.get("stages") or []
+    for stage in stages:
+        if isinstance(stage, dict) and "quote" in (stage.get("actions_allowed") or []):
+            return True
+    for prompt in (definition.get("mode_prompts") or {}).values():
+        if isinstance(prompt, str) and QUOTE_GUIDANCE_RE.search(prompt):
+            return True
+    return False
+
+
+def _agent_can_quote(data: dict[str, Any]) -> bool:
+    knowledge = data.get("knowledge_config") or {}
+    tools = knowledge.get("selected_tools") or knowledge.get("tools") if isinstance(knowledge, dict) else []
+    if isinstance(tools, list) and any(str(tool) in {"quote", "search_catalog"} for tool in tools):
+        return True
+    prompt = data.get("system_prompt")
+    return isinstance(prompt, str) and QUOTE_GUIDANCE_RE.search(prompt)
+
+
+async def _lint_catalog_for_quotes(
+    session: AsyncSession,
+    tenant_id: UUID,
+    result: ConfigValidationResult,
+    *,
+    can_quote: bool,
+) -> None:
+    items = (
+        (
+            await session.execute(
+                select(TenantCatalogItem).where(
+                    TenantCatalogItem.tenant_id == tenant_id,
+                    TenantCatalogItem.active.is_(True),
+                    TenantCatalogItem.status == "published",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    priced = [item for item in items if item.price_cents is not None or item.payment_plans]
+    for item in items:
+        if item.price_cents is None and not item.payment_plans:
+            result.add(
+                "CATALOG_WITHOUT_PRICE",
+                "critical",
+                f"Catalogo sin precio: {item.name}.",
+                f"catalog.{item.id}",
+            )
+    if can_quote and not priced:
+        result.add(
+            "QUOTE_WITHOUT_OFFICIAL_SOURCE",
+            "critical",
+            "Composer puede cotizar, pero no hay una fuente oficial publicada con precio.",
+            "catalog",
+        )

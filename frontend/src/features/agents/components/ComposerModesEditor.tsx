@@ -79,6 +79,19 @@ interface PromptToken {
   source: TokenSource;
 }
 
+const INDUSTRY_TEMPLATES = [
+  {
+    id: "motos",
+    title: "Motos",
+    body: `Cotiza con precio contado, enganche, pago quincenal, plazo, liquidación anticipada sin penalización y documentos. Si falta modelo o precio, no inventes: pide el modelo exacto o envía catálogo.`,
+  },
+  {
+    id: "clinica",
+    title: "Clínica",
+    body: `Responde con servicio, doctor, horario, precio de consulta, preparación y siguiente paso para cita. Si falta agenda o precio, pide el dato faltante o pasa a asesor.`,
+  },
+];
+
 const TOKEN_TONES: Record<TokenGroup, string> = {
   "@": "bg-emerald-100/80 text-emerald-800 ring-emerald-300",
   "{{": "bg-blue-100/80 text-blue-800 ring-blue-300",
@@ -522,6 +535,12 @@ export function ComposerModesEditor() {
     });
   };
 
+  const insertIndustryTemplate = (body: string) => {
+    const current = draft?.mode_prompts?.[activeMode] ?? "";
+    updateModePrompt(activeMode, current.trim() ? `${current.trim()}\n\n${body}` : body);
+    requestAnimationFrame(() => textareaRefs.current[activeMode]?.focus());
+  };
+
   const insertDroppedToken = (mode: FlowModeKey, event: DragEvent<HTMLTextAreaElement>) => {
     const tokenValue = event.dataTransfer.getData("text/plain");
     const token = contextualTokens.find((item) => item.token === tokenValue);
@@ -553,15 +572,14 @@ export function ComposerModesEditor() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Composer IA</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Comportamiento de la IA</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Nombres visibles y guiones por modo. El runner conserva PLAN, SALES, DOC, OBSTACLE,
-            RETENTION y SUPPORT.
+            Modos de respuesta, tono, reglas de seguridad, datos que puede usar y pruebas.
           </p>
         </div>
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           <Save className="mr-1.5 h-4 w-4" />
-          {save.isPending ? "Guardando..." : "Guardar Composer"}
+          {save.isPending ? "Guardando..." : "Guardar comportamiento"}
         </Button>
       </div>
 
@@ -620,8 +638,8 @@ export function ComposerModesEditor() {
                     </button>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)]">
-                    <div className="space-y-1.5">
+                  <div className="space-y-3">
+                    <div className="max-w-xl space-y-1.5">
                       <Label htmlFor={`composer-label-${mode}`}>Nombre visible</Label>
                       <Input
                         id={`composer-label-${mode}`}
@@ -637,8 +655,8 @@ export function ComposerModesEditor() {
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        <Label htmlFor={`composer-prompt-${mode}`}>Prompt del modo</Label>
-                        <div className="grid min-h-[720px] rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring">
+                        <Label htmlFor={`composer-prompt-${mode}`}>Instrucciones para este modo</Label>
+                        <div className="grid min-h-[720px] w-full rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring">
                           <div
                             ref={(node) => {
                               highlightRefs.current[mode] = node;
@@ -673,29 +691,29 @@ export function ComposerModesEditor() {
                             )}
                           </div>
                           <textarea
-                          ref={(node) => {
-                            textareaRefs.current[mode] = node;
-                          }}
-                          id={`composer-prompt-${mode}`}
-                          rows={28}
-                          value={draft.mode_prompts?.[mode] ?? ""}
-                          onFocus={() => syncCursor(mode)}
-                          onClick={() => syncCursor(mode)}
-                          onKeyUp={() => syncCursor(mode)}
-                          onSelect={() => syncCursor(mode)}
-                          onScroll={() => syncScroll(mode)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={(event) => insertDroppedToken(mode, event)}
-                          onChange={(event) => {
-                            setActiveMode(mode);
-                            updateModePrompt(mode, event.target.value);
-                            setCursorByMode((current) => ({
-                              ...current,
-                              [mode]: event.target.selectionStart ?? event.target.value.length,
-                            }));
-                          }}
-                          className="relative z-10 col-start-1 row-start-1 h-full min-h-[720px] w-full resize-none overflow-hidden bg-transparent p-3 text-sm leading-6 text-transparent caret-foreground outline-none selection:bg-primary/20"
-                        />
+                            ref={(node) => {
+                              textareaRefs.current[mode] = node;
+                            }}
+                            id={`composer-prompt-${mode}`}
+                            rows={28}
+                            value={draft.mode_prompts?.[mode] ?? ""}
+                            onFocus={() => syncCursor(mode)}
+                            onClick={() => syncCursor(mode)}
+                            onKeyUp={() => syncCursor(mode)}
+                            onSelect={() => syncCursor(mode)}
+                            onScroll={() => syncScroll(mode)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => insertDroppedToken(mode, event)}
+                            onChange={(event) => {
+                              setActiveMode(mode);
+                              updateModePrompt(mode, event.target.value);
+                              setCursorByMode((current) => ({
+                                ...current,
+                                [mode]: event.target.selectionStart ?? event.target.value.length,
+                              }));
+                            }}
+                            className="relative z-10 col-start-1 row-start-1 h-full min-h-[720px] w-full resize-none overflow-hidden bg-transparent p-3 text-sm leading-6 text-transparent caret-foreground outline-none selection:bg-primary/20"
+                          />
                         </div>
                         <div className="hidden rounded-md border bg-muted/20 p-3">
                           <div className="mb-2 text-[11px] font-medium text-muted-foreground">
@@ -743,6 +761,24 @@ export function ComposerModesEditor() {
                 placeholder="Buscar referencias reales..."
                 className="h-8 pl-8 text-xs"
               />
+            </div>
+            <div className="space-y-1.5 rounded-md border bg-muted/20 p-2">
+              <div className="text-xs font-medium text-muted-foreground">
+                Plantillas por industria
+              </div>
+              {INDUSTRY_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => insertIndustryTemplate(template.body)}
+                  className="w-full rounded-md border bg-background p-2 text-left transition-colors hover:bg-muted/50"
+                >
+                  <div className="text-xs font-medium">{template.title}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                    {template.body}
+                  </div>
+                </button>
+              ))}
             </div>
             <div className="max-h-[calc(100vh-16rem)] space-y-3 overflow-auto pr-1">
               {TOKEN_SECTIONS.map((section) => {

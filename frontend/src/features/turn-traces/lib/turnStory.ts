@@ -30,6 +30,7 @@ export type StoryStep =
       entityCount: number;
     }
   | { kind: "mode"; mode: string | null; rationale: string | null }
+  | { kind: "explanation"; summary: string; layers: Record<string, unknown> | null }
   | {
       kind: "knowledge";
       action: string | null;
@@ -48,10 +49,9 @@ export type StoryStep =
       rawLlmResponse: string | null;
       // Migration 047 — which composer adapter produced this turn:
       // - "openai":  happy path
-      // - "canned":  deterministic dev/test or no API key
-      // - "fallback": OpenAI exhausted retries → canned reply fired
+      // - "fallback": legacy traces only
       // NULL on legacy rows → badge omitted.
-      provider: "openai" | "canned" | "fallback" | null;
+      provider: "openai" | "fallback" | null;
       // C2 / Task 8 — agent identity surfaced above the tech metadata.
       // Fetched by DebugPanel via agentsApi.get(trace.agent_id) and
       // forwarded through buildTurnStory opts. NULL when the trace has
@@ -118,6 +118,23 @@ function deriveModeRationale(trace: TurnTraceDetail): string | null {
   return null;
 }
 
+function readRunnerLayers(trace: TurnTraceDetail): Record<string, unknown> | null {
+  const stateAfter =
+    trace.state_after && typeof trace.state_after === "object"
+      ? (trace.state_after as Record<string, unknown>)
+      : null;
+  const layers = stateAfter?.runner_layers;
+  return layers && typeof layers === "object" ? (layers as Record<string, unknown>) : null;
+}
+
+function readRunnerExplanation(trace: TurnTraceDetail): string | null {
+  const layers = readRunnerLayers(trace);
+  const explanation = layers?.explanation;
+  if (!explanation || typeof explanation !== "object") return null;
+  const summary = (explanation as Record<string, unknown>).summary;
+  return typeof summary === "string" && summary.trim() ? summary : null;
+}
+
 export function buildTurnStory(
   trace: TurnTraceDetail,
   opts: {
@@ -163,6 +180,15 @@ export function buildTurnStory(
       kind: "mode",
       mode: trace.flow_mode,
       rationale: readRouterTrigger(trace) ?? deriveModeRationale(trace),
+    });
+  }
+
+  const explanation = readRunnerExplanation(trace);
+  if (explanation) {
+    steps.push({
+      kind: "explanation",
+      summary: explanation,
+      layers: readRunnerLayers(trace),
     });
   }
 

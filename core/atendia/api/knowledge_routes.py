@@ -94,6 +94,12 @@ class CatalogItem(BaseModel):
     tags: list[str]
     use_count: int
     active: bool
+    status: str
+    price_cents: int | None
+    stock_status: str
+    region: str | None
+    branch: str | None
+    payment_plans: list
     created_at: object
 
 
@@ -104,6 +110,12 @@ class CatalogBody(BaseModel):
     category: str | None = Field(default=None, max_length=60)
     tags: list[str] = Field(default_factory=list, max_length=20)
     active: bool = True
+    status: str = Field(default="published", max_length=20)
+    price_cents: int | None = Field(default=None, ge=0)
+    stock_status: str = Field(default="unknown", max_length=20)
+    region: str | None = Field(default=None, max_length=60)
+    branch: str | None = Field(default=None, max_length=60)
+    payment_plans: list = Field(default_factory=list)
 
     @field_validator("tags")
     @classmethod
@@ -120,6 +132,12 @@ class CatalogPatch(BaseModel):
     category: str | None = Field(default=None, max_length=60)
     tags: list[str] | None = Field(default=None, max_length=20)
     active: bool | None = None
+    status: str | None = Field(default=None, max_length=20)
+    price_cents: int | None = Field(default=None, ge=0)
+    stock_status: str | None = Field(default=None, max_length=20)
+    region: str | None = Field(default=None, max_length=60)
+    branch: str | None = Field(default=None, max_length=60)
+    payment_plans: list | None = None
 
     @field_validator("tags")
     @classmethod
@@ -197,6 +215,12 @@ def _catalog_item(row: TenantCatalogItem) -> CatalogItem:
         tags=row.tags or [],
         use_count=row.use_count or 0,
         active=row.active,
+        status=row.status,
+        price_cents=row.price_cents,
+        stock_status=row.stock_status,
+        region=row.region,
+        branch=row.branch,
+        payment_plans=row.payment_plans or [],
         created_at=row.created_at,
     )
 
@@ -449,6 +473,12 @@ async def create_catalog_item(
         category=body.category.strip() if body.category else None,
         tags=body.tags,
         active=body.active,
+        status=body.status,
+        price_cents=body.price_cents,
+        stock_status=body.stock_status,
+        region=body.region.strip() if body.region else None,
+        branch=body.branch.strip() if body.branch else None,
+        payment_plans=body.payment_plans,
         embedding=await _maybe_embed(f"{body.name}\n{json.dumps(body.attrs, ensure_ascii=False)}"),
     )
     session.add(row)

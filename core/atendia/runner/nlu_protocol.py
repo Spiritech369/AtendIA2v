@@ -1,12 +1,4 @@
-"""Common interface for NLU providers.
-
-Three implementations live in this package:
-- OpenAINLU      — real LLM, used in production (T15+)
-- KeywordNLU     — keyword-based fallback for dev/tests
-- CannedNLU      — fixture-driven for deterministic tests
-
-All return (NLUResult, UsageMetadata | None). Mocks/fakes return None.
-"""
+"""Common interface for NLU providers."""
 
 from decimal import Decimal
 from typing import Protocol

@@ -6,9 +6,7 @@ Create Date: 2026-05-15
 
 Adds two nullable columns to turn_traces for C2 DebugPanel completion:
 
-* composer_provider — which adapter served this turn ("openai",
-  "canned", "fallback"). Helps operators distinguish "the LLM said X"
-  from "the LLM was unreachable and the canned reply fired".
+* composer_provider - which adapter served this turn.
 * inbound_text_cleaned — the normalized text the router actually saw
   for keyword matching (after NFKD diacritic strip + lowercase). The
   NLU and Composer receive the original text; only the rule-based
@@ -45,7 +43,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_turn_traces_composer_provider",
         "turn_traces",
-        "composer_provider IS NULL OR composer_provider IN ('openai', 'canned', 'fallback')",
+        "composer_provider IS NULL OR composer_provider IN ('openai', 'fallback')",
     )
 
 
@@ -53,3 +51,4 @@ def downgrade() -> None:
     op.drop_constraint("ck_turn_traces_composer_provider", "turn_traces", type_="check")
     op.drop_column("turn_traces", "inbound_text_cleaned")
     op.drop_column("turn_traces", "composer_provider")
+

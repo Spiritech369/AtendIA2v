@@ -17,6 +17,12 @@ export interface CatalogItem {
   tags: string[];
   use_count: number;
   active: boolean;
+  status: string;
+  price_cents: number | null;
+  stock_status: string;
+  region: string | null;
+  branch: string | null;
+  payment_plans: unknown[];
 }
 
 export interface DocumentItem {
@@ -260,7 +266,31 @@ export const knowledgeApi = {
     attrs: Record<string, unknown>;
     category?: string | null;
     tags: string[];
+    active?: boolean;
+    status?: string;
+    price_cents?: number | null;
+    stock_status?: string;
+    region?: string | null;
+    branch?: string | null;
+    payment_plans?: unknown[];
   }) => (await api.post<CatalogItem>("/knowledge/catalog", body)).data,
+  patchCatalog: async (
+    id: string,
+    body: Partial<{
+      sku: string;
+      name: string;
+      attrs: Record<string, unknown>;
+      category: string | null;
+      tags: string[];
+      active: boolean;
+      status: string;
+      price_cents: number | null;
+      stock_status: string;
+      region: string | null;
+      branch: string | null;
+      payment_plans: unknown[];
+    }>,
+  ) => (await api.patch<CatalogItem>(`/knowledge/catalog/${id}`, body)).data,
   deleteCatalog: async (id: string) => api.delete(`/knowledge/catalog/${id}`),
   listDocuments: async () => (await api.get<DocumentItem[]>("/knowledge/documents")).data,
   uploadDocument: async (file: File, category?: string) => {

@@ -40,6 +40,7 @@ FIELD_TYPES: frozenset[str] = frozenset(
         "date",
         "checkbox",
         "multiselect",
+        "document",
     }
 )
 _FIELD_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{1,63}$")
@@ -284,7 +285,7 @@ def _choices_for(defn: CustomerFieldDefinition) -> set[str] | None:
 
 
 def _is_document_status_field(defn: CustomerFieldDefinition) -> bool:
-    return defn.key.startswith("DOCS_")
+    return defn.field_type == "document" or defn.key.startswith("DOCS_")
 
 
 def _canonicalize_doc_status(

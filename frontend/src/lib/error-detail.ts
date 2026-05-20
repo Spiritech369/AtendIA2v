@@ -46,6 +46,26 @@ export function extractErrorDetail(err: unknown, fallback = ""): string {
       .filter(Boolean)
       .join("; ") || fallback;
   }
+  if (detail && typeof detail === "object") {
+    const obj = detail as {
+      summary?: string;
+      issues?: Array<{ message?: string; path?: string }>;
+    };
+    if (typeof obj.summary === "string" && obj.summary.length > 0) {
+      const issueText = Array.isArray(obj.issues)
+        ? obj.issues
+            .slice(0, 3)
+            .map((issue) =>
+              issue.message
+                ? `${issue.path ? `${issue.path}: ` : ""}${issue.message}`
+                : "",
+            )
+            .filter(Boolean)
+            .join("; ")
+        : "";
+      return issueText ? `${obj.summary}: ${issueText}` : obj.summary;
+    }
+  }
   if (typeof e?.message === "string" && e.message.length > 0) {
     return e.message;
   }

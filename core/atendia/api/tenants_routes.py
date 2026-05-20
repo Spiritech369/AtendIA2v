@@ -20,15 +20,16 @@ from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
-from atendia.config_validation import validate_pipeline_config
 from atendia.config import get_settings
+from atendia.config_validation import validate_pipeline_config
+from atendia.contracts.nlu_result import NLUResult
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantBranding, TenantPipeline
@@ -36,6 +37,15 @@ from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
 from atendia.realtime.publisher import publish_tenant_event
 from atendia.runner.followup_scheduler import normalize_followup_config
+from atendia.runner.nlu_protocol import UsageMetadata
+from atendia.runner.provider_factory import build_nlu, load_tenant_ai_selection
+from atendia.runner.runner_rules import (
+    RunnerRule,
+    RunnerRulesConfig,
+    RunnerRulesResult,
+    evaluate_runner_rules,
+    normalize_runner_rules,
+)
 
 
 async def _broadcast_pipeline_change(
@@ -736,11 +746,208 @@ class QosConfigResponse(BaseModel):
     qos_config: QosConfigBody
 
 
+class NLUSubIntentConfig(BaseModel):
+    key: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_]*$")
+    label: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=1000)
+    examples: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("examples")
+    @classmethod
+    def _trim_examples(cls, value: list[str]) -> list[str]:
+        return [str(item).strip()[:240] for item in value if str(item).strip()]
+
+
+class NLUTopicConfig(BaseModel):
+    key: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_]*$")
+    label: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=1000)
+    examples: list[str] = Field(default_factory=list, max_length=20)
+    sub_intents: list[NLUSubIntentConfig] = Field(default_factory=list, max_length=50)
+
+    @field_validator("examples")
+    @classmethod
+    def _trim_examples(cls, value: list[str]) -> list[str]:
+        return [str(item).strip()[:240] for item in value if str(item).strip()]
+
+
+class NLUTopicsResponse(BaseModel):
+    topics: list[NLUTopicConfig]
+
+
+class NLUTopicsPutBody(BaseModel):
+    topics: list[NLUTopicConfig] = Field(default_factory=list, max_length=100)
+
+
+class NLUTestBody(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+    current_stage: str = Field(default="nlu_test", min_length=1, max_length=80)
+    history: list[tuple[str, str]] = Field(default_factory=list, max_length=8)
+
+
+class NLUTestResponse(BaseModel):
+    result: NLUResult
+    usage: UsageMetadata | None
+
+
+class RunnerRulesPutBody(BaseModel):
+    runner_rules: list[RunnerRule] = Field(default_factory=list, max_length=100)
+
+
+class RunnerRulesTestBody(BaseModel):
+    runner_rules: list[RunnerRule] = Field(default_factory=list, max_length=100)
+    extracted_before: dict[str, Any] = Field(default_factory=dict)
+    extracted_after: dict[str, Any] = Field(default_factory=dict)
+    nlu: dict[str, Any] = Field(default_factory=dict)
+    current_stage: str = "nuevo_lead"
+    inbound_text: str = ""
+
+
 def normalize_qos_config(config: object) -> dict[str, Any]:
     merged = dict(DEFAULT_QOS_CONFIG)
     if isinstance(config, dict):
         merged.update({key: value for key, value in config.items() if key in merged})
     return QosConfigBody.model_validate(merged).model_dump()
+
+
+def normalize_nlu_topics(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in value:
+        topic = NLUTopicConfig.model_validate(item)
+        if topic.key in seen:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"duplicate topic key: {topic.key}")
+        seen.add(topic.key)
+        sub_seen: set[str] = set()
+        for sub in topic.sub_intents:
+            if sub.key in sub_seen:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"duplicate sub_intent key in {topic.key}: {sub.key}",
+                )
+            sub_seen.add(sub.key)
+        normalized.append(topic.model_dump())
+    return normalized
+
+
+@router.get("/nlu-topics", response_model=NLUTopicsResponse)
+async def get_nlu_topics(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> NLUTopicsResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    topics = normalize_nlu_topics((tenant.config or {}).get("nlu_topics"))
+    return NLUTopicsResponse(topics=[NLUTopicConfig.model_validate(item) for item in topics])
+
+
+@router.put("/nlu-topics", response_model=NLUTopicsResponse)
+async def put_nlu_topics(
+    body: NLUTopicsPutBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> NLUTopicsResponse:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    topics = normalize_nlu_topics([topic.model_dump() for topic in body.topics])
+    new_config = dict(tenant.config or {})
+    new_config["nlu_topics"] = topics
+    await session.execute(update(Tenant).where(Tenant.id == tenant_id).values(config=new_config))
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="nlu_topics.saved",
+        payload={"topic_count": len(topics)},
+    )
+    await session.commit()
+    return NLUTopicsResponse(topics=[NLUTopicConfig.model_validate(item) for item in topics])
+
+
+@router.post("/nlu-test", response_model=NLUTestResponse)
+async def test_nlu_message(
+    body: NLUTestBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> NLUTestResponse:
+    settings = get_settings()
+    selection = await load_tenant_ai_selection(session, tenant_id, settings)
+    nlu = build_nlu(settings, selection)
+    result, usage = await nlu.classify(
+        text=body.text.strip(),
+        current_stage=body.current_stage.strip(),
+        required_fields=[],
+        optional_fields=[],
+        history=body.history[-8:],
+    )
+    return NLUTestResponse(result=result, usage=usage)
+
+
+@router.get("/runner-rules", response_model=RunnerRulesConfig)
+async def get_runner_rules(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> RunnerRulesConfig:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    rules = normalize_runner_rules((tenant.config or {}).get("runner_rules"))
+    return RunnerRulesConfig(runner_rules=[RunnerRule.model_validate(item) for item in rules])
+
+
+@router.put("/runner-rules", response_model=RunnerRulesConfig)
+async def put_runner_rules(
+    body: RunnerRulesPutBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> RunnerRulesConfig:
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one()
+    rules = normalize_runner_rules([rule.model_dump(mode="json") for rule in body.runner_rules])
+    new_config = dict(tenant.config or {})
+    new_config["runner_rules"] = rules
+    await session.execute(update(Tenant).where(Tenant.id == tenant_id).values(config=new_config))
+    await emit_admin_event(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=user.user_id,
+        action="runner_rules.saved",
+        payload={"rule_count": len(rules)},
+    )
+    await session.commit()
+    return RunnerRulesConfig(runner_rules=[RunnerRule.model_validate(item) for item in rules])
+
+
+@router.post("/runner-rules/test", response_model=RunnerRulesResult)
+async def test_runner_rules(
+    body: RunnerRulesTestBody,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+) -> RunnerRulesResult:
+    nlu = NLUResult.model_validate(
+        {
+            "intent": body.nlu.get("intent") or "ask_info",
+            "topic": body.nlu.get("topic"),
+            "sub_intent": body.nlu.get("sub_intent"),
+            "sales_signal": body.nlu.get("sales_signal") or "none",
+            "entities": {},
+            "sentiment": body.nlu.get("sentiment") or "neutral",
+            "confidence": (
+                body.nlu.get("confidence") if body.nlu.get("confidence") is not None else 0.8
+            ),
+            "ambiguities": [],
+        }
+    )
+    return evaluate_runner_rules(
+        rules=body.runner_rules,
+        nlu=nlu,
+        extracted_before=body.extracted_before,
+        extracted_after=body.extracted_after,
+        current_stage=body.current_stage,
+        inbound_text=body.inbound_text,
+    )
 
 
 async def _ensure_branding(session: AsyncSession, tenant_id: UUID) -> TenantBranding:

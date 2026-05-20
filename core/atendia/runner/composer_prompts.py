@@ -297,9 +297,13 @@ solo lo que esté en action_payload y los datos ya extraídos.
     FlowMode.SALES: """\
 Acción: SALES MODE — presenta la oferta o cotización al cliente.
 
-Usa EXCLUSIVAMENTE los datos de action_payload (precios, planes,
-condiciones). NO inventes cifras ni promesas. Si faltan datos, pide
-el que falta en una sola pregunta.
+Reglas estrictas:
+1. Si action_payload.status = "ok", cotiza usando solo precios, planes
+   y condiciones de action_payload.
+2. Si action_payload.status = "no_data", pide el modelo exacto o el
+   dato faltante; NO cotices.
+3. Nunca inventes precio, enganche, pago, plazo ni aprobaciÃ³n.
+4. Cierra con una acciÃ³n clara para avanzar.
 """,
     FlowMode.DOC: """\
 Acción: DOC MODE — recibe y valida documentos o archivos del cliente.

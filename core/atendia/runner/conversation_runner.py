@@ -23,6 +23,10 @@ from atendia.runner.composer_protocol import (
     ComposerOutput,
     ComposerProvider,
 )
+from atendia.runner.composer_validator import (
+    ComposerValidationResult,
+    validate_composer_output,
+)
 from atendia.runner.conversation_events import (
     emit_bot_paused,
     emit_document_event,
@@ -33,6 +37,7 @@ from atendia.runner.conversation_events import (
 from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule, _normalize_for_router
 from atendia.runner.nlu_protocol import NLUProvider
 from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
+from atendia.runner.runner_layers import build_runner_layers
 from atendia.runner.vision_to_attrs import (
     VisionDocWrite,
     apply_vision_to_attrs,
@@ -50,7 +55,6 @@ from atendia.tools.lookup_requirements import (
 from atendia.tools.quote import quote
 from atendia.tools.search_catalog import search_catalog
 from atendia.tools.vision import classify_image
-
 
 _KB_REFERENCE_RE = re.compile(r"(?:#|@)(?:documento?|catalogo|catalog|kb)(?:\.[\w.-]+)?", re.I)
 _DOCUMENT_REFERENCE_RE = re.compile(r"(?:#|@)(?:documento?|document)\.([\w.-]+)", re.I)
@@ -905,16 +909,11 @@ def _composer_provider_short_name(
     """Return short adapter name for the composer instance.
 
     'openai' — OpenAIComposer hitting the API successfully.
-    'fallback' — OpenAIComposer that fell back to canned for this turn
-      (caller passes ``fallback_used=True`` from the per-call
-      ``UsageMetadata.fallback_used``).
-    'canned' — CannedComposer (deterministic dev/test path).
+    'fallback' — reserved for legacy traces only.
     None — any future class we don't recognize (frontend degrades to
       no badge; the CHECK constraint rejects '' so NEVER return that).
     """
     cls = type(composer).__name__
-    if cls == "CannedComposer":
-        return "canned"
     if cls == "OpenAIComposer":
         return "fallback" if fallback_used else "openai"
     return None
@@ -1458,7 +1457,7 @@ class ConversationRunner:
             },
         )
         # Accumulate per-turn LLM cost into conversation_state.total_cost_usd
-        # (skipped if the provider didn't produce usage metadata, e.g. KeywordNLU/CannedNLU).
+        # (skipped if the provider didn't produce usage metadata, e.g. CannedNLU).
         if usage is not None and usage.cost_usd > 0:
             await self._session.execute(
                 text("""UPDATE conversation_state
@@ -1507,6 +1506,90 @@ class ConversationRunner:
             logging.getLogger(__name__).warning(
                 "auto_enter_rules evaluation raised; staying at FSM stage %s",
                 next_stage_id,
+                exc_info=exc,
+            )
+
+        runner_flow_mode_override: FlowMode | None = None
+        runner_pause_bot: bool | None = None
+        try:
+            tenant_config = (
+                await self._session.execute(
+                    text("SELECT config FROM tenants WHERE id = :tenant_id"),
+                    {"tenant_id": tenant_id},
+                )
+            ).scalar_one_or_none()
+            raw_runner_rules = (tenant_config or {}).get("runner_rules")
+            if raw_runner_rules:
+                from atendia.runner.runner_rules import (
+                    RunnerRule,
+                    evaluate_runner_rules,
+                    normalize_runner_rules,
+                )
+
+                runner_rules = [
+                    RunnerRule.model_validate(item)
+                    for item in normalize_runner_rules(raw_runner_rules)
+                ]
+                runner_result = evaluate_runner_rules(
+                    rules=runner_rules,
+                    nlu=nlu,
+                    extracted_before=dict(extracted_jsonb or {}),
+                    extracted_after=merged_extracted,
+                    current_stage=next_stage_id,
+                    inbound_text=inbound.text,
+                )
+                for key, value in runner_result.set_data.items():
+                    merged_extracted[key] = {
+                        "value": value,
+                        "confidence": 1.0,
+                        "source_turn": turn_number,
+                        "source": "runner_rule",
+                    }
+                if runner_result.set_stage and any(
+                    stage.id == runner_result.set_stage for stage in pipeline.stages
+                ):
+                    next_stage_id = runner_result.set_stage
+                    new_stage_entered_at = datetime.now(UTC)
+                if runner_result.set_action:
+                    decision.action = runner_result.set_action
+                    decision.reason = f"runner_rule:{','.join(runner_result.matched_rules)}"
+                if runner_result.set_flow_mode:
+                    runner_flow_mode_override = runner_result.set_flow_mode
+                runner_pause_bot = runner_result.pause_bot
+                if runner_result.traces:
+                    payload = [trace.model_dump(mode="json") for trace in runner_result.traces]
+                    rules_evaluated_payload = [
+                        *(rules_evaluated_payload or []),
+                        *[
+                            {
+                                "source": "runner_rules",
+                                **item,
+                            }
+                            for item in payload
+                        ],
+                    ]
+                await self._session.execute(
+                    text(
+                        """UPDATE conversation_state
+                        SET extracted_data = :ed\:\:jsonb,
+                            stage_entered_at = :sea
+                        WHERE conversation_id = :cid"""
+                    ),
+                    {
+                        "ed": __import__("json").dumps(merged_extracted),
+                        "sea": new_stage_entered_at,
+                        "cid": conversation_id,
+                    },
+                )
+                await self._session.execute(
+                    text("UPDATE conversations SET current_stage = :s WHERE id = :cid"),
+                    {"s": next_stage_id, "cid": conversation_id},
+                )
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "runner_rules evaluation raised; keeping prior decision",
                 exc_info=exc,
             )
 
@@ -1589,6 +1672,22 @@ class ConversationRunner:
                     conversation_id,
                     next_stage_id,
                 )
+
+        if runner_pause_bot is True and not auto_handoff_triggered:
+            await self._session.execute(
+                text(
+                    "UPDATE conversation_state "
+                    "SET bot_paused = true WHERE conversation_id = :cid"
+                ),
+                {"cid": conversation_id},
+            )
+            await emit_bot_paused(
+                self._session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                reason="runner_rule",
+            )
+            auto_handoff_triggered = True
 
         # ===== Phase 3b: tone, tools, 24h check, Composer =====
 
@@ -1713,6 +1812,10 @@ class ConversationRunner:
                     stage_pinned_mode,
                     flow_mode,
                 )
+
+        if runner_flow_mode_override is not None:
+            flow_mode = runner_flow_mode_override
+            router_trigger = f"{router_trigger}:runner_rule_flow_mode"
 
         resolver_action = decision.action
         if _uses_agent_directed_composer(agent_row, flow_mode):
@@ -1912,6 +2015,8 @@ class ConversationRunner:
 
         composer_input: ComposerInput | None = None
         composer_output: ComposerOutput | None = None
+        composer_validation: ComposerValidationResult | None = None
+        composer_outbox_allowed = True
         composer_usage = None
 
         # Fase 4 — auto-handoff for stage_entry. When pause_bot_on_enter
@@ -1987,9 +2092,46 @@ class ConversationRunner:
                 vision_result=vision_result,
                 turn_number=turn_number,
             )
-            composer_output, composer_usage = await self._composer.compose(
-                input=composer_input,
-            )
+            try:
+                composer_output, composer_usage = await self._composer.compose(
+                    input=composer_input,
+                )
+            except Exception as exc:
+                from atendia.contracts.handoff_summary import HandoffReason
+                from atendia.runner.composer_openai import ComposerProviderError
+                from atendia.runner.handoff_helper import (
+                    build_handoff_summary,
+                    persist_handoff,
+                )
+
+                composer_usage = exc.usage if isinstance(exc, ComposerProviderError) else None
+                trace_errors.append(
+                    {
+                        "where": "composer",
+                        "exception": type(exc).__name__,
+                        "message": "composer failed; automatic text fallback is disabled",
+                    }
+                )
+                await persist_handoff(
+                    session=self._session,
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    summary=build_handoff_summary(
+                        reason=HandoffReason.COMPOSER_FAILED,
+                        extracted=ext_fields,
+                        last_inbound_text=inbound.text,
+                        suggested_next_action=(
+                            "Composer falló y no existe fallback de texto; el cliente sigue esperando."
+                        ),
+                        docs_per_plan=pipeline.docs_per_plan,
+                    ),
+                )
+                await self._emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.ERROR_OCCURRED,
+                    payload={"where": "composer", "fallback": "disabled"},
+                )
 
             # Phase 3c.2 — write back any binary slot the composer raised.
             # The next turn's runner will read this in _maybe_apply_confirmation
@@ -2012,40 +2154,6 @@ class ConversationRunner:
                     {"pc": pending_confirmation, "cid": conversation_id},
                 )
 
-            if composer_usage is not None and composer_usage.fallback_used:
-                trace_errors.append(
-                    {
-                        "where": "composer",
-                        "exception": composer_usage.error_type,
-                        "message": "composer fallback used",
-                    }
-                )
-                from atendia.contracts.handoff_summary import HandoffReason
-                from atendia.runner.handoff_helper import (
-                    build_handoff_summary,
-                    persist_handoff,
-                )
-
-                await persist_handoff(
-                    session=self._session,
-                    conversation_id=conversation_id,
-                    tenant_id=tenant_id,
-                    summary=build_handoff_summary(
-                        reason=HandoffReason.COMPOSER_FAILED,
-                        extracted=ext_fields,
-                        last_inbound_text=inbound.text,
-                        suggested_next_action=(
-                            "Composer agotó retries; el cliente sigue esperando."
-                        ),
-                        docs_per_plan=pipeline.docs_per_plan,
-                    ),
-                )
-                await self._emitter.emit(
-                    conversation_id=conversation_id,
-                    tenant_id=tenant_id,
-                    event_type=EventType.ERROR_OCCURRED,
-                    payload={"where": "composer", "fallback": "canned"},
-                )
 
         # Now that we have processed the turn, bump last_activity_at so the
         # next turn's 24h check sees a fresh value.
@@ -2114,6 +2222,71 @@ class ConversationRunner:
             ]
             composer_output.suggested_handoff = None
 
+        if composer_input is not None and composer_output is not None:
+            composer_validation = validate_composer_output(
+                input=composer_input,
+                output=composer_output,
+            )
+            if not composer_validation.policy_passed:
+                from atendia.contracts.handoff_summary import HandoffReason
+                from atendia.runner.handoff_helper import (
+                    build_handoff_summary,
+                    persist_handoff,
+                )
+
+                composer_outbox_allowed = False
+                blocking_issues = [
+                    issue.model_dump(mode="json")
+                    for issue in composer_validation.issues
+                    if issue.severity == "blocking"
+                ]
+                trace_errors.append(
+                    {
+                        "where": "composer_validator",
+                        "message": "composer output blocked before outbox",
+                        "issues": blocking_issues,
+                    }
+                )
+                await persist_handoff(
+                    session=self._session,
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    summary=build_handoff_summary(
+                        reason=HandoffReason.COMPOSER_FAILED,
+                        extracted=ext_fields,
+                        last_inbound_text=inbound.text,
+                        suggested_next_action=(
+                            "Validator bloqueó la respuesta del Composer antes de enviarla; "
+                            "revisar datos verificados, reglas de seguridad y responder manualmente."
+                        ),
+                        docs_per_plan=pipeline.docs_per_plan,
+                    ),
+                )
+                await self._emitter.emit(
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    event_type=EventType.ERROR_OCCURRED,
+                    payload={
+                        "where": "composer_validator",
+                        "outbox": "blocked",
+                        "issues": blocking_issues,
+                    },
+                )
+
+        runner_layers = build_runner_layers(
+            pipeline=pipeline,
+            previous_stage=previous_stage,
+            next_stage=next_stage_id,
+            decision_action=decision.action,
+            decision_reason=decision.reason,
+            flow_mode=flow_mode,
+            action_payload=action_payload,
+            extracted_data=merged_extracted,
+            rules_evaluated=rules_evaluated_payload,
+            router_trigger=router_trigger,
+            pause_bot=auto_handoff_triggered or runner_pause_bot is True,
+        )
+
         # Build state_after snapshot
         state_after = {
             "current_stage": next_stage_id,
@@ -2123,6 +2296,12 @@ class ConversationRunner:
             "followups_sent_count": followups_sent_count or 0,
             "total_cost_usd": str((total_cost_usd or Decimal("0")) + turn_cost),
             "pending_confirmation": pending_confirmation,
+            "runner_layers": runner_layers,
+            "composer_score": (
+                _jsonable(composer_validation.model_dump(mode="json"))
+                if composer_validation is not None
+                else None
+            ),
         }
 
         # Persist turn_trace
@@ -2184,7 +2363,11 @@ class ConversationRunner:
             vision_cost_usd=vision_cost_usd if vision_cost_usd > 0 else None,
             vision_latency_ms=vision_latency_ms,
             flow_mode=flow_mode.value,
-            outbound_messages=(composer_output.messages if composer_output is not None else None),
+            outbound_messages=(
+                composer_output.messages
+                if composer_output is not None and composer_outbox_allowed
+                else None
+            ),
             total_latency_ms=latency_ms,
             total_cost_usd=turn_cost,
             errors=trace_errors or None,
@@ -2201,7 +2384,12 @@ class ConversationRunner:
         await self._session.flush()
 
         # Enqueue outbound messages onto arq if we have a queue and recipient.
-        if composer_output is not None and arq_pool is not None and to_phone_e164 is not None:
+        if (
+            composer_output is not None
+            and composer_outbox_allowed
+            and arq_pool is not None
+            and to_phone_e164 is not None
+        ):
             await enqueue_messages(
                 arq_pool,
                 session=self._session,
@@ -2238,7 +2426,11 @@ class ConversationRunner:
         # stage pauses BEFORE compose (auto_handoff_triggered skips
         # Composer/outbound entirely), so no message goes out. Here
         # compose already ran, so we send THEN pause.
-        suggested_handoff = composer_output.suggested_handoff if composer_output is not None else None
+        suggested_handoff = (
+            composer_output.suggested_handoff
+            if composer_output is not None and composer_outbox_allowed
+            else None
+        )
         if suggested_handoff == "stage_triggered_handoff":
             # This reason is reserved for deterministic stage entry
             # pause_bot_on_enter. The composer must not be able to invent it
@@ -2881,3 +3073,4 @@ def _build_kb_evidence(action: str, action_payload: dict) -> dict | None:
         return None
 
     return {"action": action, "hits": hits}
+

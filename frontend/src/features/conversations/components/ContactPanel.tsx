@@ -700,10 +700,14 @@ function isDocumentFieldKey(key: string): boolean {
   return /^DOCS_[A-Z0-9_]+$/.test(key);
 }
 
-function valueFromAttrs(attrs: unknown, key: string): string | null {
+function isDocumentDefinition(definition: FieldDefinition): boolean {
+  return definition.field_type === "document" || isDocumentFieldKey(definition.key);
+}
+
+function valueFromAttrs(attrs: unknown, key: string, isDocument = isDocumentFieldKey(key)): string | null {
   if (!isPlainRecord(attrs)) return null;
   const raw = attrs[key];
-  if (isDocumentFieldKey(key)) {
+  if (isDocument) {
     if (isPlainRecord(raw)) return toDisplayValue(raw.status);
     if (typeof raw === "boolean") return raw ? "ok" : "missing";
   }
@@ -715,8 +719,10 @@ function valueForDefinition(
   configuredValues: Map<string, string | null>,
   attrs: unknown,
 ): string | null {
-  if (isDocumentFieldKey(definition.key)) {
-    return valueFromAttrs(attrs, definition.key) ?? configuredValues.get(definition.key) ?? null;
+  if (isDocumentDefinition(definition)) {
+    return (
+      valueFromAttrs(attrs, definition.key, true) ?? configuredValues.get(definition.key) ?? null
+    );
   }
   return configuredValues.get(definition.key) ?? valueFromAttrs(attrs, definition.key);
 }
@@ -997,11 +1003,17 @@ function ContactDetailGridSection({
             const inputType =
               definition.field_type === "number"
                 ? "number"
-                : definition.field_type === "select"
+                : definition.field_type === "select" || isDocumentDefinition(definition)
                   ? "select"
                   : "text";
             const options =
-              definition.field_type === "select"
+              isDocumentDefinition(definition)
+                ? [
+                    { value: "missing", label: "Pendiente" },
+                    { value: "ok", label: "Recibido" },
+                    { value: "rejected", label: "Rechazado" },
+                  ]
+                : definition.field_type === "select"
                 ? ((definition.field_options as { choices?: string[] } | null)?.choices ?? []).map(
                     (choice) => ({ value: choice, label: choice }),
                   )
@@ -1016,7 +1028,7 @@ function ContactDetailGridSection({
                 inputType={inputType}
                 options={options}
                 onSave={(next) =>
-                  isDocumentFieldKey(definition.key)
+                  isDocumentDefinition(definition)
                     ? patchAttr.mutateAsync({
                         key: definition.key,
                         value: next ? { status: next } : { status: "missing" },
@@ -1024,7 +1036,7 @@ function ContactDetailGridSection({
                     : putFieldValues.mutateAsync({ [definition.key]: next })
                 }
                 onDelete={() =>
-                  isDocumentFieldKey(definition.key)
+                  isDocumentDefinition(definition)
                     ? deleteAttr.mutateAsync(definition.key)
                     : putFieldValues.mutateAsync({ [definition.key]: null })
                 }

@@ -14,7 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
-from atendia.config_validation import validate_agent_config as validate_agent_references
+from atendia.config_validation import (
+    validate_agent_activation_config,
+    validate_agent_config as validate_agent_references,
+)
 from atendia.config import get_settings
 from atendia.db.models.agent import Agent
 from atendia.db.models.workflow import Workflow
@@ -995,9 +998,10 @@ async def create_agent(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
+    body_data = body.model_dump()
     if body.is_default:
         await _clear_default(session, tenant_id)
-    row = Agent(tenant_id=tenant_id, **body.model_dump())
+    row = Agent(tenant_id=tenant_id, **body_data)
     session.add(row)
     try:
         await session.flush()
@@ -1101,6 +1105,17 @@ async def patch_agent(
         validation = await validate_agent_references(session, tenant_id, draft)
         if validation.critical_count:
             raise HTTPException(422, validation.error_message())
+    if values.get("status") == "production":
+        draft = _item(row).model_dump(mode="json")
+        draft.update(values)
+        validation = await validate_agent_activation_config(
+            session,
+            tenant_id,
+            draft,
+            agent_id=agent_id,
+        )
+        if validation.critical_count:
+            raise HTTPException(status.HTTP_409_CONFLICT, validation.as_dict())
     if values.get("is_default") is True:
         await _clear_default(session, tenant_id)
     for key, value in values.items():
@@ -1355,8 +1370,8 @@ async def validate_agent_config(
     data = _item(row).model_dump(mode="json")
     if draft:
         data.update(draft)
-    extra = await validate_agent_references(session, tenant_id, data)
-    return _merge_validation_dict(base, extra.as_dict())
+    activation = await validate_agent_activation_config(session, tenant_id, data, agent_id=agent_id)
+    return _merge_validation_dict(base, activation.as_dict())
 
 
 @router.post("/{agent_id}/preview-response")
@@ -1791,9 +1806,19 @@ async def publish_agent(
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
-    validation = _validate_agent_config(row)
+    validation = _merge_validation_dict(
+        _validate_agent_config(row),
+        (
+            await validate_agent_activation_config(
+                session,
+                tenant_id,
+                _item(row).model_dump(mode="json"),
+                agent_id=agent_id,
+            )
+        ).as_dict(),
+    )
     if validation["critical_count"]:
-        raise HTTPException(status.HTTP_409_CONFLICT, validation["summary"])
+        raise HTTPException(status.HTTP_409_CONFLICT, validation)
     row.status = "production"
     row.version = row.version if row.version.startswith("v") else f"v{row.version}"
     ops = _merged_ops(row)

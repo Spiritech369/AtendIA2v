@@ -77,7 +77,7 @@ def fresh_tenant() -> tuple[str, str, str]:
 
 async def test_runner_persists_composer_provider_and_cleaned_text(fresh_tenant):
     """A single run_turn against a fresh tenant lands a turn_traces
-    row with composer_provider set ('canned' by default in tests) and
+    row with composer_provider set and
     inbound_text_cleaned set to the normalized text."""
     tid, _cid, conv = fresh_tenant
     from atendia.contracts.message import Message, MessageDirection
@@ -127,8 +127,8 @@ async def test_runner_persists_composer_provider_and_cleaned_text(fresh_tenant):
                 .one()
             )
 
-        assert row["composer_provider"] in ("openai", "canned", "fallback"), (
-            f"composer_provider must be one of the 3 enum values, got {row['composer_provider']!r}"
+        assert row["composer_provider"] in ("openai", "fallback"), (
+            f"composer_provider must be an expected value, got {row['composer_provider']!r}"
         )
         assert row["inbound_text_cleaned"] is not None, (
             "inbound_text_cleaned must be persisted (not NULL)"
@@ -141,13 +141,6 @@ async def test_runner_persists_composer_provider_and_cleaned_text(fresh_tenant):
         assert row["inbound_text_cleaned"] == row["inbound_text_cleaned"].lower()
     finally:
         await engine.dispose()
-
-
-def test_composer_provider_short_name_classifies_canned():
-    from atendia.runner.composer_canned import CannedComposer
-    from atendia.runner.conversation_runner import _composer_provider_short_name
-
-    assert _composer_provider_short_name(CannedComposer()) == "canned"
 
 
 def test_composer_provider_short_name_classifies_openai_success():

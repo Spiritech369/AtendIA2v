@@ -10,7 +10,6 @@ from sqlalchemy import text
 from atendia.contracts.message import Message, MessageDirection
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.pipeline_definition import FieldSpec
-from atendia.runner.composer_canned import CannedComposer
 from atendia.runner.composer_protocol import (
     ComposerInput,
     ComposerOutput,
@@ -119,7 +118,7 @@ async def test_runner_extracts_fields_then_transitions_to_quote(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t37_main")
 
     nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
-    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
+    runner = ConversationRunner(db_session, nlu_provider, _RecordingComposer())
 
     # Turn 1: client gives info → fields extracted, stays in qualify
     inbound1 = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
@@ -195,7 +194,7 @@ async def test_runner_exposes_customer_field_definitions_to_nlu(db_session):
         ambiguities=[],
     )
     nlu_provider = SpyNLU(nlu_result)
-    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
+    runner = ConversationRunner(db_session, nlu_provider, _RecordingComposer())
 
     inbound = _make_inbound(conv_id, tid, "Por fuera")
     trace = await runner.run_turn(
@@ -271,7 +270,7 @@ class _FakeNLUWithCost:
 
 
 class _RecordingComposer:
-    """Composer that records the last input and returns canned text + optional usage.
+    """Composer that records the last input and returns test text + optional usage.
 
     Useful for asserting tone propagation, history, and cost accumulation.
     """
@@ -307,7 +306,7 @@ async def test_total_cost_accumulates_across_turns(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_cost")
 
     nlu_provider = _FakeNLUWithCost(Decimal("0.000050"))
-    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
+    runner = ConversationRunner(db_session, nlu_provider, _RecordingComposer())
 
     # Turn 1
     inbound1 = _make_inbound(conv_id, tid, "hola")
@@ -347,7 +346,7 @@ async def test_total_cost_not_modified_when_usage_is_none(db_session):
     tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t21_no_cost")
 
     nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
-    runner = ConversationRunner(db_session, nlu_provider, CannedComposer())
+    runner = ConversationRunner(db_session, nlu_provider, _RecordingComposer())
 
     inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
     await runner.run_turn(
@@ -466,6 +465,44 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
         )
     ).scalar()
     assert handoff_count == 0
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_runner_validator_blocks_unsafe_composer_output(db_session):
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_validator_blocks")
+
+    composer = _RecordingComposer(messages=["Claro, te queda aprobado en $99,999."])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    inbound = _make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX")
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=inbound,
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert trace.composer_output is not None
+    assert trace.outbound_messages is None
+    assert trace.errors is not None
+    assert any(err.get("where") == "composer_validator" for err in trace.errors)
+    assert trace.state_after is not None
+    score = trace.state_after["composer_score"]
+    assert score["policy_passed"] is False
+    assert score["needs_handoff"] is True
+
+    handoff_count = (
+        await db_session.execute(
+            text("SELECT COUNT(*) FROM human_handoffs WHERE conversation_id = :c"),
+            {"c": conv_id},
+        )
+    ).scalar()
+    assert handoff_count == 1
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
@@ -622,19 +659,15 @@ async def test_runner_24h_handoff_creates_row_no_compose(db_session):
 # T23: composer fallback → handoff with reason='composer_failed'
 # ============================================================================
 @pytest.mark.asyncio
-async def test_runner_composer_fallback_creates_handoff(db_session):
-    """T23: composer_usage.fallback_used=True → human_handoff with reason='composer_failed'."""
-    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t23_fallback")
+async def test_runner_composer_failure_creates_handoff(db_session):
+    """Composer failures create a handoff without an automatic text fallback."""
+    tid, cid, conv_id = await _seed_tenant_with_pipeline(db_session, "test_t23_composer_failed")
 
-    fallback_usage = UsageMetadata(
-        model="gpt-4o",
-        tokens_in=200,
-        tokens_out=20,
-        cost_usd=Decimal("0.000200"),
-        latency_ms=500,
-        fallback_used=True,
-    )
-    composer = _RecordingComposer(usage=fallback_usage, messages=["[canned fallback]"])
+    class _FailingComposer:
+        async def compose(self, *, input):
+            raise RuntimeError("composer down")
+
+    composer = _FailingComposer()
     nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
     runner = ConversationRunner(db_session, nlu_provider, composer)
 
@@ -657,7 +690,7 @@ async def test_runner_composer_fallback_creates_handoff(db_session):
     assert rows[0][0] == "composer_failed"
     assert rows[0][1] == "pending"
 
-    # ERROR_OCCURRED event should have payload {"where":"composer", "fallback":"canned"}.
+    # ERROR_OCCURRED event should show fallback disabled.
     event_payload = (
         await db_session.execute(
             text(
@@ -670,7 +703,7 @@ async def test_runner_composer_fallback_creates_handoff(db_session):
     ).scalar()
     assert event_payload is not None
     assert event_payload["where"] == "composer"
-    assert event_payload["fallback"] == "canned"
+    assert event_payload["fallback"] == "disabled"
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
@@ -784,7 +817,7 @@ async def test_runner_runs_vision_in_parallel_when_image_attached(
         runner = ConversationRunner(
             db_session,
             _FakeNLUWithCost(Decimal("0.000050")),
-            CannedComposer(),
+            _RecordingComposer(),
         )
 
         inbound = _make_inbound(conv_id, tid, "aquí va mi INE")
@@ -836,7 +869,7 @@ async def test_runner_skips_vision_when_no_image_attachment(db_session, monkeypa
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     inbound = _make_inbound(conv_id, tid, "hola")
     trace = await runner.run_turn(
@@ -980,7 +1013,7 @@ async def test_runner_picks_flow_mode_per_authored_rules(db_session):
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     trace = await runner.run_turn(
         conversation_id=conv_id,
@@ -1038,7 +1071,7 @@ async def test_runner_prefers_agent_flow_mode_rules_over_pipeline_rules(db_sessi
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     trace = await runner.run_turn(
         conversation_id=conv_id,
@@ -1074,7 +1107,7 @@ async def test_runner_handles_explicit_empty_pipeline_flow_mode_rules(db_session
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     trace = await runner.run_turn(
         conversation_id=conv_id,
@@ -1123,7 +1156,7 @@ async def test_pending_confirmation_si_assigns_tipo_credito(db_session):
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     await runner.run_turn(
         conversation_id=conv_id,
@@ -1168,7 +1201,7 @@ async def test_pending_confirmation_no_to_negocio_sat_assigns_sin_comprobantes(
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     await runner.run_turn(
         conversation_id=conv_id,
@@ -1211,7 +1244,7 @@ async def test_pending_confirmation_ambiguous_reply_does_not_clear(db_session):
     runner = ConversationRunner(
         db_session,
         _FakeNLUWithCost(Decimal("0.000050")),
-        CannedComposer(),
+        _RecordingComposer(),
     )
     await runner.run_turn(
         conversation_id=conv_id,
@@ -1302,7 +1335,7 @@ async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypa
         runner = ConversationRunner(
             db_session,
             _FakeNLUWithCost(Decimal("0.000050")),
-            CannedComposer(),
+            _RecordingComposer(),
         )
         inbound = _make_inbound(conv_id, tid, "aquí va")
         inbound.attachments = [
@@ -1337,3 +1370,6 @@ async def test_runner_swallows_vision_failure_and_keeps_nlu(db_session, monkeypa
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
     get_settings.cache_clear()
+
+
+

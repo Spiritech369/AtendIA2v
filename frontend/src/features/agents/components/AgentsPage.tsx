@@ -1,6 +1,7 @@
 import { Background, Controls, type Edge, MarkerType, type Node, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   Activity,
   AlertTriangle,
@@ -54,7 +55,9 @@ import {
   type DecisionMap,
   type ExtractionField,
   type Guardrail,
+  normalizeValidationResult,
   type PreviewResult,
+  type ValidationIssue,
   type ValidationResult,
 } from "@/features/agents/api";
 import { api } from "@/lib/api-client";
@@ -170,6 +173,42 @@ function severityClass(severity: string): string {
   if (severity === "high") return "border-orange-400/40 bg-orange-500/10 text-orange-200";
   if (severity === "medium") return "border-amber-400/40 bg-amber-500/10 text-amber-200";
   return "border-sky-400/40 bg-sky-500/10 text-sky-200";
+}
+
+function validationIsReady(validation: ValidationResult): boolean {
+  return validation.status === "ok" || validation.status === "ready";
+}
+
+function validationFromError(error: unknown): ValidationResult | null {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    return normalizeValidationResult(detail);
+  }
+  return null;
+}
+
+function issueAction(issue: ValidationIssue): { label: string; to: string; detail: string } | null {
+  const code = issue.code;
+  const path = issue.path ?? "";
+  if (code.includes("CATALOG") || code.includes("QUOTE")) {
+    return { label: "Ir a Catálogo", to: "/catalog", detail: "Carga productos oficiales con precio o planes." };
+  }
+  if (code.includes("MODE_WITHOUT_GUIDANCE") || path.includes("mode_prompts")) {
+    return { label: "Ir a Composer", to: "/composer", detail: "Completa la guía del modo usado por el pipeline." };
+  }
+  if (code.includes("DOCUMENT") || path.includes("documents")) {
+    return { label: "Ir a Conocimiento", to: "/knowledge", detail: "Sube o revisa documentos KB requeridos." };
+  }
+  if (code.includes("WORKFLOW")) {
+    return { label: "Ir a Workflows", to: "/workflows", detail: "Corrige loops o nodos sin salida." };
+  }
+  if (code.includes("REQUIRED_FIELD")) {
+    return { label: "Ir a Datos cliente", to: "/customer-fields", detail: "Crea o corrige el campo requerido." };
+  }
+  if (path.includes("vision_doc_mapping") || path.includes("docs_per_plan") || path.includes("documents_catalog")) {
+    return { label: "Ir a Expediente", to: "/expediente", detail: "Configura documentos, planes o auto-marcado Vision." };
+  }
+  return null;
 }
 
 function cloneAgent(agent: AgentItem): AgentItem {
@@ -1663,15 +1702,41 @@ function ValidationPanel({ validation }: { validation: ValidationResult | null }
       <div
         className={cn(
           "rounded-lg border p-3 text-sm",
-          validation.status === "ok"
+          validationIsReady(validation)
             ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100"
             : "border-red-300/30 bg-red-500/10 text-red-100",
         )}
       >
         {validation.summary}
       </div>
+      {validation.issues.some((issue) => issue.severity === "critical" || issue.severity === "error") && (
+        <div className="mt-3 rounded-lg border border-red-300/30 bg-red-500/10 p-3">
+          <div className="mb-2 text-xs font-semibold text-red-100">Bloqueo crítico del linter</div>
+          <div className="space-y-2">
+            {validation.issues
+              .filter((issue) => issue.severity === "critical" || issue.severity === "error")
+              .map((issue) => {
+                const action = issueAction(issue);
+                return (
+                  <div key={`${issue.code}-${issue.path ?? issue.message}`} className="rounded-md border border-white/10 bg-slate-950/60 p-2 text-xs">
+                    <div className="font-medium text-red-100">{issue.message}</div>
+                    {issue.path && <div className="mt-1 font-mono text-[10px] text-slate-500">{issue.path}</div>}
+                    {action && (
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] text-slate-400">{action.detail}</span>
+                        <Button asChild size="sm" className="h-7 text-xs">
+                          <Link to={action.to}>{action.label}</Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
       <div className="mt-2 space-y-1">
-        {validation.checks.map((check) => (
+        {(validation.checks ?? []).map((check) => (
           <div
             key={check.label}
             className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs"
@@ -2176,7 +2241,7 @@ function deriveNextBestAction(args: {
   onSave: () => void;
 }): NextBestActionItem {
   const { agent, validation, dirty, onValidate, onPublish, onSave } = args;
-  if (validation && validation.status !== "ok") {
+  if (validation && !validationIsReady(validation)) {
     const blocking = validation.issues.find((i) => i.severity === "critical" || i.severity === "error");
     if (blocking) {
       return {
@@ -2348,7 +2413,7 @@ function ValidationBeforePublishCard({
           <div
             className={cn(
               "rounded-md border p-2.5 text-xs",
-              validation.status === "ok"
+              validationIsReady(validation)
                 ? "border-emerald-300/30 bg-emerald-500/10 text-emerald-100"
                 : validation.status === "warning"
                   ? "border-amber-300/30 bg-amber-500/10 text-amber-100"
@@ -2357,8 +2422,28 @@ function ValidationBeforePublishCard({
           >
             {validation.summary}
           </div>
+          {validation.issues.some((issue) => issue.severity === "critical" || issue.severity === "error") && (
+            <div className="mt-2 space-y-1.5 rounded-md border border-red-300/30 bg-red-500/10 p-2">
+              <div className="text-[11px] font-semibold text-red-100">Bloqueo crítico del linter</div>
+              {validation.issues
+                .filter((issue) => issue.severity === "critical" || issue.severity === "error")
+                .map((issue) => {
+                  const action = issueAction(issue);
+                  return (
+                    <div key={`${issue.code}-${issue.path ?? issue.message}`} className="rounded border border-white/10 bg-slate-950/50 p-2 text-[11px]">
+                      <div className="text-red-100">{issue.message}</div>
+                      {action && (
+                        <Button asChild size="sm" className="mt-2 h-7 text-xs">
+                          <Link to={action.to}>{action.label}</Link>
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
           <ul className="mt-2 space-y-1">
-            {validation.checks.map((check) => (
+            {(validation.checks ?? []).map((check) => (
               <li
                 key={check.label}
                 className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[11px]"
@@ -3284,7 +3369,16 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
       void invalidateAgents();
       toast.success("Publicado en producción");
     },
-    onError: (error: Error) => toast.error("Publicación bloqueada", { description: error.message }),
+    onError: (error: Error) => {
+      const linter = validationFromError(error);
+      if (linter) {
+        setValidation(linter);
+        setActiveTab("Resumen");
+        toast.error("Publicación bloqueada por el linter", { description: linter.summary });
+        return;
+      }
+      toast.error("Publicación bloqueada", { description: error.message });
+    },
   });
 
   const rollbackMutation = useMutation({

@@ -273,7 +273,7 @@ class StageDefinition(BaseModel):
         return self
 
 
-_DOC_KEY_RE = re.compile(r"^DOCS_[A-Z][A-Z0-9_]*$")
+_DOC_KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class DocumentSpec(BaseModel):
@@ -289,7 +289,7 @@ class DocumentSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    key: str = Field(min_length=6, max_length=80)
+    key: str = Field(min_length=2, max_length=80)
     label: str = Field(min_length=1, max_length=80)
     hint: str = Field(default="", max_length=200)
 
@@ -299,7 +299,7 @@ class DocumentSpec(BaseModel):
         if not _DOC_KEY_RE.fullmatch(v):
             raise ValueError(
                 f"document key {v!r} must match {_DOC_KEY_RE.pattern} "
-                "(uppercase, starts with DOCS_)"
+                "(uppercase letters, numbers and underscores)"
             )
         return v
 

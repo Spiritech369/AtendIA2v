@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -8,8 +8,14 @@ import yaml
 from sqlalchemy import text
 
 from atendia.contracts.message import Message, MessageDirection
+from atendia.runner.composer_protocol import ComposerOutput
 from atendia.runner.conversation_runner import ConversationRunner
 from atendia.runner.nlu_canned import CannedNLU
+
+
+class _TestComposer:
+    async def compose(self, *, input):
+        return ComposerOutput(messages=["ok"]), None
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "conversations"
 
@@ -65,7 +71,8 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     cid = (
         await db_session.execute(
             text(
-                "INSERT INTO customers (tenant_id, phone_e164) VALUES (:t, '+5215555550042') RETURNING id"
+                "INSERT INTO customers (tenant_id, phone_e164) "
+                "VALUES (:t, '+5215555550042') RETURNING id"
             ),
             {"t": tid},
         )
@@ -90,10 +97,7 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     inline_nlu = {"nlu_results": [t["nlu"] for t in spec["turns"]]}
     inline_path = tmp_path / f"{fixture_path.stem}.nlu.yaml"
     inline_path.write_text(yaml.safe_dump(inline_nlu), encoding="utf-8")
-
-    from atendia.runner.composer_canned import CannedComposer
-
-    runner = ConversationRunner(db_session, CannedNLU(inline_path), CannedComposer())
+    runner = ConversationRunner(db_session, CannedNLU(inline_path), _TestComposer())
 
     for i, turn in enumerate(spec["turns"]):
         msg = Message(
@@ -102,7 +106,7 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
             tenant_id=str(tid),
             direction=MessageDirection.INBOUND,
             text=turn["inbound"],
-            sent_at=datetime.now(timezone.utc),
+            sent_at=datetime.now(UTC),
         )
         trace = await runner.run_turn(
             conversation_id=conv_id,
@@ -120,3 +124,4 @@ async def test_fixture_runs_to_expected_states(fixture_path, db_session, tmp_pat
     # Cleanup
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
+

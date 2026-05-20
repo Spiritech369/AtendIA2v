@@ -1,12 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown,
-  ArrowUp,
-  Bot,
   Check,
-  CheckCircle2,
   ClipboardCheck,
-  Eye,
   FileCheck,
   Files,
   FileText,
@@ -17,7 +12,6 @@ import {
   RotateCcw,
   Save,
   Trash2,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -34,7 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { tenantsApi } from "@/features/config/api";
 import { fieldsApi } from "@/features/customers/api";
 import { cn } from "@/lib/utils";
@@ -43,38 +36,16 @@ import { useAuthStore } from "@/stores/auth";
 type DocumentSpec = {
   key: string;
   label: string;
-  hint: string;
 };
 
 type ExpedienteDraft = {
   docs_plan_field: string;
   docs_per_plan: Record<string, string[]>;
   documents_catalog: DocumentSpec[];
-  vision_doc_mapping: Record<string, string[]>;
 };
 
-const DOC_KEY_RE = /^DOCS_[A-Z][A-Z0-9_]*$/;
-const VISION_CATEGORIES = [
-  "ine",
-  "comprobante",
-  "recibo_nomina",
-  "estado_cuenta",
-  "constancia_sat",
-  "factura",
-  "imss",
-] as const;
-type VisionCategory = (typeof VISION_CATEGORIES)[number];
-
-const VISION_LABELS: Record<VisionCategory, string> = {
-  ine: "INE",
-  comprobante: "Comprobante",
-  recibo_nomina: "Recibo nomina",
-  estado_cuenta: "Estado cuenta",
-  constancia_sat: "Constancia SAT",
-  factura: "Factura",
-  imss: "IMSS",
-};
-const PLAN_FIELD_KEYS = new Set(["CREDITO_TIPO", "TIPO_CREDITO", "PLAN_CREDITO"]);
+const DOC_KEY_RE = /^[A-Z][A-Z0-9_]*$/;
+const UNSELECTED_FIELD = "__none__";
 
 function parseStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -92,7 +63,6 @@ function parseDraft(definition: Record<string, unknown> | undefined): Expediente
           {
             key: raw.key,
             label: raw.label,
-            hint: typeof raw.hint === "string" ? raw.hint : "",
           },
         ];
       })
@@ -105,22 +75,10 @@ function parseDraft(definition: Record<string, unknown> | undefined): Expediente
     }
   }
 
-  const visionMapping: Record<string, string[]> = {};
-  if (typeof def.vision_doc_mapping === "object" && def.vision_doc_mapping !== null) {
-    for (const [category, docs] of Object.entries(
-      def.vision_doc_mapping as Record<string, unknown>,
-    )) {
-      if ((VISION_CATEGORIES as readonly string[]).includes(category)) {
-        visionMapping[category] = parseStringList(docs).filter((key) => DOC_KEY_RE.test(key));
-      }
-    }
-  }
-
   return {
-    docs_plan_field: typeof def.docs_plan_field === "string" ? def.docs_plan_field : "plan_credito",
+    docs_plan_field: typeof def.docs_plan_field === "string" ? def.docs_plan_field : "",
     docs_per_plan: docsByPlan,
     documents_catalog: catalog,
-    vision_doc_mapping: visionMapping,
   };
 }
 
@@ -130,11 +88,10 @@ function deriveDocKey(label: string): string {
     .toUpperCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/^DOCS[_\s]?/i, "")
     .replace(/[^A-Z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .replace(/_+/g, "_");
-  return clean ? `DOCS_${clean}` : "";
+  return clean;
 }
 
 function normalizeDocKeyInput(value: string): string {
@@ -159,20 +116,14 @@ function choicesFromFieldOptions(options: Record<string, unknown> | null): strin
 }
 
 function serialiseExpediente(draft: ExpedienteDraft): Record<string, unknown> {
-  const mapping: Record<string, string[]> = {};
-  for (const [category, docs] of Object.entries(draft.vision_doc_mapping)) {
-    const clean = docs.filter((key) => DOC_KEY_RE.test(key));
-    if (clean.length > 0) mapping[category] = clean;
-  }
   return {
-    docs_plan_field: draft.docs_plan_field.trim() || "plan_credito",
+    docs_plan_field: draft.docs_plan_field.trim(),
     documents_catalog: draft.documents_catalog.map((doc) => ({
       key: doc.key,
       label: doc.label.trim(),
-      ...(doc.hint.trim() ? { hint: doc.hint.trim() } : {}),
     })),
     docs_per_plan: draft.docs_per_plan,
-    vision_doc_mapping: mapping,
+    vision_doc_mapping: {},
   };
 }
 
@@ -193,22 +144,20 @@ function validateDraft(draft: ExpedienteDraft): string | null {
     }
   }
 
-  for (const [category, docs] of Object.entries(draft.vision_doc_mapping)) {
-    if (!(VISION_CATEGORIES as readonly string[]).includes(category)) {
-      return `Categoria Vision invalida: ${category}`;
-    }
-    for (const key of docs) {
-      if (!docKeys.has(key))
-        return `Vision ${category} apunta a un documento que ya no existe: ${key}`;
-    }
-  }
-
   return null;
 }
 
 function expedienteFingerprint(value: ExpedienteDraft | null): string {
   if (!value) return "";
   return JSON.stringify(serialiseExpediente(value));
+}
+
+function hasLegacyVisionMapping(definition: Record<string, unknown> | undefined): boolean {
+  const value = definition?.vision_doc_mapping;
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value as Record<string, unknown>).some(
+    (docs) => Array.isArray(docs) && docs.length > 0,
+  );
 }
 
 export function ExpedientePage() {
@@ -231,7 +180,6 @@ export function ExpedientePage() {
   const [draft, setDraft] = useState<ExpedienteDraft | null>(null);
   const [newDocLabel, setNewDocLabel] = useState("");
   const [newDocKey, setNewDocKey] = useState("");
-  const [newDocHint, setNewDocHint] = useState("");
   const [newPlanName, setNewPlanName] = useState("");
 
   useEffect(() => {
@@ -241,9 +189,16 @@ export function ExpedientePage() {
   }, [query.data?.definition]);
 
   const savedDraft = useMemo(() => parseDraft(query.data?.definition), [query.data?.definition]);
+  const legacyVisionMappingPresent = useMemo(
+    () => hasLegacyVisionMapping(query.data?.definition),
+    [query.data?.definition],
+  );
   const dirty = useMemo(
-    () => draft !== null && expedienteFingerprint(draft) !== expedienteFingerprint(savedDraft),
-    [draft, savedDraft],
+    () =>
+      draft !== null &&
+      (expedienteFingerprint(draft) !== expedienteFingerprint(savedDraft) ||
+        legacyVisionMappingPresent),
+    [draft, savedDraft, legacyVisionMappingPresent],
   );
   const docKeyPreview = newDocKey.trim()
     ? normalizeDocKeyInput(newDocKey)
@@ -255,6 +210,7 @@ export function ExpedientePage() {
     () =>
       (customerFields.data ?? [])
         .map((field) => ({ ...field, docKey: normalizeTechnicalKey(field.key) }))
+        .filter((field) => field.field_type === "document" || field.docKey.startsWith("DOCS_"))
         .filter((field) => DOC_KEY_RE.test(field.docKey))
         .filter((field) => !draft?.documents_catalog.some((doc) => doc.key === field.docKey))
         .sort((a, b) => a.docKey.localeCompare(b.docKey)),
@@ -265,13 +221,10 @@ export function ExpedientePage() {
       (customerFields.data ?? []).find(
         (field) =>
           normalizeTechnicalKey(field.key) === normalizeTechnicalKey(draft?.docs_plan_field ?? ""),
-      ) ??
-      (customerFields.data ?? []).find((field) =>
-        PLAN_FIELD_KEYS.has(normalizeTechnicalKey(field.key)),
       ),
     [customerFields.data, draft?.docs_plan_field],
   );
-  const selectedPlanFieldKey = draft?.docs_plan_field || planField?.key || "plan_credito";
+  const selectedPlanFieldKey = draft?.docs_plan_field || planField?.key || "";
   const planFieldChoices = useMemo(
     () =>
       planField
@@ -283,33 +236,21 @@ export function ExpedientePage() {
   );
   const validationError = draft ? validateDraft(draft) : null;
   const planCount = draft ? Object.keys(draft.docs_per_plan).length : 0;
-  const mappedVisionCount = draft
-    ? Object.values(draft.vision_doc_mapping).reduce((sum, docs) => sum + docs.length, 0)
-    : 0;
-  const visionCategoryCount = draft
-    ? Object.values(draft.vision_doc_mapping).filter((docs) => docs.length > 0).length
-    : 0;
   const configWarnings = useMemo(() => {
     if (!draft) return [];
     const warnings: string[] = [];
     if (!draft.docs_plan_field.trim()) warnings.push("Falta seleccionar el campo del cliente.");
     if (draft.documents_catalog.length === 0) warnings.push("No hay documentos en catalogo.");
     if (Object.keys(draft.docs_per_plan).length === 0) warnings.push("No hay casos configurados.");
-    if (mappedVisionCount === 0) warnings.push("Vision esta en modo manual.");
     return warnings;
-  }, [draft, mappedVisionCount]);
+  }, [draft]);
   const docUsage = useMemo(() => {
-    const usage: Record<string, { plans: number; vision: number }> = {};
+    const usage: Record<string, { plans: number }> = {};
     if (!draft) return usage;
-    for (const doc of draft.documents_catalog) usage[doc.key] = { plans: 0, vision: 0 };
+    for (const doc of draft.documents_catalog) usage[doc.key] = { plans: 0 };
     for (const docs of Object.values(draft.docs_per_plan)) {
       for (const docKey of docs) {
         if (usage[docKey]) usage[docKey].plans += 1;
-      }
-    }
-    for (const docs of Object.values(draft.vision_doc_mapping)) {
-      for (const docKey of docs) {
-        if (usage[docKey]) usage[docKey].vision += 1;
       }
     }
     return usage;
@@ -342,11 +283,10 @@ export function ExpedientePage() {
     if (!draft || !label || !key || docKeyExists) return;
     setDraft({
       ...draft,
-      documents_catalog: [...draft.documents_catalog, { key, label, hint: newDocHint.trim() }],
+      documents_catalog: [...draft.documents_catalog, { key, label }],
     });
     setNewDocLabel("");
     setNewDocKey("");
-    setNewDocHint("");
   }
 
   function updateDocument(index: number, patch: Partial<DocumentSpec>) {
@@ -371,18 +311,10 @@ export function ExpedientePage() {
           docs.filter((docKey) => docKey !== key),
         ]),
       ) as Record<string, string[]>;
-      const visionEntries = Object.entries(current.vision_doc_mapping).flatMap(
-        ([category, docs]) => {
-          const nextDocs = docs.filter((docKey) => docKey !== key);
-          return nextDocs.length > 0 ? [[category, nextDocs] as const] : [];
-        },
-      );
-      const vision_doc_mapping = Object.fromEntries(visionEntries) as Record<string, string[]>;
       return {
         ...current,
         documents_catalog: current.documents_catalog.filter((doc) => doc.key !== key),
         docs_per_plan,
-        vision_doc_mapping,
       };
     });
   }
@@ -434,34 +366,6 @@ export function ExpedientePage() {
     });
   }
 
-  function toggleVisionDoc(category: VisionCategory, docKey: string) {
-    setDraft((current) => {
-      if (!current) return current;
-      const currentDocs = current.vision_doc_mapping[category] ?? [];
-      const nextDocs = currentDocs.includes(docKey)
-        ? currentDocs.filter((key) => key !== docKey)
-        : [...currentDocs, docKey];
-      const vision_doc_mapping = { ...current.vision_doc_mapping };
-      if (nextDocs.length === 0) delete vision_doc_mapping[category];
-      else vision_doc_mapping[category] = nextDocs;
-      return { ...current, vision_doc_mapping };
-    });
-  }
-
-  function moveVisionDoc(category: VisionCategory, index: number, delta: -1 | 1) {
-    setDraft((current) => {
-      if (!current) return current;
-      const docs = [...(current.vision_doc_mapping[category] ?? [])];
-      const target = index + delta;
-      if (target < 0 || target >= docs.length) return current;
-      [docs[index], docs[target]] = [docs[target] as string, docs[index] as string];
-      return {
-        ...current,
-        vision_doc_mapping: { ...current.vision_doc_mapping, [category]: docs },
-      };
-    });
-  }
-
   if (query.isLoading || !draft) {
     return (
       <div className="space-y-4">
@@ -494,7 +398,7 @@ export function ExpedientePage() {
               Expediente
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Matriz de documentos, reglas por caso y lectura automatica de Vision.
+              Matriz de documentos y reglas por caso.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -528,7 +432,7 @@ export function ExpedientePage() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         <Metric
           icon={Files}
           label="Catalogo"
@@ -536,7 +440,6 @@ export function ExpedientePage() {
           detail="documentos"
         />
         <Metric icon={ListChecks} label="Casos" value={planCount} detail="planes activos" />
-        <Metric icon={Eye} label="Vision" value={mappedVisionCount} detail="mapeos automaticos" />
       </div>
 
       <ConfigStatus
@@ -544,8 +447,6 @@ export function ExpedientePage() {
         fieldLabel={planField?.label}
         planNames={Object.keys(draft.docs_per_plan)}
         documentCount={draft.documents_catalog.length}
-        mappedVisionCount={mappedVisionCount}
-        visionCategoryCount={visionCategoryCount}
         warnings={configWarnings}
       />
 
@@ -588,7 +489,7 @@ export function ExpedientePage() {
                       value={newDocKey}
                       onChange={(event) => setNewDocKey(event.target.value)}
                       onBlur={() => setNewDocKey((value) => normalizeDocKeyInput(value))}
-                      placeholder="DOCS_INE_FRENTE"
+                      placeholder="INE_FRENTE"
                       className="h-8 font-mono text-xs"
                     />
                     <p
@@ -605,7 +506,7 @@ export function ExpedientePage() {
                           {docKeyExists ? " y ya existe" : ""}
                         </>
                       ) : (
-                        "Puedes pegar aqui el ID creado en Datos del cliente."
+                        "Puedes pegar aqui el ID de un campo tipo Documento creado en Datos del cliente."
                       )}
                     </p>
                     {customerDocFieldOptions.length > 0 && (
@@ -626,15 +527,6 @@ export function ExpedientePage() {
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Nota</Label>
-                    <Input
-                      value={newDocHint}
-                      onChange={(event) => setNewDocHint(event.target.value)}
-                      placeholder="Vigente, legible, sin recortar"
-                      className="h-8"
-                    />
                   </div>
                   <Button
                     type="button"
@@ -668,9 +560,6 @@ export function ExpedientePage() {
                         <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                           {docUsage[doc.key]?.plans ?? 0} casos
                         </Badge>
-                        <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                          {docUsage[doc.key]?.vision ?? 0} Vision
-                        </Badge>
                       </div>
                     </div>
                     <Button
@@ -691,13 +580,6 @@ export function ExpedientePage() {
                       onChange={(event) => updateDocument(index, { label: event.target.value })}
                       className="h-8"
                     />
-                    <Input
-                      value={doc.hint}
-                      disabled={!canEdit}
-                      onChange={(event) => updateDocument(index, { hint: event.target.value })}
-                      placeholder="Nota opcional"
-                      className="h-8 text-xs"
-                    />
                   </div>
                 </div>
               ))}
@@ -709,52 +591,50 @@ export function ExpedientePage() {
         </section>
 
         <section className="rounded-lg border bg-card">
-          <Tabs defaultValue="cases" className="gap-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
-              <div>
-                <h2 className="flex items-center gap-2 text-base font-semibold">
-                  <Bot className="h-4 w-4" />
-                  Reglas del expediente
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Que documentos pide cada valor del campo configurado y que reconoce Vision.
-                </p>
-              </div>
-              <TabsList>
-                <TabsTrigger value="cases">
-                  <FileCheck className="h-4 w-4" />
-                  Casos
-                </TabsTrigger>
-                <TabsTrigger value="vision">
-                  <Eye className="h-4 w-4" />
-                  Vision
-                </TabsTrigger>
-              </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-semibold">
+                <FileCheck className="h-4 w-4" />
+                Reglas del expediente
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Que documentos pide cada valor del campo configurado.
+              </p>
             </div>
+          </div>
 
-            <TabsContent value="cases" className="space-y-3 p-4">
-              {canEdit && (
-                <div className="grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-                  <div>
-                    <Label className="text-xs">Campo que define el caso</Label>
-                    <Select
-                      value={selectedPlanFieldKey}
-                      onValueChange={(value) =>
-                        setDraft((current) =>
-                          current ? { ...current, docs_plan_field: value } : current,
-                        )
-                      }
-                    >
-                      <SelectTrigger className="h-8 font-mono text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customerFields.data?.map((field) => (
-                          <SelectItem key={field.id} value={field.key} className="text-xs">
-                            {normalizeTechnicalKey(field.key)} - {field.label}
-                          </SelectItem>
-                        ))}
-                        {(!customerFields.data?.length ||
+          <div className="space-y-3 p-4">
+            {canEdit && (
+              <div className="grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <div>
+                  <Label className="text-xs">Campo que define el caso</Label>
+                  <Select
+                    value={selectedPlanFieldKey || UNSELECTED_FIELD}
+                    onValueChange={(value) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              docs_plan_field: value === UNSELECTED_FIELD ? "" : value,
+                            }
+                          : current,
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 font-mono text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNSELECTED_FIELD} className="text-xs" disabled>
+                        Selecciona un campo
+                      </SelectItem>
+                      {customerFields.data?.map((field) => (
+                        <SelectItem key={field.id} value={field.key} className="text-xs">
+                          {normalizeTechnicalKey(field.key)} - {field.label}
+                        </SelectItem>
+                      ))}
+                      {selectedPlanFieldKey &&
+                        (!customerFields.data?.length ||
                           !customerFields.data.some(
                             (field) => field.key === selectedPlanFieldKey,
                           )) && (
@@ -762,232 +642,137 @@ export function ExpedientePage() {
                             {normalizeTechnicalKey(selectedPlanFieldKey)}
                           </SelectItem>
                         )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <p className="self-end text-[11px] text-muted-foreground">
-                    Cada caso debe llamarse igual que un valor posible de{" "}
-                    <code>{normalizeTechnicalKey(selectedPlanFieldKey)}</code>. Ejemplo: si el
-                    cliente tiene ese campo en <code>Nomina recibos</code>, se aplican los
-                    documentos del caso <code>Nomina recibos</code>.
-                  </p>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                <p className="self-end text-[11px] text-muted-foreground">
+                  Cada caso debe llamarse igual que un valor posible de{" "}
+                  <code>{normalizeTechnicalKey(selectedPlanFieldKey)}</code>. Ejemplo: si el cliente
+                  tiene ese campo en <code>Nomina recibos</code>, se aplican los documentos del caso{" "}
+                  <code>Nomina recibos</code>.
+                </p>
+              </div>
+            )}
 
-              {canEdit && (
-                <div className="flex items-end gap-2 rounded-md border border-dashed bg-muted/20 p-3">
-                  <div className="flex-1">
-                    <Label className="text-xs">
-                      Nuevo caso / valor de {planField?.label ?? "credito"}
-                    </Label>
+            {canEdit && (
+              <div className="flex items-end gap-2 rounded-md border border-dashed bg-muted/20 p-3">
+                <div className="flex-1">
+                  <Label className="text-xs">
+                    Nuevo caso / valor de {planField?.label ?? "credito"}
+                  </Label>
+                  <Input
+                    value={newPlanName}
+                    onChange={(event) => setNewPlanName(event.target.value)}
+                    placeholder="Nomina recibos"
+                    className="h-8"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && newPlanName.trim()) {
+                        event.preventDefault();
+                        addPlan();
+                      }
+                    }}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Debe coincidir con el valor que ya tenga el cliente en{" "}
+                    <code>{normalizeTechnicalKey(selectedPlanFieldKey)}</code>.
+                  </p>
+                  {planFieldChoices.length > 0 && (
+                    <div className="mt-2 flex max-h-20 flex-wrap gap-1 overflow-auto">
+                      {planFieldChoices.slice(0, 10).map((choice) => (
+                        <button
+                          key={choice}
+                          type="button"
+                          className="rounded-full border border-dashed px-2 py-1 text-[11px] hover:bg-muted"
+                          onClick={() => setNewPlanName(choice)}
+                        >
+                          {choice}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addPlan}>
+                  <Plus className="h-4 w-4" />
+                  Agregar
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {Object.entries(draft.docs_per_plan).map(([plan, docs]) => (
+                <div key={plan} className="rounded-md border bg-background p-3">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
                     <Input
-                      value={newPlanName}
-                      onChange={(event) => setNewPlanName(event.target.value)}
-                      placeholder="Nomina recibos"
-                      className="h-8"
+                      defaultValue={plan}
+                      disabled={!canEdit}
+                      className="h-8 min-w-48 flex-1 text-xs"
+                      onBlur={(event) => renamePlan(plan, event.currentTarget.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter" && newPlanName.trim()) {
-                          event.preventDefault();
-                          addPlan();
-                        }
+                        if (event.key === "Enter") event.currentTarget.blur();
                       }}
                     />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Debe coincidir con el valor que ya tenga el cliente en{" "}
-                      <code>{normalizeTechnicalKey(selectedPlanFieldKey)}</code>.
-                    </p>
-                    {planFieldChoices.length > 0 && (
-                      <div className="mt-2 flex max-h-20 flex-wrap gap-1 overflow-auto">
-                        {planFieldChoices.slice(0, 10).map((choice) => (
-                          <button
-                            key={choice}
-                            type="button"
-                            className="rounded-full border border-dashed px-2 py-1 text-[11px] hover:bg-muted"
-                            onClick={() => setNewPlanName(choice)}
-                          >
-                            {choice}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <Badge variant="outline" className="font-mono">
+                      {normalizeTechnicalKey(selectedPlanFieldKey)}
+                    </Badge>
+                    <Badge variant={docs.length ? "default" : "secondary"}>
+                      {docs.length} docs
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={!canEdit}
+                      onClick={() => removePlan(plan)}
+                      aria-label={`Eliminar ${plan}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addPlan}>
-                    <Plus className="h-4 w-4" />
-                    Agregar
-                  </Button>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {Object.entries(draft.docs_per_plan).map(([plan, docs]) => (
-                  <div key={plan} className="rounded-md border bg-background p-3">
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <Input
-                        defaultValue={plan}
-                        disabled={!canEdit}
-                        className="h-8 min-w-48 flex-1 text-xs"
-                        onBlur={(event) => renamePlan(plan, event.currentTarget.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") event.currentTarget.blur();
-                        }}
-                      />
-                      <Badge variant="outline" className="font-mono">
-                        {normalizeTechnicalKey(selectedPlanFieldKey)}
-                      </Badge>
-                      <Badge variant={docs.length ? "default" : "secondary"}>
-                        {docs.length} docs
-                      </Badge>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={!canEdit}
-                        onClick={() => removePlan(plan)}
-                        aria-label={`Eliminar ${plan}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {draft.documents_catalog.map((doc) => {
-                        const checked = docs.includes(doc.key);
-                        return (
-                          <button
-                            key={doc.key}
-                            type="button"
-                            disabled={!canEdit}
-                            aria-pressed={checked}
-                            onClick={() => togglePlanDoc(plan, doc.key)}
-                            className={cn(
-                              "min-h-16 rounded-md border px-3 py-2 text-left text-xs transition",
-                              checked
-                                ? "border-emerald-500/50 bg-emerald-500/10"
-                                : "border-border hover:bg-muted/40",
-                              !canEdit && "cursor-not-allowed opacity-60",
-                            )}
-                          >
-                            <span className="flex items-start gap-2">
-                              <span
-                                className={cn(
-                                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                                  checked
-                                    ? "border-emerald-600 bg-emerald-600 text-white"
-                                    : "border-input bg-background",
-                                )}
-                              >
-                                {checked ? <Check className="h-3 w-3" /> : null}
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block truncate font-medium">{doc.label}</span>
-                                <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                                  {doc.key}
-                                </span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {draft.documents_catalog.map((doc) => {
+                      const checked = docs.includes(doc.key);
+                      return (
+                        <button
+                          key={doc.key}
+                          type="button"
+                          disabled={!canEdit}
+                          aria-pressed={checked}
+                          onClick={() => togglePlanDoc(plan, doc.key)}
+                          className={cn(
+                            "min-h-16 rounded-md border px-3 py-2 text-left text-xs transition",
+                            checked
+                              ? "border-emerald-500/50 bg-emerald-500/10"
+                              : "border-border hover:bg-muted/40",
+                            !canEdit && "cursor-not-allowed opacity-60",
+                          )}
+                        >
+                          <span className="flex items-start gap-2">
+                            <span
+                              className={cn(
+                                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                                checked
+                                  ? "border-emerald-600 bg-emerald-600 text-white"
+                                  : "border-input bg-background",
+                              )}
+                            >
+                              {checked ? <Check className="h-3 w-3" /> : null}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{doc.label}</span>
+                              <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                                {doc.key}
                               </span>
                             </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-                {planCount === 0 && <EmptyState icon={FileCheck} text="Sin casos configurados." />}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="vision" className="space-y-3 p-4">
-              {VISION_CATEGORIES.map((category) => {
-                const docs = draft.vision_doc_mapping[category] ?? [];
-                return (
-                  <div key={category} className="rounded-md border bg-background p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-medium">{VISION_LABELS[category]}</div>
-                        <code className="text-xs text-muted-foreground">{category}</code>
-                      </div>
-                      <Badge variant={docs.length ? "default" : "secondary"}>
-                        {docs.length ? `${docs.length} doc` : "Manual"}
-                      </Badge>
-                    </div>
-
-                    {docs.length > 0 && (
-                      <div className="mb-2 space-y-1.5">
-                        {docs.map((docKey, index) => {
-                          const doc = draft.documents_catalog.find((item) => item.key === docKey);
-                          return (
-                            <div
-                              key={docKey}
-                              className="flex items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5 text-xs"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                              <span className="min-w-0 flex-1 truncate">
-                                {doc?.label ?? docKey}
-                                {category === "ine" && (
-                                  <span className="ml-2 text-[10px] text-muted-foreground">
-                                    {index === 0
-                                      ? "frente"
-                                      : index === 1
-                                        ? "reverso"
-                                        : `lado ${index + 1}`}
-                                  </span>
-                                )}
-                              </span>
-                              {canEdit && (
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    disabled={index === 0}
-                                    onClick={() => moveVisionDoc(category, index, -1)}
-                                  >
-                                    <ArrowUp className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    disabled={index === docs.length - 1}
-                                    onClick={() => moveVisionDoc(category, index, 1)}
-                                  >
-                                    <ArrowDown className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    onClick={() => toggleVisionDoc(category, docKey)}
-                                  >
-                                    <X className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {canEdit && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {draft.documents_catalog
-                          .filter((doc) => !docs.includes(doc.key))
-                          .map((doc) => (
-                            <button
-                              type="button"
-                              key={doc.key}
-                              className="rounded-full border border-dashed px-2 py-1 text-xs hover:bg-muted"
-                              onClick={() => toggleVisionDoc(category, doc.key)}
-                            >
-                              + {doc.label}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </TabsContent>
-          </Tabs>
+                </div>
+              ))}
+              {planCount === 0 && <EmptyState icon={FileCheck} text="Sin casos configurados." />}
+            </div>
+          </div>
         </section>
       </div>
     </div>
@@ -1024,16 +809,12 @@ function ConfigStatus({
   fieldLabel,
   planNames,
   documentCount,
-  mappedVisionCount,
-  visionCategoryCount,
   warnings,
 }: {
   fieldKey: string;
   fieldLabel?: string;
   planNames: string[];
   documentCount: number;
-  mappedVisionCount: number;
-  visionCategoryCount: number;
   warnings: string[];
 }) {
   return (
@@ -1045,7 +826,7 @@ function ConfigStatus({
             Estado de configuracion
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Este expediente usa este campo, estos casos, estos docs y esta Vision.
+            Este expediente usa este campo, estos casos y estos documentos.
           </p>
         </div>
         <Badge variant={warnings.length === 0 ? "default" : "secondary"}>
@@ -1053,7 +834,7 @@ function ConfigStatus({
         </Badge>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-4">
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <StatusBlock
           label="Campo cliente"
           value={normalizeTechnicalKey(fieldKey)}
@@ -1068,11 +849,6 @@ function ConfigStatus({
           label="Documentos"
           value={`${documentCount}`}
           detail="catalogo que pide el bot"
-        />
-        <StatusBlock
-          label="Vision"
-          value={`${mappedVisionCount}`}
-          detail={`${visionCategoryCount} categorias automaticas`}
         />
       </div>
 

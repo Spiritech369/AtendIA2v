@@ -33,6 +33,9 @@ o implícitamente, en el último mensaje):
 Campos opcionales (extrae si aparecen; no los inventes si no aparecen):
 {{optional_fields_block}}
 
+Topics comerciales configurados para este tenant:
+{{topics_block}}
+
 {{output_instructions}}
 """
 
@@ -59,6 +62,12 @@ Reglas de salida:
   varios, no reemplaces el campo singular y deja la comparacion al composer.
 - intent: greeting | ask_info | ask_price | buy | schedule | complain |
           off_topic | unclear.
+- topic: usa SOLO una key de la lista configurada para este tenant. Si ningun
+  topic encaja claramente, devuelve null.
+- sub_intent: intencion fina dentro del topic. Usa una key configurada si
+  existe; si el topic encaja pero no hay sub_intent clara, devuelve null.
+- sales_signal: none | low | medium | high. Es una senal comercial secundaria,
+  NO una orden de avance.
 - sentiment: positive, neutral, negative.
 - confidence: número 0.0–1.0 sobre tu certeza de la intent.
 """
@@ -70,6 +79,45 @@ def _render_fields(fields: list[FieldSpec]) -> str:
     return "\n".join(f"- {f.name}: {f.description or '(sin descripción)'}" for f in fields)
 
 
+def _render_topics(topics: list[dict] | None) -> str:
+    if not topics:
+        return "(ninguno configurado; devuelve topic=null y sub_intent=null)"
+    lines: list[str] = []
+    for topic in topics:
+        if not isinstance(topic, dict):
+            continue
+        key = str(topic.get("key") or "").strip()
+        if not key:
+            continue
+        label = str(topic.get("label") or key).strip()
+        description = str(topic.get("description") or "").strip()
+        parts = [f"- {key}: {label}"]
+        if description:
+            parts.append(description)
+        examples = topic.get("examples")
+        if isinstance(examples, list) and examples:
+            rendered = ", ".join(str(v) for v in examples[:5] if str(v).strip())
+            if rendered:
+                parts.append(f"ejemplos: {rendered}")
+        sub_intents = topic.get("sub_intents")
+        if isinstance(sub_intents, list) and sub_intents:
+            rendered_subs: list[str] = []
+            for item in sub_intents[:12]:
+                if isinstance(item, dict):
+                    sub_key = str(item.get("key") or "").strip()
+                    sub_label = str(item.get("label") or sub_key).strip()
+                    if sub_key:
+                        rendered_subs.append(f"{sub_key} ({sub_label})")
+                else:
+                    sub_key = str(item).strip()
+                    if sub_key:
+                        rendered_subs.append(sub_key)
+            if rendered_subs:
+                parts.append(f"sub_intents: {', '.join(rendered_subs)}")
+        lines.append("; ".join(parts))
+    return "\n".join(lines) if lines else "(ninguno configurado; devuelve topic=null y sub_intent=null)"
+
+
 def build_prompt(
     *,
     text: str,
@@ -77,6 +125,7 @@ def build_prompt(
     required_fields: list[FieldSpec],
     optional_fields: list[FieldSpec],
     history: list[tuple[str, str]],
+    topics: list[dict] | None = None,
 ) -> list[dict[str, str]]:
     """Assemble the full chat-completions message list for the NLU call."""
     system_content = render_template(
@@ -84,6 +133,7 @@ def build_prompt(
         stage=current_stage,
         required_fields_block=_render_fields(required_fields),
         optional_fields_block=_render_fields(optional_fields),
+        topics_block=_render_topics(topics),
         output_instructions=OUTPUT_INSTRUCTIONS,
     )
     return [

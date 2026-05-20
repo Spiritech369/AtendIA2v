@@ -40,10 +40,8 @@ import {
 } from "./PipelineEditor";
 
 // ── Static catalogs ────────────────────────────────────────────────────
-// Open question #1 from the plan doc lands on "static for now, dynamic
-// later". The list comes from the user's spec; document fields use the
-// DOCS_* uppercase convention the AI Field Extraction sprint already
-// emits into customer.attrs.
+// Base customer fields stay as suggestions. Document-status fields are
+// tenant-configured in PipelineEditor and passed through `fieldCatalog`.
 
 export interface RuleFieldOption {
   id: string;
@@ -64,12 +62,6 @@ export const FIELD_CATALOG: ReadonlyArray<RuleFieldOption> = [
   { id: "enganche_confirmado", label: "Enganche confirmado", group: "Ventas" },
   { id: "solicitud_sistema_status", label: "Estatus en sistema", group: "Ventas" },
 
-  // Document statuses (canonical path: DOCS_KEY.status)
-  { id: "DOCS_INE.status", label: "INE — status", group: "Documentos" },
-  { id: "DOCS_COMPROBANTE_DOMICILIO.status", label: "Comprobante domicilio — status", group: "Documentos" },
-  { id: "DOCS_ESTADOS_CUENTA.status", label: "Estados de cuenta — status", group: "Documentos" },
-  { id: "DOCS_RECIBOS_NOMINA.status", label: "Recibos de nómina — status", group: "Documentos" },
-  { id: "DOCS_RESOLUCION_IMSS.status", label: "Resolución IMSS — status", group: "Documentos" },
 ];
 
 export const OPERATOR_LABELS: Record<RuleOperator, string> = {
@@ -98,9 +90,9 @@ const ALL_OPERATORS: RuleOperator[] = [
   "docs_complete_for_plan",
 ];
 
-// Document-status enum from the user's spec. Used as suggestions when the
-// operator is equals/not_equals/in/not_in and the field path is a DOCS_*
-// status. The list is just hints — operators can still type anything.
+// Document-status enum. Used as suggestions when the operator is
+// equals/not_equals/in/not_in and the field path is a document status.
+// The list is just hints — operators can still type anything.
 export const DOC_STATUS_VALUES = [
   "missing",
   "received",

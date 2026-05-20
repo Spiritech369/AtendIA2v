@@ -15,8 +15,8 @@ import {
   FileSpreadsheet,
   Globe,
   Info,
-  Lock,
   Loader2,
+  Lock,
   Mail,
   MessageCircle,
   RefreshCw,
@@ -50,14 +50,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AIProviderInfo, WhatsAppDetails } from "@/features/config/api";
 import { integrationsApi, tenantsApi } from "@/features/config/api";
 import { BaileysCard } from "@/features/config/components/BaileysCard";
@@ -92,10 +86,6 @@ function resolveProvider(provider: string): ProviderMeta {
     return { name: "Claude (Anthropic)", endpoint: "https://api.anthropic.com", isFallback: false };
   if (p.includes("openai") || p === "gpt")
     return { name: "OpenAI", endpoint: "https://api.openai.com", isFallback: false };
-  if (p === "keyword")
-    return { name: "Keyword matching", endpoint: "—", isFallback: true };
-  if (p === "canned")
-    return { name: "Respuestas predefinidas", endpoint: "—", isFallback: true };
   return { name: provider, endpoint: "—", isFallback: false };
 }
 
@@ -169,9 +159,7 @@ function waStatus(d: WhatsAppDetails): WAStatus {
 }
 
 function buildChecklist(d: WhatsAppDetails): CheckStep[] {
-  const ageMs = d.last_webhook_at
-    ? Date.now() - new Date(d.last_webhook_at).getTime()
-    : Infinity;
+  const ageMs = d.last_webhook_at ? Date.now() - new Date(d.last_webhook_at).getTime() : Infinity;
   return [
     {
       title: "Credenciales Meta presentes",
@@ -249,9 +237,7 @@ function CopyField({
     return (
       <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
         <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="text-muted-foreground">
-          Solo administradores pueden ver este token.
-        </span>
+        <span className="text-muted-foreground">Solo administradores pueden ver este token.</span>
       </div>
     );
   }
@@ -353,9 +339,7 @@ function ChecklistStep({ step }: { step: CheckStep }) {
           <span className="text-xs font-medium">{step.title}</span>
           <span
             className={`shrink-0 text-[10px] font-medium ${
-              step.ok
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400"
+              step.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
             }`}
           >
             {step.statusLabel}
@@ -402,8 +386,7 @@ function WhatsAppHeroCard({
       void qc.invalidateQueries({ queryKey: ["conversations"] });
       void qc.invalidateQueries({ queryKey: ["turn-traces"] });
     },
-    onError: (e) =>
-      toast.error("No se pudo ejecutar el sandbox", { description: e.message }),
+    onError: (e) => toast.error("No se pudo ejecutar el sandbox", { description: e.message }),
   });
 
   if (loading || !details) {
@@ -427,7 +410,9 @@ function WhatsAppHeroCard({
             <div className="space-y-4 border-r px-6 py-5">
               <Skeleton className="h-12 w-full rounded-lg" />
               <div className="space-y-0 rounded-lg border">
-                {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="mx-3 my-2 h-4 w-5/6" />)}
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="mx-3 my-2 h-4 w-5/6" />
+                ))}
               </div>
               <div className="space-y-2">
                 <Skeleton className="h-4 w-28" />
@@ -437,7 +422,9 @@ function WhatsAppHeroCard({
             </div>
             <div className="px-5 py-5 space-y-3">
               <Skeleton className="h-4 w-36" />
-              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full rounded-md" />)}
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-md" />
+              ))}
             </div>
           </div>
         </CardContent>
@@ -543,12 +530,12 @@ function WhatsAppHeroCard({
             {/* Left: identity + credentials */}
             <div className="space-y-5 border-r px-6 py-5">
               {/* Channel status pill */}
-              <div className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${sm.bg} ${sm.border}`}>
+              <div
+                className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${sm.bg} ${sm.border}`}
+              >
                 <StatusIcon className={`h-4 w-4 shrink-0 ${sm.fg}`} />
                 <div>
-                  <div className={`text-xs font-medium ${sm.fg}`}>
-                    {statusMessage}
-                  </div>
+                  <div className={`text-xs font-medium ${sm.fg}`}>{statusMessage}</div>
                   <div className="text-[11px] text-muted-foreground">
                     Última actualización: {relativeFromNow(details.last_webhook_at)}
                   </div>
@@ -611,8 +598,8 @@ function WhatsAppHeroCard({
                 Checklist de configuración
               </p>
               <div className="divide-y">
-                {checklist.map((step, i) => (
-                  <ChecklistStep key={i} step={step} />
+                {checklist.map((step) => (
+                  <ChecklistStep key={step.title} step={step} />
                 ))}
               </div>
             </div>
@@ -626,8 +613,8 @@ function WhatsAppHeroCard({
           <DialogHeader>
             <DialogTitle>Desconectar WhatsApp</DialogTitle>
             <DialogDescription>
-              Para desconectar el canal es necesario eliminar las variables de entorno del servidor y
-              reiniciar el servicio. Esta acción no se puede revertir desde la UI.
+              Para desconectar el canal es necesario eliminar las variables de entorno del servidor
+              y reiniciar el servicio. Esta acción no se puede revertir desde la UI.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
@@ -719,8 +706,40 @@ function AIProviderConfigDialog({
   onClose: () => void;
   info: AIProviderInfo;
 }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState({
+    nlu_provider: info.nlu_provider,
+    nlu_model: info.nlu_model,
+    composer_provider: info.composer_provider,
+    composer_model: info.composer_model,
+  });
   const nlu = resolveProvider(info.nlu_provider);
   const composer = resolveProvider(info.composer_provider);
+  const isDirty =
+    draft.nlu_provider !== info.nlu_provider ||
+    draft.nlu_model !== info.nlu_model ||
+    draft.composer_provider !== info.composer_provider ||
+    draft.composer_model !== info.composer_model;
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft({
+      nlu_provider: info.nlu_provider,
+      nlu_model: info.nlu_model,
+      composer_provider: info.composer_provider,
+      composer_model: info.composer_model,
+    });
+  }, [info, open]);
+
+  const save = useMutation({
+    mutationFn: () => integrationsApi.putAIProvider(draft),
+    onSuccess: () => {
+      toast.success("Proveedor de IA actualizado");
+      void qc.invalidateQueries({ queryKey: ["integrations", "ai-provider"] });
+      onClose();
+    },
+    onError: (e) => toast.error("No se pudo guardar IA", { description: e.message }),
+  });
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -728,7 +747,7 @@ function AIProviderConfigDialog({
         <DialogHeader>
           <DialogTitle>Configuración del proveedor de IA</DialogTitle>
           <DialogDescription>
-            Los proveedores se configuran vía variables de entorno en el servidor.
+            Define que proveedores usa este tenant para clasificar y responder.
           </DialogDescription>
         </DialogHeader>
 
@@ -739,13 +758,42 @@ function AIProviderConfigDialog({
             <div className="divide-y text-xs">
               <InfoRow label="Proveedor" value={nlu.name} />
               <InfoRow label="Modelo" value={info.nlu_model} mono />
-              <InfoRow label="Endpoint" value={nlu.endpoint} href={nlu.endpoint !== "—" ? nlu.endpoint : undefined} />
+              <InfoRow
+                label="Endpoint"
+                value={nlu.endpoint}
+                href={nlu.endpoint !== "—" ? nlu.endpoint : undefined}
+              />
+              <InfoRow
+                label="Fallback"
+                value={`${info.nlu_fallback_provider} / ${info.nlu_fallback_model}`}
+                mono
+              />
             </div>
-            <div className="pt-1">
-              <Label className="text-[10px] text-muted-foreground">Variable de entorno</Label>
-              <code className="mt-1 block rounded-md border bg-muted/30 px-2 py-1 font-mono text-[10px]">
-                ATENDIA_V2_NLU_PROVIDER={info.nlu_provider}
-              </code>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Proveedor</Label>
+                <Select
+                  value={draft.nlu_provider}
+                  onValueChange={(value) => setDraft((d) => ({ ...d, nlu_provider: value }))}
+                >
+                  <SelectTrigger className="mt-1 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai" className="text-xs">
+                      OpenAI
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Modelo</Label>
+                <Input
+                  value={draft.nlu_model}
+                  onChange={(e) => setDraft((d) => ({ ...d, nlu_model: e.target.value }))}
+                  className="mt-1 font-mono text-xs"
+                />
+              </div>
             </div>
           </div>
 
@@ -755,25 +803,57 @@ function AIProviderConfigDialog({
             <div className="divide-y text-xs">
               <InfoRow label="Proveedor" value={composer.name} />
               <InfoRow label="Modelo" value={info.composer_model} mono />
-              <InfoRow label="Endpoint" value={composer.endpoint} href={composer.endpoint !== "—" ? composer.endpoint : undefined} />
+              <InfoRow
+                label="Endpoint"
+                value={composer.endpoint}
+                href={composer.endpoint !== "—" ? composer.endpoint : undefined}
+              />
             </div>
-            <div className="pt-1">
-              <Label className="text-[10px] text-muted-foreground">Variable de entorno</Label>
-              <code className="mt-1 block rounded-md border bg-muted/30 px-2 py-1 font-mono text-[10px]">
-                ATENDIA_V2_COMPOSER_PROVIDER={info.composer_provider}
-              </code>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Proveedor</Label>
+                <Select
+                  value={draft.composer_provider}
+                  onValueChange={(value) => setDraft((d) => ({ ...d, composer_provider: value }))}
+                >
+                  <SelectTrigger className="mt-1 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai" className="text-xs">
+                      OpenAI
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Modelo</Label>
+                <Input
+                  value={draft.composer_model}
+                  onChange={(e) => setDraft((d) => ({ ...d, composer_model: e.target.value }))}
+                  className="mt-1 font-mono text-xs"
+                />
+              </div>
             </div>
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Para cambiar el proveedor, actualiza las variables en el servidor y reinicia el servicio.
-            El cambio se aplica en la próxima conversación.
+            La API key sigue viviendo en el servidor. Esta seleccion se guarda por tenant y se
+            aplica en el proximo turno del bot.
           </p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cerrar
+          </Button>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={
+              save.isPending || !isDirty || !draft.nlu_model.trim() || !draft.composer_model.trim()
+            }
+          >
+            {save.isPending ? "Guardando..." : "Guardar"}
           </Button>
           <Button
             variant="outline"
@@ -799,13 +879,7 @@ function AIProviderConfigDialog({
 
 // ─── AI Provider Card ─────────────────────────────────────────────────────────
 
-function AIProviderCard({
-  info,
-  loading,
-}: {
-  info: AIProviderInfo | undefined;
-  loading: boolean;
-}) {
+function AIProviderCard({ info, loading }: { info: AIProviderInfo | undefined; loading: boolean }) {
   const [configOpen, setConfigOpen] = useState(false);
 
   if (loading || !info) {
@@ -825,7 +899,7 @@ function AIProviderCard({
     );
   }
 
-  const usingFallback = info.nlu_provider === "keyword" || info.composer_provider === "canned";
+  const usingFallback = !info.has_openai_key;
   const nlu = resolveProvider(info.nlu_provider);
   const composer = resolveProvider(info.composer_provider);
 
@@ -843,11 +917,11 @@ function AIProviderCard({
                 <Brain className="h-4 w-4" />
                 Proveedor de IA
               </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Configurado vía variables de entorno.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Configurado por tenant.</p>
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusCls}`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusCls}`}
+            >
               {usingFallback ? (
                 <AlertTriangle className="h-3 w-3" />
               ) : (
@@ -873,7 +947,11 @@ function AIProviderCard({
                 </p>
               </div>
               <Button size="sm" variant="outline" className="shrink-0 text-xs" asChild>
-                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Activar OpenAI
                   <ExternalLink className="ml-1.5 h-3 w-3" />
                 </a>
@@ -889,7 +967,10 @@ function AIProviderCard({
                 <p className="text-sm font-semibold">{nlu.name}</p>
               </div>
               {nlu.isFallback && (
-                <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-500/30">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-500/30"
+                >
                   Fallback
                 </Badge>
               )}
@@ -906,7 +987,12 @@ function AIProviderCard({
               <div className="flex items-center gap-1">
                 <span className="font-mono text-[11px] truncate max-w-[160px]">{nlu.endpoint}</span>
                 {nlu.endpoint !== "—" && (
-                  <a href={nlu.endpoint} target="_blank" rel="noopener noreferrer" title="Abrir endpoint">
+                  <a
+                    href={nlu.endpoint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Abrir endpoint"
+                  >
                     <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                   </a>
                 )}
@@ -924,18 +1010,48 @@ function AIProviderCard({
                 <Zap className="h-3.5 w-3.5" />
                 Estado
               </div>
-              <span className={`flex items-center gap-1 font-medium ${usingFallback ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${usingFallback ? "bg-amber-500" : "bg-emerald-500"}`} />
+              <span
+                className={`flex items-center gap-1 font-medium ${usingFallback ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${usingFallback ? "bg-amber-500" : "bg-emerald-500"}`}
+                />
                 {usingFallback ? "Fallback activo" : "Saludable"}
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2 text-xs">
               <span className="text-muted-foreground">OpenAI API key</span>
-              <span className={`flex items-center gap-1 font-medium ${info.has_openai_key ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+              <span
+                className={`flex items-center gap-1 font-medium ${info.has_openai_key ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+              >
                 {info.has_openai_key ? (
-                  <><Check className="h-3.5 w-3.5" />Configurada</>
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Configurada
+                  </>
                 ) : (
-                  <><WifiOff className="h-3.5 w-3.5" />No configurada</>
+                  <>
+                    <WifiOff className="h-3.5 w-3.5" />
+                    No configurada
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Anthropic API key</span>
+              <span
+                className={`flex items-center gap-1 font-medium ${info.has_anthropic_key ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
+              >
+                {info.has_anthropic_key ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Fallback listo
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3.5 w-3.5" />
+                    Sin fallback
+                  </>
                 )}
               </span>
             </div>
@@ -947,7 +1063,9 @@ function AIProviderCard({
               <p className="text-[10px] text-muted-foreground mb-1">Composer (respuestas)</p>
               <div className="flex items-center justify-between">
                 <span className="font-medium">{composer.name}</span>
-                <span className="font-mono text-[11px] text-muted-foreground truncate ml-2 max-w-[140px]">{info.composer_model}</span>
+                <span className="font-mono text-[11px] text-muted-foreground truncate ml-2 max-w-[140px]">
+                  {info.composer_model}
+                </span>
               </div>
             </div>
           )}
@@ -1030,16 +1148,24 @@ function TimezoneCard({ value, loading }: { value: string; loading: boolean }) {
       label: "Operación",
       sublabel: "24 horas",
       value: fmtSafe(draft, {
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
       }),
     },
     {
       label: "Agente",
       sublabel: "12 horas",
       value: fmtSafe(draft, {
-        day: "numeric", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: true,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
       }),
     },
     {
@@ -1115,7 +1241,9 @@ function TimezoneCard({ value, loading }: { value: string; loading: boolean }) {
                         {tz.replace(/_/g, " ")}
                       </SelectItem>
                     ))}
-                    <SelectItem value="__custom__" className="text-xs">Otra…</SelectItem>
+                    <SelectItem value="__custom__" className="text-xs">
+                      Otra…
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1152,7 +1280,11 @@ function TimezoneCard({ value, loading }: { value: string; loading: boolean }) {
                 size="sm"
                 variant="ghost"
                 className="text-xs"
-                onClick={() => { setDraft(value); setEditing(false); setCustom(!COMMON_TIMEZONES.includes(value)); }}
+                onClick={() => {
+                  setDraft(value);
+                  setEditing(false);
+                  setCustom(!COMMON_TIMEZONES.includes(value));
+                }}
               >
                 Cancelar
               </Button>

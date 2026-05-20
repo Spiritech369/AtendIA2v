@@ -21,16 +21,12 @@ describe("StepComposer provider badge", () => {
     render(<TurnStoryView steps={[baseComposer]} />);
     expect(screen.getByText(/openai/i)).toBeInTheDocument();
   });
-  it("renders a 'canned' badge when provider is canned", () => {
-    render(<TurnStoryView steps={[{ ...baseComposer, provider: "canned" }]} />);
-    expect(screen.getByText(/canned/i)).toBeInTheDocument();
-  });
   it("renders a 'fallback' badge when provider is fallback", () => {
     render(<TurnStoryView steps={[{ ...baseComposer, provider: "fallback" }]} />);
     expect(screen.getByText(/fallback/i)).toBeInTheDocument();
   });
   it("omits the badge when provider is null (legacy rows)", () => {
     render(<TurnStoryView steps={[{ ...baseComposer, provider: null }]} />);
-    expect(screen.queryByText(/^openai|^canned|^fallback/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^openai|^fallback/i)).not.toBeInTheDocument();
   });
 });

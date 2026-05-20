@@ -9,6 +9,7 @@ import {
   ArrowRight,
   BookOpen,
   Brain,
+  FileSearch,
   MessageSquareText,
   Paperclip,
   SendHorizonal,
@@ -188,6 +189,40 @@ function StepMode({ index, step }: { index: number; step: Extract<StoryStep, { k
   );
 }
 
+function StepExplanation({
+  index,
+  step,
+}: {
+  index: number;
+  step: Extract<StoryStep, { kind: "explanation" }>;
+}) {
+  const layerNames = step.layers ? Object.keys(step.layers) : [];
+  return (
+    <StepShell
+      index={index}
+      icon={FileSearch}
+      primary={
+        <span>
+          <span className="text-muted-foreground">Explicación del Runner</span>
+        </span>
+      }
+    >
+      <div className="rounded-md border bg-muted/30 px-2 py-1.5 text-[12px] text-foreground/90">
+        {step.summary}
+      </div>
+      {layerNames.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {layerNames.map((name) => (
+            <Badge key={name} variant="outline" className="font-mono text-[10px]">
+              {name}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </StepShell>
+  );
+}
+
 function StepKnowledge({
   index,
   step,
@@ -280,7 +315,6 @@ function StepComposer({
             className={cn(
               "text-[10px]",
               step.provider === "openai" && "border-blue-500/40 bg-blue-500/10 text-blue-700",
-              step.provider === "canned" && "border-amber-500/40 bg-amber-500/10 text-amber-700",
               step.provider === "fallback" && "border-rose-500/40 bg-rose-500/10 text-rose-700",
             )}
             title={`Composer adapter: ${step.provider}`}
@@ -375,6 +409,8 @@ export function TurnStoryView({ steps }: { steps: StoryStep[] }) {
             return <StepNlu key={key} index={idx} step={step} />;
           case "mode":
             return <StepMode key={key} index={idx} step={step} />;
+          case "explanation":
+            return <StepExplanation key={key} index={idx} step={step} />;
           case "knowledge":
             return <StepKnowledge key={key} index={idx} step={step} />;
           case "composer":

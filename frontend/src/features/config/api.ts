@@ -20,6 +20,21 @@ export interface TimezoneResponse {
   timezone: string;
 }
 
+export interface ConfigValidationIssue {
+  code: string;
+  severity: string;
+  message: string;
+  path?: string | null;
+}
+
+export interface ConfigValidationResponse {
+  status: string;
+  summary: string;
+  critical_count: number;
+  warning_count: number;
+  issues: ConfigValidationIssue[];
+}
+
 export interface QosConfig {
   enabled: boolean;
   debug_badges_enabled: boolean;
@@ -42,10 +57,71 @@ export interface QosConfigResponse {
   qos_config: QosConfig;
 }
 
+export interface NLUSubIntentConfig {
+  key: string;
+  label: string;
+  description: string;
+  examples: string[];
+}
+
+export interface NLUTopicConfig {
+  key: string;
+  label: string;
+  description: string;
+  examples: string[];
+  sub_intents: NLUSubIntentConfig[];
+}
+
+export interface NLUTopicsResponse {
+  topics: NLUTopicConfig[];
+}
+
+export interface NLUTestResponse {
+  result: Record<string, unknown>;
+  usage: Record<string, unknown> | null;
+}
+
 export interface FollowupScheduleItem {
   kind: string;
   delay_hours: number;
   body: string;
+}
+
+export interface RunnerRuleCondition {
+  field: string;
+  operator: string;
+  value?: unknown;
+}
+
+export interface RunnerRuleThen {
+  set_stage?: string | null;
+  set_flow_mode?: string | null;
+  set_action?: string | null;
+  set_data?: Record<string, unknown>;
+  pause_bot?: boolean | null;
+}
+
+export interface RunnerRule {
+  name: string;
+  category?: string;
+  priority?: number;
+  enabled: boolean;
+  when: RunnerRuleCondition;
+  then: RunnerRuleThen;
+}
+
+export interface RunnerRulesResponse {
+  runner_rules: RunnerRule[];
+}
+
+export interface RunnerRulesTestResponse {
+  matched_rules: string[];
+  traces: Array<Record<string, unknown>>;
+  set_data: Record<string, unknown>;
+  set_stage: string | null;
+  set_flow_mode: string | null;
+  set_action: string | null;
+  pause_bot: boolean | null;
 }
 
 export interface FollowupsConfig {
@@ -91,9 +167,12 @@ export interface WhatsAppWebhookSandboxResponse {
 export interface AIProviderInfo {
   nlu_provider: string;
   nlu_model: string;
+  nlu_fallback_provider: string;
+  nlu_fallback_model: string;
   composer_provider: string;
   composer_model: string;
   has_openai_key: boolean;
+  has_anthropic_key: boolean;
 }
 
 export interface WorkflowReference {
@@ -143,6 +222,8 @@ export interface PipelineVersionDetail extends PipelineVersionListItem {
 
 export const tenantsApi = {
   getPipeline: async () => (await api.get<PipelineResponse>("/tenants/pipeline")).data,
+  validatePipeline: async (definition: Record<string, unknown>) =>
+    (await api.post<ConfigValidationResponse>("/tenants/pipeline/validate", { definition })).data,
   putPipeline: async (definition: Record<string, unknown>) =>
     (await api.put<PipelineResponse>("/tenants/pipeline", { definition })).data,
   deletePipeline: async () => {
@@ -175,6 +256,23 @@ export const tenantsApi = {
   getQosConfig: async () => (await api.get<QosConfigResponse>("/tenants/qos-config")).data,
   putQosConfig: async (qos_config: QosConfig) =>
     (await api.put<QosConfigResponse>("/tenants/qos-config", qos_config)).data,
+  getNLUTopics: async () => (await api.get<NLUTopicsResponse>("/tenants/nlu-topics")).data,
+  putNLUTopics: async (topics: NLUTopicConfig[]) =>
+    (await api.put<NLUTopicsResponse>("/tenants/nlu-topics", { topics })).data,
+  testNLU: async (text: string) =>
+    (await api.post<NLUTestResponse>("/tenants/nlu-test", { text })).data,
+  getRunnerRules: async () =>
+    (await api.get<RunnerRulesResponse>("/tenants/runner-rules")).data,
+  putRunnerRules: async (runner_rules: RunnerRule[]) =>
+    (await api.put<RunnerRulesResponse>("/tenants/runner-rules", { runner_rules })).data,
+  testRunnerRules: async (body: {
+    runner_rules: RunnerRule[];
+    extracted_before?: Record<string, unknown>;
+    extracted_after?: Record<string, unknown>;
+    nlu?: Record<string, unknown>;
+    current_stage?: string;
+    inbound_text?: string;
+  }) => (await api.post<RunnerRulesTestResponse>("/tenants/runner-rules/test", body)).data,
   getFollowupsConfig: async () =>
     (await api.get<FollowupsConfigResponse>("/tenants/followups-config")).data,
   putFollowupsConfig: async (followups_config: FollowupsConfig) =>
@@ -204,4 +302,11 @@ export const integrationsApi = {
     (await api.post<WhatsAppWebhookSandboxResponse>("/integrations/whatsapp/test-webhook", {}))
       .data,
   getAIProvider: async () => (await api.get<AIProviderInfo>("/integrations/ai-provider")).data,
+  putAIProvider: async (
+    body: Pick<
+      AIProviderInfo,
+      "nlu_provider" | "nlu_model" | "composer_provider" | "composer_model"
+    >,
+  ) =>
+    (await api.put<AIProviderInfo>("/integrations/ai-provider", body)).data,
 };

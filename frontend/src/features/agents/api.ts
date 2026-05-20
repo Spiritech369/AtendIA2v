@@ -218,13 +218,16 @@ export interface ValidationIssue {
   severity: "ok" | "warning" | "error" | "critical" | string;
   message: string;
   area?: string;
+  path?: string;
 }
 
 export interface ValidationResult {
-  status: "ok" | "warning" | "error" | string;
+  status: "ok" | "ready" | "warning" | "error" | "blocked" | string;
   summary: string;
   issues: ValidationIssue[];
   checks: Array<{ label: string; status: string }>;
+  critical_count?: number;
+  warning_count?: number;
 }
 
 export interface AgentMonitorMetrics {
@@ -261,6 +264,23 @@ export interface WorkflowRef {
   node_ids: string[];
 }
 
+export function normalizeValidationResult(raw: unknown): ValidationResult {
+  const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const checks = Array.isArray(obj.checks)
+    ? obj.checks
+    : Array.isArray(obj.checklist)
+      ? obj.checklist
+      : [];
+  return {
+    status: typeof obj.status === "string" ? obj.status : "error",
+    summary: typeof obj.summary === "string" ? obj.summary : "Validacion no disponible",
+    issues: Array.isArray(obj.issues) ? (obj.issues as ValidationIssue[]) : [],
+    checks: checks as Array<{ label: string; status: string }>,
+    critical_count: typeof obj.critical_count === "number" ? obj.critical_count : undefined,
+    warning_count: typeof obj.warning_count === "number" ? obj.warning_count : undefined,
+  };
+}
+
 export const agentsApi = {
   list: async () => (await api.get<AgentItem[]>("/agents")).data,
   get: async (id: string) => (await api.get<AgentItem>(`/agents/${id}`)).data,
@@ -289,7 +309,9 @@ export const agentsApi = {
       }>("/agents/compare", { agent_ids })
     ).data,
   validateConfig: async (id: string, draft?: Partial<AgentPayload>) =>
-    (await api.post<ValidationResult>(`/agents/${id}/validate-config`, draft ?? {})).data,
+    normalizeValidationResult(
+      (await api.post<ValidationResult>(`/agents/${id}/validate-config`, draft ?? {})).data,
+    ),
   previewResponse: async (id: string, message: string, draftConfig?: Partial<AgentPayload>) =>
     (
       await api.post<PreviewResult>(`/agents/${id}/preview-response`, {
