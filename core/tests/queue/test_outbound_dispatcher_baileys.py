@@ -68,12 +68,12 @@ def _set_baileys(tid: str, *, enabled: bool, prefer: bool, status_val: str) -> N
     asyncio.run(_do())
 
 
-def _check(tid: str) -> bool:
+def _check(tid: str, metadata: dict | None = None) -> bool:
     async def _do() -> bool:
         engine = create_async_engine(get_settings().database_url)
         Session = async_sessionmaker(engine, expire_on_commit=False)
         async with Session() as session:
-            result = await _should_route_baileys(session, tid)
+            result = await _should_route_baileys(session, tid, metadata)
         await engine.dispose()
         return result
 
@@ -97,6 +97,16 @@ def test_enabled_preferred_but_disconnected_routes_to_meta(tenant_id):
 def test_enabled_not_preferred_routes_to_meta(tenant_id):
     _set_baileys(tenant_id, enabled=True, prefer=False, status_val="connected")
     assert _check(tenant_id) is False
+
+
+def test_baileys_reply_channel_routes_to_baileys_without_global_preference(tenant_id):
+    _set_baileys(tenant_id, enabled=True, prefer=False, status_val="connected")
+    assert _check(tenant_id, {"reply_channel": "baileys"}) is True
+
+
+def test_baileys_reply_channel_still_requires_connected_session(tenant_id):
+    _set_baileys(tenant_id, enabled=True, prefer=False, status_val="disconnected")
+    assert _check(tenant_id, {"reply_channel": "baileys"}) is False
 
 
 def test_disabled_routes_to_meta(tenant_id):

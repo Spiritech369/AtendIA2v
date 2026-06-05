@@ -1,5 +1,13 @@
 from atendia.tools.base import Tool
 from atendia.tools.book_appointment import BookAppointmentTool
+from atendia.tools.deterministic import (
+    get_missing_documents,
+    getMissingDocuments,
+    list_catalog,
+    listCatalog,
+    resolve_credit_plan,
+    resolveCreditPlan,
+)
 from atendia.tools.escalate import EscalateToHumanTool
 from atendia.tools.followup import ScheduleFollowupTool
 from atendia.tools.lookup_faq import LookupFAQTool
@@ -25,4 +33,12 @@ def register_all_tools() -> None:
         register_tool(tool_cls())  # type: ignore[abstract]
 
 
-__all__ = ["register_all_tools"]
+__all__ = [
+    "getMissingDocuments",
+    "get_missing_documents",
+    "listCatalog",
+    "list_catalog",
+    "register_all_tools",
+    "resolveCreditPlan",
+    "resolve_credit_plan",
+]

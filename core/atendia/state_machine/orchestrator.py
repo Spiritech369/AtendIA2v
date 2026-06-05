@@ -1,7 +1,8 @@
 from dataclasses import dataclass
+from typing import Any
 
 from atendia.contracts.conversation_state import ConversationState
-from atendia.contracts.nlu_result import NLUResult
+from atendia.contracts.nlu_result import Intent, NLUResult
 from atendia.contracts.pipeline_definition import PipelineDefinition
 from atendia.state_machine.action_resolver import NoActionAvailableError, resolve_action
 from atendia.state_machine.ambiguity import is_ambiguous
@@ -24,8 +25,10 @@ def process_turn(
     state: ConversationState,
     nlu: NLUResult,
     turn_count: int,
+    turn_resolution: Any | None = None,
 ) -> OrchestratorDecision:
-    if is_ambiguous(nlu):
+    resolution_can_continue = _turn_resolution_can_continue(turn_resolution)
+    if is_ambiguous(nlu) and not resolution_can_continue:
         current_stage = _stage_by_id(pipeline, state.current_stage)
         action = (
             "ask_clarification"
@@ -45,7 +48,8 @@ def process_turn(
 
     target_stage = _stage_by_id(pipeline, target_stage_id)
     try:
-        action = resolve_action(target_stage, nlu.intent)
+        effective_intent = _effective_intent(nlu, turn_resolution)
+        action = resolve_action(target_stage, effective_intent)
     except NoActionAvailableError:
         action = (
             "ask_clarification"
@@ -67,3 +71,33 @@ def process_turn(
         action=action,
         reason=transition_reason,
     )
+
+
+def _turn_resolution_can_continue(turn_resolution: Any | None) -> bool:
+    if turn_resolution is None:
+        return False
+    try:
+        selected = turn_resolution.selected_attempt
+    except AttributeError:
+        return False
+    return bool(
+        turn_resolution.resolved
+        and selected is not None
+        and selected.can_write_state
+        and not selected.requires_confirmation
+        and selected.field_updates
+    )
+
+
+def _effective_intent(nlu: NLUResult, turn_resolution: Any | None) -> Intent:
+    if not _turn_resolution_can_continue(turn_resolution):
+        return nlu.intent
+    raw_intent = getattr(turn_resolution, "effective_intent", None)
+    if raw_intent:
+        try:
+            return Intent(str(raw_intent).upper())
+        except ValueError:
+            pass
+    if nlu.intent == Intent.UNCLEAR:
+        return Intent.ASK_INFO
+    return nlu.intent

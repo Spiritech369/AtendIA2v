@@ -1,0 +1,63 @@
+{
+  "generated_at": "2026-06-03T23:52:46-06:00",
+  "template_type": "single_contact_live_smoke_post_report",
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "approved_phone": "+528212889421",
+  "approved_contact_id": null,
+  "start_time": null,
+  "end_time": null,
+  "real_turns": null,
+  "transcript": [],
+  "final_messages": [],
+  "tool_usage": {
+    "tools_called": [],
+    "tool_results": [],
+    "unexpected_tools": []
+  },
+  "state_writer": {
+    "accepted": [],
+    "blocked": [],
+    "notes": []
+  },
+  "business_events": [],
+  "workflow_results": [],
+  "side_effects": {
+    "actions_real": null,
+    "workflow_side_effects_real": null,
+    "whatsapp_sent_to_non_approved_contact": null,
+    "outbox_duplicate": null
+  },
+  "provider_metrics": {
+    "provider_invoked": null,
+    "provider_retry_count": null,
+    "provider_retry_exhausted_count": null,
+    "provider_fallback_count": null,
+    "provider_fallback_response_count": null
+  },
+  "quote_safety": {
+    "quote_snapshot_present": null,
+    "stale_quote_count": null,
+    "price_without_quote_count": null,
+    "cash_quote_when_credit_requested": null,
+    "requirements_mixed_count": null
+  },
+  "document_handling": {
+    "attachments_received": null,
+    "document_received_without_attachment": null,
+    "document_check_results": []
+  },
+  "human_review": {
+    "reviewer": null,
+    "human_review_score": null,
+    "high_risk_conversations": null,
+    "notes": []
+  },
+  "decision": null,
+  "allowed_decisions": [
+    "SMOKE_PASS_REPEAT_WITH_2_3_CONTACTS",
+    "SMOKE_PASS_READY_FOR_LIMITED_CANARY_PREP",
+    "SMOKE_NEEDS_FIXES",
+    "SMOKE_ROLLBACK_REQUIRED"
+  ]
+}

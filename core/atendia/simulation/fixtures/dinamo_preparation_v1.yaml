@@ -1,0 +1,292 @@
+name: dinamo_preparation_v1
+tenant: Dinamo Motos NL
+global_forbidden_behaviors:
+  - prometer_aprobacion
+  - inventar_precio
+  - inventar_color_inventario
+  - pedir_documentos_antes_de_plan
+  - repetir_datos_guardados
+  - aceptar_documento_invalido
+  - marcar_papeleria_completa_sin_requisitos
+  - usar_documentos_familiares_como_ingreso
+  - mas_de_un_final_message
+  - usar_legacy_composer_copy
+cases:
+  - case_id: official_nomina_tarjeta_happy_path
+    title: Nomina tarjeta con antiguedad y moto
+    category: credito_nomina_tarjeta
+    initial_stage: nuevos
+    turns:
+      - customer_message: Tengo 8 meses trabajando
+        expected_behavior: guardar antiguedad suficiente y avanzar a plan
+      - customer_message: Me depositan nomina en tarjeta
+        expected_behavior: guardar plan nomina tarjeta
+      - customer_message: Me interesa la Dinamo R4
+        expected_behavior: guardar moto interes y pasar a cliente potencial
+    expected_field_updates:
+      CUMPLE_ANTIGUEDAD: true
+      PLAN: Nomina Tarjeta
+      MOTO_INTERES: R4 250 CC
+    expected_stage_changes: [cliente_potencial]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion, pedir_documentos_antes_de_plan]
+    scoring_rules: [official_fields, one_question_max]
+  - case_id: official_seniority_low
+    title: Antiguedad insuficiente
+    category: credito_riesgo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Tengo un mes trabajando
+        expected_behavior: marcar antiguedad false y pedir revision humana
+    expected_field_updates:
+      CUMPLE_ANTIGUEDAD: false
+    expected_stage_changes: [plan]
+    expected_handoff: true
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: official_no_job
+    title: Cliente sin trabajo
+    category: credito_riesgo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Ahorita no tengo trabajo, si me aprueban?
+        expected_behavior: no prometer aprobacion y escalar
+    expected_field_updates:
+      CUMPLE_ANTIGUEDAD: false
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [no_approval_promise]
+  - case_id: official_sin_comprobantes
+    title: Sin comprobantes
+    category: credito_informal
+    initial_stage: plan
+    turns:
+      - customer_message: Me pagan por fuera
+        expected_behavior: mapear a Sin Comprobantes
+    expected_field_updates:
+      PLAN: Sin Comprobantes
+    expected_stage_changes: [plan]
+    expected_handoff: false
+    forbidden_behaviors: [pedir_documentos_antes_de_plan]
+    scoring_rules: [field_updates_grounded]
+  - case_id: official_pensionados
+    title: Pensionados
+    category: credito_pensionado
+    initial_stage: plan
+    turns:
+      - customer_message: Soy pensionado
+        expected_behavior: mapear a Pensionados
+    expected_field_updates:
+      PLAN: Pensionados
+    expected_stage_changes: [plan]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [field_updates_grounded]
+  - case_id: official_guardia_seguridad
+    title: Guardia de seguridad
+    category: credito_guardia
+    initial_stage: plan
+    turns:
+      - customer_message: Trabajo de guardia de seguridad
+        expected_behavior: mapear a Guardia de Seguridad
+    expected_field_updates:
+      PLAN: Guardia de Seguridad
+    expected_stage_changes: [plan]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [field_updates_grounded]
+  - case_id: official_model_nitrox
+    title: Modelo Nitrox
+    category: catalogo
+    initial_stage: plan
+    initial_contact_fields:
+      PLAN: Nomina Tarjeta
+    turns:
+      - customer_message: Me interesa la Nitrox
+        expected_behavior: guardar moto interes
+    expected_field_updates:
+      MOTO_INTERES: Nitrox
+    expected_stage_changes: [cliente_potencial]
+    expected_handoff: false
+    forbidden_behaviors: [inventar_precio]
+    scoring_rules: [grounded_in_knowledge]
+  - case_id: official_model_adventure
+    title: Modelo Adventure
+    category: catalogo
+    initial_stage: plan
+    initial_contact_fields:
+      PLAN: Sin Comprobantes
+    turns:
+      - customer_message: Quiero una Adventure
+        expected_behavior: guardar moto interes
+    expected_field_updates:
+      MOTO_INTERES: Adventure
+    expected_stage_changes: [cliente_potencial]
+    expected_handoff: false
+    forbidden_behaviors: [inventar_precio]
+    scoring_rules: [grounded_in_knowledge]
+  - case_id: official_catalog_request
+    title: Cliente pide catalogo
+    category: catalogo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Me pasas catalogo?
+        expected_behavior: responder con catalogo activo sin inventar disponibilidad
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: false
+    forbidden_behaviors: [inventar_precio, inventar_color_inventario]
+    scoring_rules: [grounded_in_knowledge]
+  - case_id: official_documents_before_plan
+    title: Pregunta documentos sin plan
+    category: documentos
+    initial_stage: nuevos
+    turns:
+      - customer_message: Que documentos ocupo?
+        expected_behavior: explicar base y pedir primero tipo de ingreso
+    expected_field_updates: {}
+    expected_stage_changes: [papeleria_incompleta]
+    expected_handoff: false
+    forbidden_behaviors: [pedir_documentos_antes_de_plan]
+    scoring_rules: [one_question_max]
+  - case_id: official_ine_received
+    title: INE recibida pero faltan documentos
+    category: documentos
+    initial_stage: papeleria_incompleta
+    initial_contact_fields:
+      PLAN: Sin Comprobantes
+      MOTO_INTERES: Dinamo R4
+    turns:
+      - customer_message: Ya mande mi INE
+        expected_behavior: registrar INE recibida y pedir solo faltantes
+    expected_field_updates: {}
+    expected_stage_changes: [papeleria_incompleta]
+    expected_handoff: false
+    expected_documents: [INE_AMBOS_LADOS]
+    forbidden_behaviors: [marcar_papeleria_completa_sin_requisitos]
+    scoring_rules: [document_checklist]
+  - case_id: official_docs_complete
+    title: Papeleria completa
+    category: documentos
+    initial_stage: papeleria_incompleta
+    initial_contact_fields:
+      PLAN: Sin Comprobantes
+      MOTO_INTERES: Dinamo R4
+    turns:
+      - customer_message: INE y comprobante listo
+        expected_behavior: marcar documentos completos y pasar a revision humana
+    expected_field_updates:
+      DOCUMENTOS_COMPLETOS: true
+    expected_stage_changes: [papeleria_completa]
+    expected_handoff: false
+    expected_documents: [INE_AMBOS_LADOS, COMPROBANTE_DOMICILIO]
+    forbidden_behaviors: [marcar_papeleria_completa_sin_requisitos]
+    scoring_rules: [document_checklist]
+  - case_id: official_blurry_document
+    title: Documento borroso
+    category: documentos
+    initial_stage: papeleria_incompleta
+    turns:
+      - customer_message: La foto salio borrosa
+        expected_behavior: pedir reenvio sin aceptar documento
+    expected_field_updates: {}
+    expected_stage_changes: [papeleria_incompleta]
+    expected_handoff: false
+    forbidden_behaviors: [aceptar_documento_invalido]
+    scoring_rules: [document_quality]
+  - case_id: official_third_party_documents
+    title: Documentos de familiar
+    category: documentos_riesgo
+    initial_stage: papeleria_incompleta
+    turns:
+      - customer_message: Puedo mandar documentos de mi mama?
+        expected_behavior: no aceptarlos como ingreso propio y escalar
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: [usar_documentos_familiares_como_ingreso]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: official_buro_question
+    title: Pregunta por buro
+    category: credito_riesgo
+    initial_stage: plan
+    turns:
+      - customer_message: Estoy en buro, si me aprueban?
+        expected_behavior: no prometer aprobacion y registrar riesgo
+    expected_field_updates:
+      buro_status: en_buro
+    expected_stage_changes: [plan]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [no_approval_promise]
+  - case_id: official_nomina_excel_exception
+    title: Nomina en Excel
+    category: documentos_riesgo
+    initial_stage: plan
+    turns:
+      - customer_message: Mi nomina viene en Excel
+        expected_behavior: pedir revision humana por excepcion documental
+    expected_field_updates:
+      PLAN: Nomina Tarjeta
+    expected_stage_changes: [plan]
+    expected_handoff: true
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: official_remembers_existing_plan
+    title: No repetir plan guardado
+    category: memoria
+    initial_stage: plan
+    initial_contact_fields:
+      PLAN: Nomina Tarjeta
+    turns:
+      - customer_message: Ya te dije como me pagan
+        expected_behavior: reconocer dato guardado y pedir modelo
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: false
+    forbidden_behaviors: [repetir_datos_guardados]
+    scoring_rules: [memory_respect]
+  - case_id: official_human_requested
+    title: Cliente pide humano
+    category: handoff
+    initial_stage: nuevos
+    turns:
+      - customer_message: Quiero hablar con Francisco
+        expected_behavior: needs_human sin inventar respuesta
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: []
+    scoring_rules: [handoff]
+  - case_id: official_credit_start
+    title: Inicio de credito
+    category: credito
+    initial_stage: nuevos
+    turns:
+      - customer_message: Hola, quiero credito para una moto
+        expected_behavior: entrar a plan y preguntar ingreso
+    expected_field_updates: {}
+    expected_stage_changes: [plan]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [one_question_max]
+  - case_id: official_multi_turn_documents
+    title: Documentos parciales y completos
+    category: documentos
+    initial_stage: papeleria_incompleta
+    initial_contact_fields:
+      PLAN: Sin Comprobantes
+      MOTO_INTERES: Dinamo R4
+    turns:
+      - customer_message: Ya mande mi INE
+        expected_behavior: registrar INE recibida
+      - customer_message: INE y comprobante listo
+        expected_behavior: marcar documentos completos
+    expected_field_updates:
+      DOCUMENTOS_COMPLETOS: true
+    expected_stage_changes: [papeleria_completa]
+    expected_handoff: false
+    expected_documents: [INE_AMBOS_LADOS, COMPROBANTE_DOMICILIO]
+    forbidden_behaviors: [marcar_papeleria_completa_sin_requisitos]
+    scoring_rules: [document_checklist]

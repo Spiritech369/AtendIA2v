@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-06-05",
+  "status": "PROPOSAL_ONLY",
+  "applied": false,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "technical_rollback_owner": "Felipe Balderas",
+  "business_owner": "Francisco Esparza",
+  "disable": {
+    "send_enabled": false,
+    "outbox_enabled": false,
+    "single_contact_smoke_enabled": false,
+    "model_provider_enabled_if_provider_failure": false,
+    "runtime_v2_enabled_if_critical_failure": false,
+    "pending_outbox_for_approved_contact": "cancelled"
+  },
+  "keep_disabled": {
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false
+  },
+  "legacy_policy": {
+    "legacy_fallback_reenabled": false,
+    "legacy_fallback_disabled_while_runtime_v2_enabled": true
+  },
+  "sql_proposals_only": [
+    "UPDATE tenants SET config = jsonb_set(coalesce(config, '{}'::jsonb), '{agent_runtime_v2}', (coalesce(config->'agent_runtime_v2', '{}'::jsonb) || jsonb_build_object('send_enabled', false, 'outbox_enabled', false, 'single_contact_smoke_enabled', false, 'actions_enabled', false, 'workflow_side_effects_enabled', false)), true) WHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+    "UPDATE outbound_outbox SET status = 'cancelled', last_error = 'single_contact_smoke_rollback' WHERE tenant_id = '6ad78236-1fc9-467a-858d-90d248d57ee5' AND status IN ('pending', 'retry') AND payload::text LIKE '%<approved-contact-id>%';"
+  ]
+}

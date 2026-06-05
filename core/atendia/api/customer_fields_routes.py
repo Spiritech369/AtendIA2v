@@ -22,10 +22,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.contact_memory.policy import (
+    merge_policy_options,
+    policy_config_dict,
+    policy_options_from_flat_fields,
+)
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.customer import Customer
 from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
 from atendia.db.session import get_db_session
+from atendia.runner.employment_seniority_policy import parse_employment_seniority
 from atendia.state_machine.pipeline_evaluator import evaluate_pipeline_rules
 from atendia.state_machine.pipeline_loader import PipelineNotFoundError, load_active_pipeline
 
@@ -38,7 +44,9 @@ FIELD_TYPES: frozenset[str] = frozenset(
         "select",
         "number",
         "date",
+        "duration",
         "checkbox",
+        "catalog_item",
         "multiselect",
         "document",
     }
@@ -57,6 +65,14 @@ class FieldDefOut(BaseModel):
     field_type: str
     field_options: dict | None
     ordering: int
+    extractable_by_ai: bool
+    write_policy: str
+    confidence_threshold: float
+    evidence_required: bool
+    prompt_visible: bool
+    lifecycle_relevant: bool
+    pii: bool
+    sensitive: bool
     created_at: datetime
 
 
@@ -68,6 +84,14 @@ class FieldDefCreate(BaseModel):
     field_type: str
     field_options: dict | None = None
     ordering: int = 0
+    extractable_by_ai: bool | None = None
+    write_policy: str | None = None
+    confidence_threshold: float | None = Field(default=None, ge=0, le=1)
+    evidence_required: bool | None = None
+    prompt_visible: bool | None = None
+    lifecycle_relevant: bool | None = None
+    pii: bool | None = None
+    sensitive: bool | None = None
 
     @field_validator("key")
     @classmethod
@@ -106,6 +130,14 @@ class FieldDefUpdate(BaseModel):
     field_type: str | None = None
     field_options: dict | None = None
     ordering: int | None = None
+    extractable_by_ai: bool | None = None
+    write_policy: str | None = None
+    confidence_threshold: float | None = Field(default=None, ge=0, le=1)
+    evidence_required: bool | None = None
+    prompt_visible: bool | None = None
+    lifecycle_relevant: bool | None = None
+    pii: bool | None = None
+    sensitive: bool | None = None
 
     @field_validator("field_type")
     @classmethod
@@ -121,6 +153,28 @@ class FieldDefUpdate(BaseModel):
     @classmethod
     def _valid_options(cls, value: dict | None) -> dict | None:
         return FieldDefCreate._valid_options(value)
+
+
+def _field_def_out(defn: CustomerFieldDefinition) -> FieldDefOut:
+    policy = policy_config_dict(defn)
+    return FieldDefOut(
+        id=defn.id,
+        tenant_id=defn.tenant_id,
+        key=defn.key,
+        label=defn.label,
+        field_type=defn.field_type,
+        field_options=defn.field_options,
+        ordering=defn.ordering,
+        extractable_by_ai=policy["extractable_by_ai"],
+        write_policy=policy["write_policy"],
+        confidence_threshold=policy["confidence_threshold"],
+        evidence_required=policy["evidence_required"],
+        prompt_visible=policy["prompt_visible"],
+        lifecycle_relevant=policy["lifecycle_relevant"],
+        pii=policy["pii"],
+        sensitive=policy["sensitive"],
+        created_at=defn.created_at,
+    )
 
 
 # ── Definitions endpoints ────────────────────────────────────────────
@@ -143,19 +197,7 @@ async def list_definitions(
         .scalars()
         .all()
     )
-    return [
-        FieldDefOut(
-            id=d.id,
-            tenant_id=d.tenant_id,
-            key=d.key,
-            label=d.label,
-            field_type=d.field_type,
-            field_options=d.field_options,
-            ordering=d.ordering,
-            created_at=d.created_at,
-        )
-        for d in rows
-    ]
+    return [_field_def_out(d) for d in rows]
 
 
 @definitions_router.post("", response_model=FieldDefOut, status_code=status.HTTP_201_CREATED)
@@ -165,27 +207,21 @@ async def create_definition(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> FieldDefOut:
+    values = body.model_dump()
+    policy_values = policy_options_from_flat_fields(values)
+    values["field_options"] = merge_policy_options(values.get("field_options"), policy_values)
     defn = CustomerFieldDefinition(
         tenant_id=tenant_id,
-        key=body.key,
-        label=body.label,
-        field_type=body.field_type,
-        field_options=body.field_options,
-        ordering=body.ordering,
+        key=values["key"],
+        label=values["label"],
+        field_type=values["field_type"],
+        field_options=values["field_options"],
+        ordering=values["ordering"],
     )
     session.add(defn)
     await session.commit()
     await session.refresh(defn)
-    return FieldDefOut(
-        id=defn.id,
-        tenant_id=defn.tenant_id,
-        key=defn.key,
-        label=defn.label,
-        field_type=defn.field_type,
-        field_options=defn.field_options,
-        ordering=defn.ordering,
-        created_at=defn.created_at,
-    )
+    return _field_def_out(defn)
 
 
 @definitions_router.patch("/{def_id}", response_model=FieldDefOut)
@@ -208,6 +244,12 @@ async def update_definition(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "field definition not found")
 
     changes = body.model_dump(exclude_unset=True)
+    policy_values = policy_options_from_flat_fields(changes)
+    if policy_values:
+        changes["field_options"] = merge_policy_options(
+            changes.get("field_options", defn.field_options),
+            policy_values,
+        )
     if not changes:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no fields to update")
 
@@ -215,16 +257,7 @@ async def update_definition(
         setattr(defn, k, v)
     await session.commit()
     await session.refresh(defn)
-    return FieldDefOut(
-        id=defn.id,
-        tenant_id=defn.tenant_id,
-        key=defn.key,
-        label=defn.label,
-        field_type=defn.field_type,
-        field_options=defn.field_options,
-        ordering=defn.ordering,
-        created_at=defn.created_at,
-    )
+    return _field_def_out(defn)
 
 
 @definitions_router.delete("/{def_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -324,7 +357,7 @@ def _canonicalize_field_value(
     field_type = defn.field_type
     choices = _choices_for(defn)
 
-    if field_type in ("text", "select"):
+    if field_type in ("text", "select", "catalog_item"):
         if not isinstance(value, str):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -363,6 +396,20 @@ def _canonicalize_field_value(
                 f"{defn.key} must be an ISO date string",
             ) from None
         return parsed.isoformat()
+
+    if field_type == "duration":
+        if not isinstance(value, str):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must be a duration string",
+            )
+        parsed_duration = parse_employment_seniority(value)
+        if parsed_duration is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"{defn.key} must include a measurable duration",
+            )
+        return parsed_duration.display_value
 
     if field_type == "checkbox":
         if isinstance(value, bool):

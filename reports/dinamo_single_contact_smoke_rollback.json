@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-06-03T23:52:46-06:00",
+  "status": "ready_as_proposal_only",
+  "rollback_executed": false,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "tenant_name": "Dinamo Motos NL",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "agent_name": "Francisco de Dinamo NL",
+  "approved_test_phone": "+528212889421",
+  "owner": "Felipe Balderas",
+  "must_disable": [
+    "live send",
+    "single contact smoke",
+    "model provider for tenant if provider fails",
+    "runtime v2 for tenant if needed",
+    "pending outbox/send rows for approved phone"
+  ],
+  "must_keep_disabled": [
+    "actions_enabled",
+    "workflow_side_effects_enabled"
+  ],
+  "sql_proposals": {
+    "disable_send_actions_workflows_smoke": "UPDATE tenants SET config = jsonb_set(jsonb_set(jsonb_set(jsonb_set(COALESCE(config, '{}'::jsonb), '{agent_runtime_v2,send_enabled}', 'false'::jsonb, true), '{agent_runtime_v2,actions_enabled}', 'false'::jsonb, true), '{agent_runtime_v2,workflow_events_enabled}', 'false'::jsonb, true), '{agent_runtime_v2,single_contact_smoke}', 'null'::jsonb, true) WHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+    "disable_model_provider_if_provider_fails": "UPDATE tenants SET config = jsonb_set(COALESCE(config, '{}'::jsonb), '{agent_runtime_v2,model_provider_enabled}', 'false'::jsonb, true) WHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+    "disable_runtime_v2_if_needed": "UPDATE tenants SET config = jsonb_set(COALESCE(config, '{}'::jsonb), '{agent_runtime_v2,runtime_v2_enabled}', 'false'::jsonb, true) WHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+    "cancel_pending_outbox_for_approved_phone": "UPDATE outbound_outbox SET status = 'cancelled', last_error = 'single_contact_smoke_rollback_cancel_pending', updated_at = now() WHERE tenant_id = '6ad78236-1fc9-467a-858d-90d248d57ee5' AND status = 'pending' AND payload->>'to_phone_e164' = '+528212889421';"
+  },
+  "post_rollback_verification": [
+    "agent_runtime_v2.send_enabled=false",
+    "agent_runtime_v2.actions_enabled=false",
+    "agent_runtime_v2.workflow_events_enabled=false",
+    "no pending outbox for approved phone",
+    "no outbound message to non-approved phone",
+    "legacy runner fallback remains available"
+  ],
+  "traffic_started": false,
+  "tenant_config_applied": false,
+  "whatsapp_sent": false
+}

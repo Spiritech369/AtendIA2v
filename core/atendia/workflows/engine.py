@@ -39,6 +39,7 @@ from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.agent_runtime.workflow_events import AGENT_WORKFLOW_EVENT_TYPES
 from atendia.channels.base import OutboundMessage
 from atendia.config import get_settings
 from atendia.db.models.agent import Agent
@@ -85,6 +86,7 @@ TRIGGERS: frozenset[str] = frozenset(
         "document_rejected",
         "docs_complete_for_plan",
         "human_handoff_requested",
+        *AGENT_WORKFLOW_EVENT_TYPES,
     }
 )
 
@@ -164,7 +166,7 @@ class WorkflowValidationError(ValueError):
     """Raised when ``validate_definition`` or ``validate_references`` rejects a workflow."""
 
 
-class _ExecutionFailure(Exception):
+class _ExecutionFailure(Exception):  # noqa: N818
     """Internal control-flow exception carrying an ``error_code``."""
 
     def __init__(self, error: str, *, code: str | None = None) -> None:
@@ -543,6 +545,17 @@ def _parse_uuid(raw: Any, field: str) -> UUID:
         raise WorkflowValidationError(f"{field} is not a valid UUID: {raw!r}") from exc
 
 
+def _maybe_uuid(raw: Any) -> UUID | None:
+    if raw in (None, ""):
+        return None
+    if isinstance(raw, UUID):
+        return raw
+    try:
+        return UUID(str(raw))
+    except (ValueError, TypeError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Trigger evaluation
 # ---------------------------------------------------------------------------
@@ -600,6 +613,7 @@ async def evaluate_event(session: AsyncSession, event_id: UUID) -> list[UUID]:
                 execution = WorkflowExecution(
                     workflow_id=workflow.id,
                     conversation_id=event.conversation_id,
+                    customer_id=_maybe_uuid(event.payload.get("customer_id")),
                     trigger_event_id=event.id,
                     status="running",
                 )
@@ -667,6 +681,62 @@ def _trigger_matches(config: dict, payload: dict) -> bool:
     expected_category = config.get("category")
     if expected_category and payload.get("category") != expected_category:
         return False
+    if not _matches_number_filters(config, payload, "confidence"):
+        return False
+    expected_action = config.get("action_id")
+    if expected_action and payload.get("action_id") != expected_action:
+        return False
+    expected_actions = config.get("action_ids")
+    if isinstance(expected_actions, list) and expected_actions:
+        if payload.get("action_id") not in expected_actions:
+            return False
+    expected_field = config.get("field_key")
+    if expected_field and payload.get("field_key") != expected_field:
+        return False
+    expected_fields = config.get("field_keys")
+    if isinstance(expected_fields, list) and expected_fields:
+        if payload.get("field_key") not in expected_fields:
+            return False
+    expected_lifecycle_stage = config.get("lifecycle_stage")
+    if expected_lifecycle_stage and payload.get("lifecycle_stage") != expected_lifecycle_stage:
+        return False
+    expected_lifecycle_stages = config.get("lifecycle_stages")
+    if isinstance(expected_lifecycle_stages, list) and expected_lifecycle_stages:
+        if payload.get("lifecycle_stage") not in expected_lifecycle_stages:
+            return False
+    expected_risk_flags = config.get("risk_flags")
+    if isinstance(expected_risk_flags, list) and expected_risk_flags:
+        actual_flags = payload.get("risk_flags")
+        if not isinstance(actual_flags, list) or not any(
+            flag in actual_flags for flag in expected_risk_flags
+        ):
+            return False
+    return True
+
+
+def _matches_number_filters(config: dict, payload: dict, key: str) -> bool:
+    if not any(f"{key}_{suffix}" in config for suffix in ("lt", "lte", "gt", "gte")):
+        return True
+    try:
+        value = float(payload.get(key))
+    except (TypeError, ValueError):
+        return False
+    comparators = {
+        "lt": lambda actual, expected: actual < expected,
+        "lte": lambda actual, expected: actual <= expected,
+        "gt": lambda actual, expected: actual > expected,
+        "gte": lambda actual, expected: actual >= expected,
+    }
+    for suffix, comparator in comparators.items():
+        raw_expected = config.get(f"{key}_{suffix}")
+        if raw_expected is None:
+            continue
+        try:
+            expected = float(raw_expected)
+        except (TypeError, ValueError):
+            return False
+        if not comparator(value, expected):
+            return False
     return True
 
 

@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { CustomerFieldsEditor } from "@/features/config/components/CustomerFieldsEditor";
-import { requireRole } from "@/lib/auth-guards";
+import { requireCapability } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/customer-fields")({
-  beforeLoad: requireRole(["tenant_admin", "superadmin"]),
+  beforeLoad: requireCapability("route.customer_fields", ["tenant_admin", "superadmin"]),
   component: CustomerFieldsPage,
 });
 

@@ -1,0 +1,131 @@
+{
+  "decision": "UNIVERSAL_TRACE_API_BRIDGE_READY",
+  "scope": {
+    "traffic_activated": false,
+    "whatsapp_sent": false,
+    "dinamo_config_applied_to_production": false,
+    "real_actions_or_workflows_enabled": false,
+    "db_migration_added": false
+  },
+  "endpoints_reviewed": [
+    {
+      "endpoint": "GET /api/v1/turn-traces",
+      "changed": false,
+      "notes": "List endpoint remains payload-light."
+    },
+    {
+      "endpoint": "GET /api/v1/turn-traces/{trace_id}",
+      "changed": true,
+      "notes": "Detail endpoint now exposes top-level trace_metadata derived from persisted JSON payloads."
+    },
+    {
+      "endpoint": "GET /api/v1/turn-traces/{trace_id}/why-answer-v2",
+      "changed": false,
+      "notes": "Existing aggregator remains compatible."
+    },
+    {
+      "endpoint": "POST /api/v1/conversations/{conversation_id}/agent-runtime-v2/preview",
+      "changed": false,
+      "notes": "Already returns output.trace_metadata directly."
+    },
+    {
+      "endpoint": "POST /api/v1/conversations/{conversation_id}/agent-runtime-v2/send",
+      "changed": false,
+      "notes": "Persists TurnOutput.model_dump(mode=json) in turn_traces.composer_output."
+    },
+    {
+      "endpoint": "GET /api/v1/conversations/{conversation_id}",
+      "changed": false,
+      "notes": "Reviewed for ContactPanel impact; tenant_domain_contract top-level remains a follow-up."
+    },
+    {
+      "endpoint": "GET /api/v1/conversations/{conversation_id}/messages",
+      "changed": false,
+      "notes": "Does not transport universal trace."
+    }
+  ],
+  "files_modified": [
+    "core/atendia/api/turn_traces_routes.py",
+    "core/tests/api/test_turn_traces_routes.py",
+    "frontend/tests/features/turn-traces/UniversalTracePanel.test.tsx"
+  ],
+  "files_created": [
+    "core/tests/api/test_turn_trace_metadata_serializer.py",
+    "reports/universal_trace_api_bridge.md",
+    "reports/universal_trace_api_bridge.json"
+  ],
+  "api_shape": {
+    "before": "trace_metadata was only nested inside composer_output/state_after/raw payloads if present.",
+    "after": "TurnTraceDetail includes top-level trace_metadata, with trace_metadata.universal_turn_trace when persisted.",
+    "fallback_order": [
+      "composer_output.trace_metadata",
+      "state_after.trace_metadata",
+      "raw_llm_response JSON trace_metadata",
+      "direct universal_turn_trace wrapped in trace_metadata"
+    ],
+    "missing_trace_behavior": "trace_metadata is null; frontend shows metadata_missing/raw trace fallback."
+  },
+  "frontend_consumption": {
+    "reader": "readUniversalTurnTrace(trace)",
+    "primary_path": "trace.trace_metadata.universal_turn_trace",
+    "fallback_paths": [
+      "trace.composer_output.trace_metadata.universal_turn_trace",
+      "trace.state_after.trace_metadata.universal_turn_trace"
+    ],
+    "validated_by": "UniversalTracePanel test using TurnTraceDetail-shaped object"
+  },
+  "tests": [
+    {
+      "command": "ATENDIA_V2_DATABASE_URL=postgresql+asyncpg://atendia:atendia@localhost:5433/atendia_v2 uv run pytest tests/agent_runtime/test_universal_turn_trace.py tests/api/test_turn_traces_routes.py -q",
+      "cwd": "core",
+      "status": "passed",
+      "result": "21 passed, 2 warnings in 18.41s"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_universal_turn_trace.py tests/api/test_turn_trace_metadata_serializer.py -q",
+      "cwd": "core",
+      "status": "passed",
+      "result": "13 passed, 2 warnings in 0.11s"
+    },
+    {
+      "command": "uv run ruff check atendia/api/turn_traces_routes.py tests/api/test_turn_trace_metadata_serializer.py tests/api/test_turn_traces_routes.py",
+      "cwd": "core",
+      "status": "passed",
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "cwd": "core",
+      "status": "passed",
+      "result": "179 passed, 27 deselected, 2 warnings in 2.89s"
+    },
+    {
+      "command": "npm exec -- vitest run tests/features/turn-traces/UniversalTracePanel.test.tsx tests/features/conversations/TenantFieldPanel.test.tsx",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "Test Files 2 passed (2); Tests 11 passed (11); Duration 3.23s"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "tsc --noEmit passed"
+    },
+    {
+      "command": "npm exec -- biome check <5 touched frontend files>",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "Checked 5 files in 27ms. No fixes applied."
+    }
+  ],
+  "environment_notes": [
+    "The first API test run failed because default database_url pointed at localhost:5432 and no service was listening there.",
+    "Docker showed atendia_postgres_v2 healthy on localhost:5433, so integrated API tests were re-run with ATENDIA_V2_DATABASE_URL pointed at port 5433 and passed."
+  ],
+  "risks_remaining": [
+    "Default local database_url and running Docker Postgres port are misaligned.",
+    "ConversationDetail still does not expose tenant_domain_contract top-level; recommended follow-up for ContactPanel metadata completeness.",
+    "Legacy traces without trace_metadata safely return null."
+  ],
+  "next_step": "Align dev/test DB URL and review ConversationDetail tenant_domain_contract exposure as a separate follow-up."
+}

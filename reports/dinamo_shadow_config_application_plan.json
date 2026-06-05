@@ -1,0 +1,28 @@
+{
+  "decision": "proposal_only",
+  "generated_at": "2026-06-03T22:24:52.1570446-06:00",
+  "applied": false,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "payload_source": "core/tests/agent_runtime/fixtures/tenant_domain_contracts/dinamo_motos_nl_shadow.json",
+  "live_send_enabled": false,
+  "actions_enabled": false,
+  "workflow_side_effects_enabled": false,
+  "canary_enabled": false,
+  "single_contact_smoke_enabled": false,
+  "sql_proposal": [
+    "-- PROPOSAL ONLY. DO NOT RUN WITHOUT HUMAN APPROVAL.",
+    "BEGIN;",
+    "-- Upsert tenant_domain_contract payload from fixture with runtime_mode='v2_shadow_until_evaluated'.",
+    "-- Keep live_send_enabled=false, actions_enabled=false, workflow_side_effects_enabled=false.",
+    "ROLLBACK;"
+  ],
+  "rollback_proposal": "No-op until applied. If applied later, restore previous tenant config version and keep all side-effect flags disabled.",
+  "human_gates_before_apply": [
+    "review fixture JSON and reports",
+    "confirm DB target and backup",
+    "confirm all live/action/workflow flags remain false",
+    "rerun dry-run E2E tests",
+    "obtain explicit human approval"
+  ]
+}

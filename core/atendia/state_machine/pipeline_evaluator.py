@@ -35,6 +35,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
@@ -67,13 +68,13 @@ def resolve_field_path(fields: dict[str, Any], path: str) -> Any:
     ``{value, ...}`` shape on the way.
 
     Examples:
-        >>> resolve_field_path({"plan_credito": "36m"}, "plan_credito")
-        '36m'
+        >>> resolve_field_path({"selection": "premium"}, "selection")
+        'premium'
         >>> resolve_field_path(
-        ...     {"plan_credito": {"value": "36m", "confidence": 0.9}},
-        ...     "plan_credito",
+        ...     {"selection": {"value": "premium", "confidence": 0.9}},
+        ...     "selection",
         ... )
-        '36m'
+        'premium'
         >>> resolve_field_path(
         ...     {"DOCS_INE": {"status": "ok"}}, "DOCS_INE.status"
         ... )
@@ -123,7 +124,7 @@ def _string_value(value: Any) -> str | None:
     return None
 
 
-def _normalize_plan_key(value: Any) -> str:
+def _normalize_selection_key(value: Any) -> str:
     text_value = _string_value(value)
     if not text_value:
         return ""
@@ -141,28 +142,26 @@ def _normalize_plan_key(value: Any) -> str:
     return normalized.strip("_")
 
 
-def _resolve_docs_plan_key(
+def _resolve_document_selection_key(
     fields: dict[str, Any],
     *,
     condition_field: str,
-    docs_per_plan: dict[str, list],
-    docs_plan_field: str | None = None,
+    document_requirements: dict[str, list],
+    document_requirements_field: str | None = None,
 ) -> str | None:
-    """Find the docs_per_plan key for the current customer state.
+    """Find the document_requirements key for the current customer state.
 
-    Tenants can choose whether requirements are keyed by plan id,
-    percentage, income type, or a custom field. The explicit rule field
-    remains first for backwards compatibility; docs_plan_field and common
-    legacy fields are fallbacks so old pipelines keep moving while the
-    operator cleans up config in Expediente.
+    Tenants can choose whether requirements are keyed by case type,
+    service tier, or any custom field. The explicit rule field and
+    document_requirements_field are the only sources; no vertical-specific field names
+    are implied by the evaluator.
     """
-    if not docs_per_plan:
+    if not document_requirements:
         return None
 
     candidate_fields: list[str] = [condition_field]
-    if docs_plan_field:
-        candidate_fields.append(docs_plan_field)
-    candidate_fields.extend(["plan_credito", "credito_plan", "tipo_credito"])
+    if document_requirements_field:
+        candidate_fields.append(document_requirements_field)
 
     candidates: list[str] = []
     seen_fields: set[str] = set()
@@ -178,26 +177,28 @@ def _resolve_docs_plan_key(
         return None
 
     for value in candidates:
-        if value in docs_per_plan:
+        if value in document_requirements:
             return value
 
-    normalized_keys = {_normalize_plan_key(key): key for key in docs_per_plan}
+    normalized_keys = {_normalize_selection_key(key): key for key in document_requirements}
     for value in candidates:
-        normalized = _normalize_plan_key(value)
+        normalized = _normalize_selection_key(value)
         if normalized and normalized in normalized_keys:
             return str(normalized_keys[normalized])
 
     scored: list[tuple[int, str]] = []
-    candidate_norms = [_normalize_plan_key(v) for v in candidates if _normalize_plan_key(v)]
+    candidate_norms = [
+        _normalize_selection_key(v) for v in candidates if _normalize_selection_key(v)
+    ]
     candidate_tokens = set()
     candidate_digits = set()
     for norm in candidate_norms:
         candidate_tokens.update(t for t in norm.split("_") if t and not t.isdigit())
         candidate_digits.update(re.findall(r"\d+", norm))
 
-    for raw_key in docs_per_plan:
+    for raw_key in document_requirements:
         key = str(raw_key)
-        key_norm = _normalize_plan_key(key)
+        key_norm = _normalize_selection_key(key)
         if not key_norm:
             continue
         score = 0
@@ -229,16 +230,89 @@ def _is_field_payload_segment(seg: str, current: dict) -> bool:
     return seg in current
 
 
+def _bool_like(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in {"true", "1", "yes", "si", "sí", "s"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return None
+
+
+def _decimal_like(value: Any) -> Decimal | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    raw = str(value).replace(",", "").strip()
+    if raw == "":
+        return None
+    try:
+        return Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _semantic_equals(left: Any, right: Any) -> bool:
+    left_bool = _bool_like(left)
+    right_bool = _bool_like(right)
+    if left_bool is not None and right_bool is not None:
+        return left_bool == right_bool
+
+    left_number = _decimal_like(left)
+    right_number = _decimal_like(right)
+    if left_number is not None and right_number is not None:
+        return left_number == right_number
+
+    return left == right
+
+
+def _canonical_doc_status(value: Any) -> str | None:
+    if isinstance(value, dict) and "value" in value:
+        value = value["value"]
+    if isinstance(value, bool):
+        return "ok" if value else "missing"
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().casefold()
+    if normalized in {
+        "ok",
+        "true",
+        "1",
+        "yes",
+        "si",
+        "sí",
+        "received",
+        "recibido",
+        "approved",
+        "aprobado",
+    }:
+        return "ok"
+    if normalized in {"missing", "false", "0", "no", "pending", "pendiente", "pending_review"}:
+        return "missing"
+    if normalized in {"rejected", "rechazado", "rechazada", "unreadable", "expired"}:
+        return "rejected"
+    return None
+
+
+def _resolve_doc_status(fields: dict[str, Any], doc_key: str) -> str | None:
+    status = _canonical_doc_status(resolve_field_path(fields, f"{doc_key}.status"))
+    if status is not None:
+        return status
+    return _canonical_doc_status(resolve_field_path(fields, doc_key))
+
+
 def evaluate_condition(
     condition: Condition,
     fields: dict[str, Any],
     *,
-    docs_per_plan: dict[str, list] | None = None,
-    docs_plan_field: str | None = None,
+    document_requirements: dict[str, list] | None = None,
+    document_requirements_field: str | None = None,
 ) -> bool:
     """Pure operator dispatch. Mirrors the FE OperatorSelector contract.
 
-    ``docs_per_plan`` is required only by ``docs_complete_for_plan`` —
+    ``document_requirements`` is required only by ``documents_complete_for_selection`` —
     the evaluator passes the active pipeline's mapping down through
     ``evaluate_rule_group`` / ``evaluate_pipeline_rules``. Other
     operators ignore it.
@@ -251,10 +325,15 @@ def evaluate_condition(
         return value is not None and value != ""
     if op == "not_exists":
         return value is None or value == ""
+    if condition.field.endswith(".status"):
+        if value is None:
+            value = resolve_field_path(fields, condition.field.rsplit(".", 1)[0])
+        value = _canonical_doc_status(value) or value
+        expected = _canonical_doc_status(expected) or expected
     if op == "equals":
-        return value == expected
+        return _semantic_equals(value, expected)
     if op == "not_equals":
-        return value != expected
+        return not _semantic_equals(value, expected)
     if op == "contains":
         if value is None:
             return False
@@ -273,33 +352,30 @@ def evaluate_condition(
         return isinstance(expected, list) and value in expected
     if op == "not_in":
         return isinstance(expected, list) and value not in expected
-    if op == "docs_complete_for_plan":
-        # Plan-aware aggregate: "every document this plan requires has
-        # status=ok on the customer". `condition.field` names the field
-        # that holds the plan id (typically `plan_credito`). The list of
-        # required docs comes from `pipeline.docs_per_plan[plan]`. Each
+    if op == "documents_complete_for_selection":
+        # Selection-aware aggregate: every document configured for the
+        # current customer selection must have status=ok. `condition.field`
+        # names the selector field; document keys come from
+        # `pipeline.document_requirements[selection]`. Each
         # doc key resolves to `customer.attrs.<KEY>.status` (via
         # `resolve_field_path`).
-        if not docs_per_plan:
+        if not document_requirements:
             return False
-        plan = _resolve_docs_plan_key(
+        selection = _resolve_document_selection_key(
             fields,
             condition_field=condition.field,
-            docs_per_plan=docs_per_plan,
-            docs_plan_field=docs_plan_field,
+            document_requirements=document_requirements,
+            document_requirements_field=document_requirements_field,
         )
-        if not plan:
+        if not selection:
             return False
-        required = docs_per_plan.get(plan)
+        required = document_requirements.get(selection)
         if not isinstance(required, list) or not required:
             return False
         for doc_key in required:
             if not isinstance(doc_key, str):
                 continue
-            status = resolve_field_path(fields, f"{doc_key}.status")
-            if isinstance(status, dict) and "value" in status:
-                status = status["value"]
-            if not (isinstance(status, str) and status.lower() == "ok"):
+            if _resolve_doc_status(fields, doc_key) != "ok":
                 return False
         return True
     return False
@@ -309,8 +385,8 @@ def evaluate_rule_group(
     rules: AutoEnterRules,
     fields: dict[str, Any],
     *,
-    docs_per_plan: dict[str, list] | None = None,
-    docs_plan_field: str | None = None,
+    document_requirements: dict[str, list] | None = None,
+    document_requirements_field: str | None = None,
 ) -> bool:
     """Run every condition under ``rules.match`` semantics."""
     if not rules.enabled or not rules.conditions:
@@ -319,8 +395,8 @@ def evaluate_rule_group(
         evaluate_condition(
             c,
             fields,
-            docs_per_plan=docs_per_plan,
-            docs_plan_field=docs_plan_field,
+            document_requirements=document_requirements,
+            document_requirements_field=document_requirements_field,
         )
         for c in rules.conditions
     )
@@ -422,11 +498,10 @@ def _merge_fields(
 ) -> dict[str, Any]:
     """Build the flat field dict the evaluator reads.
 
-    Why merge: some fields are stored on the customer (modelo_interes,
-    plan_credito persisted across conversations), others live in
-    conversation_state.extracted_data (per-turn AI extractions before
-    they're flushed to customer.attrs). Whichever wins — we prefer the
-    extracted_data view because it's the freshest per-turn snapshot.
+    Why merge: some fields are stored on the customer, others live in
+    conversation_state.extracted_data before they are flushed to the
+    customer. Whichever wins, we prefer the extracted_data view because
+    it is the freshest per-turn snapshot.
     """
     merged: dict[str, Any] = {}
     if customer_attrs:
@@ -510,10 +585,9 @@ async def evaluate_pipeline_rules(
         ),
     )
 
-    # Plan-aware aggregate operators need the docs_per_plan table to
-    # resolve "all required docs for this plan are ok". Built once here
+    # Selection-aware aggregate operators need the document_requirements table.
     # so we don't re-read the pipeline JSON per condition.
-    docs_per_plan = pipeline.docs_per_plan or {}
+    document_requirements = pipeline.document_requirements or {}
 
     # Run each enabled rule group; collect the stages that match. Along
     # the way, record per-condition pass/fail into rules_evaluated so the
@@ -527,8 +601,8 @@ async def evaluate_pipeline_rules(
             passed = evaluate_condition(
                 cond,
                 fields,
-                docs_per_plan=docs_per_plan,
-                docs_plan_field=pipeline.docs_plan_field,
+                document_requirements=document_requirements,
+                document_requirements_field=pipeline.document_requirements_field,
             )
             rules_evaluated.append(
                 {
@@ -543,8 +617,8 @@ async def evaluate_pipeline_rules(
         if evaluate_rule_group(
             stage.auto_enter_rules,
             fields,
-            docs_per_plan=docs_per_plan,
-            docs_plan_field=pipeline.docs_plan_field,
+            document_requirements=document_requirements,
+            document_requirements_field=pipeline.document_requirements_field,
         ):
             matching.append(stage)
 

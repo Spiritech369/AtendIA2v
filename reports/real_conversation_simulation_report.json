@@ -1,0 +1,284 @@
+{
+    "generated_at":  "2026-06-03T05:49:44.6364985-06:00",
+    "decision":  "REAL_SIMULATION_BLOCKED_PROVIDER_FAILED",
+    "executive_summary":  "Real anonymized dataset and replay passed, but current provider advisor/stability comparison failed; do not start canary.",
+    "scope":  {
+                  "tenant_email":  "dinamomotosnl@gmail.com",
+                  "tenant_id":  "6ad78236-1fc9-467a-858d-90d248d57ee5",
+                  "tenant_name":  "Dinamo Motos NL",
+                  "tenant_status":  "active",
+                  "tenant_timezone":  "America/Mexico_City",
+                  "agent_id":  "c169deec-226d-55b7-bd07-270f339e75a6",
+                  "agent_name":  "Francisco de Dinamo NL",
+                  "agent_status":  "production",
+                  "execution_mode":  "offline_anonymized_replay",
+                  "provider_real":  true,
+                  "send_real_messages":  false,
+                  "actions_enabled":  false,
+                  "workflow_events_enabled":  false
+              },
+    "dataset":  {
+                    "generated":  true,
+                    "audit":  "DATASET_AUDIT_PASS",
+                    "conversations":  20,
+                    "turns":  109,
+                    "raw_text_exported":  false
+                },
+    "replay_summary":  {
+                           "replay_cases_total":  20,
+                           "replay_cases_passed":  20,
+                           "critical_failure_count":  0,
+                           "quote_guard_blocks_total":  0,
+                           "progress_guard_blocks_total":  0,
+                           "provider_retry_count":  0,
+                           "provider_fallback_response_count":  0,
+                           "duplicate_side_effect_count":  0,
+                           "handoff_false_positive_count":  0,
+                           "documents_stage_false_positive_count":  0,
+                           "avg_turns_to_quote":  3.3077,
+                           "avg_turns_to_handoff":  1.8,
+                           "quoted_without_canonical_product_rate":  0.0,
+                           "price_without_snapshot_rate":  0.0,
+                           "stale_quote_rate":  0.0,
+                           "repeated_question_rate":  0.0,
+                           "definition_of_done_pass":  true
+                       },
+    "provider_advisor_summary":  {
+                                     "provider_used":  "openai",
+                                     "model":  "gpt-4o-mini",
+                                     "provider_error_rate":  0.0,
+                                     "provider_429_count":  0,
+                                     "provider_timeout_count":  0,
+                                     "provider_5xx_count":  0,
+                                     "provider_retry_count":  0,
+                                     "provider_retry_exhausted_count":  0,
+                                     "provider_circuit_breaker_open_count":  0,
+                                     "provider_fallback_response_count":  0,
+                                     "provider_latency_p50":  2059,
+                                     "provider_latency_p95":  7567,
+                                     "provider_latency_p99":  8302,
+                                     "cases_total":  40,
+                                     "cases_passed":  36,
+                                     "cases_failed":  4,
+                                     "turns_total":  200,
+                                     "naturalidad_avg":  4.93,
+                                     "repeated_question_rate":  0.015,
+                                     "exact_response_repeat_rate":  0.005,
+                                     "repeated_slot_question_rate":  0.0,
+                                     "repeated_quote_without_request_rate":  0.0,
+                                     "repeated_requirements_without_request_rate":  0.0,
+                                     "stale_quote_rate":  0.0,
+                                     "quoted_without_canonical_product_rate":  0.0,
+                                     "price_without_snapshot_rate":  0.0,
+                                     "price_amount_mismatch_rate":  0.0,
+                                     "quote_guard_blocks_total":  0,
+                                     "progress_guard_blocks_total":  6,
+                                     "progress_guard_block_rate":  0.03,
+                                     "sanitized_messages_count":  0,
+                                     "progress_guard_sanitized_messages_count":  6,
+                                     "generic_sanitizer_fallback_rate":  0.0,
+                                     "answer_relevance_rate":  0.715,
+                                     "documents_request_answered_rate":  0.7222,
+                                     "conversation_progress_rate":  0.985,
+                                     "quote_active_phrase_rate":  0.0,
+                                     "side_effects":  {
+                                                          "whatsapp":  0,
+                                                          "outbox":  0,
+                                                          "database_writes":  0
+                                                      },
+                                     "definition_of_done_pass":  false
+                                 },
+    "provider_stability_summary":  {
+                                       "runs":  5,
+                                       "runs_passed":  0,
+                                       "definition_of_done_pass":  false,
+                                       "cases_passed_accumulated":  180,
+                                       "cases_total_accumulated":  200,
+                                       "provider_retry_count":  5,
+                                       "provider_429_count":  5,
+                                       "provider_fallback_response_count":  0,
+                                       "side_effects":  0,
+                                       "quoted_without_canonical_product_rate":  0.0,
+                                       "price_without_snapshot_rate":  0.0,
+                                       "stale_quote_rate":  0.0,
+                                       "repeated_question_rate":  0.015,
+                                       "exact_response_repeat_rate":  0.005,
+                                       "baseline_source":  "C:\\Users\\Sprt\\Documents\\Proyectos IA\\AtendIA-v2\\reports\\provider_advisor_first_eval.json",
+                                       "mode":  "baseline_with_simulated_429"
+                                   },
+    "provider_failures":  [
+                              {
+                                  "case_id":  "adv_15",
+                                  "title":  "Cambio despues de documentos",
+                                  "failures":  [
+                                                   "robotic_template"
+                                               ],
+                                  "notes":  [
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError"
+                                            ]
+                              },
+                              {
+                                  "case_id":  "adv_18",
+                                  "title":  "Modelo ambiguo despues de quote",
+                                  "failures":  [
+                                                   "repeated_question_or_exact_response_detected"
+                                               ],
+                                  "notes":  [
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError"
+                                            ]
+                              },
+                              {
+                                  "case_id":  "adv_24",
+                                  "title":  "Nombre parcial adventure",
+                                  "failures":  [
+                                                   "repeated_question_or_exact_response_detected"
+                                               ],
+                                  "notes":  [
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError"
+                                            ]
+                              },
+                              {
+                                  "case_id":  "adv_28",
+                                  "title":  "Tres preguntas sin pedir datos primero",
+                                  "failures":  [
+                                                   "repeated_question_or_exact_response_detected"
+                                               ],
+                                  "notes":  [
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError",
+                                                "composer_provider_error:ProviderCircuitOpenError"
+                                            ]
+                              }
+                          ],
+    "side_effects_total":  0,
+    "safety_rates":  {
+                         "quoted_without_canonical_product_rate":  0.0,
+                         "price_without_snapshot_rate":  0.0,
+                         "stale_quote_rate":  0.0,
+                         "repeated_question_rate":  0.015,
+                         "exact_response_repeat_rate":  0.005
+                     },
+    "top_5_best":  [
+                       "sim_001",
+                       "sim_002",
+                       "sim_003",
+                       "sim_004",
+                       "sim_005"
+                   ],
+    "top_5_risk":  [
+                       {
+                           "case_id":  "adv_15",
+                           "title":  "Cambio despues de documentos",
+                           "failures":  [
+                                            "robotic_template"
+                                        ],
+                           "notes":  [
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError"
+                                     ]
+                       },
+                       {
+                           "case_id":  "adv_18",
+                           "title":  "Modelo ambiguo despues de quote",
+                           "failures":  [
+                                            "repeated_question_or_exact_response_detected"
+                                        ],
+                           "notes":  [
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError"
+                                     ]
+                       },
+                       {
+                           "case_id":  "adv_24",
+                           "title":  "Nombre parcial adventure",
+                           "failures":  [
+                                            "repeated_question_or_exact_response_detected"
+                                        ],
+                           "notes":  [
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError"
+                                     ]
+                       },
+                       {
+                           "case_id":  "adv_28",
+                           "title":  "Tres preguntas sin pedir datos primero",
+                           "failures":  [
+                                            "repeated_question_or_exact_response_detected"
+                                        ],
+                           "notes":  [
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError",
+                                         "composer_provider_error:ProviderCircuitOpenError"
+                                     ]
+                       }
+                   ],
+    "patterns":  [
+                     {
+                         "pattern":  "cotizacion directa",
+                         "cases":  13,
+                         "pass_fail":  "pass",
+                         "example":  "sim_004",
+                         "recommendation":  "Mantener quote guard y snapshot obligatorio; recordar intencion si el producto aparece despues."
+                     },
+                     {
+                         "pattern":  "documentos",
+                         "cases":  12,
+                         "pass_fail":  "pass",
+                         "example":  "sim_001",
+                         "recommendation":  "Responder documentos segun plan; no mover etapa sin adjunto real."
+                     },
+                     {
+                         "pattern":  "handoff humano",
+                         "cases":  1,
+                         "pass_fail":  "pass",
+                         "example":  "sim_003",
+                         "recommendation":  "No crear handoff real en simulacion; pedir confirmacion/derivar solo bajo politica."
+                     },
+                     {
+                         "pattern":  "seguimiento/general",
+                         "cases":  0,
+                         "pass_fail":  "pass",
+                         "example":  "none",
+                         "recommendation":  "Responder duda directa y avanzar una sola pregunta."
+                     }
+                 ],
+    "production_safety":  {
+                              "traffic_started":  false,
+                              "tenant_config_applied":  false,
+                              "send_real_messages":  false,
+                              "actions_enabled":  false,
+                              "workflow_events_enabled":  false,
+                              "side_effects":  0
+                          },
+    "risks":  [
+                  "Provider advisor eval current run failed 36/40.",
+                  "Provider stability failed 0/5 because the failed provider baseline was used.",
+                  "Provider failure notes include composer ProviderCircuitOpenError on adversarial cases.",
+                  "Transcripts are intent-level offline simulations, not real sent responses."
+              ]
+}

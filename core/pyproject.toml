@@ -60,6 +60,9 @@ extend-ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration_db: tests that require a migrated PostgreSQL test database",
+]
 
 [tool.coverage.run]
 source = ["atendia"]

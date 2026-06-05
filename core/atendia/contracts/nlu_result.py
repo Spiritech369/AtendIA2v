@@ -1,20 +1,20 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from atendia.contracts.conversation_state import ExtractedField
 
 
 class Intent(str, Enum):
-    GREETING = "greeting"
-    ASK_INFO = "ask_info"
-    ASK_PRICE = "ask_price"
-    BUY = "buy"
-    SCHEDULE = "schedule"
-    COMPLAIN = "complain"
-    OFF_TOPIC = "off_topic"
-    UNCLEAR = "unclear"
+    GREETING = "GREETING"
+    ASK_INFO = "ASK_INFO"
+    ASK_PRICE = "ASK_PRICE"
+    BUY = "BUY"
+    SCHEDULE = "SCHEDULE"
+    COMPLAIN = "COMPLAIN"
+    OFF_TOPIC = "OFF_TOPIC"
+    UNCLEAR = "UNCLEAR"
 
 
 class Sentiment(str, Enum):
@@ -32,3 +32,12 @@ class NLUResult(BaseModel):
     sentiment: Sentiment
     confidence: float = Field(ge=0.0, le=1.0)
     ambiguities: list[str] = Field(default_factory=list)
+
+    @field_validator("intent", mode="before")
+    @classmethod
+    def _normalize_intent(cls, value):
+        if isinstance(value, Intent):
+            return value
+        if isinstance(value, str):
+            return value.strip().upper()
+        return value

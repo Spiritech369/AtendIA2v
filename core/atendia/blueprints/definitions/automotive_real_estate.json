@@ -1,0 +1,123 @@
+{
+  "id": "automotive_real_estate",
+  "name": "Automotive and Real Estate",
+  "description": "Lead qualification, catalog guidance and appointment flow for high-consideration purchases.",
+  "industries": ["automotive", "real_estate"],
+  "contact_fields": [
+    {
+      "key": "interest_item",
+      "label": "Item of interest",
+      "field_type": "text",
+      "ordering": 10,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.8,
+      "lifecycle_relevant": true
+    },
+    {
+      "key": "budget_range",
+      "label": "Budget range",
+      "field_type": "text",
+      "ordering": 20,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.85,
+      "lifecycle_relevant": true
+    },
+    {
+      "key": "preferred_location",
+      "label": "Preferred location",
+      "field_type": "text",
+      "ordering": 30,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.82
+    },
+    {
+      "key": "purchase_timeline",
+      "label": "Purchase timeline",
+      "field_type": "select",
+      "field_options": {"choices": ["today", "this_week", "this_month", "later"]},
+      "ordering": 40,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.82,
+      "lifecycle_relevant": true
+    }
+  ],
+  "lifecycle_stages": [
+    {
+      "id": "new_inquiry",
+      "name": "New inquiry",
+      "description": "Customer has started a conversation.",
+      "goal": "Understand the current question and identify the product or property interest.",
+      "recommended_fields": ["interest_item"],
+      "recommended_actions": ["add_tag"],
+      "allowed_actions": ["add_tag", "assign_conversation"],
+      "order": 10
+    },
+    {
+      "id": "qualified_interest",
+      "name": "Qualified interest",
+      "description": "Customer has shared interest, budget or timing.",
+      "goal": "Help compare options using approved knowledge and prepare a human handoff if needed.",
+      "entry_conditions": ["interest_item or budget_range is known"],
+      "recommended_fields": ["interest_item", "budget_range", "purchase_timeline"],
+      "recommended_actions": ["update_contact_field", "move_lifecycle"],
+      "allowed_actions": ["update_contact_field", "move_lifecycle", "assign_conversation", "add_tag"],
+      "order": 20
+    },
+    {
+      "id": "appointment_requested",
+      "name": "Appointment requested",
+      "description": "Customer asked for a visit, test drive, showing or call.",
+      "goal": "Confirm one scheduling preference and route to the correct team.",
+      "recommended_fields": ["preferred_location", "purchase_timeline"],
+      "recommended_actions": ["assign_conversation", "move_lifecycle"],
+      "allowed_actions": ["assign_conversation", "move_lifecycle", "add_tag"],
+      "order": 30
+    },
+    {
+      "id": "closed_lost",
+      "name": "Closed lost",
+      "description": "Customer is no longer interested or cannot be served.",
+      "goal": "Close cleanly with reason and no further automated pressure.",
+      "allowed_actions": ["close_conversation", "add_tag"],
+      "is_lost_stage": true,
+      "order": 90
+    }
+  ],
+  "agent_template": {
+    "name": "Sales Guide",
+    "role": "sales",
+    "tone": "consultative",
+    "language_policy": {"primary": "es-MX", "mode": "match_customer"},
+    "instructions": "Answer the customer's current question first. Use approved catalog, pricing, policy and availability sources as truth. Do not invent prices, availability, financing terms or documents. Ask at most one next question. Propose field updates and lifecycle changes only when the customer gives evidence.",
+    "escalation_policy": {"mode": "human_on_low_confidence_or_purchase_intent"}
+  },
+  "enabled_actions": ["update_contact_field", "move_lifecycle", "assign_conversation", "add_tag"],
+  "knowledge_categories": ["catalog", "pricing", "services", "appointment_rules", "document_rules", "policy"],
+  "workflow_templates": [
+    {
+      "id": "low_confidence_notify_sales",
+      "name": "Notify sales on low confidence",
+      "trigger_type": "agent_confidence_low",
+      "trigger_config": {"confidence_lte": 0.5},
+      "definition": {"nodes": [], "edges": []},
+      "active": false,
+      "stub": true
+    }
+  ],
+  "eval_scenarios": [
+    {
+      "id": "automotive_real_estate_price",
+      "name": "Customer asks for price",
+      "input_message": "How much is the entry option?",
+      "expected_behaviors": ["answer_current_question", "cite_source"],
+      "forbidden_behaviors": ["invent_price"]
+    },
+    {
+      "id": "automotive_real_estate_appointment",
+      "name": "Customer requests an appointment",
+      "input_message": "I want to visit tomorrow",
+      "expected_behaviors": ["answer_current_question"],
+      "expected_lifecycle": "appointment_requested"
+    }
+  ]
+}

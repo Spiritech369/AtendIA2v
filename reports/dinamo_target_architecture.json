@@ -1,0 +1,114 @@
+{
+  "generated_at": "2026-06-03",
+  "final_decision": "TARGET_IS_VALID_AFTER_TOOL_CONTRACT_FIRST_MIGRATION",
+  "target_principle": "AI sells like Francisco; deterministic runtime owns commercial truth.",
+  "flow": [
+    "inbound_message_or_attachment",
+    "normalized_turn_context",
+    "francisco_agent",
+    "mandatory_tool_router",
+    "StateWriter",
+    "composer",
+    "TurnOutput.final_message",
+    "guards",
+    "workflow_engine_lifecycle_actions",
+    "trace_and_why_answer"
+  ],
+  "responsibilities_by_layer": [
+    {
+      "layer": "Francisco Agent",
+      "responsibility": "Converses, understands intent, chooses next step and asks for tools.",
+      "mode": "AI with strict contract"
+    },
+    {
+      "layer": "Catalog Resolver",
+      "responsibility": "Resolves canonical model, aliases, candidates and source facts.",
+      "mode": "deterministic tool/retrieval"
+    },
+    {
+      "layer": "Credit Plan Resolver",
+      "responsibility": "Converts income/work type into plan and enganche.",
+      "mode": "deterministic tenant data/config"
+    },
+    {
+      "layer": "Quote Resolver",
+      "responsibility": "Generates quote snapshot.",
+      "mode": "deterministic tool"
+    },
+    {
+      "layer": "Requirements Resolver",
+      "responsibility": "Returns documents by selected plan and missing docs.",
+      "mode": "deterministic tool"
+    },
+    {
+      "layer": "StateWriter",
+      "responsibility": "Accepts/rejects writes and invalidates stale quote state.",
+      "mode": "deterministic policy"
+    },
+    {
+      "layer": "Workflow Engine",
+      "responsibility": "Emits and executes business events, followups, handoff and stage moves.",
+      "mode": "deterministic engine"
+    }
+  ],
+  "ai_may": [
+    "classify conversational intent",
+    "decide whether more information is needed",
+    "select required deterministic tools",
+    "draft natural copy from structured evidence",
+    "explain ambiguity",
+    "recommend handoff with structured reason"
+  ],
+  "ai_must_not": [
+    "invent commercial facts",
+    "save contact fields directly",
+    "decide pipeline stage directly",
+    "mark documents complete without evidence",
+    "trigger workflows directly",
+    "hardcode Dinamo rules inside agent_runtime_v2"
+  ],
+  "deterministic_owns": [
+    "catalog identity and ambiguity",
+    "credit plan and enganche mapping",
+    "quote snapshots and stale quote invalidation",
+    "requirements and missing documents",
+    "document accepted/rejected/complete state",
+    "accepted customer fields",
+    "workflow trigger payloads",
+    "side-effect idempotency",
+    "audit traces"
+  ],
+  "mandatory_tools": [
+    "catalog.retrieve",
+    "credit_plan.resolve",
+    "quote.resolve",
+    "requirements.retrieve",
+    "faq.retrieve",
+    "document.check"
+  ],
+  "workflow_events": [
+    "lead_started",
+    "plan_identified",
+    "quote_sent",
+    "docs_requested",
+    "document_received",
+    "docs_incomplete",
+    "docs_complete",
+    "handoff_required",
+    "followup_1d",
+    "followup_3d",
+    "followup_7d",
+    "closed"
+  ],
+  "guards_block": [
+    "price/payment text without trusted quote evidence",
+    "stale quote text",
+    "cash quote for accepted credit intent",
+    "repeated questions when state is accepted",
+    "handoff without structured reason",
+    "document lifecycle updates without evidence",
+    "duplicate side effects",
+    "tool/action payloads becoming final visible copy"
+  ],
+  "acceptance_statement": "Every visible fact is traceable to a tool, accepted state, tenant config or cited KB source; every side effect is traceable to a deterministic event/action."
+}

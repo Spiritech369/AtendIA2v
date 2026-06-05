@@ -23,7 +23,13 @@ const loginSchema = z.object({
   password: z.string().min(1, "Requerido"),
 });
 type LoginValues = z.infer<typeof loginSchema>;
-const DEMO_LOGIN = { email: "admin@demo.com", password: "admin123" } satisfies LoginValues;
+const DEMO_LOGIN_ENABLED = import.meta.env.VITE_ENABLE_DEMO_LOGIN === "true";
+const DEMO_LOGIN = DEMO_LOGIN_ENABLED
+  ? ({
+      email: import.meta.env.VITE_DEMO_LOGIN_EMAIL ?? "",
+      password: import.meta.env.VITE_DEMO_LOGIN_PASSWORD ?? "",
+    } satisfies LoginValues)
+  : null;
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -101,7 +107,7 @@ function LoginPage() {
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Iniciando…" : "Entrar"}
               </Button>
-              {import.meta.env.DEV && (
+              {DEMO_LOGIN && DEMO_LOGIN.email && DEMO_LOGIN.password && (
                 <Button
                   type="button"
                   variant="outline"
@@ -112,7 +118,7 @@ function LoginPage() {
                     void onSubmit(DEMO_LOGIN);
                   }}
                 >
-                  Entrar con demo
+                  Usar cuenta demo
                 </Button>
               )}
             </form>

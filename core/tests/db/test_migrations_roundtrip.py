@@ -25,6 +25,7 @@ async def test_full_roundtrip_drops_and_recreates_all_tables():
         "conversation_state",
         "messages",
         "events",
+        "business_event_ledger",
         "turn_traces",
         "tool_calls",
         "tenant_pipelines",

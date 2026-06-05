@@ -1,5 +1,8 @@
 """Deterministic flow router (Phase 3c.2).
 
+Legacy status: KEEP_FALLBACK. AgentRuntime v2 tenants should use lifecycle and
+agent configuration instead of this pipeline-as-script router.
+
 Cada turno, evalúa una lista de FlowModeRule del JSONB del pipeline
 y devuelve el FlowMode correspondiente. Primer match gana. La regla
 'always' debe ser la última (fallback SUPPORT).

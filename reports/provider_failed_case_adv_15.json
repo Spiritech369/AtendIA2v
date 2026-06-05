@@ -1,0 +1,873 @@
+{
+  "summary": {
+    "provider_used": "openai",
+    "model": "gpt-4o-mini",
+    "provider_error_rate": 0.0,
+    "provider_429_count": 0,
+    "provider_timeout_count": 0,
+    "provider_5xx_count": 0,
+    "provider_retry_count": 0,
+    "provider_retry_exhausted_count": 0,
+    "provider_circuit_breaker_open_count": 0,
+    "provider_fallback_response_count": 0,
+    "provider_latency_p50": 1917,
+    "provider_latency_p95": 2977,
+    "provider_latency_p99": 2977,
+    "cases_total": 1,
+    "cases_passed": 0,
+    "cases_failed": 1,
+    "turns_total": 5,
+    "naturalidad_avg": 4.8,
+    "repeated_question_rate": 0.0,
+    "exact_response_repeat_rate": 0.0,
+    "repeated_slot_question_rate": 0.0,
+    "repeated_quote_without_request_rate": 0.0,
+    "repeated_requirements_without_request_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "price_amount_mismatch_rate": 0.0,
+    "quote_guard_blocks_total": 0,
+    "progress_guard_blocks_total": 0,
+    "progress_guard_block_rate": 0.0,
+    "sanitized_messages_count": 0,
+    "progress_guard_sanitized_messages_count": 0,
+    "generic_sanitizer_fallback_rate": 0.0,
+    "answer_relevance_rate": 0.4,
+    "documents_request_answered_rate": 0.0,
+    "conversation_progress_rate": 1.0,
+    "quote_active_phrase_rate": 0,
+    "side_effects": {
+      "whatsapp": 0,
+      "outbox": 0,
+      "database_writes": 0
+    },
+    "definition_of_done_pass": true
+  },
+  "cases": [
+    {
+      "case_id": "adv_15",
+      "title": "Cambio despues de documentos",
+      "source": "adversarial",
+      "pass_fail": "fail",
+      "final_pipeline_stage": "handoff",
+      "naturalidad_score": 4.8,
+      "repeated_question_detected": false,
+      "stale_quote_detected": false,
+      "robotic_phrase_score": 0.0,
+      "failures": [
+        "robotic_template"
+      ],
+      "human_review_notes": [
+        "composer_provider_error:ProviderRetryExhaustedError",
+        "composer_provider_error:ProviderRetryExhaustedError",
+        "composer_provider_error:ProviderRetryExhaustedError",
+        "composer_provider_error:ProviderRetryExhaustedError",
+        "composer_provider_error:ProviderRetryExhaustedError"
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "R4 por fuera"
+        },
+        {
+          "role": "assistant",
+          "text": "Necesito que una persona del equipo revise esto para responderte con certeza."
+        },
+        {
+          "role": "customer",
+          "text": "tengo 2 anos"
+        },
+        {
+          "role": "assistant",
+          "text": "Perfecto, tomo tu antiguedad laboral y seguimos con la validacion."
+        },
+        {
+          "role": "customer",
+          "text": "te mando INE"
+        },
+        {
+          "role": "assistant",
+          "text": "Recibido, tomo tu INE en cuenta y reviso el checklist."
+        },
+        {
+          "role": "customer",
+          "text": "mejor Adventure"
+        },
+        {
+          "role": "assistant",
+          "text": "Perfecto, cambio al nuevo modelo y reviso esa opcion con datos validados."
+        },
+        {
+          "role": "customer",
+          "text": "cotizame"
+        },
+        {
+          "role": "assistant",
+          "text": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones."
+        }
+      ],
+      "turns": [
+        {
+          "turn_index": 1,
+          "customer_message": "R4 por fuera",
+          "attachments": [],
+          "provider_used": "openai",
+          "raw_model_decision": null,
+          "raw_model_composer": {
+            "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "human_review_notes": [
+              "composer_provider_error:ProviderRetryExhaustedError"
+            ],
+            "used_quote_snapshot_id": null,
+            "used_quote_snapshot_hash": null
+          },
+          "advisor_decision": {
+            "understanding": "Provider call failed before AdvisorBrain decision could be completed.",
+            "customer_goal": "human_review",
+            "conversation_goals": [
+              "handoff"
+            ],
+            "known_facts": {},
+            "missing_facts": [],
+            "next_best_action": "handoff",
+            "required_tools": [],
+            "proposed_state_changes": [],
+            "response_plan": "Ask a human to review because provider timed out.",
+            "confidence": 0.0,
+            "needs_human": true,
+            "risk_flags": [
+              "provider_timeout_or_error"
+            ],
+            "latest_customer_act": null,
+            "new_information_detected": false,
+            "answered_slot": null,
+            "should_ask_question": false,
+            "question_slot": null,
+            "conversation_progress_action": null,
+            "metadata": {
+              "provider_used": "openai_advisor_brain",
+              "model": "gpt-4o-mini",
+              "latency_ms": 2976,
+              "raw_model_decision": null,
+              "provider_error_type": "ProviderRetryExhaustedError",
+              "provider_reliability": {
+                "provider_error_rate": 0.0,
+                "provider_429_count": 0,
+                "provider_timeout_count": 0,
+                "provider_5xx_count": 0,
+                "provider_retry_count": 0,
+                "provider_retry_exhausted_count": 0,
+                "provider_circuit_breaker_open_count": 0,
+                "provider_fallback_response_count": 0,
+                "provider_latency_p50": 2977,
+                "provider_latency_p95": 2977,
+                "provider_latency_p99": 2977,
+                "provider_call_count": 1,
+                "provider_error_count": 0,
+                "circuit_state": "closed",
+                "last_error_kind": null
+              }
+            }
+          },
+          "tool_calls": [],
+          "state_updates": [],
+          "blocked_updates": [],
+          "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+          "quote_snapshot_id": null,
+          "quote_snapshot_hash": null,
+          "quote_safety": {
+            "allowed": true,
+            "visible_price_detected": false,
+            "failures": [],
+            "quote_snapshot_id": null,
+            "quote_snapshot_hash": null,
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "price_mentions_count": 0,
+              "matched_snapshot_amounts": 0,
+              "unmatched_amounts": []
+            },
+            "has_visible_quote": false,
+            "action": "allowed",
+            "mode": "block",
+            "reason": null
+          },
+          "conversation_progress_guard": {
+            "allowed": true,
+            "repeat_detected": false,
+            "repeat_type": null,
+            "failures": [],
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "similarity_to_last_assistant": 0.0,
+              "repeated_slot": null,
+              "repeated_action": null
+            },
+            "mode": "block",
+            "action": "allowed"
+          },
+          "provider_reliability": {
+            "advisor_brain": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 2977,
+              "provider_latency_p95": 2977,
+              "provider_latency_p99": 2977,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            },
+            "composer": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 2048,
+              "provider_latency_p95": 2048,
+              "provider_latency_p99": 2048,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            }
+          },
+          "previous_assistant_message": "",
+          "quote_context_notes": [],
+          "robotic_phrase_score": 0,
+          "repeated_question_detected": false,
+          "stale_quote_detected": false,
+          "human_review_notes": [
+            "composer_provider_error:ProviderRetryExhaustedError"
+          ],
+          "pipeline_stage": "handoff",
+          "hard_validation_failures": []
+        },
+        {
+          "turn_index": 2,
+          "customer_message": "tengo 2 anos",
+          "attachments": [],
+          "provider_used": "openai",
+          "raw_model_decision": null,
+          "raw_model_composer": {
+            "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "human_review_notes": [
+              "composer_provider_error:ProviderRetryExhaustedError"
+            ],
+            "used_quote_snapshot_id": null,
+            "used_quote_snapshot_hash": null
+          },
+          "advisor_decision": {
+            "understanding": "Provider call failed before AdvisorBrain decision could be completed.",
+            "customer_goal": "human_review",
+            "conversation_goals": [
+              "handoff"
+            ],
+            "known_facts": {},
+            "missing_facts": [],
+            "next_best_action": "handoff",
+            "required_tools": [],
+            "proposed_state_changes": [],
+            "response_plan": "Ask a human to review because provider timed out.",
+            "confidence": 0.0,
+            "needs_human": true,
+            "risk_flags": [
+              "provider_timeout_or_error"
+            ],
+            "latest_customer_act": null,
+            "new_information_detected": false,
+            "answered_slot": null,
+            "should_ask_question": false,
+            "question_slot": null,
+            "conversation_progress_action": null,
+            "metadata": {
+              "provider_used": "openai_advisor_brain",
+              "model": "gpt-4o-mini",
+              "latency_ms": 2321,
+              "raw_model_decision": null,
+              "provider_error_type": "ProviderRetryExhaustedError",
+              "provider_reliability": {
+                "provider_error_rate": 0.0,
+                "provider_429_count": 0,
+                "provider_timeout_count": 0,
+                "provider_5xx_count": 0,
+                "provider_retry_count": 0,
+                "provider_retry_exhausted_count": 0,
+                "provider_circuit_breaker_open_count": 0,
+                "provider_fallback_response_count": 0,
+                "provider_latency_p50": 2321,
+                "provider_latency_p95": 2321,
+                "provider_latency_p99": 2321,
+                "provider_call_count": 1,
+                "provider_error_count": 0,
+                "circuit_state": "closed",
+                "last_error_kind": null
+              }
+            }
+          },
+          "tool_calls": [],
+          "state_updates": [],
+          "blocked_updates": [],
+          "final_message": "Perfecto, tomo tu antiguedad laboral y seguimos con la validacion.",
+          "quote_snapshot_id": null,
+          "quote_snapshot_hash": null,
+          "quote_safety": {
+            "allowed": true,
+            "visible_price_detected": false,
+            "failures": [],
+            "quote_snapshot_id": null,
+            "quote_snapshot_hash": null,
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "price_mentions_count": 0,
+              "matched_snapshot_amounts": 0,
+              "unmatched_amounts": []
+            },
+            "has_visible_quote": false,
+            "action": "allowed",
+            "mode": "block",
+            "reason": null
+          },
+          "conversation_progress_guard": {
+            "allowed": true,
+            "repeat_detected": false,
+            "repeat_type": null,
+            "failures": [],
+            "sanitized_message": "Perfecto, tomo tu antiguedad laboral y seguimos con la validacion.",
+            "metrics": {
+              "similarity_to_last_assistant": 0.2797,
+              "repeated_slot": null,
+              "repeated_action": null
+            },
+            "mode": "block",
+            "action": "allowed"
+          },
+          "provider_reliability": {
+            "advisor_brain": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 2321,
+              "provider_latency_p95": 2321,
+              "provider_latency_p99": 2321,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            },
+            "composer": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1888,
+              "provider_latency_p95": 1888,
+              "provider_latency_p99": 1888,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            }
+          },
+          "previous_assistant_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+          "quote_context_notes": [],
+          "robotic_phrase_score": 0,
+          "repeated_question_detected": false,
+          "stale_quote_detected": false,
+          "human_review_notes": [
+            "composer_provider_error:ProviderRetryExhaustedError"
+          ],
+          "pipeline_stage": "handoff",
+          "hard_validation_failures": []
+        },
+        {
+          "turn_index": 3,
+          "customer_message": "te mando INE",
+          "attachments": [
+            {
+              "kind": "ine",
+              "filename": "ine_adv_15.jpg"
+            }
+          ],
+          "provider_used": "openai",
+          "raw_model_decision": null,
+          "raw_model_composer": {
+            "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "human_review_notes": [
+              "composer_provider_error:ProviderRetryExhaustedError"
+            ],
+            "used_quote_snapshot_id": null,
+            "used_quote_snapshot_hash": null
+          },
+          "advisor_decision": {
+            "understanding": "Provider call failed before AdvisorBrain decision could be completed.",
+            "customer_goal": "human_review",
+            "conversation_goals": [
+              "handoff"
+            ],
+            "known_facts": {},
+            "missing_facts": [],
+            "next_best_action": "handoff",
+            "required_tools": [],
+            "proposed_state_changes": [],
+            "response_plan": "Ask a human to review because provider timed out.",
+            "confidence": 0.0,
+            "needs_human": true,
+            "risk_flags": [
+              "provider_timeout_or_error"
+            ],
+            "latest_customer_act": null,
+            "new_information_detected": false,
+            "answered_slot": null,
+            "should_ask_question": false,
+            "question_slot": null,
+            "conversation_progress_action": null,
+            "metadata": {
+              "provider_used": "openai_advisor_brain",
+              "model": "gpt-4o-mini",
+              "latency_ms": 1959,
+              "raw_model_decision": null,
+              "provider_error_type": "ProviderRetryExhaustedError",
+              "provider_reliability": {
+                "provider_error_rate": 0.0,
+                "provider_429_count": 0,
+                "provider_timeout_count": 0,
+                "provider_5xx_count": 0,
+                "provider_retry_count": 0,
+                "provider_retry_exhausted_count": 0,
+                "provider_circuit_breaker_open_count": 0,
+                "provider_fallback_response_count": 0,
+                "provider_latency_p50": 1959,
+                "provider_latency_p95": 1959,
+                "provider_latency_p99": 1959,
+                "provider_call_count": 1,
+                "provider_error_count": 0,
+                "circuit_state": "closed",
+                "last_error_kind": null
+              }
+            }
+          },
+          "tool_calls": [],
+          "state_updates": [],
+          "blocked_updates": [],
+          "final_message": "Recibido, tomo tu INE en cuenta y reviso el checklist.",
+          "quote_snapshot_id": null,
+          "quote_snapshot_hash": null,
+          "quote_safety": {
+            "allowed": true,
+            "visible_price_detected": false,
+            "failures": [],
+            "quote_snapshot_id": null,
+            "quote_snapshot_hash": null,
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "price_mentions_count": 0,
+              "matched_snapshot_amounts": 0,
+              "unmatched_amounts": []
+            },
+            "has_visible_quote": false,
+            "action": "allowed",
+            "mode": "block",
+            "reason": null
+          },
+          "conversation_progress_guard": {
+            "allowed": true,
+            "repeat_detected": false,
+            "repeat_type": null,
+            "failures": [],
+            "sanitized_message": "Recibido, tomo tu INE en cuenta y reviso el checklist.",
+            "metrics": {
+              "similarity_to_last_assistant": 0.4833,
+              "repeated_slot": null,
+              "repeated_action": null
+            },
+            "mode": "block",
+            "action": "allowed"
+          },
+          "provider_reliability": {
+            "advisor_brain": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1959,
+              "provider_latency_p95": 1959,
+              "provider_latency_p99": 1959,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            },
+            "composer": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1917,
+              "provider_latency_p95": 1917,
+              "provider_latency_p99": 1917,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            }
+          },
+          "previous_assistant_message": "Perfecto, tomo tu antiguedad laboral y seguimos con la validacion.",
+          "quote_context_notes": [],
+          "robotic_phrase_score": 0,
+          "repeated_question_detected": false,
+          "stale_quote_detected": false,
+          "human_review_notes": [
+            "composer_provider_error:ProviderRetryExhaustedError"
+          ],
+          "pipeline_stage": "handoff",
+          "hard_validation_failures": [
+            "robotic_template"
+          ]
+        },
+        {
+          "turn_index": 4,
+          "customer_message": "mejor Adventure",
+          "attachments": [],
+          "provider_used": "openai",
+          "raw_model_decision": null,
+          "raw_model_composer": {
+            "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "human_review_notes": [
+              "composer_provider_error:ProviderRetryExhaustedError"
+            ],
+            "used_quote_snapshot_id": null,
+            "used_quote_snapshot_hash": null
+          },
+          "advisor_decision": {
+            "understanding": "Provider call failed before AdvisorBrain decision could be completed.",
+            "customer_goal": "human_review",
+            "conversation_goals": [
+              "handoff"
+            ],
+            "known_facts": {},
+            "missing_facts": [],
+            "next_best_action": "handoff",
+            "required_tools": [],
+            "proposed_state_changes": [],
+            "response_plan": "Ask a human to review because provider timed out.",
+            "confidence": 0.0,
+            "needs_human": true,
+            "risk_flags": [
+              "provider_timeout_or_error"
+            ],
+            "latest_customer_act": null,
+            "new_information_detected": false,
+            "answered_slot": null,
+            "should_ask_question": false,
+            "question_slot": null,
+            "conversation_progress_action": null,
+            "metadata": {
+              "provider_used": "openai_advisor_brain",
+              "model": "gpt-4o-mini",
+              "latency_ms": 1917,
+              "raw_model_decision": null,
+              "provider_error_type": "ProviderRetryExhaustedError",
+              "provider_reliability": {
+                "provider_error_rate": 0.0,
+                "provider_429_count": 0,
+                "provider_timeout_count": 0,
+                "provider_5xx_count": 0,
+                "provider_retry_count": 0,
+                "provider_retry_exhausted_count": 0,
+                "provider_circuit_breaker_open_count": 0,
+                "provider_fallback_response_count": 0,
+                "provider_latency_p50": 1917,
+                "provider_latency_p95": 1917,
+                "provider_latency_p99": 1917,
+                "provider_call_count": 1,
+                "provider_error_count": 0,
+                "circuit_state": "closed",
+                "last_error_kind": null
+              }
+            }
+          },
+          "tool_calls": [],
+          "state_updates": [],
+          "blocked_updates": [],
+          "final_message": "Perfecto, cambio al nuevo modelo y reviso esa opcion con datos validados.",
+          "quote_snapshot_id": null,
+          "quote_snapshot_hash": null,
+          "quote_safety": {
+            "allowed": true,
+            "visible_price_detected": false,
+            "failures": [],
+            "quote_snapshot_id": null,
+            "quote_snapshot_hash": null,
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "price_mentions_count": 0,
+              "matched_snapshot_amounts": 0,
+              "unmatched_amounts": []
+            },
+            "has_visible_quote": false,
+            "action": "allowed",
+            "mode": "block",
+            "reason": null
+          },
+          "conversation_progress_guard": {
+            "allowed": true,
+            "repeat_detected": false,
+            "repeat_type": null,
+            "failures": [],
+            "sanitized_message": "Perfecto, cambio al nuevo modelo y reviso esa opcion con datos validados.",
+            "metrics": {
+              "similarity_to_last_assistant": 0.0,
+              "repeated_slot": null,
+              "repeated_action": null
+            },
+            "mode": "block",
+            "action": "allowed"
+          },
+          "provider_reliability": {
+            "advisor_brain": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1917,
+              "provider_latency_p95": 1917,
+              "provider_latency_p99": 1917,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            },
+            "composer": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1872,
+              "provider_latency_p95": 1872,
+              "provider_latency_p99": 1872,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            }
+          },
+          "previous_assistant_message": "Recibido, tomo tu INE en cuenta y reviso el checklist.",
+          "quote_context_notes": [],
+          "robotic_phrase_score": 0,
+          "repeated_question_detected": false,
+          "stale_quote_detected": false,
+          "human_review_notes": [
+            "composer_provider_error:ProviderRetryExhaustedError"
+          ],
+          "pipeline_stage": "handoff",
+          "hard_validation_failures": []
+        },
+        {
+          "turn_index": 5,
+          "customer_message": "cotizame",
+          "attachments": [],
+          "provider_used": "openai",
+          "raw_model_decision": null,
+          "raw_model_composer": {
+            "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "human_review_notes": [
+              "composer_provider_error:ProviderRetryExhaustedError"
+            ],
+            "used_quote_snapshot_id": null,
+            "used_quote_snapshot_hash": null
+          },
+          "advisor_decision": {
+            "understanding": "Provider call failed before AdvisorBrain decision could be completed.",
+            "customer_goal": "human_review",
+            "conversation_goals": [
+              "handoff"
+            ],
+            "known_facts": {},
+            "missing_facts": [],
+            "next_best_action": "handoff",
+            "required_tools": [],
+            "proposed_state_changes": [],
+            "response_plan": "Ask a human to review because provider timed out.",
+            "confidence": 0.0,
+            "needs_human": true,
+            "risk_flags": [
+              "provider_timeout_or_error"
+            ],
+            "latest_customer_act": null,
+            "new_information_detected": false,
+            "answered_slot": null,
+            "should_ask_question": false,
+            "question_slot": null,
+            "conversation_progress_action": null,
+            "metadata": {
+              "provider_used": "openai_advisor_brain",
+              "model": "gpt-4o-mini",
+              "latency_ms": 1802,
+              "raw_model_decision": null,
+              "provider_error_type": "ProviderRetryExhaustedError",
+              "provider_reliability": {
+                "provider_error_rate": 0.0,
+                "provider_429_count": 0,
+                "provider_timeout_count": 0,
+                "provider_5xx_count": 0,
+                "provider_retry_count": 0,
+                "provider_retry_exhausted_count": 0,
+                "provider_circuit_breaker_open_count": 0,
+                "provider_fallback_response_count": 0,
+                "provider_latency_p50": 1802,
+                "provider_latency_p95": 1802,
+                "provider_latency_p99": 1802,
+                "provider_call_count": 1,
+                "provider_error_count": 0,
+                "circuit_state": "closed",
+                "last_error_kind": null
+              }
+            }
+          },
+          "tool_calls": [],
+          "state_updates": [],
+          "blocked_updates": [],
+          "final_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+          "quote_snapshot_id": null,
+          "quote_snapshot_hash": null,
+          "quote_safety": {
+            "allowed": true,
+            "visible_price_detected": false,
+            "failures": [],
+            "quote_snapshot_id": null,
+            "quote_snapshot_hash": null,
+            "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+            "metrics": {
+              "price_mentions_count": 0,
+              "matched_snapshot_amounts": 0,
+              "unmatched_amounts": []
+            },
+            "has_visible_quote": false,
+            "action": "allowed",
+            "mode": "block",
+            "reason": null
+          },
+          "conversation_progress_guard": {
+            "allowed": true,
+            "repeat_detected": false,
+            "repeat_type": null,
+            "failures": [],
+            "sanitized_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+            "metrics": {
+              "similarity_to_last_assistant": 0.0,
+              "repeated_slot": null,
+              "repeated_action": null
+            },
+            "mode": "block",
+            "action": "allowed"
+          },
+          "provider_reliability": {
+            "advisor_brain": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1802,
+              "provider_latency_p95": 1802,
+              "provider_latency_p99": 1802,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            },
+            "composer": {
+              "provider_error_rate": 0.0,
+              "provider_429_count": 0,
+              "provider_timeout_count": 0,
+              "provider_5xx_count": 0,
+              "provider_retry_count": 0,
+              "provider_retry_exhausted_count": 0,
+              "provider_circuit_breaker_open_count": 0,
+              "provider_fallback_response_count": 0,
+              "provider_latency_p50": 1991,
+              "provider_latency_p95": 1991,
+              "provider_latency_p99": 1991,
+              "provider_call_count": 1,
+              "provider_error_count": 0,
+              "circuit_state": "closed",
+              "last_error_kind": null
+            }
+          },
+          "previous_assistant_message": "Perfecto, cambio al nuevo modelo y reviso esa opcion con datos validados.",
+          "quote_context_notes": [],
+          "robotic_phrase_score": 0,
+          "repeated_question_detected": false,
+          "stale_quote_detected": false,
+          "human_review_notes": [
+            "composer_provider_error:ProviderRetryExhaustedError"
+          ],
+          "pipeline_stage": "handoff",
+          "hard_validation_failures": []
+        }
+      ]
+    }
+  ],
+  "local_baseline_summary": {
+    "cases_total": 10,
+    "cases_passed": 10,
+    "cases_failed": 0,
+    "pass": true,
+    "average_naturalidad": 5.0,
+    "side_effects": {
+      "whatsapp": 0,
+      "outbox": 0,
+      "database_writes": 0
+    }
+  },
+  "comparison": {
+    "local_cases_passed": 10,
+    "provider_base_cases_passed": 0,
+    "provider_adversarial_cases_passed": 0,
+    "observations": [
+      "Local simulation is deterministic and only covers the original 10 cases.",
+      "Provider run uses GPT for AdvisorBrain and Composer, while tools and StateWriter stay deterministic.",
+      "Provider produced 1 cases with validation failures; inspect provider_advisor_first_eval.json."
+    ]
+  }
+}

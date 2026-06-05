@@ -40,6 +40,16 @@ services:
       dockerfile: Dockerfile
     container_name: atendia_backend
     restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        uv run alembic upgrade head &&
+        uv run uvicorn atendia.main:app
+        --host 0.0.0.0
+        --port 8001
+        --reload
+        --reload-dir atendia
     ports:
       - "8001:8001"
     env_file:

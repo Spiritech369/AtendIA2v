@@ -1,0 +1,119 @@
+{
+  "id": "beauty_barber_spa",
+  "name": "Beauty, Barber and Spa",
+  "description": "Booking, service selection and policy guidance for appointment-based beauty businesses.",
+  "industries": ["beauty", "barber", "spa"],
+  "contact_fields": [
+    {
+      "key": "requested_service",
+      "label": "Requested service",
+      "field_type": "text",
+      "ordering": 10,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.82,
+      "lifecycle_relevant": true
+    },
+    {
+      "key": "preferred_staff",
+      "label": "Preferred staff",
+      "field_type": "text",
+      "ordering": 20,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.85
+    },
+    {
+      "key": "preferred_time",
+      "label": "Preferred time",
+      "field_type": "text",
+      "ordering": 30,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.82,
+      "lifecycle_relevant": true
+    },
+    {
+      "key": "service_notes",
+      "label": "Service notes",
+      "field_type": "text",
+      "ordering": 40,
+      "write_policy": "ai_suggest",
+      "confidence_threshold": 0.88,
+      "sensitive": true
+    }
+  ],
+  "lifecycle_stages": [
+    {
+      "id": "new_booking_inquiry",
+      "name": "New booking inquiry",
+      "description": "Customer asks about service, price, duration or availability.",
+      "goal": "Answer with approved service and policy knowledge.",
+      "recommended_fields": ["requested_service"],
+      "allowed_actions": ["add_tag", "assign_conversation"],
+      "order": 10
+    },
+    {
+      "id": "appointment_requested",
+      "name": "Appointment requested",
+      "description": "Customer wants a booking or shares a desired time.",
+      "goal": "Capture one scheduling preference and route for booking confirmation.",
+      "recommended_fields": ["requested_service", "preferred_time", "preferred_staff"],
+      "recommended_actions": ["update_contact_field", "move_lifecycle"],
+      "allowed_actions": ["update_contact_field", "move_lifecycle", "assign_conversation", "add_tag"],
+      "order": 20
+    },
+    {
+      "id": "booking_confirmed",
+      "name": "Booking confirmed",
+      "description": "Appointment details are confirmed by the business.",
+      "goal": "Keep the conversation clear and avoid changing appointment facts without evidence.",
+      "recommended_actions": ["add_tag"],
+      "allowed_actions": ["add_tag", "assign_conversation"],
+      "order": 30
+    },
+    {
+      "id": "no_show_or_cancelled",
+      "name": "No show or cancelled",
+      "description": "Customer cancelled or did not attend.",
+      "goal": "Record the outcome and avoid automatic pressure.",
+      "allowed_actions": ["close_conversation", "add_tag"],
+      "is_lost_stage": true,
+      "order": 90
+    }
+  ],
+  "agent_template": {
+    "name": "Booking Assistant",
+    "role": "receptionist",
+    "tone": "friendly",
+    "language_policy": {"primary": "es-MX", "mode": "match_customer"},
+    "instructions": "Answer service, price, duration and policy questions using approved knowledge. Do not invent availability or discounts. Ask at most one next question, usually service or preferred time. Propose field updates and lifecycle changes only with customer evidence.",
+    "escalation_policy": {"mode": "human_on_booking_confirmation_or_low_confidence"}
+  },
+  "enabled_actions": ["update_contact_field", "move_lifecycle", "assign_conversation", "add_tag"],
+  "knowledge_categories": ["services", "pricing", "appointment_rules", "policy", "general"],
+  "workflow_templates": [
+    {
+      "id": "booking_request_notify",
+      "name": "Notify team on booking request",
+      "trigger_type": "agent_lifecycle_update_suggested",
+      "trigger_config": {"lifecycle_stage": "appointment_requested"},
+      "definition": {"nodes": [], "edges": []},
+      "active": false,
+      "stub": true
+    }
+  ],
+  "eval_scenarios": [
+    {
+      "id": "beauty_barber_spa_price",
+      "name": "Customer asks service price",
+      "input_message": "How much is a haircut?",
+      "expected_behaviors": ["answer_current_question", "cite_source"],
+      "forbidden_behaviors": ["invent_price"]
+    },
+    {
+      "id": "beauty_barber_spa_booking",
+      "name": "Customer asks for booking",
+      "input_message": "Can I book tomorrow afternoon?",
+      "expected_behaviors": ["answer_current_question"],
+      "expected_lifecycle": "appointment_requested"
+    }
+  ]
+}

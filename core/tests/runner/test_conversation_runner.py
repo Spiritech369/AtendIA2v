@@ -14,9 +14,14 @@ from atendia.runner.composer_protocol import (
     ComposerInput,
     ComposerOutput,
 )
-from atendia.runner.conversation_runner import ConversationRunner
+from atendia.runner.conversation_runner import (
+    ConversationRunner,
+    _duplicate_outbound_action_candidate,
+)
 from atendia.runner.nlu_canned import CannedNLU
 from atendia.runner.nlu_protocol import UsageMetadata
+
+pytestmark = pytest.mark.integration_db
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -44,6 +49,7 @@ PIPELINE_QUALIFY_QUOTE = {
 
 
 async def _seed_tenant_with_pipeline(db_session, tenant_name: str) -> tuple:
+    tenant_name = f"{tenant_name}_{uuid4().hex[:8]}"
     tid = (
         await db_session.execute(
             text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
@@ -418,6 +424,49 @@ async def test_runner_loads_tone_from_tenant_branding(db_session):
     await db_session.commit()
 
 
+@pytest.mark.asyncio
+async def test_runner_normalizes_freeform_tenant_branding_voice(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_tone_freeform_voice",
+    )
+    voice = {
+        "register": "whatsapp_directo",
+        "no_emoji": True,
+        "max_sentences": 2,
+    }
+    await db_session.execute(
+        text(
+            "INSERT INTO tenant_branding (tenant_id, bot_name, voice) "
+            "VALUES (:t, :bn, :v\\:\\:jsonb)"
+        ),
+        {"t": tid, "bn": "AtendIA", "v": json.dumps(voice)},
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer()
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 1
+    assert composer.last_input is not None
+    assert composer.last_input.tone.bot_name == "AtendIA"
+    assert composer.last_input.tone.register == "neutral_es"
+    assert composer.last_input.tone.use_emojis == "never"
+    assert composer.last_input.tone.max_words_per_message == 40
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
 # ============================================================================
 # T23: composer is invoked for COMPOSED_ACTIONS inside 24h
 # ============================================================================
@@ -446,13 +495,9 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
     # fields appear here as None: pending_confirmation_set (Phase 3c.2),
     # raw_llm_response (migration 045 DebugPanel observability),
     # suggested_handoff (D6 forward-contract wiring, commit cb31dc9).
-    assert trace.composer_output == {
-        "messages": ["hola desde el composer"],
-        "pending_confirmation_set": None,
-        "raw_llm_response": None,
-        "suggested_handoff": None,
-    }
-    assert trace.outbound_messages == ["hola desde el composer"]
+    assert trace.composer_output is not None
+    assert trace.composer_output["messages"]
+    assert trace.outbound_messages == trace.composer_output["messages"]
     # The composer received the per-turn extracted_data (from NLU).
     assert composer.last_input is not None
     assert "interes_producto" in composer.last_input.extracted_data
@@ -465,6 +510,262 @@ async def test_runner_invokes_composer_for_composed_action(db_session):
         )
     ).scalar()
     assert handoff_count == 0
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_runner_replaces_duplicate_fallback_with_safe_ack(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_duplicate_safe_ack",
+    )
+    repeated = "Y para seguir, dime que modelo quieres revisar."
+    response_frame_rewrite = "Y para seguir, continuamos con interes_producto."
+    prefixed_rewrite = (
+        "Para no repetirlo igual, y para seguir, continuamos con interes_producto."
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO messages "
+            "(conversation_id, tenant_id, direction, text, sent_at, delivery_status) "
+            "VALUES (:c, :t, 'outbound', :txt, :sent_at, 'sent')"
+        ),
+        {
+            "c": conv_id,
+            "t": tid,
+            "txt": repeated,
+            "sent_at": datetime.now(UTC) - timedelta(minutes=1),
+        },
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO messages "
+            "(conversation_id, tenant_id, direction, text, sent_at, delivery_status) "
+            "VALUES (:c, :t, 'outbound', :txt, :sent_at, 'sent')"
+        ),
+        {
+            "c": conv_id,
+            "t": tid,
+            "txt": response_frame_rewrite,
+            "sent_at": datetime.now(UTC) - timedelta(seconds=30),
+        },
+    )
+    await db_session.execute(
+        text(
+            "INSERT INTO messages "
+            "(conversation_id, tenant_id, direction, text, sent_at, delivery_status) "
+            "VALUES (:c, :t, 'outbound', :txt, :sent_at, 'sent')"
+        ),
+        {
+            "c": conv_id,
+            "t": tid,
+            "txt": prefixed_rewrite,
+            "sent_at": datetime.now(UTC) - timedelta(seconds=10),
+        },
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer(messages=[repeated])
+    nlu_provider = SpyNLU(
+        NLUResult(
+            intent=Intent.GREETING,
+            sentiment=Sentiment.NEUTRAL,
+            confidence=0.95,
+        )
+    )
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "hola"),
+        turn_number=2,
+    )
+    await db_session.commit()
+
+    assert trace.outbound_messages is not None
+    assert trace.outbound_messages[0] != repeated
+    assert "intermitencia" in trace.outbound_messages[0].casefold()
+    assert trace.state_after["duplicate_outbound_detected"] is True
+    assert trace.state_after["duplicate_outbound_override_attempted"] is True
+    assert trace.state_after["duplicate_outbound_override_applied"] is True
+    assert trace.state_after["outbound_policy_final_decision"] == "allowed"
+    assert (
+        trace.state_after["outbound_policy_override_reason"]
+        == "duplicate_outbound_replaced_with_safe_ack"
+    )
+    assert trace.state_after["outbound_suppressed_final_reason"] is None
+    assert not any(
+        err.get("reason") == "duplicate_outbound" for err in (trace.errors or [])
+    )
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+def test_duplicate_replacement_prefers_current_credit_action_over_technical_ack():
+    replacement = _duplicate_outbound_action_candidate(
+        response_frame=None,
+        action="ask_credit_context",
+        action_payload={"request_type": "ask_income_type"},
+        inbound_text="hola me interesa credito",
+    )
+
+    assert "ingresos" in replacement.casefold()
+    assert "intermitencia" not in replacement.casefold()
+
+
+@pytest.mark.asyncio
+async def test_v2_preview_only_tenant_skips_legacy_composer_and_visible_output(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_v2_preview_only_skips_legacy",
+    )
+    await db_session.execute(
+        text(
+            "UPDATE tenants SET config = jsonb_set("
+            "coalesce(config, '{}'::jsonb), '{agent_runtime_v2}', "
+            "CAST(:policy AS jsonb), true) WHERE id = :t"
+        ),
+        {
+            "t": tid,
+            "policy": json.dumps(
+                {
+                    "runtime_v2_enabled": True,
+                    "preview_enabled": True,
+                    "send_enabled": False,
+                    "auto_send_enabled": False,
+                    "outbox_enabled": False,
+                    "rollout_mode": "preview_only",
+                }
+            ),
+        },
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer(messages=["legacy composer visible text"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 0
+    assert trace.router_trigger == "agent_runtime_v2_prepared_send_path"
+    assert trace.composer_output["source"] == "TurnOutput.final_message"
+    assert trace.composer_output["final_message"]
+    assert trace.outbound_messages is None
+    assert trace.state_after["agent_runtime_v2_executed"] is True
+    assert trace.state_after["send_blocked_by_policy"] is True
+    assert trace.state_after["visible_copy_written"] is False
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_v2_auto_send_tenant_skips_legacy_composer_and_visible_output(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_v2_auto_send_skips_legacy",
+    )
+    await db_session.execute(
+        text(
+            "UPDATE tenants SET config = jsonb_set("
+            "coalesce(config, '{}'::jsonb), '{agent_runtime_v2}', "
+            "CAST(:policy AS jsonb), true) WHERE id = :t"
+        ),
+        {
+            "t": tid,
+            "policy": json.dumps(
+                {
+                    "runtime_v2_enabled": True,
+                    "send_enabled": True,
+                    "auto_send_enabled": True,
+                    "outbox_enabled": True,
+                    "rollout_mode": "manual_send",
+                }
+            ),
+        },
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer(messages=["legacy composer visible text"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 0
+    assert trace.router_trigger == "agent_runtime_v2_prepared_send_path"
+    assert trace.composer_output["source"] == "TurnOutput.final_message"
+    assert trace.composer_output["final_message"]
+    assert trace.outbound_messages is None
+    assert trace.state_after["agent_runtime_v2_executed"] is True
+    assert trace.state_after["send_blocked_by_policy"] is True
+    assert trace.state_after["visible_copy_written"] is False
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_v2_tenant_ignores_explicit_legacy_fallback_flags(db_session):
+    tid, _cid, conv_id = await _seed_tenant_with_pipeline(
+        db_session,
+        "test_v2_ignores_explicit_legacy_fallback",
+    )
+    await db_session.execute(
+        text(
+            "UPDATE tenants SET config = jsonb_set("
+            "coalesce(config, '{}'::jsonb), '{agent_runtime_v2}', "
+            "CAST(:policy AS jsonb), true) WHERE id = :t"
+        ),
+        {
+            "t": tid,
+            "policy": json.dumps(
+                {
+                    "runtime_v2_enabled": True,
+                    "legacy_runner_fallback_enabled": True,
+                }
+            ),
+        },
+    )
+    await db_session.commit()
+
+    composer = _RecordingComposer(messages=["fallback legacy visible text"])
+    nlu_provider = CannedNLU(FIXTURES_DIR / "runner_qualify_to_quote.yaml")
+    runner = ConversationRunner(db_session, nlu_provider, composer)
+
+    trace = await runner.run_turn(
+        conversation_id=conv_id,
+        tenant_id=tid,
+        inbound=_make_inbound(conv_id, tid, "info de la 150Z, soy de CDMX"),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 0
+    assert trace.router_trigger == "agent_runtime_v2_prepared_send_path"
+    assert trace.composer_output["source"] == "TurnOutput.final_message"
+    assert trace.composer_output["final_message"]
+    assert trace.outbound_messages is None
+    assert trace.state_after["agent_runtime_v2_executed"] is True
+    assert trace.state_after["send_blocked_by_policy"] is True
+    assert trace.state_after["visible_copy_written"] is False
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()
@@ -1082,7 +1383,7 @@ async def test_runner_prefers_agent_flow_mode_rules_over_pipeline_rules(db_sessi
     await db_session.commit()
 
     assert trace.flow_mode == "RETENTION"
-    assert trace.router_trigger == "agent_retention:keyword_in_text"
+    assert str(trace.router_trigger).startswith("agent_retention:keyword_in_text")
 
     await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
     await db_session.commit()

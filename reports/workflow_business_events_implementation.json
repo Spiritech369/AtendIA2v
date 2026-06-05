@@ -1,0 +1,128 @@
+{
+  "generated_at": "2026-06-05",
+  "decision": "WORKFLOW_BUSINESS_EVENTS_READY",
+  "traffic_real_started": false,
+  "whatsapp_sent": false,
+  "live_config_applied": false,
+  "actions_or_workflows_enabled_live": false,
+  "files": [
+    "core/atendia/agent_runtime/business_events.py",
+    "core/atendia/agent_runtime/universal_turn_trace.py",
+    "core/atendia/agent_runtime/advisor_pipeline.py",
+    "core/atendia/agent_runtime/workflow_events.py",
+    "core/atendia/agent_runtime/tenant_domain_contract.py",
+    "core/tests/agent_runtime/test_business_events.py"
+  ],
+  "schema": {
+    "BusinessEvent": [
+      "event_id",
+      "event_type",
+      "tenant_id",
+      "agent_id",
+      "conversation_id",
+      "contact_id",
+      "domain",
+      "source",
+      "triggered_by",
+      "evidence_refs",
+      "payload",
+      "idempotency_key",
+      "status",
+      "reason"
+    ],
+    "WorkflowResult": [
+      "event_type",
+      "idempotency_key",
+      "status",
+      "dry_run",
+      "reason",
+      "side_effects_allowed"
+    ]
+  },
+  "supported_universal_events": [
+    "lead_started",
+    "intent_identified",
+    "selection_identified",
+    "plan_identified",
+    "offer_quoted",
+    "requirements_requested",
+    "document_received",
+    "requirements_partial",
+    "requirements_complete",
+    "human_handoff_requested",
+    "followup_scheduled",
+    "policy_blocked",
+    "conversation_closed"
+  ],
+  "tenant_declared_events_supported": true,
+  "derivation_sources": {
+    "state_writer": [
+      "selection_identified",
+      "plan_identified",
+      "requirements_complete"
+    ],
+    "tools": [
+      "offer_quoted",
+      "requirements_requested",
+      "document_received",
+      "requirements_partial"
+    ],
+    "guards": [
+      "policy_blocked"
+    ],
+    "lifecycle": [
+      "conversation_closed",
+      "tenant_declared_lifecycle_events"
+    ],
+    "system": [
+      "lead_started",
+      "intent_identified",
+      "human_handoff_requested",
+      "followup_scheduled"
+    ]
+  },
+  "keyword_triggering_allowed": false,
+  "idempotency": {
+    "stable_keys": true,
+    "duplicate_suppression_within_bundle": true,
+    "examples": [
+      "lead_started:{tenant_id}:{conversation_id}",
+      "selection_identified:{tenant_id}:{conversation_id}:{field}:{value_hash}",
+      "offer_quoted:{tenant_id}:{conversation_id}:{quote_snapshot_id}",
+      "document_received:{tenant_id}:{conversation_id}:{attachment_id}",
+      "human_handoff_requested:{tenant_id}:{conversation_id}:{reason}"
+    ]
+  },
+  "dry_run_and_side_effect_gating": {
+    "business_events_default_status": "dry_run",
+    "workflow_results_default_status": "dry-run",
+    "safe_mode_blocks_workflow_execution": true,
+    "real_workflow_execution_enabled": false,
+    "real_actions_enabled": false
+  },
+  "universal_turn_trace": {
+    "business_events_included": true,
+    "workflow_results_included": true,
+    "path": "TurnOutput.trace_metadata.universal_turn_trace"
+  },
+  "validation": [
+    {
+      "command": "uv run ruff check atendia/agent_runtime/business_events.py atendia/agent_runtime/workflow_events.py atendia/agent_runtime/universal_turn_trace.py atendia/agent_runtime/advisor_pipeline.py tests/agent_runtime/test_business_events.py",
+      "result": "All checks passed"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_business_events.py tests/agent_runtime/test_universal_turn_trace.py tests/agent_runtime/test_declarative_state_writer.py tests/agent_runtime/test_mandatory_tool_contract.py tests/agent_runtime/test_tenant_domain_contract.py -q",
+      "result": "50 passed, 1 warning"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "201 passed, 30 deselected, 2 warnings"
+    }
+  ],
+  "risks_remaining": [
+    "Production workflow execution still needs a separate approval gate and persistence-backed idempotency ledger.",
+    "Cross-turn duplicate suppression depends on stable keys being honored by the future persistence/execution layer.",
+    "Global lint/test debt outside scoped files was not addressed."
+  ],
+  "recommended_next_step": "Add a persistence-backed idempotency ledger before enabling real workflow side effects."
+}

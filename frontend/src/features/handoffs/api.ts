@@ -96,6 +96,7 @@ export interface HandoffCommandItem {
   related_history: string[];
   knowledge_gap_topic: string | null;
   ai_rule: string;
+  source?: "mock" | "stored";
 }
 
 export interface SummaryCards {

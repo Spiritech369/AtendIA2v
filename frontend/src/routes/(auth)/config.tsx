@@ -8,10 +8,10 @@ import { NLUConfigEditor } from "@/features/config/components/NLUConfigEditor";
 import { QosConfigEditor } from "@/features/config/components/QosConfigEditor";
 import { RunnerRulesEditor } from "@/features/config/components/RunnerRulesEditor";
 import { ToneEditor } from "@/features/config/components/ToneEditor";
-import { requireRole } from "@/lib/auth-guards";
+import { requireCapability } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/config")({
-  beforeLoad: requireRole(["tenant_admin", "superadmin"]),
+  beforeLoad: requireCapability("route.config", ["tenant_admin", "superadmin"]),
   component: ConfigPage,
 });
 

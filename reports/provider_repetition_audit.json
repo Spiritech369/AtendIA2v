@@ -1,0 +1,107 @@
+{
+  "summary": {
+    "entries_total": 3,
+    "categories": {
+      "exact_response_repeat": 1,
+      "same_slot_question_repeated": 0,
+      "quote_repeated_without_user_asking": 0,
+      "requirements_repeated_without_user_asking": 0,
+      "guard_fallback_repeated": 0,
+      "generic_cta_repeated": 0,
+      "advisor_next_action_stuck": 0,
+      "composer_ignored_new_user_signal": 2
+    }
+  },
+  "entries": [
+    {
+      "category": "exact_response_repeat",
+      "case_id": "adv_18",
+      "turn_index": 4,
+      "customer_message": "y la otra cuanto?",
+      "previous_assistant_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+      "current_assistant_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+      "similarity": 0.0,
+      "advisor_next_best_action": "handoff",
+      "latest_customer_act": null,
+      "known_facts": {},
+      "quote_guard_result": {
+        "allowed": true,
+        "visible_price_detected": false,
+        "failures": [],
+        "quote_snapshot_id": null,
+        "quote_snapshot_hash": null,
+        "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+        "metrics": {
+          "price_mentions_count": 0,
+          "matched_snapshot_amounts": 0,
+          "unmatched_amounts": []
+        },
+        "has_visible_quote": false,
+        "action": "allowed",
+        "mode": "block",
+        "reason": null
+      },
+      "suspected_root_cause": "Final assistant message matched the previous assistant message exactly."
+    },
+    {
+      "category": "composer_ignored_new_user_signal",
+      "case_id": "adv_24",
+      "turn_index": 5,
+      "customer_message": "cotizame",
+      "previous_assistant_message": "Perfecto, tomo tu antiguedad laboral y seguimos con la validacion.",
+      "current_assistant_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+      "similarity": 0.0,
+      "advisor_next_best_action": "handoff",
+      "latest_customer_act": null,
+      "known_facts": {},
+      "quote_guard_result": {
+        "allowed": true,
+        "visible_price_detected": false,
+        "failures": [],
+        "quote_snapshot_id": null,
+        "quote_snapshot_hash": null,
+        "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+        "metrics": {
+          "price_mentions_count": 0,
+          "matched_snapshot_amounts": 0,
+          "unmatched_amounts": []
+        },
+        "has_visible_quote": false,
+        "action": "allowed",
+        "mode": "block",
+        "reason": null
+      },
+      "suspected_root_cause": "Advisor or Composer did not incorporate the latest customer signal."
+    },
+    {
+      "category": "composer_ignored_new_user_signal",
+      "case_id": "adv_28",
+      "turn_index": 4,
+      "customer_message": "cotiza",
+      "previous_assistant_message": "Perfecto, tomo ese dato de ingresos y avanzo con el siguiente paso.",
+      "current_assistant_message": "Para cotizarte bien, dime que modelo quieres o elige una de las opciones.",
+      "similarity": 0.0,
+      "advisor_next_best_action": "handoff",
+      "latest_customer_act": null,
+      "known_facts": {},
+      "quote_guard_result": {
+        "allowed": true,
+        "visible_price_detected": false,
+        "failures": [],
+        "quote_snapshot_id": null,
+        "quote_snapshot_hash": null,
+        "sanitized_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+        "metrics": {
+          "price_mentions_count": 0,
+          "matched_snapshot_amounts": 0,
+          "unmatched_amounts": []
+        },
+        "has_visible_quote": false,
+        "action": "allowed",
+        "mode": "block",
+        "reason": null
+      },
+      "suspected_root_cause": "Advisor or Composer did not incorporate the latest customer signal."
+    }
+  ]
+}

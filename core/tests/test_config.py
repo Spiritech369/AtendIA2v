@@ -19,3 +19,15 @@ def test_composer_provider_default_is_openai():
     assert s.composer_timeout_s == 8.0
     assert s.composer_retry_delays_ms == [500, 2000]
     assert s.composer_max_messages == 2
+
+
+def test_agent_runtime_model_provider_is_disabled_by_default():
+    s = Settings(_env_file=None)  # type: ignore[arg-type]
+    assert s.agent_runtime_v2_enabled is False
+    assert s.agent_runtime_v2_send_enabled is False
+    assert s.agent_runtime_v2_actions_enabled is False
+    assert s.agent_runtime_v2_workflow_events_enabled is False
+    assert s.agent_runtime_v2_model_provider == "disabled"
+    assert s.agent_runtime_v2_model == "gpt-4o-mini"
+    assert s.agent_runtime_v2_model_timeout_s == 8.0
+    assert s.agent_runtime_v2_model_retry_delays_ms == [500, 2000]

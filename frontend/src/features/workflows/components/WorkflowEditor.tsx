@@ -289,7 +289,7 @@ function titleFor(node: WorkflowNode) {
 }
 
 function summaryFor(node: WorkflowNode, agentNameById?: Map<string, string>, triggerType?: string) {
-  const cfg = node.config;
+  const cfg = node.config ?? {};
   if (node.type === "trigger") {
     return triggerLabel(triggerType ?? String(cfg.event ?? "message_received"));
   }
@@ -349,7 +349,7 @@ function summaryFor(node: WorkflowNode, agentNameById?: Map<string, string>, tri
   }
   if (node.type === "request_documents") return "INE, comprobante, ingresos";
   if (node.type === "end") return String(cfg.result ?? "finaliza");
-  return String(cfg.intent ?? cfg.field ?? cfg.title ?? cfg.reason ?? "configuración lista");
+  return String(cfg.intent ?? cfg.field ?? cfg.title ?? cfg.reason ?? "Sin intent");
 }
 
 function readConfigString(configDraft: string, key: string): string {

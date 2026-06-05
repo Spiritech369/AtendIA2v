@@ -1,0 +1,95 @@
+{
+  "rc": "RC4 staging-readiness",
+  "generated_at": "2026-06-03T06:00:00Z",
+  "database": {
+    "harness": "docker-compose.test.yml postgres-test",
+    "url_env": "ATENDIA_TEST_DATABASE_URL",
+    "url_used": "postgresql+asyncpg://atendia:atendia@localhost:55432/atendia_test",
+    "migrations": "alembic upgrade head via pytest session harness",
+    "cleanup": "TRUNCATE public application tables RESTART IDENTITY CASCADE before and after each integration_db test; alembic_version preserved"
+  },
+  "commands": [
+    {
+      "name": "lint_scoped_rc4",
+      "command": "uv run ruff check atendia/config.py atendia/simulation/provider_advisor_first_eval.py tests/conftest.py tests/agent_runtime/test_action_layer_v2.py tests/agent_runtime/test_rollout_policy.py tests/agent_runtime/test_shadow_service.py tests/agent_runtime/test_rc4_db_idempotency.py",
+      "status": "pass",
+      "notes": "Scoped to RC4-touched files because full ruff check has pre-existing repository debt outside RC4."
+    },
+    {
+      "name": "unit_without_db",
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "status": "pass",
+      "passed": 142,
+      "deselected": 27
+    },
+    {
+      "name": "integration_db",
+      "command": "ATENDIA_TEST_DATABASE_URL=postgresql+asyncpg://atendia:atendia@localhost:55432/atendia_test uv run pytest tests/agent_runtime -m \"integration_db\" -q",
+      "status": "pass",
+      "passed": 27,
+      "deselected": 142
+    },
+    {
+      "name": "agent_runtime_full",
+      "command": "ATENDIA_TEST_DATABASE_URL=postgresql+asyncpg://atendia:atendia@localhost:55432/atendia_test uv run pytest tests/agent_runtime -q",
+      "status": "pass",
+      "passed": 169
+    },
+    {
+      "name": "local_deterministic_simulation",
+      "command": "uv run python -m atendia.simulation.advisor_first_multiturn",
+      "status": "pass",
+      "cases_passed": 10,
+      "cases_total": 10,
+      "naturalidad": 5.0,
+      "side_effects": {
+        "whatsapp": 0,
+        "outbox": 0,
+        "database_writes": 0
+      }
+    },
+    {
+      "name": "provider_advisor_first_eval",
+      "command": "ATENDIA_V2_AGENT_RUNTIME_V2_MODEL_TIMEOUT_S=30 ATENDIA_V2_AGENT_RUNTIME_V2_PROVIDER_CIRCUIT_FAILURE_THRESHOLD=100 uv run python -m atendia.simulation.provider_advisor_first_eval",
+      "status": "pass",
+      "cases_passed": 40,
+      "cases_total": 40,
+      "base_cases_passed": 10,
+      "adversarial_cases_passed": 30,
+      "naturalidad": 5.0,
+      "side_effects": {
+        "whatsapp": 0,
+        "outbox": 0,
+        "database_writes": 0
+      }
+    },
+    {
+      "name": "provider_stability_eval",
+      "command": "uv run python -m atendia.simulation.provider_stability_eval --runs 5",
+      "status": "pass",
+      "runs_passed": 5,
+      "runs": 5,
+      "cases_passed_accumulated": 200,
+      "cases_total_accumulated": 200,
+      "provider_429_count": 5,
+      "provider_retry_count": 5,
+      "provider_fallback_response_count": 0,
+      "side_effects": 0
+    }
+  ],
+  "definition_of_done": {
+    "unit_tests_without_db": true,
+    "integration_db_tests": true,
+    "agent_runtime_full": true,
+    "local_deterministic_10_of_10": true,
+    "provider_stability_5_of_5": true,
+    "provider_base_adversarial_40_of_40": true,
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "repeated_question_rate": 0.0,
+    "exact_response_repeat_rate": 0.0,
+    "side_effects": 0,
+    "retry_circuit_breaker_no_duplicate_real_writes": true
+  }
+}

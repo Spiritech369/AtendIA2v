@@ -1,0 +1,157 @@
+{
+  "report": "multitenant_implementation_plan",
+  "generated_at": "2026-06-03",
+  "decision": "IMPLEMENT_CONTRACTS_FIRST_NO_LIVE_ROLLOUT",
+  "runtime_modified": false,
+  "config_applied": false,
+  "live_traffic_enabled": false,
+  "recommended_sequence": [
+    "mandatory_tool_contract",
+    "tenant_domain_contract",
+    "declarative_state_writer",
+    "universal_turn_trace",
+    "tenant_aware_frontend",
+    "workflow_business_events",
+    "fixtures_and_simulations",
+    "shadow_comparison",
+    "readiness_review"
+  ],
+  "phases": [
+    {
+      "phase": 0,
+      "name": "freeze_boundaries",
+      "objective": "Prevent new vertical hardcodes in runtime v2.",
+      "tests": [
+        "static test over core/atendia/agent_runtime",
+        "tool/action result visible copy rejection"
+      ],
+      "acceptance": "No new tenant or vertical hardcodes in runtime v2."
+    },
+    {
+      "phase": 1,
+      "name": "mandatory_tool_contract",
+      "objective": "Require tools for sensitive facts.",
+      "likely_files": [
+        "core/atendia/agent_runtime/advisor_pipeline.py",
+        "core/atendia/agent_runtime/schemas.py",
+        "core/tests/agent_runtime"
+      ],
+      "tests": [
+        "price without quote tool is blocked",
+        "requirements without requirements tool are blocked",
+        "sensitive policy without FAQ/policy tool is blocked",
+        "tool result cannot contain visible final copy"
+      ],
+      "acceptance": "Sensitive facts cannot be published without tool trace."
+    },
+    {
+      "phase": 2,
+      "name": "tenant_domain_contract_loader",
+      "objective": "Load domain, fields, tools, pipeline, events, guards and frontend metadata from tenant config.",
+      "likely_files": [
+        "core/atendia/agent_runtime/context_builder.py",
+        "core/atendia/agent_runtime/agent_config.py",
+        "core/atendia/api/customer_fields_routes.py",
+        "core/atendia/api/conversations_routes.py"
+      ],
+      "tests": [
+        "Dinamo loads vehicle_credit_sales",
+        "Non-Dinamo tenant does not load Dinamo fields",
+        "Invalid config falls back safely"
+      ],
+      "acceptance": "Runtime and frontend receive tenant/domain metadata without hardcodes."
+    },
+    {
+      "phase": 3,
+      "name": "declarative_state_writer",
+      "objective": "Move sensitive write rules to tenant/domain field policies.",
+      "tests": [
+        "tool_only field cannot be written by model",
+        "document received requires attachment or human evidence",
+        "requirements_complete is system-derived only",
+        "bureau_mentioned does not become rejection"
+      ],
+      "acceptance": "State writes are configurable and auditable."
+    },
+    {
+      "phase": 4,
+      "name": "universal_turn_trace",
+      "objective": "Expose decision narrative per turn.",
+      "tests": [
+        "trace contains proposal and validation",
+        "missing tool appears as blocking",
+        "guard block is visible",
+        "final output source is TurnOutput.final_message"
+      ],
+      "acceptance": "Advisor can explain why AtendIA responded."
+    },
+    {
+      "phase": 5,
+      "name": "tenant_aware_frontend",
+      "objective": "Remove Dinamo knowledge from operational frontend.",
+      "tests": [
+        "Dinamo fixture renders vehicle_credit_sales fields",
+        "appointment_services fixture renders without Dinamo fields",
+        "blocked value is not shown as validated"
+      ],
+      "acceptance": "Frontend works for two domains without component edits."
+    },
+    {
+      "phase": 6,
+      "name": "workflow_business_events",
+      "objective": "Map universal business events to workflows with idempotency.",
+      "tests": [
+        "offer_quoted fires once",
+        "requirements_complete requires evidence",
+        "self-trigger loop is blocked",
+        "side effects stay dry-run without approval"
+      ],
+      "acceptance": "Workflows react to business events, not fragile text."
+    },
+    {
+      "phase": 7,
+      "name": "fixtures_and_simulations",
+      "objective": "Test Dinamo and a non-Dinamo tenant without real traffic.",
+      "tests": [
+        "turn trace snapshots",
+        "tool requirement contract tests",
+        "frontend rendering tests"
+      ],
+      "acceptance": "Two domains demonstrate real multitenancy."
+    },
+    {
+      "phase": 8,
+      "name": "shadow_comparison_and_readiness",
+      "objective": "Compare runtime v2 with legacy without real sends.",
+      "tests": [
+        "Dinamo eval suite",
+        "provider reliability tests",
+        "no live-send assertions"
+      ],
+      "acceptance": "Rollout can be discussed only after readiness passes."
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Hardcoding Dinamo in runtime v2",
+      "mitigation": "Static tests and tenant/domain contract"
+    },
+    {
+      "risk": "Frontend remains coupled",
+      "mitigation": "Tenant metadata and non-Dinamo fixture"
+    },
+    {
+      "risk": "Missing tools block too much",
+      "mitigation": "Safe fallback and visible handoff"
+    },
+    {
+      "risk": "Workflows duplicate actions",
+      "mitigation": "Idempotency keys and dry-run"
+    },
+    {
+      "risk": "Visible copy becomes decentralized",
+      "mitigation": "Keep TurnOutput.final_message as sole authority"
+    }
+  ],
+  "first_code_change_recommended": "Implement mandatory_tool_contract."
+}

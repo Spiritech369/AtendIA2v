@@ -1,4 +1,8 @@
-"""OpenAI Composer (gpt-4o) with strict structured outputs and retry."""
+"""Legacy OpenAI Composer with strict structured outputs and retry.
+
+Kept for ConversationRunner fallback. AgentRuntime v2 uses TurnOutput and must
+not route customer-visible final copy through this composer.
+"""
 
 import asyncio
 import json

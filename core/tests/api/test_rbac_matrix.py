@@ -1,15 +1,7 @@
-"""RBAC matrix — every admin-gated endpoint must reject operator (403) and
-allow tenant_admin/superadmin.
+"""RBAC matrix for admin/config/write endpoints.
 
-We only verify the gating bit. The exact success status (200/201/202/204) and
-body shape aren't asserted, because endpoints may return 4xx for other reasons
-(missing referenced resource, embedding service offline, …) — those are
-verified in route-specific test files.
-
-The matrix covers one endpoint per admin-gated route module so a future
-refactor that drops `Depends(require_tenant_admin)` from a whole file gets
-caught here. Endpoint-specific RBAC (e.g. users superadmin-only) lives in its
-own file (`test_users_rbac.py`).
+The matrix verifies the authorization gate only. Allowed roles may still
+receive 4xx for route-specific reasons such as missing referenced resources.
 """
 
 from __future__ import annotations
@@ -17,10 +9,7 @@ from __future__ import annotations
 import pytest
 
 # (method, path, payload, allowed_roles)
-# Bodies are minimal and pass Pydantic validation so we always reach the
-# `Depends(require_tenant_admin)` check.
 RBAC_MATRIX: list[tuple[str, str, dict | None, set[str]]] = [
-    # ── workflows: POST /api/v1/workflows ──
     (
         "POST",
         "/api/v1/workflows",
@@ -32,14 +21,24 @@ RBAC_MATRIX: list[tuple[str, str, dict | None, set[str]]] = [
         },
         {"tenant_admin", "superadmin"},
     ),
-    # ── agents: POST /api/v1/agents ──
+    (
+        "POST",
+        "/api/v1/workflows/00000000-0000-0000-0000-000000000000/publish",
+        {},
+        {"tenant_admin", "superadmin"},
+    ),
     (
         "POST",
         "/api/v1/agents",
         {"name": "rbac matrix probe"},
         {"tenant_admin", "superadmin"},
     ),
-    # ── customer-fields: POST /api/v1/customer-fields/definitions ──
+    (
+        "POST",
+        "/api/v1/agents/00000000-0000-0000-0000-000000000000/publish",
+        {},
+        {"tenant_admin", "superadmin"},
+    ),
     (
         "POST",
         "/api/v1/customer-fields/definitions",
@@ -51,18 +50,34 @@ RBAC_MATRIX: list[tuple[str, str, dict | None, set[str]]] = [
         },
         {"tenant_admin", "superadmin"},
     ),
-    # ── tenants: PUT /api/v1/tenants/timezone ──
     (
         "PUT",
         "/api/v1/tenants/timezone",
         {"timezone": "America/Mexico_City"},
         {"tenant_admin", "superadmin"},
     ),
-    # ── knowledge: POST /api/v1/knowledge/faqs ──
     (
-        "POST",
-        "/api/v1/knowledge/faqs",
-        {"question": "¿probe?", "answer": "probe response"},
+        "PUT",
+        "/api/v1/tenants/pipeline",
+        {"definition": {"stages": []}},
+        {"tenant_admin", "superadmin"},
+    ),
+    (
+        "PUT",
+        "/api/v1/tenants/runner-rules",
+        {"runner_rules": []},
+        {"tenant_admin", "superadmin"},
+    ),
+    (
+        "PUT",
+        "/api/v1/tenants/qos-config",
+        {"enabled": False},
+        {"tenant_admin", "superadmin"},
+    ),
+    (
+        "PUT",
+        "/api/v1/tenants/inbox-config",
+        {"inbox_config": {}},
         {"tenant_admin", "superadmin"},
     ),
 ]

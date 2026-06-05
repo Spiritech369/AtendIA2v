@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-06-03T23:52:46-06:00",
+  "decision": "CONTACT_GATE_NOT_SUPPORTED",
+  "scope": "universal agent_runtime_v2 live-send path",
+  "approved_test_phone": "+528212889421",
+  "approved_test_contact_id": null,
+  "universal_contact_gate_supported": false,
+  "universal_evidence": [
+    {
+      "file": "core/atendia/agent_runtime/rollout_policy.py",
+      "line": 47,
+      "detail": "RolloutPolicy supports allowed_agent_ids."
+    },
+    {
+      "file": "core/atendia/agent_runtime/rollout_policy.py",
+      "line": 48,
+      "detail": "RolloutPolicy supports allowed_channel_ids, but no allowed_contact_ids or allowed_phone_numbers."
+    },
+    {
+      "file": "core/atendia/agent_runtime/rollout_policy.py",
+      "line": 163,
+      "detail": "can_send receives tenant_id, agent_id, and channel_id only."
+    },
+    {
+      "file": "core/atendia/agent_runtime/pilot_policy.py",
+      "line": 24,
+      "detail": "PilotPolicy starts tenant/agent/channel/send-count controls, but no contact/phone allowlist."
+    },
+    {
+      "file": "core/atendia/api/conversations_routes.py",
+      "line": 1246,
+      "detail": "_ensure_send_allowed checks conversation safety state and WhatsApp window, not contact allowlist."
+    },
+    {
+      "file": "core/atendia/api/conversations_routes.py",
+      "line": 1820,
+      "detail": "Customer.phone_e164 is fetched after send/pilot checks."
+    },
+    {
+      "file": "core/atendia/api/conversations_routes.py",
+      "line": 1837,
+      "detail": "Outbound is staged without a contact allowlist check."
+    }
+  ],
+  "separate_dinamo_specific_gate": {
+    "supported": true,
+    "mechanism": "dinamo_agent_first_live_limited",
+    "not_used_for_universal_activation": true,
+    "evidence": [
+      "core/atendia/runner/dinamo_agent_runtime.py:151",
+      "core/atendia/runner/dinamo_agent_runtime.py:169",
+      "core/atendia/runner/dinamo_agent_runtime.py:1102",
+      "core/atendia/runner/dinamo_agent_runtime.py:1106",
+      "core/atendia/runner/conversation_runner.py:3746"
+    ],
+    "focused_test_result": "3 passed, 1 skipped, 2 warnings"
+  },
+  "blocker": "NOT_READY_CONTACT_GATE_NOT_SUPPORTED",
+  "traffic_started": false,
+  "tenant_config_applied": false,
+  "whatsapp_sent": false
+}

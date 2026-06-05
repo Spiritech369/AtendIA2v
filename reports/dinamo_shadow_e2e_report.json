@@ -1,0 +1,92 @@
+{
+  "decision": "DINAMO_SHADOW_READY",
+  "generated_at": "2026-06-03T22:24:52.1570446-06:00",
+  "test_file": "core/tests/agent_runtime/test_dinamo_shadow_e2e.py",
+  "traffic_real_activated": false,
+  "whatsapp_sent": false,
+  "live_config_applied": false,
+  "actions_enabled": false,
+  "workflow_side_effects_enabled": false,
+  "turns": [
+    {
+      "turn": 1,
+      "tools": ["catalog.search", "credit_plan.resolve", "faq.lookup"],
+      "accepted_fields": [
+        "product_selection",
+        "product_catalog_id",
+        "purchase_type",
+        "plan_selection",
+        "down_payment_percent",
+        "bureau_mentioned"
+      ],
+      "pipeline": "plan_identificado",
+      "events": ["lead_started", "intent_identified", "selection_identified", "plan_identified"],
+      "quote_resolve_executed": false
+    },
+    {
+      "turn": 2,
+      "tools": ["credit_plan.resolve", "quote.resolve"],
+      "accepted_fields": [
+        "employment_seniority",
+        "eligibility_seniority",
+        "quote_snapshot_id",
+        "payment_amount",
+        "cash_price"
+      ],
+      "pipeline": "cotizado",
+      "events": ["offer_quoted"]
+    },
+    {
+      "turn": 3,
+      "tools": ["requirements.lookup"],
+      "accepted_fields": ["requirements_checklist"],
+      "pipeline": "papeleria_solicitada",
+      "events": ["requirements_requested"]
+    },
+    {
+      "turn": 4,
+      "tools": [],
+      "accepted_fields": [],
+      "pipeline": null,
+      "events": ["intent_identified"],
+      "document_check_executed": false,
+      "document_received_emitted": false
+    },
+    {
+      "turn": 5,
+      "tools": ["requirements.lookup", "document.check"],
+      "accepted_fields": ["requirements_missing", "requirements_complete"],
+      "pipeline": "papeleria_recibida",
+      "events": ["document_received", "requirements_partial"],
+      "requirements_complete": false
+    },
+    {
+      "turn": 6,
+      "tools": ["requirements.lookup", "document.check", "handoff.create"],
+      "accepted_fields": [
+        "requirements_complete",
+        "human_handoff_needed",
+        "handoff_reason"
+      ],
+      "pipeline": "en_revision_humana",
+      "events": ["document_received", "requirements_complete", "human_handoff_requested"],
+      "requirements_complete": true,
+      "approval_promised": false
+    }
+  ],
+  "universal_trace_sections_present_per_turn": [
+    "gpt_proposed",
+    "atendia_validation",
+    "mandatory_tool_decisions",
+    "tool_results",
+    "state_changes",
+    "business_events",
+    "guards",
+    "lifecycle",
+    "final_output"
+  ],
+  "business_events_dry_run": true,
+  "workflow_results_dry_run": true,
+  "side_effects_allowed": false,
+  "frontend_fixture": "frontend/src/features/turn-traces/__fixtures__/dinamoShadowUniversalTrace.ts"
+}

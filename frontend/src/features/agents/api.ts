@@ -124,6 +124,7 @@ export interface AgentVersionSnapshot {
   goal?: string | null;
   style?: string | null;
   tone?: string | null;
+  voice?: Record<string, unknown>;
   language?: string | null;
   max_sentences?: number | null;
   no_emoji?: boolean;
@@ -169,6 +170,7 @@ export interface AgentItem {
   goal: string | null;
   style: string | null;
   tone: string | null;
+  voice: Record<string, unknown>;
   language: string | null;
   max_sentences: number | null;
   no_emoji: boolean;
@@ -181,6 +183,15 @@ export interface AgentItem {
   knowledge_config: Record<string, unknown>;
   flow_mode_rules: Record<string, unknown> | null;
   ops_config: Record<string, unknown>;
+  template: string;
+  instructions: string;
+  language_policy: Record<string, unknown>;
+  enabled_knowledge_source_ids: string[];
+  enabled_action_ids: string[];
+  visible_contact_field_keys: string[];
+  allowed_lifecycle_stage_ids: string[];
+  escalation_policy: Record<string, unknown>;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   health: AgentHealth;
@@ -256,12 +267,146 @@ export interface PreviewResult {
   systemPrompt?: string;
 }
 
+export interface AgentTestTurnHistoryItem {
+  role: "customer" | "agent" | "system";
+  text: string;
+  sent_at?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentTestTurnContactField {
+  key: string;
+  label: string;
+  field_type?: string;
+  options?: Record<string, unknown> | null;
+}
+
+export interface AgentTestTurnV2Payload {
+  test_message: string;
+  conversation_history?: AgentTestTurnHistoryItem[];
+  contact_fields?: AgentTestTurnContactField[];
+  lifecycle_stage?: string | null;
+  knowledge_source_ids?: string[] | null;
+  save_readiness_evidence?: boolean;
+  requires_knowledge_citation?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentKnowledgeCitation {
+  source_id?: string;
+  title?: string | null;
+  snippet?: string | null;
+  score?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentTestTurnV2Response {
+  final_message: string;
+  knowledge_citations: AgentKnowledgeCitation[];
+  field_updates: Array<Record<string, unknown>>;
+  lifecycle_update: Record<string, unknown> | null;
+  actions: Array<Record<string, unknown>>;
+  confidence: number;
+  needs_human: boolean;
+  risk_flags: string[];
+  trace_metadata: Record<string, unknown>;
+  debug: Record<string, unknown>;
+}
+
 export interface WorkflowRef {
   id: string;
   name: string;
   active: boolean;
   version: number;
   node_ids: string[];
+}
+
+export interface AgentStudioOption {
+  id: string;
+  label: string;
+  type?: string | null;
+  description?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface OnboardingState {
+  tenant_id: string;
+  selected_blueprint_id: string | null;
+  channel_connected: boolean;
+  knowledge_uploaded: boolean;
+  agent_configured: boolean;
+  contact_fields_ready: boolean;
+  lifecycle_ready: boolean;
+  test_passed: boolean;
+  published: boolean;
+  current_step: string;
+  checklist: Record<string, unknown>;
+}
+
+export interface OnboardingCheck {
+  code: string;
+  label: string;
+  passed: boolean;
+  severity: string;
+  message: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface OnboardingValidation {
+  ready: boolean;
+  state: OnboardingState;
+  checks: OnboardingCheck[];
+  blocking_codes: string[];
+  readiness: Record<string, unknown> | null;
+}
+
+export interface RuntimeV2ShadowReport {
+  summary: Record<string, number>;
+  legacy_vs_v2: Record<string, number>;
+  top_risk_flags: Array<{ value: string; count: number }>;
+  top_policy_issues: Array<{ value: string; count: number }>;
+  top_knowledge_sources: Array<{ value: string; count: number }>;
+  pilot_inputs?: Record<string, number | null>;
+  examples: Array<Record<string, unknown>>;
+}
+
+export interface RuntimeV2PilotReport {
+  tenant_id?: string;
+  sends: number;
+  policy_failures: number;
+  average_confidence: number | null;
+  needs_human_count: number;
+  knowledge_gap_count: number;
+  policy_blocked_count: number;
+  actions_proposed: number;
+  fields_suggested: number;
+  fields_applied: number;
+  lifecycle_suggested: number;
+  lifecycle_applied: number;
+  error_rate: number;
+  trace_count: number;
+}
+
+export interface WhyAnswerReport {
+  final_message: string;
+  confidence: number | null;
+  knowledge: {
+    citations: Array<Record<string, unknown>>;
+    source_cards: Array<Record<string, unknown>>;
+  };
+  field_updates: Array<Record<string, unknown>>;
+  lifecycle_update: Record<string, unknown> | null;
+  actions: {
+    planned: Array<Record<string, unknown>>;
+    executed: Array<Record<string, unknown>>;
+    dry_run: Array<Record<string, unknown>>;
+  };
+  workflow_events: Array<Record<string, unknown>>;
+  policy: Record<string, unknown>;
+  rollout_policy: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  side_effects: Record<string, unknown>;
+  human_summary: string;
 }
 
 export function normalizeValidationResult(raw: unknown): ValidationResult {
@@ -320,6 +465,32 @@ export const agentsApi = {
         conversationContext: {},
       })
     ).data,
+  testTurnV2: async (id: string, payload: AgentTestTurnV2Payload) =>
+    (await api.post<AgentTestTurnV2Response>(`/agents/${id}/test-turn-v2`, payload)).data,
+  studioActions: async () => (await api.get<AgentStudioOption[]>("/agents/studio/actions")).data,
+  studioKnowledgeSources: async () =>
+    (await api.get<AgentStudioOption[]>("/agents/studio/knowledge-sources")).data,
+  studioContactFields: async () =>
+    (await api.get<AgentStudioOption[]>("/agents/studio/contact-fields")).data,
+  studioLifecycleStages: async () =>
+    (await api.get<AgentStudioOption[]>("/agents/studio/lifecycle-stages")).data,
+  onboardingState: async () => (await api.get<OnboardingState>("/onboarding/state")).data,
+  validateOnboarding: async () =>
+    (await api.post<OnboardingValidation>("/onboarding/validate")).data,
+  publishReadiness: async () =>
+    (await api.post<OnboardingValidation>("/onboarding/publish-readiness")).data,
+  shadowReport: async (params?: {
+    agent_id?: string;
+    conversation_id?: string;
+    channel?: string;
+    min_confidence?: number;
+    include_examples?: boolean;
+    limit?: number;
+  }) => (await api.get<RuntimeV2ShadowReport>("/agent-runtime-v2/shadow-report", { params })).data,
+  pilotReport: async () =>
+    (await api.get<RuntimeV2PilotReport>("/agent-runtime-v2/pilot-report")).data,
+  whyAnswer: async (traceId: string, params?: { conversation_id?: string }) =>
+    (await api.get<WhyAnswerReport>(`/turn-traces/${traceId}/why-answer-v2`, { params })).data,
   monitor: async (id: string) => (await api.get<AgentMonitorMetrics>(`/agents/${id}/monitor`)).data,
   createGuardrail: async (id: string, body: Omit<Guardrail, "id" | "violation_count">) =>
     (await api.post<Guardrail>(`/agents/${id}/guardrails`, body)).data,

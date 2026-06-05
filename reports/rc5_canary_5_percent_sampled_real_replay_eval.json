@@ -1,0 +1,17 @@
+﻿{
+    "version":  "RC5",
+    "canary_stage":  "5_percent",
+    "generated_at":  "2026-06-03T16:03:54.5622263-06:00",
+    "status":  "not_run",
+    "decision":  "NOT_READY_MISSING_APPROVED_SCOPE",
+    "dataset":  "reports/rc5_canary_5_percent_sampled_real_replay.anonymized.json",
+    "reason":  "Replay was not executed because dataset export/audit did not run without approved tenant/agent scope.",
+    "pass":  false,
+    "critical_failures":  null,
+    "duplicate_side_effects":  null,
+    "stale_quote_rate":  null,
+    "price_without_snapshot_rate":  null,
+    "quoted_without_canonical_product_rate":  null,
+    "false_handoff_count":  null,
+    "unsafe_customer_visible_message_count":  null
+}

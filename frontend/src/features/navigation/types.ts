@@ -15,6 +15,7 @@ export interface NavItem {
   to: string;
   icon: LucideIcon;
   roles: readonly Role[];
+  capability?: string;
   badgeKey?: BadgeKey;
   /** Exact-path match only (e.g. "/" should not match every route). */
   exactMatch?: boolean;

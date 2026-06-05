@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-06-05",
+  "decision": "CONTRACT_PERSISTENCE_BLOCKED",
+  "fixture_path": "core/tests/agent_runtime/fixtures/tenant_domain_contracts/dinamo_motos_nl_shadow.json",
+  "fixture_safe_flags": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "single_contact_smoke_enabled": false,
+    "canary_enabled": false
+  },
+  "db_read_only_check": {
+    "attempted": true,
+    "result": "blocked",
+    "reason": "Docker daemon unavailable; postgres-test could not be started"
+  },
+  "live_config_applied": false,
+  "proposed_safe_config_only": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "single_contact_smoke_enabled": false
+  }
+}

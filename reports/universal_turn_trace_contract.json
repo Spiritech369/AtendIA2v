@@ -1,0 +1,122 @@
+{
+  "trace_version": "1.0",
+  "report": "universal_turn_trace_contract",
+  "generated_at": "2026-06-03",
+  "principle": "GPT proposes; AtendIA validates; tools prove facts; guards protect; the customer only sees TurnOutput.final_message.",
+  "root_schema": {
+    "trace_version": "string",
+    "turn_id": "string",
+    "tenant_id": "string",
+    "agent_id": "string",
+    "conversation_id": "string",
+    "contact_id": "string|null",
+    "domain": "string",
+    "input": "object",
+    "gpt_understanding": "object",
+    "gpt_proposed": "object",
+    "mandatory_tool_decisions": "array",
+    "tool_results": "array",
+    "atendia_validation": "object",
+    "state_changes": "object",
+    "lifecycle": "object",
+    "business_events": "array",
+    "workflow_results": "array",
+    "guards": "array",
+    "provider": "object",
+    "final_output": "object",
+    "audit": "object"
+  },
+  "sections": {
+    "input": [
+      "channel",
+      "message_text",
+      "attachments",
+      "received_at"
+    ],
+    "gpt_understanding": [
+      "intent",
+      "entities_detected",
+      "fields_mentioned",
+      "risk_flags",
+      "needs_human"
+    ],
+    "gpt_proposed": [
+      "field_updates",
+      "lifecycle_updates",
+      "actions",
+      "required_tools",
+      "draft_final_message_non_visible"
+    ],
+    "mandatory_tool_decisions": {
+      "tool_id": "string",
+      "reason": "string",
+      "trigger": "string",
+      "status": [
+        "required",
+        "executed",
+        "missing",
+        "blocked",
+        "not_applicable"
+      ],
+      "blocking": "boolean"
+    },
+    "tool_results": [
+      "tool_id",
+      "safe_inputs",
+      "structured_output",
+      "citations",
+      "error_or_no_data",
+      "used_for"
+    ],
+    "atendia_validation": [
+      "accepted_field_updates",
+      "blocked_field_updates",
+      "accepted_lifecycle_updates",
+      "blocked_lifecycle_updates",
+      "accepted_actions",
+      "blocked_actions",
+      "policy_warnings"
+    ],
+    "guards": {
+      "guard_id": "string",
+      "scope": [
+        "tool",
+        "state",
+        "lifecycle",
+        "workflow",
+        "final_message",
+        "provider"
+      ],
+      "result": [
+        "passed",
+        "warned",
+        "blocked",
+        "rewrote"
+      ],
+      "reason": "string",
+      "evidence_refs": "array"
+    },
+    "final_output": {
+      "final_message": "string",
+      "source": "TurnOutput.final_message",
+      "sanitized": "boolean",
+      "blocked_sensitive_claims": "array",
+      "citations_used": "array"
+    }
+  },
+  "invariants": [
+    "final_output.final_message must come from TurnOutput.final_message.",
+    "Sensitive facts require tool trace or must be blocked.",
+    "Accepted field updates require source and evidence.",
+    "Accepted lifecycle updates require reason and rule or evidence.",
+    "Workflow side effects require idempotency key.",
+    "Every trace includes tenant_id."
+  ],
+  "recommended_tests": [
+    "Valid quote turn requires quote.resolve and accepts snapshot.",
+    "Invented price blocks sensitive final copy.",
+    "Text-only document cannot complete requirements.",
+    "Duplicate workflow uses same idempotency key and does not duplicate actions.",
+    "Tenant B does not render Dinamo labels or fields."
+  ]
+}

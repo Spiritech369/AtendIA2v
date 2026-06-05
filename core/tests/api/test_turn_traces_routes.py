@@ -91,6 +91,249 @@ def _seed_with_traces() -> tuple[str, str, str, str, list[str]]:
     return tid, conv, email, plain, tids
 
 
+def _seed_why_answer_trace() -> tuple[str, str, str, str, str]:
+    email = f"why_answer_{uuid4().hex[:8]}@dinamo.com"
+    plain = "test-password-123"
+    hashed = hash_password(plain)
+    trace_id = str(uuid4())
+    agent_id = str(uuid4())
+    event_id = str(uuid4())
+    workflow_id = str(uuid4())
+
+    async def _do():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            tid = (
+                await conn.execute(
+                    text("INSERT INTO tenants (name) VALUES (:n) RETURNING id"),
+                    {"n": f"why_answer_{uuid4().hex[:8]}"},
+                )
+            ).scalar()
+            await conn.execute(
+                text(
+                    "INSERT INTO tenant_users (tenant_id, email, role, password_hash) "
+                    "VALUES (:t, :e, 'operator', :h)"
+                ),
+                {"t": tid, "e": email, "h": hashed},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO agents (id, tenant_id, name, status) "
+                    "VALUES (:id, :t, 'Why Agent', 'production')"
+                ),
+                {"id": agent_id, "t": tid},
+            )
+            customer_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customers (tenant_id, phone_e164) "
+                        "VALUES (:t, :p) RETURNING id"
+                    ),
+                    {"t": tid, "p": f"+52156{uuid4().hex[:8]}"[:24]},
+                )
+            ).scalar()
+            conv = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO conversations "
+                        "(tenant_id, customer_id, assigned_agent_id) "
+                        "VALUES (:t, :c, :a) RETURNING id"
+                    ),
+                    {"t": tid, "c": customer_id, "a": agent_id},
+                )
+            ).scalar()
+            field_def = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO customer_field_definitions "
+                        "(id, tenant_id, key, label, field_type, ordering) "
+                        "VALUES (:id, :t, 'budget', 'Budget', 'text', 1) RETURNING id"
+                    ),
+                    {"id": str(uuid4()), "t": tid},
+                )
+            ).scalar()
+            composer_output = {
+                "final_message": "Claro, el plan recomendado usa la política aprobada.",
+                "confidence": 0.88,
+                "knowledge_citations": [
+                    {
+                        "source_id": "source-policy",
+                        "title": "Policy Source",
+                        "snippet": "Approved policy snippet",
+                        "score": 0.91,
+                        "metadata": {"source_name": "Policy Source"},
+                    }
+                ],
+                "field_updates": [
+                    {
+                        "field_key": "budget",
+                        "new_value": "$10,000",
+                        "reason": "Customer stated budget",
+                        "confidence": 0.9,
+                        "evidence": ["Tengo 10 mil"],
+                    }
+                ],
+                "lifecycle_update": {
+                    "target_stage": "qualified",
+                    "reason": "Budget captured",
+                    "evidence": ["Tengo 10 mil"],
+                    "confidence": 0.87,
+                },
+                "actions": [
+                    {
+                        "name": "update_contact_field",
+                        "payload": {"field_key": "budget"},
+                    }
+                ],
+                "needs_human": False,
+                "risk_flags": [],
+            }
+            await conn.execute(
+                text(
+                    "INSERT INTO turn_traces "
+                    "(id, tenant_id, conversation_id, agent_id, turn_number, inbound_text, "
+                    " composer_output, kb_evidence, state_after, rules_evaluated, "
+                    " total_cost_usd, bot_paused) "
+                    "VALUES (:id, :t, :c, :a, 1, 'Tengo 10 mil', "
+                    " CAST(:co AS jsonb), CAST(:kb AS jsonb), CAST(:sa AS jsonb), "
+                    " CAST(:rules AS jsonb), 0, false)"
+                ),
+                {
+                    "id": trace_id,
+                    "t": tid,
+                    "c": conv,
+                    "a": agent_id,
+                    "co": json.dumps(composer_output),
+                    "kb": json.dumps({"citations": composer_output["knowledge_citations"]}),
+                    "sa": json.dumps(
+                        {
+                            "rollout": {"preview": {"allowed": True}},
+                            "side_effects": {"sent_message": False},
+                        }
+                    ),
+                    "rules": json.dumps([{"rule": "policy_valid", "passed": True}]),
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO action_execution_logs "
+                    "(id, tenant_id, conversation_id, action_id, input, status, result, "
+                    " dry_run, trace_id) "
+                    "VALUES (:id, :t, :c, :action, CAST(:input AS jsonb), :status, "
+                    " CAST(:result AS jsonb), :dry, :trace)"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "t": tid,
+                    "c": conv,
+                    "action": "update_contact_field",
+                    "input": json.dumps({"field_key": "budget"}),
+                    "status": "skipped",
+                    "result": json.dumps({"dry_run": True}),
+                    "dry": True,
+                    "trace": trace_id,
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO action_execution_logs "
+                    "(id, tenant_id, conversation_id, action_id, input, status, result, "
+                    " dry_run, trace_id) "
+                    "VALUES (:id, :t, :c, :action, CAST(:input AS jsonb), :status, "
+                    " CAST(:result AS jsonb), :dry, :trace)"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "t": tid,
+                    "c": conv,
+                    "action": "add_tag",
+                    "input": json.dumps({"tag": "qualified"}),
+                    "status": "succeeded",
+                    "result": json.dumps({"tag": "qualified"}),
+                    "dry": False,
+                    "trace": trace_id,
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO customer_field_update_evidence "
+                    "(id, tenant_id, customer_id, field_definition_id, field_key, "
+                    " old_value, new_value, source, reason, confidence, status, trace_id) "
+                    "VALUES (:id, :t, :c, :fd, 'budget', null, '$10,000', "
+                    " 'agent_runtime_v2', 'Customer stated budget', 0.9, 'applied', :trace)"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "t": tid,
+                    "c": customer_id,
+                    "fd": field_def,
+                    "trace": trace_id,
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO lifecycle_stage_history "
+                    "(id, tenant_id, conversation_id, from_stage, to_stage, reason, "
+                    " evidence, confidence, source, trace_id) "
+                    "VALUES (:id, :t, :c, 'new', 'qualified', 'Budget captured', "
+                    " CAST(:ev AS jsonb), 0.87, 'agent_runtime_v2', :trace)"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "t": tid,
+                    "c": conv,
+                    "ev": json.dumps(["Tengo 10 mil"]),
+                    "trace": trace_id,
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO events "
+                    "(id, conversation_id, tenant_id, type, payload, occurred_at) "
+                    "VALUES (:id, :c, :t, 'agent_turn_completed', CAST(:p AS jsonb), now())"
+                ),
+                {
+                    "id": event_id,
+                    "c": conv,
+                    "t": tid,
+                    "p": json.dumps({"trace_id": trace_id, "dry_run": False}),
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO workflows "
+                    "(id, tenant_id, name, trigger_type, active, definition) "
+                    "VALUES (:id, :t, 'Why Workflow', 'agent_turn_completed', false, "
+                    " CAST('{\"nodes\": [], \"edges\": []}' AS jsonb))"
+                ),
+                {"id": workflow_id, "t": tid},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO workflow_executions "
+                    "(id, workflow_id, trigger_event_id, status) "
+                    "VALUES (:id, :w, :e, 'running')"
+                ),
+                {"id": str(uuid4()), "w": workflow_id, "e": event_id},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO agent_readiness_eval_results "
+                    "(id, tenant_id, agent_id, suite_id, score, passed, scenario_count, "
+                    " failed_scenarios, policy_failures, metadata) "
+                    "VALUES (:id, :t, :a, 'agent_runtime_v2_minimum_readiness', "
+                    " 0.95, true, 1, CAST('[]' AS jsonb), CAST('[]' AS jsonb), "
+                    " CAST('{}' AS jsonb))"
+                ),
+                {"id": str(uuid4()), "t": tid, "a": agent_id},
+            )
+        await engine.dispose()
+        return str(tid), str(conv)
+
+    tid, conv = asyncio.run(_do())
+    return tid, conv, email, plain, trace_id
+
+
 @pytest.fixture
 def operator_with_traces() -> Iterator[tuple[str, str, str, str, list[str]]]:
     seed = _seed_with_traces()
@@ -111,7 +354,7 @@ def _login(client: TestClient, email: str, plain: str) -> None:
 
 
 def test_list_turn_traces(operator_with_traces):
-    _, conv, email, plain, tids = operator_with_traces
+    _, conv, email, plain, _ = operator_with_traces
     client = TestClient(app)
     _login(client, email, plain)
 
@@ -158,6 +401,84 @@ def test_get_turn_trace_returns_full_payload(operator_with_traces):
     assert body["inbound_text"] == "hola turn 0"
     assert body["composer_model"] == "gpt-4o"
     assert body["bot_paused"] is False
+
+
+def test_get_turn_trace_exposes_universal_trace_metadata_from_composer_output(
+    operator_with_traces,
+):
+    _, _, email, plain, tids = operator_with_traces
+    trace_metadata = {
+        "trace_id": "turn-test",
+        "provider": "mock",
+        "universal_turn_trace": {
+            "trace_version": "1.0",
+            "gpt_proposed": {},
+            "atendia_validation": {},
+            "mandatory_tool_decisions": [],
+            "state_changes": {},
+            "guards": [],
+            "final_output": {
+                "final_message": "mensaje final",
+                "source": "TurnOutput.final_message",
+            },
+        },
+    }
+    composer_output = {
+        "final_message": "mensaje final",
+        "confidence": 0.9,
+        "trace_metadata": trace_metadata,
+    }
+
+    async def _do():
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE turn_traces "
+                    "SET composer_output = CAST(:composer AS jsonb), "
+                    "    raw_llm_response = :raw "
+                    "WHERE id = :trace_id"
+                ),
+                {
+                    "composer": json.dumps(composer_output),
+                    "raw": json.dumps(composer_output),
+                    "trace_id": tids[0],
+                },
+            )
+        await engine.dispose()
+
+    asyncio.run(_do())
+
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/turn-traces/{tids[0]}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    assert body["trace_metadata"]["universal_turn_trace"]["trace_version"] == "1.0"
+    assert (
+        body["trace_metadata"]["universal_turn_trace"]["final_output"]["final_message"]
+        == "mensaje final"
+    )
+    assert body["composer_output"]["trace_metadata"]["trace_id"] == "turn-test"
+    assert body["raw_llm_response"] == json.dumps(composer_output)
+
+
+def test_get_turn_trace_without_universal_trace_returns_safe_null_metadata(
+    operator_with_traces,
+):
+    _, _, email, plain, tids = operator_with_traces
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/turn-traces/{tids[0]}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    assert "trace_metadata" in body
+    assert body["trace_metadata"] is None
+    assert body["nlu_output"] == {"intent": "intent_0"}
 
 
 def test_get_turn_trace_404_other_tenant(operator_with_traces):
@@ -249,3 +570,80 @@ def test_get_turn_trace_returns_composer_provider_and_cleaned_text(
     # omitting them.
     assert "composer_provider" in body, "composer_provider key missing from detail response"
     assert "inbound_text_cleaned" in body, "inbound_text_cleaned key missing from detail response"
+
+
+def test_why_answer_v2_aggregates_runtime_evidence():
+    tid, _, email, plain, trace_id = _seed_why_answer_trace()
+    try:
+        client = TestClient(app)
+        _login(client, email, plain)
+
+        resp = client.get(f"/api/v1/turn-traces/{trace_id}/why-answer-v2")
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["final_message"] == "Claro, el plan recomendado usa la política aprobada."
+        assert body["confidence"] == 0.88
+        assert body["knowledge"]["citations"][0]["source_id"] == "source-policy"
+        assert body["knowledge"]["source_cards"][0]["title"] == "Policy Source"
+        assert body["actions"]["planned"][0]["name"] == "update_contact_field"
+        assert body["actions"]["dry_run"][0]["action_id"] == "update_contact_field"
+        assert body["actions"]["executed"][0]["action_id"] == "add_tag"
+        assert any(update["field_key"] == "budget" for update in body["field_updates"])
+        assert body["lifecycle_update"]["target_stage"] == "qualified"
+        assert body["lifecycle_update"]["history"][0]["to_stage"] == "qualified"
+        assert body["workflow_events"][0]["type"] == "agent_turn_completed"
+        assert body["workflow_events"][0]["workflow_executions"][0]["status"] == "running"
+        assert body["policy"]["valid"] is True
+        assert body["rollout_policy"]["preview"]["allowed"] is True
+        assert body["readiness"]["passed"] is True
+        assert body["side_effects"]["dry_run_actions"] == 1
+        assert body["side_effects"]["executed_actions"] == 1
+        assert "knowledge citation" in body["human_summary"]
+    finally:
+
+        async def _do():
+            engine = create_async_engine(get_settings().database_url)
+            async with engine.begin() as conn:
+                await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": tid})
+            await engine.dispose()
+
+        asyncio.run(_do())
+
+
+def test_why_answer_v2_missing_data_returns_empty_sections(operator_with_traces):
+    _, _, email, plain, tids = operator_with_traces
+    client = TestClient(app)
+    _login(client, email, plain)
+
+    resp = client.get(f"/api/v1/turn-traces/{tids[0]}/why-answer-v2")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["knowledge"] == {"citations": [], "source_cards": []}
+    assert body["field_updates"] == []
+    assert body["lifecycle_update"] == {}
+    assert body["actions"] == {"planned": [], "executed": [], "dry_run": []}
+    assert body["workflow_events"] == []
+    assert body["readiness"] == {}
+
+
+def test_why_answer_v2_does_not_leak_other_tenant_trace(operator_with_traces):
+    other = _seed_why_answer_trace()
+    try:
+        _, _, email, plain, _ = operator_with_traces
+        client = TestClient(app)
+        _login(client, email, plain)
+
+        resp = client.get(f"/api/v1/turn-traces/{other[4]}/why-answer-v2")
+
+        assert resp.status_code == 404
+    finally:
+
+        async def _do():
+            engine = create_async_engine(get_settings().database_url)
+            async with engine.begin() as conn:
+                await conn.execute(text("DELETE FROM tenants WHERE id = :t"), {"t": other[0]})
+            await engine.dispose()
+
+        asyncio.run(_do())

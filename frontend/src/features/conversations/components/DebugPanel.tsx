@@ -30,7 +30,9 @@ import {
   ToolCallsTimeline,
 } from "@/features/turn-traces/components/TurnPanels";
 import { TurnStoryView } from "@/features/turn-traces/components/TurnStoryView";
+import { UniversalTracePanel } from "@/features/turn-traces/components/UniversalTracePanel";
 import { buildTurnStory } from "@/features/turn-traces/lib/turnStory";
+import { readUniversalTurnTrace } from "@/features/turn-traces/lib/universalTrace";
 
 interface Props {
   traceId: string;
@@ -89,6 +91,7 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
     dateStyle: "short",
     timeStyle: "short",
   });
+  const universalTrace = readUniversalTurnTrace(t);
 
   return (
     <PanelShell
@@ -118,6 +121,9 @@ export function DebugPanel({ traceId, conversationId, onClose }: Props) {
 
           {/* The story — the operator-facing narrative. */}
           <TurnStoryView steps={buildTurnStory(t, { totalTurns, agent: agentForStory })} />
+
+          <Separator />
+          <UniversalTracePanel trace={universalTrace} />
 
           <Separator />
           <EntityPills trace={t} />

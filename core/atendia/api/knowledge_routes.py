@@ -26,6 +26,15 @@ from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.config import get_settings
+from atendia.db.models.commercial_catalog import (
+    Catalog as CommercialCatalog,
+)
+from atendia.db.models.commercial_catalog import (
+    CatalogItem as CommercialCatalogItem,
+)
+from atendia.db.models.commercial_catalog import (
+    CatalogItemPlan as CommercialCatalogItemPlan,
+)
 from atendia.db.models.kb_agent_permission import KbAgentPermission
 from atendia.db.models.kb_collection import KbCollection
 from atendia.db.models.kb_conflict import KbConflict
@@ -223,6 +232,78 @@ def _catalog_item(row: TenantCatalogItem) -> CatalogItem:
         payment_plans=row.payment_plans or [],
         created_at=row.created_at,
     )
+
+
+def _money_to_cents(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return round(float(value) * 100)
+    except (TypeError, ValueError):
+        return None
+
+
+def _commercial_catalog_item(
+    row: CommercialCatalogItem,
+    plans: list[CommercialCatalogItemPlan],
+) -> CatalogItem:
+    attrs = dict(row.attributes_json or {})
+    attrs.setdefault(
+        "catalog_source",
+        {
+            "kind": "commercial_catalog",
+            "catalog_id": str(row.catalog_id),
+            "item_id": str(row.id),
+        },
+    )
+    payment_plans = [
+        {
+            "plan": plan.plan_code,
+            "plan_name": plan.plan_name,
+            "plan_code": plan.plan_code,
+            "enganche_mxn": _decimal_number(plan.down_payment_amount),
+            "down_payment_amount": _decimal_number(plan.down_payment_amount),
+            "down_payment_percent": _decimal_number(plan.down_payment_percent),
+            "pago_quincenal_mxn": _decimal_number(plan.installment_amount),
+            "installment_amount": _decimal_number(plan.installment_amount),
+            "installment_frequency": plan.installment_frequency,
+            "numero_quincenas": plan.installment_count,
+            "installment_count": plan.installment_count,
+            "term_months": plan.term_months,
+            "status": plan.status,
+            "eligibility_rules_json": plan.eligibility_rules_json or {},
+        }
+        for plan in plans
+    ]
+    return CatalogItem(
+        id=row.id,
+        sku=row.sku,
+        name=row.name,
+        attrs=attrs,
+        category=row.category,
+        tags=list(row.tags_json or []),
+        use_count=0,
+        active=row.status == "active",
+        status="published" if row.status == "active" else row.status,
+        price_cents=_money_to_cents(row.base_price or row.list_price),
+        stock_status=row.stock_status,
+        region=None,
+        branch=row.branch_id,
+        payment_plans=payment_plans,
+        created_at=row.created_at,
+    )
+
+
+def _decimal_number(value: object) -> int | float | None:
+    if value in (None, ""):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number.is_integer():
+        return int(number)
+    return number
 
 
 def _doc_item(row: KnowledgeDocument) -> DocumentItem:
@@ -448,14 +529,60 @@ async def list_catalog(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CatalogItem]:
-    stmt = (
+    legacy_stmt = (
         select(TenantCatalogItem)
         .where(TenantCatalogItem.tenant_id == tenant_id)
         .order_by(TenantCatalogItem.name.asc())
     )
     if category:
-        stmt = stmt.where(TenantCatalogItem.category == category)
-    return [_catalog_item(row) for row in (await session.execute(stmt)).scalars().all()]
+        legacy_stmt = legacy_stmt.where(TenantCatalogItem.category == category)
+    legacy_items = [
+        _catalog_item(row) for row in (await session.execute(legacy_stmt)).scalars().all()
+    ]
+
+    commercial_stmt = (
+        select(CommercialCatalogItem)
+        .join(CommercialCatalog, CommercialCatalog.id == CommercialCatalogItem.catalog_id)
+        .where(
+            CommercialCatalogItem.tenant_id == tenant_id,
+            CommercialCatalog.status == "active",
+            CommercialCatalogItem.status == "active",
+        )
+        .order_by(CommercialCatalogItem.name.asc())
+    )
+    if category:
+        commercial_stmt = commercial_stmt.where(CommercialCatalogItem.category == category)
+    commercial_rows = (await session.execute(commercial_stmt)).scalars().all()
+    plan_rows: list[CommercialCatalogItemPlan] = []
+    if commercial_rows:
+        plan_rows = (
+            (
+                await session.execute(
+                    select(CommercialCatalogItemPlan)
+                    .where(
+                        CommercialCatalogItemPlan.tenant_id == tenant_id,
+                        CommercialCatalogItemPlan.catalog_item_id.in_(
+                            [row.id for row in commercial_rows]
+                        ),
+                        CommercialCatalogItemPlan.status == "active",
+                    )
+                    .order_by(CommercialCatalogItemPlan.plan_code.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+    plans_by_item: dict[UUID, list[CommercialCatalogItemPlan]] = {}
+    for plan in plan_rows:
+        plans_by_item.setdefault(plan.catalog_item_id, []).append(plan)
+
+    legacy_skus = {item.sku for item in legacy_items}
+    commercial_items = [
+        _commercial_catalog_item(row, plans_by_item.get(row.id, []))
+        for row in commercial_rows
+        if row.sku not in legacy_skus
+    ]
+    return [*commercial_items, *legacy_items]
 
 
 @router.post("/catalog", response_model=CatalogItem, status_code=status.HTTP_201_CREATED)
@@ -1025,10 +1152,10 @@ async def reindex_documents(
 # the URL prefix stays /api/v1/knowledge/* with no path breakage.
 # Sub-routers ship incrementally — those not yet implemented will land in
 # follow-up sessions per docs/runbook/knowledge-base.md §7.
-from atendia.api._kb.collections import router as _kb_collections_router
-from atendia.api._kb.command_center import router as _kb_command_center_router
-from atendia.api._kb.search import router as _kb_search_router
-from atendia.api._kb.test_query import router as _kb_test_query_router
+from atendia.api._kb.collections import router as _kb_collections_router  # noqa: E402
+from atendia.api._kb.command_center import router as _kb_command_center_router  # noqa: E402
+from atendia.api._kb.search import router as _kb_search_router  # noqa: E402
+from atendia.api._kb.test_query import router as _kb_test_query_router  # noqa: E402
 
 router.include_router(_kb_command_center_router)
 router.include_router(_kb_search_router)

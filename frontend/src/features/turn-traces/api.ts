@@ -86,6 +86,7 @@ export interface TurnTraceDetail extends TurnTraceListItem {
   // recorded before runner instrumentation landed.
   composer_provider: "openai" | "fallback" | null;
   inbound_text_cleaned: string | null;
+  trace_metadata?: Record<string, unknown> | null;
 }
 
 export const turnTracesApi = {

@@ -1,0 +1,138 @@
+{
+  "decision": "WORKFLOW_BUSINESS_EVENTS_READY",
+  "reason": "PostgreSQL test DB was raised, migrations roundtripped, integration_db ledger tests passed, scoped duplicate/idempotency behavior passed, tenant isolation passed, and non-DB runtime suites remained green.",
+  "docker_postgres_status": {
+    "initial_docker_status": "Docker CLI installed; daemon initially unavailable",
+    "docker_desktop_started": true,
+    "docker_ready": true,
+    "postgres_test_started": true,
+    "service": "postgres-test",
+    "container": "atendia_postgres_test"
+  },
+  "files_created": [
+    "core/atendia/agent_runtime/business_event_ledger.py",
+    "core/atendia/db/models/business_event_ledger.py",
+    "core/atendia/db/migrations/versions/065_business_event_ledger.py",
+    "core/tests/agent_runtime/test_business_event_ledger.py"
+  ],
+  "files_modified": [
+    "core/atendia/db/models/__init__.py",
+    "core/tests/db/test_migrations_roundtrip.py",
+    "reports/business_event_idempotency_ledger_implementation.md",
+    "reports/business_event_idempotency_ledger_implementation.json"
+  ],
+  "schema": {
+    "table": "business_event_ledger",
+    "unique_constraint": {
+      "name": "uq_business_event_ledger_scope_idempotency_key",
+      "columns": [
+        "tenant_id",
+        "conversation_id",
+        "event_type",
+        "idempotency_key"
+      ]
+    },
+    "indexes": [
+      "business_event_ledger_pkey",
+      "ix_business_event_ledger_conversation_id",
+      "ix_business_event_ledger_event_type",
+      "ix_business_event_ledger_idempotency_key",
+      "ix_business_event_ledger_tenant_id",
+      "ix_business_event_ledger_trace_id",
+      "uq_business_event_ledger_scope_idempotency_key"
+    ],
+    "columns": [
+      "id",
+      "tenant_id",
+      "conversation_id",
+      "event_type",
+      "idempotency_key",
+      "status",
+      "reason",
+      "event_payload",
+      "workflow_result",
+      "trace_id",
+      "side_effects_allowed",
+      "created_at",
+      "updated_at"
+    ]
+  },
+  "idempotency": {
+    "mechanism": "PostgreSQL scoped unique constraint plus ON CONFLICT DO NOTHING",
+    "scope": [
+      "tenant_id",
+      "conversation_id",
+      "event_type",
+      "idempotency_key"
+    ],
+    "duplicate_status": "duplicate",
+    "duplicate_reason": "duplicate_idempotency_key",
+    "same_scope_duplicate_validated": true,
+    "different_tenant_scope_same_key_validated": true,
+    "row_count_for_duplicate_test": 1,
+    "row_count_for_tenant_scope_test": 2
+  },
+  "side_effects": {
+    "whatsapp_sent": false,
+    "followups_created": false,
+    "workflow_execution_enabled": false,
+    "actions_enabled": false,
+    "tenant_live_config_applied": false,
+    "runtime_send_path_touched": false
+  },
+  "commands": [
+    {
+      "command": "docker version",
+      "result": "Docker CLI installed; daemon initially unavailable"
+    },
+    {
+      "command": "docker compose -f docker-compose.test.yml up -d postgres-test",
+      "result": "Container atendia_postgres_test Started"
+    },
+    {
+      "command": "uv run ruff check atendia/agent_runtime/business_event_ledger.py atendia/db/models/business_event_ledger.py atendia/db/migrations/versions/065_business_event_ledger.py tests/agent_runtime/test_business_event_ledger.py",
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run alembic downgrade base",
+      "result": "downgraded test DB from businesseventledger065 to base"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_business_event_ledger.py -m \"integration_db\" -q",
+      "result": "4 passed, 1 deselected, 2 warnings in 3.22s"
+    },
+    {
+      "command": "uv run pytest tests/db/test_migrations_roundtrip.py -q",
+      "result": "1 passed, 2 warnings in 2.75s"
+    },
+    {
+      "command": "docker compose -f docker-compose.test.yml exec -T postgres-test psql -U atendia -d atendia_test -c \"select conname, pg_get_constraintdef(oid) as definition from pg_constraint where conrelid = 'business_event_ledger'::regclass order by conname;\"",
+      "result": "unique scope constraint present"
+    },
+    {
+      "command": "docker compose -f docker-compose.test.yml exec -T postgres-test psql -U atendia -d atendia_test -c \"select indexname, indexdef from pg_indexes where tablename = 'business_event_ledger' order by indexname;\"",
+      "result": "expected indexes present"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_business_event_ledger.py -m \"integration_db\" -q",
+      "result": "4 passed, 1 deselected, 1 warning in 1.89s"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_business_events.py tests/agent_runtime/test_universal_turn_trace.py -q",
+      "result": "22 passed, 1 warning in 0.28s"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "202 passed, 34 deselected, 2 warnings in 3.22s"
+    },
+    {
+      "command": "uv run ruff check atendia/agent_runtime/business_event_ledger.py atendia/agent_runtime/business_events.py atendia/db/models/business_event_ledger.py atendia/db/models/__init__.py atendia/db/migrations/versions/065_business_event_ledger.py tests/agent_runtime/test_business_event_ledger.py tests/db/test_migrations_roundtrip.py",
+      "result": "All checks passed!"
+    }
+  ],
+  "remaining_risks": [
+    "Ledger is intentionally not wired to real workflow execution.",
+    "Future live execution must require tenant contract, action gating, safe mode checks, and successful ledger insertion before side effects."
+  ],
+  "recommended_next_step": "Add the gated workflow bridge that consumes only ledger-recorded business events, still dry-run by default, and require explicit tenant-level enablement before action execution can move live."
+}

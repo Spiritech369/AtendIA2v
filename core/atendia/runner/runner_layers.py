@@ -18,6 +18,7 @@ def build_runner_layers(
     rules_evaluated: list[dict[str, Any]] | None,
     router_trigger: str | None,
     pause_bot: bool,
+    decision_debug: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create the four explicit runner layers persisted in turn traces.
 
@@ -39,6 +40,7 @@ def build_runner_layers(
             rules_evaluated=rules_evaluated,
             router_trigger=router_trigger,
             pause_bot=pause_bot,
+            decision_debug=decision_debug or {},
         ),
         "payload": _payload_layer(action_payload),
         "explanation": _explanation_layer(
@@ -74,7 +76,7 @@ def _data_layer(*, pipeline: Any, extracted_data: dict[str, Any]) -> dict[str, A
             for item in (getattr(pipeline, "documents_catalog", []) or [])
             if getattr(item, "key", None)
         ],
-        "catalog_available": bool(getattr(pipeline, "docs_per_plan", None)),
+        "catalog_available": bool(getattr(pipeline, "document_requirements", None)),
     }
 
 
@@ -88,6 +90,7 @@ def _decision_layer(
     rules_evaluated: list[dict[str, Any]] | None,
     router_trigger: str | None,
     pause_bot: bool,
+    decision_debug: dict[str, Any],
 ) -> dict[str, Any]:
     matched_rules = [
         rule.get("name") or rule.get("stage_id")
@@ -104,6 +107,76 @@ def _decision_layer(
         "router_trigger": router_trigger,
         "matched_rules": [item for item in matched_rules if item],
         "pause_bot": pause_bot,
+        "action_before_auto_enter": decision_debug.get("action_before_auto_enter"),
+        "action_after_recompute": decision_debug.get("action_after_recompute", decision_action),
+        "stage_after_fsm": decision_debug.get("stage_after_fsm"),
+        "stage_after_auto_enter": decision_debug.get("stage_after_auto_enter", next_stage),
+        "auto_enter_rules_executed": decision_debug.get("auto_enter_rules_executed", False),
+        "recomputed_after_stage_change": decision_debug.get("recomputed_after_stage_change", False),
+        "recompute_reason": decision_debug.get("recompute_reason"),
+        "executed_tools": decision_debug.get("executed_tools", []),
+        "tool_inputs": decision_debug.get("tool_inputs", []),
+        "tool_outputs": decision_debug.get("tool_outputs", []),
+        "resolver_attempts": decision_debug.get("resolver_attempts", []),
+        "field_updates_proposed": decision_debug.get("field_updates_proposed", []),
+        "field_updates_approved": decision_debug.get("field_updates_approved", []),
+        "field_updates_blocked": decision_debug.get("field_updates_blocked", []),
+        "pending_question": decision_debug.get("pending_question"),
+        "pending_confirmation": decision_debug.get("pending_confirmation"),
+        "decision_payload": decision_debug.get("decision_payload"),
+        "knowledge_pack_version": decision_debug.get("knowledge_pack_version"),
+        "repeated_question_blocked": decision_debug.get("repeated_question_blocked", False),
+        "protected_field": decision_debug.get("protected_field"),
+        "existing_value": decision_debug.get("existing_value"),
+        "attempted_question": decision_debug.get("attempted_question"),
+        "conflict_detected": decision_debug.get("conflict_detected", False),
+        "overwrite_allowed": decision_debug.get("overwrite_allowed"),
+        "overwrite_blocked_reason": decision_debug.get("overwrite_blocked_reason"),
+        "state_guard_events": decision_debug.get("state_guard_events", []),
+        "advisor_decision": decision_debug.get("advisor_decision"),
+        "commercial_intent": decision_debug.get("commercial_intent"),
+        "pending_to_resume": decision_debug.get("pending_to_resume"),
+        "blocked_commercial_actions": decision_debug.get("blocked_commercial_actions", []),
+        "quote_gate_evaluated": decision_debug.get("quote_gate_evaluated", False),
+        "quote_gate_result": decision_debug.get("quote_gate_result"),
+        "quote_gate_blocked_actions": decision_debug.get("quote_gate_blocked_actions", []),
+        "quote_ready_fields": decision_debug.get("quote_ready_fields", []),
+        "missing_quote_fields": decision_debug.get("missing_quote_fields", []),
+        "agent_brain_plan_present": decision_debug.get("agent_brain_plan_present", False),
+        "agent_brain_plan_valid": decision_debug.get("agent_brain_plan_valid", False),
+        "agent_brain_plan_rejected_reason": decision_debug.get("agent_brain_plan_rejected_reason"),
+        "agent_brain_proposed_final_action": decision_debug.get("agent_brain_proposed_final_action"),
+        "agent_brain_tool_plan": decision_debug.get("agent_brain_tool_plan", []),
+        "agent_brain_proposed_state_updates": decision_debug.get("agent_brain_proposed_state_updates", {}),
+        "policy_overrode_agent_brain": decision_debug.get("policy_overrode_agent_brain", False),
+        "policy_override_reason": decision_debug.get("policy_override_reason"),
+        "detected_intents": decision_debug.get("detected_intents", []),
+        "answered_intents": decision_debug.get("answered_intents", []),
+        "unresolved_intents": decision_debug.get("unresolved_intents", []),
+        "intent_stack": decision_debug.get("intent_stack", []),
+        "primary_commercial_goal": decision_debug.get("primary_commercial_goal"),
+        "next_required_step": decision_debug.get("next_required_step"),
+        "pending_bot_question": decision_debug.get("pending_bot_question"),
+        "yes_no_context_resolution": decision_debug.get("yes_no_context_resolution"),
+        "resolved_followup_intent": decision_debug.get("resolved_followup_intent"),
+        "resolved_followup_entity": decision_debug.get("resolved_followup_entity"),
+        "context_resolution_confidence": decision_debug.get("context_resolution_confidence"),
+        "soft_close_candidate": decision_debug.get("soft_close_candidate", False),
+        "soft_close_blocked_reason": decision_debug.get("soft_close_blocked_reason"),
+        "soft_close_applied": decision_debug.get("soft_close_applied", False),
+        "model_change_detected": decision_debug.get("model_change_detected", False),
+        "alternative_quote_requested": decision_debug.get("alternative_quote_requested", False),
+        "previous_model": decision_debug.get("previous_model"),
+        "new_model": decision_debug.get("new_model"),
+        "selected_catalog_candidate": decision_debug.get("selected_catalog_candidate"),
+        "selected_candidate_index": decision_debug.get("selected_candidate_index"),
+        "preserved_fields": decision_debug.get("preserved_fields", []),
+        "invalidated_fields": decision_debug.get("invalidated_fields", []),
+        "recalculated_fields": decision_debug.get("recalculated_fields", []),
+        "documents_blocked_until_requote": decision_debug.get(
+            "documents_blocked_until_requote", False
+        ),
+        "quote_count_after_turn": decision_debug.get("quote_count_after_turn"),
     }
 
 
@@ -184,25 +257,14 @@ def _human_summary(
 def _human_reasons(extracted_data: dict[str, Any]) -> list[str]:
     values = {key: _unwrap(value) for key, value in extracted_data.items()}
     reasons: list[str] = []
-    if _has_valid_seniority(values):
-        reasons.append("ya tiene antigüedad válida")
-    if _present(values.get("tipo_credito")):
-        reasons.append("tipo_credito asignado")
-    if _present(values.get("modelo_interes")) or _present(values.get("interes_producto")):
-        reasons.append("modelo_interes detectado")
-    return reasons
-
-
-def _has_valid_seniority(values: dict[str, Any]) -> bool:
-    if values.get("cumple_antiguedad") is True:
-        return True
-    for key in ("tiempo_empleo_meses", "antiguedad_laboral_meses", "antiguedad_empleo_meses"):
-        try:
-            if values.get(key) is not None and float(values[key]) >= 6:
-                return True
-        except (TypeError, ValueError):
+    for key in sorted(values):
+        if len(reasons) >= 3:
+            break
+        if str(key).lower().startswith(("docs_", "docs.")):
             continue
-    return False
+        if _present(values.get(key)):
+            reasons.append(f"{key} asignado")
+    return reasons
 
 
 def _present(value: Any) -> bool:

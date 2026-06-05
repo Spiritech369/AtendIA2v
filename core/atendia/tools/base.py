@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -42,24 +42,50 @@ class ToolNoDataResult(BaseModel):
 
 
 class Quote(BaseModel):
-    """Real-data result from `quote(sku=...)`.
+    """Structured result from ``quote(sku=...)``.
 
-    `Quote` is the rich shape: full price ladder, planes de crédito, and
-    ficha técnica — everything the Composer prompt needs to write a single
-    accurate WhatsApp message without a second tool call.
-
-    Status is a fixed literal so the Composer router branches on
-    `payload["status"] == "ok"` without isinstance checks.
+    The shape is product-neutral: list/cash price, payment options and
+    product details. Tenant-specific names or old catalog keys are handled
+    outside the runtime surface.
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     status: Literal["ok"] = "ok"
     sku: str
     name: str
     category: str
-    price_lista_mxn: Decimal
-    price_contado_mxn: Decimal
-    planes_credito: dict
-    ficha_tecnica: dict
+    list_price_mxn: Decimal = Field(
+        validation_alias=AliasChoices("list_price_mxn", "price_lista_mxn")
+    )
+    cash_price_mxn: Decimal = Field(
+        validation_alias=AliasChoices("cash_price_mxn", "price_contado_mxn", "precio_contado_mxn")
+    )
+    payment_options: dict = Field(
+        validation_alias=AliasChoices("payment_options", "planes_credito")
+    )
+    product_details: dict = Field(validation_alias=AliasChoices("product_details", "ficha_tecnica"))
+    source: dict = Field(default_factory=dict)
+
+    @property
+    def price_lista_mxn(self) -> Decimal:
+        return self.list_price_mxn
+
+    @property
+    def precio_contado_mxn(self) -> Decimal:
+        return self.cash_price_mxn
+
+    @property
+    def price_contado_mxn(self) -> Decimal:
+        return self.cash_price_mxn
+
+    @property
+    def planes_credito(self) -> dict:
+        return self.payment_options
+
+    @property
+    def ficha_tecnica(self) -> dict:
+        return self.product_details
 
 
 class FAQMatch(BaseModel):
@@ -71,7 +97,8 @@ class FAQMatch(BaseModel):
 
     `faq_id` and `collection_id` (migration 045) let the DebugPanel
     deep-link each hit back to the KB module so the operator can edit the
-    source row in one click. Both nullable to keep legacy callers working.
+    source row in one click. Both nullable because some providers do not
+    expose editable source rows.
     """
 
     pregunta: str
@@ -84,19 +111,27 @@ class FAQMatch(BaseModel):
 class CatalogResult(BaseModel):
     """One row of `search_catalog()`'s ranked list.
 
-    Lighter than `Quote` — no `planes_credito` or `ficha_tecnica` because
-    `search_catalog` is the browsing entry point ("muéstrame motonetas
-    económicas"). Once the user picks one, the runner re-dispatches to
-    `quote(sku=…)` for the full payload.
+    Lighter than `Quote`; `search_catalog` is the browsing entry point
+    for product or service discovery. Once the user picks one, the
+    runner can re-dispatch to `quote(sku=...)` for the full payload.
 
     `catalog_item_id` and `collection_id` (migration 045) enable
     DebugPanel deep-links the same way as FAQMatch.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     sku: str
     name: str
     category: str
-    price_contado_mxn: Decimal
+    cash_price_mxn: Decimal = Field(
+        validation_alias=AliasChoices("cash_price_mxn", "price_contado_mxn", "precio_contado_mxn")
+    )
     score: float
     catalog_item_id: UUID | None = None
     collection_id: UUID | None = None
+    source: dict = Field(default_factory=dict)
+
+    @property
+    def price_contado_mxn(self) -> Decimal:
+        return self.cash_price_mxn

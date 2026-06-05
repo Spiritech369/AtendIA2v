@@ -190,6 +190,111 @@ def test_command_center_items_returns_live_catalog_rows(client_tenant_admin) -> 
     assert catalog[0]["risk_level"] == "low"
 
 
+def test_command_center_items_includes_knowledge_os_v2_sources(client_tenant_admin) -> None:
+    source_ids = [uuid4(), uuid4(), uuid4(), uuid4(), uuid4()]
+    source_specs = [
+        ("catalogo_dinamo", "table", "catalog", {"retrieval_enabled": True}),
+        ("requisitos_dinamo", "file", "credit_policy", {"retrieval_enabled": True}),
+        ("faq_dinamo", "file", "faq", {"retrieval_enabled": True}),
+        ("prompt_agente_dinamo", "manual", "general", {"role": "agent_instructions"}),
+        ("flujo_dinamo_orden_caos", "file", "general", {"role": "eval_scenarios"}),
+    ]
+
+    async def _seed() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            for source_id, (name, source_type, content_type, metadata) in zip(
+                source_ids, source_specs, strict=True
+            ):
+                await conn.execute(
+                    text(
+                        "INSERT INTO knowledge_sources "
+                        "(id, tenant_id, name, type, content_type, status, priority, "
+                        "metadata_json) "
+                        "VALUES (:id, :t, :name, :type, :content_type, 'active', 10, :m\\:\\:jsonb)"
+                    ),
+                    {
+                        "id": str(source_id),
+                        "t": client_tenant_admin.tenant_id,
+                        "name": name,
+                        "type": source_type,
+                        "content_type": content_type,
+                        "m": json.dumps(metadata),
+                    },
+                )
+        await engine.dispose()
+
+    asyncio.run(_seed())
+
+    resp = client_tenant_admin.get("/api/v1/knowledge/items")
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    titles = [item["title"] for item in items]
+    assert any("catalogo_dinamo" in title for title in titles)
+    assert any("requisitos_dinamo" in title for title in titles)
+    assert any("faq_dinamo" in title for title in titles)
+    assert any(item["collection"] == "Non-factual" for item in items)
+
+
+def test_list_catalog_includes_published_commercial_catalog(client_tenant_admin) -> None:
+    catalog_id = uuid4()
+    item_id = uuid4()
+
+    async def _seed() -> None:
+        engine = create_async_engine(get_settings().database_url)
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO catalogs (id, tenant_id, name, vertical, currency, status) "
+                    "VALUES (:id, :t, 'Catalogo Dinamo Test', 'motorcycles', 'MXN', 'active')"
+                ),
+                {"id": str(catalog_id), "t": client_tenant_admin.tenant_id},
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO catalog_items "
+                    "(id, tenant_id, catalog_id, sku, name, type, category, base_price, "
+                    "list_price, stock_status, status, attributes_json, ai_rules_json, tags_json) "
+                    "VALUES (:id, :t, :catalog_id, 'R4', 'Dinamo R4', 'motorcycle', "
+                    "'trabajo', 28999, 32999, 'unknown', 'active', "
+                    ":attrs\\:\\:jsonb, '{}'\\:\\:jsonb, '[]'\\:\\:jsonb)"
+                ),
+                {
+                    "id": str(item_id),
+                    "t": client_tenant_admin.tenant_id,
+                    "catalog_id": str(catalog_id),
+                    "attrs": json.dumps({"alias": ["R4"]}),
+                },
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO catalog_item_plans "
+                    "(id, tenant_id, catalog_item_id, plan_name, plan_code, plan_type, "
+                    "down_payment_amount, down_payment_percent, installment_amount, "
+                    "installment_frequency, installment_count, eligibility_rules_json, status) "
+                    "VALUES (:id, :t, :item_id, 'Credito 10%', '10%', 'credit', "
+                    "3000, 10, 900, 'biweekly', 48, '{}'\\:\\:jsonb, 'active')"
+                ),
+                {
+                    "id": str(uuid4()),
+                    "t": client_tenant_admin.tenant_id,
+                    "item_id": str(item_id),
+                },
+            )
+        await engine.dispose()
+
+    asyncio.run(_seed())
+
+    resp = client_tenant_admin.get("/api/v1/knowledge/catalog")
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()
+    r4 = next(item for item in rows if item["sku"] == "R4")
+    assert r4["name"] == "Dinamo R4"
+    assert r4["price_cents"] == 2899900
+    assert r4["payment_plans"][0]["plan_code"] == "10%"
+    assert r4["payment_plans"][0]["pago_quincenal_mxn"] == 900
+
+
 def test_delete_document_db_first(client_tenant_admin) -> None:
     doc = _upload_pdf(client_tenant_admin)
     resp = client_tenant_admin.delete(

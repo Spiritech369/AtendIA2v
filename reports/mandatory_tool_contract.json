@@ -1,0 +1,208 @@
+{
+  "report": "mandatory_tool_contract",
+  "generated_at": "2026-06-03",
+  "principle": "Sensitive operational facts require tenant-declared tools; tools return structured data, never final visible copy.",
+  "topics": [
+    {
+      "topic": "catalog_or_listing",
+      "applies_when": [
+        "product",
+        "service",
+        "property",
+        "package",
+        "availability",
+        "listing"
+      ],
+      "universal_tool": "catalog.search"
+    },
+    {
+      "topic": "offer_or_quote",
+      "applies_when": [
+        "price",
+        "payment",
+        "plan",
+        "validity",
+        "quote",
+        "discount"
+      ],
+      "universal_tool": "quote.resolve"
+    },
+    {
+      "topic": "requirements",
+      "applies_when": [
+        "requirements",
+        "documents",
+        "mandatory steps"
+      ],
+      "universal_tool": "requirements.lookup"
+    },
+    {
+      "topic": "policy_or_faq",
+      "applies_when": [
+        "policies",
+        "restrictions",
+        "approval",
+        "warranty",
+        "coverage"
+      ],
+      "universal_tool": "faq.lookup"
+    },
+    {
+      "topic": "document_status",
+      "applies_when": [
+        "document received",
+        "document rejected",
+        "requirements complete"
+      ],
+      "universal_tool": "document.check"
+    },
+    {
+      "topic": "availability",
+      "applies_when": [
+        "schedule",
+        "stock",
+        "appointment"
+      ],
+      "universal_tool": "availability.check"
+    },
+    {
+      "topic": "booking_or_action",
+      "applies_when": [
+        "create appointment",
+        "create task",
+        "schedule follow-up",
+        "handoff"
+      ],
+      "universal_tool": "action.execute"
+    }
+  ],
+  "decision_schema": {
+    "tool_id": "string",
+    "topic": "string",
+    "required": "boolean",
+    "reason": "string",
+    "trigger_source": "string",
+    "blocking_scopes": "array",
+    "status": [
+      "required",
+      "executed",
+      "missing",
+      "blocked",
+      "not_applicable"
+    ],
+    "fallback": "string"
+  },
+  "result_schema": {
+    "tool_id": "string",
+    "status": [
+      "success",
+      "no_data",
+      "error",
+      "blocked"
+    ],
+    "tenant_id": "string",
+    "inputs": "object",
+    "output": "object",
+    "citations": "array",
+    "no_data_reason": "string|null",
+    "used_for": "array",
+    "visible_text_allowed": false
+  },
+  "invariants": [
+    "Tool results do not contain final_message, message, reply or customer-facing final text.",
+    "Every tool result is tenant scoped.",
+    "Missing mandatory tools block sensitive facts.",
+    "No-data results produce uncertainty or handoff, not invented facts.",
+    "Validated tool facts override conflicting model proposals."
+  ],
+  "enforcement_matrix": [
+    {
+      "trigger": "final_copy_mentions_price_payment_discount_or_validity",
+      "required_tool": "quote.resolve",
+      "blocks": [
+        "final_message",
+        "quote_field_update",
+        "offer_quoted"
+      ]
+    },
+    {
+      "trigger": "field_update_writes_product_or_service_selection",
+      "required_tool": "catalog.search",
+      "blocks": [
+        "field_update",
+        "selection_stage"
+      ]
+    },
+    {
+      "trigger": "final_copy_requests_specific_requirements",
+      "required_tool": "requirements.lookup",
+      "blocks": [
+        "final_message",
+        "requirements_requested"
+      ]
+    },
+    {
+      "trigger": "field_update_marks_document_received_or_rejected",
+      "required_tool": "document.check",
+      "blocks": [
+        "field_update",
+        "requirements_partial"
+      ]
+    },
+    {
+      "trigger": "field_update_marks_requirements_complete",
+      "required_tool": "requirements.lookup+document.check",
+      "blocks": [
+        "field_update",
+        "complete_stage"
+      ]
+    },
+    {
+      "trigger": "final_copy_answers_sensitive_policy",
+      "required_tool": "faq.lookup_or_policy.lookup",
+      "blocks": [
+        "final_message"
+      ]
+    }
+  ],
+  "dinamo_mapping": [
+    {
+      "topic": "moto_modelo",
+      "tool": "catalog.search",
+      "required_when": "model is identified or recommended"
+    },
+    {
+      "topic": "plan_credito",
+      "tool": "credit_plan.resolve",
+      "required_when": "plan, down payment, monthly payment or credit modality is discussed"
+    },
+    {
+      "topic": "cotizacion",
+      "tool": "quote.resolve",
+      "required_when": "payment, price, down payment, quote validity or cotizado stage is mentioned"
+    },
+    {
+      "topic": "papeleria",
+      "tool": "requirements.lookup",
+      "required_when": "documents or requirements are requested"
+    },
+    {
+      "topic": "documento_recibido",
+      "tool": "document.check",
+      "required_when": "document status is changed"
+    },
+    {
+      "topic": "buro_aprobacion",
+      "tool": "faq.lookup_or_policy.lookup",
+      "required_when": "bureau or approval policy is answered"
+    }
+  ],
+  "required_tests": [
+    "Price in final copy without quote.resolve is blocked.",
+    "Product proposal without catalog match becomes needs_review.",
+    "Requirements requested without requirements.lookup are blocked.",
+    "Text-only document without attachment is blocked.",
+    "Bureau mention does not auto-reject.",
+    "Tenant B cannot use Dinamo catalog."
+  ]
+}

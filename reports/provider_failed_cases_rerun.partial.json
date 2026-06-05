@@ -1,0 +1,50 @@
+﻿[
+    {
+        "case_id":  "adv_15",
+        "cases_passed":  0,
+        "cases_total":  1,
+        "dod":  true,
+        "circuit":  0,
+        "fallback":  0,
+        "retry_exhausted":  0,
+        "repeated":  0.0,
+        "exact":  0.0,
+        "failures":  "robotic_template"
+    },
+    {
+        "case_id":  "adv_18",
+        "cases_passed":  0,
+        "cases_total":  1,
+        "dod":  false,
+        "circuit":  0,
+        "fallback":  0,
+        "retry_exhausted":  0,
+        "repeated":  0.2,
+        "exact":  0.2,
+        "failures":  "repeated_question_or_exact_response_detected"
+    },
+    {
+        "case_id":  "adv_24",
+        "cases_passed":  0,
+        "cases_total":  1,
+        "dod":  false,
+        "circuit":  0,
+        "fallback":  0,
+        "retry_exhausted":  0,
+        "repeated":  0.2,
+        "exact":  0.0,
+        "failures":  "repeated_question_or_exact_response_detected"
+    },
+    {
+        "case_id":  "adv_28",
+        "cases_passed":  0,
+        "cases_total":  1,
+        "dod":  false,
+        "circuit":  0,
+        "fallback":  0,
+        "retry_exhausted":  0,
+        "repeated":  0.2,
+        "exact":  0.0,
+        "failures":  "repeated_question_or_exact_response_detected"
+    }
+]

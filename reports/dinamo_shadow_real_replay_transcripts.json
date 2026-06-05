@@ -1,0 +1,5469 @@
+{
+  "generated_at": "2026-06-04T05:52:17.014875+00:00",
+  "dataset": {
+    "path": "..\\reports\\dinamo_shadow_real_replay_dataset.anonymized.json",
+    "cases_total": 20,
+    "anonymized": true,
+    "raw_text_exported": false
+  },
+  "tenant_domain_contract": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "domain": "vehicle_credit_sales",
+    "runtime_mode": "v2_shadow_until_evaluated",
+    "pipeline_id": "dinamo_vehicle_credit_shadow",
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "canary_enabled": false,
+    "single_contact_smoke_enabled": false
+  },
+  "safety": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "traffic_real_activated": false,
+    "whatsapp_sent": false,
+    "config_live_applied": false,
+    "single_contact_smoke_enabled": false
+  },
+  "cases": [
+    {
+      "conversation_id": "real_b16cedc7b627",
+      "conversation_hash": "b16cedc7b627",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_48c72b56c5de",
+      "conversation_hash": "48c72b56c5de",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_dfe7b2bb13f0",
+      "conversation_hash": "dfe7b2bb13f0",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "handoff"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente pide hablar con asesor humano",
+          "attachments": [],
+          "shadow_response_proposed": "Solicito revision humana en dry-run; no creo accion real ni envio mensaje externo.",
+          "tools_used": [
+            "handoff.create"
+          ],
+          "fields_accepted": [
+            {
+              "field": "human_handoff_needed",
+              "value": true,
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "human_handoff_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "human_handoff_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "en_revision_humana",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Solicito revision humana en dry-run; no creo accion real ni envio mensaje externo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_13893adc7d42",
+      "conversation_hash": "13893adc7d42",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "tools_used": [
+            "catalog.search",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_16a192a09810",
+      "conversation_hash": "16a192a09810",
+      "source": "sampled_real_conversation",
+      "turn_count": 6,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 6,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_cd9f92957c51",
+      "conversation_hash": "cd9f92957c51",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_1f066b43b997",
+      "conversation_hash": "1f066b43b997",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_e60c9db15927",
+      "conversation_hash": "e60c9db15927",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_1b476683a40d",
+      "conversation_hash": "1b476683a40d",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "tools_used": [
+            "catalog.search",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_0da316dac672",
+      "conversation_hash": "0da316dac672",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "tools_used": [
+            "catalog.search",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_b39964f2f0c4",
+      "conversation_hash": "b39964f2f0c4",
+      "source": "sampled_real_conversation",
+      "turn_count": 9,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion de moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "tools_used": [
+            "catalog.search",
+            "credit_plan.resolve",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 6,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 7,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 8,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 9,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_7f7bb70f4d9f",
+      "conversation_hash": "7f7bb70f4d9f",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion de moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "tools_used": [
+            "catalog.search",
+            "credit_plan.resolve",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_7f62ce6fea72",
+      "conversation_hash": "7f62ce6fea72",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_fb5b32b4a6f2",
+      "conversation_hash": "fb5b32b4a6f2",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "tools_used": [
+            "catalog.search",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_37a6d29290ae",
+      "conversation_hash": "37a6d29290ae",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_c6a3b647dc52",
+      "conversation_hash": "c6a3b647dc52",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [
+            {
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "reason": "canonical_product_required_before_quote"
+            }
+          ],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [
+            {
+              "guard_id": "quote_snapshot_guard",
+              "result": "blocked",
+              "reason": "quote_requires_catalog_match"
+            }
+          ],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Para cotizar necesito identificar el modelo antes de usar quote.resolve.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "quote_request_waiting_for_product_reference"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "tools_used": [
+            "catalog.search",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ahora que identificaste modelo, resuelvo la cotizacion pendiente con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "quote_request_waiting_for_product_reference",
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_71543761982d",
+      "conversation_hash": "71543761982d",
+      "source": "sampled_real_conversation",
+      "turn_count": 9,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion de moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "tools_used": [
+            "catalog.search",
+            "credit_plan.resolve",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 6,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 7,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 8,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 9,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_d06730ba4836",
+      "conversation_hash": "d06730ba4836",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_00e6ef475a08",
+      "conversation_hash": "00e6ef475a08",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "documents"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente menciona interes en moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "tools_used": [
+            "catalog.search"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "selection_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "moto_identificada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Ubico el modelo anonimo con catalog.search en shadow y no guardo texto crudo.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente pregunta por documentos requeridos",
+          "attachments": [],
+          "shadow_response_proposed": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "tools_used": [
+            "requirements.lookup"
+          ],
+          "fields_accepted": [
+            {
+              "field": "requirements_checklist",
+              "value": [
+                "documentos_validados_por_plan"
+              ],
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "requirements_requested"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "requirements_requested",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "papeleria_solicitada",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Consulto requirements.lookup y respondo requisitos validados sin mezclar planes.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    },
+    {
+      "conversation_id": "real_dc7e52d6ffdd",
+      "conversation_hash": "dc7e52d6ffdd",
+      "source": "sampled_real_conversation",
+      "turn_count": 5,
+      "expected_tags": [
+        "quote"
+      ],
+      "replay_passed": true,
+      "critical_failures": [],
+      "messages_anonymized": true,
+      "turns": [
+        {
+          "turn": 1,
+          "customer_message": "cliente solicita cotizacion de moto modelo anonimo",
+          "attachments": [],
+          "shadow_response_proposed": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "tools_used": [
+            "catalog.search",
+            "credit_plan.resolve",
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "product_selection",
+              "value": "modelo_anonimo",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "product_catalog_id",
+              "value": "catalog_shadow_match",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            },
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "lead_started",
+            "selection_identified",
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "lead_started",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "selection_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            },
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Genero cotizacion shadow con quote.resolve y snapshot validado; no envio WhatsApp ni precio live.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 2,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 3,
+          "customer_message": "cliente solicita cotizacion",
+          "attachments": [],
+          "shadow_response_proposed": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "tools_used": [
+            "quote.resolve"
+          ],
+          "fields_accepted": [
+            {
+              "field": "quote_snapshot_id",
+              "value": "shadow_quote_snapshot",
+              "decision": "accepted",
+              "source": "shadow_replay"
+            }
+          ],
+          "fields_blocked": [],
+          "business_events": [
+            "offer_quoted"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "offer_quoted",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": "cotizado",
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Uso el modelo ya identificado y valido la cotizacion con quote.resolve en shadow.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 4,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        },
+        {
+          "turn": 5,
+          "customer_message": "cliente comparte informacion sin datos personales",
+          "attachments": [],
+          "shadow_response_proposed": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "tools_used": [],
+          "fields_accepted": [],
+          "fields_blocked": [],
+          "business_events": [
+            "intent_identified"
+          ],
+          "workflow_results": [
+            {
+              "event_type": "intent_identified",
+              "status": "dry-run",
+              "dry_run": true,
+              "side_effects_allowed": false
+            }
+          ],
+          "guards": [],
+          "pipeline_shadow": {
+            "pipeline_id": "dinamo_vehicle_credit_shadow",
+            "stage": null,
+            "dry_run": true,
+            "side_effects_enabled": false
+          },
+          "final_message_visible": "Lo tengo en cuenta; para avanzar necesito un dato comercial explicito.",
+          "final_output_authority": "TurnOutput.final_message",
+          "risk_notes": [
+            "none"
+          ],
+          "side_effects": {
+            "traffic_real_activated": false,
+            "whatsapp_sent": false,
+            "outbox": 0,
+            "workflow_side_effects": 0
+          }
+        }
+      ],
+      "risk_notes": [
+        "none"
+      ]
+    }
+  ],
+  "summary": {
+    "cases_total": 20,
+    "turns_total": 109,
+    "tools_used": {
+      "catalog.search": 18,
+      "credit_plan.resolve": 4,
+      "handoff.create": 1,
+      "quote.resolve": 15,
+      "requirements.lookup": 21
+    },
+    "business_events_dry_run": {
+      "human_handoff_requested": 1,
+      "intent_identified": 63,
+      "lead_started": 20,
+      "offer_quoted": 15,
+      "requirements_requested": 21,
+      "selection_identified": 18
+    },
+    "final_output_authority": "TurnOutput.final_message",
+    "raw_text_exported": false,
+    "side_effects": 0,
+    "whatsapp_sent": 0,
+    "workflow_side_effects": 0
+  }
+}

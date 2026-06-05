@@ -25,7 +25,9 @@ async def load_active_pipeline(session: AsyncSession, tenant_id: UUID) -> Pipeli
     row = result.scalar_one_or_none()
     if row is None:
         raise PipelineNotFoundError(f"no active pipeline for tenant {tenant_id}")
-    return PipelineDefinition.model_validate(row.definition)
+    definition = dict(row.definition or {})
+    definition.setdefault("version", row.version)
+    return PipelineDefinition.model_validate(definition)
 
 
 async def resolve_initial_stage(session: AsyncSession, tenant_id: UUID) -> str:
@@ -43,7 +45,7 @@ async def resolve_initial_stage(session: AsyncSession, tenant_id: UUID) -> str:
     The empty-stages defensive fallback still returns ``"greeting"``
     because that case implies a manually-corrupted definition — the
     operator needs to notice it, and crashing further down the runner
-    is worse than logging and continuing on the legacy default.
+    is worse than logging and continuing with the database default.
     """
     from atendia.state_machine.default_pipeline import (
         ensure_default_pipeline,

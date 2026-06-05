@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AuditLogPage } from "@/features/audit-log/AuditLogPage";
-import { requireRole } from "@/lib/auth-guards";
+import { requireCapability } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/audit-log")({
-  beforeLoad: requireRole(["superadmin"]),
+  beforeLoad: requireCapability("route.audit_log", ["superadmin"]),
   component: AuditLogPage,
 });

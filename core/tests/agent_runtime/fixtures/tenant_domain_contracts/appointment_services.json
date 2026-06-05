@@ -1,0 +1,82 @@
+{
+  "contract_version": "1.0",
+  "tenant_id": "tenant_barber_fixture",
+  "agent_id": "agent_barber_fixture",
+  "domain": "appointment_services",
+  "locale": "es-MX",
+  "timezone": "America/Mexico_City",
+  "entities": {
+    "service": "bookable_service",
+    "appointment": "booking"
+  },
+  "fields": [
+    {
+      "key": "service_selection",
+      "label": "Servicio",
+      "domain_role": "selection",
+      "aliases": ["service", "servicio"],
+      "write_policy": "auto_apply_when_catalog_match",
+      "allowed_sources": ["user_message", "catalog.search"],
+      "evidence_required": true
+    },
+    {
+      "key": "appointment_time",
+      "label": "Horario",
+      "domain_role": "appointment",
+      "aliases": ["horario", "appointment"],
+      "write_policy": "suggest_review",
+      "allowed_sources": ["user_message", "availability.check"],
+      "evidence_required": true
+    },
+    {
+      "key": "booking_status",
+      "label": "Estado de cita",
+      "domain_role": "appointment",
+      "aliases": ["booking", "cita"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["booking.create"],
+      "evidence_required": true
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "catalog.search",
+      "topic": "catalog_or_listing",
+      "aliases": ["service_catalog"]
+    },
+    {
+      "tool_id": "availability.check",
+      "topic": "availability",
+      "aliases": ["availability"]
+    },
+    {
+      "tool_id": "booking.create",
+      "topic": "booking_or_action",
+      "aliases": ["booking"]
+    },
+    {
+      "tool_id": "faq.lookup",
+      "topic": "policy_or_faq",
+      "aliases": ["faq"]
+    }
+  ],
+  "pipeline": {
+    "stages": ["new", "service_selected", "appointment_requested", "booked"]
+  },
+  "workflow_events": [
+    "lead_started",
+    "selection_identified",
+    "appointment_requested",
+    "appointment_scheduled"
+  ],
+  "guards": [
+    "mandatory_tool_guard",
+    "final_copy_guard",
+    "tenant_isolation_guard"
+  ],
+  "frontend": {
+    "field_groups": ["selection", "appointment"]
+  },
+  "trace": {},
+  "safety": {}
+}

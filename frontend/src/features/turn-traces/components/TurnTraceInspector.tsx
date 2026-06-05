@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { turnTracesApi } from "@/features/turn-traces/api";
+import { readUniversalTurnTrace } from "@/features/turn-traces/lib/universalTrace";
 
 import { buildTurnStory } from "../lib/turnStory";
 import { FlowModeBadge } from "./FlowModeBadge";
@@ -25,6 +26,7 @@ import {
   StateDiff,
 } from "./TurnPanels";
 import { TurnStoryView } from "./TurnStoryView";
+import { UniversalTracePanel } from "./UniversalTracePanel";
 
 export function TurnTraceInspector({
   traceId,
@@ -60,6 +62,8 @@ export function TurnTraceInspector({
             </div>
             <ErrorBanner trace={query.data} />
             <TurnStoryView steps={buildTurnStory(query.data)} />
+            <Separator />
+            <UniversalTracePanel trace={readUniversalTurnTrace(query.data)} />
             <Separator />
             <EntityPills trace={query.data} />
             <Separator />

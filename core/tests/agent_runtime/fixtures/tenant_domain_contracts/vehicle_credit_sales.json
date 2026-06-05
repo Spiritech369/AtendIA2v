@@ -1,0 +1,118 @@
+{
+  "contract_version": "1.0",
+  "tenant_id": "tenant_dinamo_fixture",
+  "agent_id": "agent_francisco_fixture",
+  "domain": "vehicle_credit_sales",
+  "locale": "es-MX",
+  "timezone": "America/Mexico_City",
+  "entities": {
+    "product": "vehicle",
+    "quote": "financing_offer"
+  },
+  "fields": [
+    {
+      "key": "product_selection",
+      "label": "Moto seleccionada",
+      "domain_role": "selection",
+      "aliases": ["MOTO", "MODELO_INTERES", "product", "model"],
+      "write_policy": "auto_apply_when_catalog_match",
+      "allowed_sources": ["user_message", "catalog.search"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "plan_selection",
+      "label": "Plan de credito",
+      "domain_role": "plan",
+      "aliases": ["CREDITO", "PLAN", "PLAN_CREDITO"],
+      "write_policy": "auto_apply_when_valid_plan",
+      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "quote_snapshot_id",
+      "label": "Cotizacion validada",
+      "domain_role": "quote",
+      "aliases": ["quote_snapshot", "ULTIMA_COTIZACION"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["quote.resolve"],
+      "evidence_required": true,
+      "value_path": "snapshot_id"
+    },
+    {
+      "key": "requirements_complete",
+      "label": "Papeleria completa",
+      "domain_role": "document",
+      "aliases": ["Doc_Completos", "docs_complete"],
+      "write_policy": "system_derived",
+      "allowed_sources": ["requirements.lookup", "document.check", "system"],
+      "evidence_required": true,
+      "required_tools": ["requirements.lookup", "document.check"]
+    },
+    {
+      "key": "bureau_mentioned",
+      "label": "Buro mencionado",
+      "domain_role": "eligibility",
+      "aliases": ["Buro", "BURO"],
+      "write_policy": "auto_apply_when_explicit",
+      "allowed_sources": ["user_message"],
+      "evidence_required": true
+    },
+    {
+      "key": "bureau_status",
+      "label": "Estado buro",
+      "domain_role": "eligibility",
+      "aliases": [],
+      "write_policy": "suggest_review",
+      "allowed_sources": ["faq.lookup", "human_review"],
+      "evidence_required": true
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "catalog.search",
+      "topic": "catalog_or_listing",
+      "aliases": ["catalog"]
+    },
+    {
+      "tool_id": "quote.resolve",
+      "topic": "offer_or_quote",
+      "aliases": ["quote"]
+    },
+    {
+      "tool_id": "requirements.lookup",
+      "topic": "requirements",
+      "aliases": ["requirements"]
+    },
+    {
+      "tool_id": "faq.lookup",
+      "topic": "policy_or_faq",
+      "aliases": ["faq"]
+    },
+    {
+      "tool_id": "document.check",
+      "topic": "document_status",
+      "aliases": ["document"]
+    }
+  ],
+  "pipeline": {
+    "stages": ["new", "selection", "quoted", "requirements"]
+  },
+  "workflow_events": [
+    "lead_started",
+    "selection_identified",
+    "offer_quoted",
+    "requirements_requested"
+  ],
+  "guards": [
+    "mandatory_tool_guard",
+    "final_copy_guard",
+    "tenant_isolation_guard"
+  ],
+  "frontend": {
+    "field_groups": ["selection", "quote", "requirements"]
+  },
+  "trace": {},
+  "safety": {}
+}

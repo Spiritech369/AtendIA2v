@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 interface NYIButtonProps {
   label: string;
@@ -19,13 +20,10 @@ interface NYIButtonProps {
  * Visual: amber color + lock icon.
  * Distinct from DemoBadge (violet), which marks simulated-but-implemented features.
  *
- * Sprint B.2 gating: by default the button renders `null` so production
- * users never see aspirational chrome. Set `VITE_SHOW_NYI=true` in dev
- * to surface them while the team is reviewing/triaging which to build
- * next. Tests opt in explicitly via the same env var or by mocking it.
+ * P0 gating: by default the button renders `null` so live tenants never
+ * see aspirational chrome. The backend capabilities contract is the only
+ * source that can turn this on.
  */
-const SHOW_NYI = import.meta.env?.VITE_SHOW_NYI === "true";
-
 export function NYIButton({
   label,
   icon: Icon,
@@ -33,7 +31,11 @@ export function NYIButton({
   variant = "outline",
   className,
 }: NYIButtonProps) {
-  if (!SHOW_NYI) {
+  const showNyi = useCapabilitiesStore(
+    (s) => s.capabilities?.feature_flags.show_nyi_controls === true,
+  );
+
+  if (!showNyi) {
     return null;
   }
   return (

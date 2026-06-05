@@ -10,6 +10,7 @@ import Fastify from 'fastify'
 import { listSessions } from './src/session-manager.js'
 import { registerRoutes } from './src/routes.js'
 import { startSession } from './src/baileys.js'
+import { startWebhookRetryLoop } from './src/webhook-client.js'
 
 const PORT = Number(process.env.PORT || 7755)
 const HOST = process.env.HOST || '0.0.0.0'
@@ -60,6 +61,7 @@ app
   .listen({ port: PORT, host: HOST })
   .then(async () => {
     app.log.info({ port: PORT }, 'baileys-bridge listening')
+    startWebhookRetryLoop(app.log)
     await autoResumeSessions(app.log)
   })
   .catch((err) => {

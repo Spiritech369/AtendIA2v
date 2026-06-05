@@ -47,43 +47,10 @@ from atendia.state_machine.event_emitter import EventEmitter
 _log = logging.getLogger(__name__)
 
 
-# Fields that, when AUTO-applied, are interesting enough to surface in
-# the conversation timeline as a system event. Anything outside this
-# list still produces an `events` row (for analytics) but no chat
-# bubble — otherwise low-signal fields (city, marca) would spam the
-# operator's view.
-_TIMELINE_WORTHY_FIELDS: frozenset[str] = frozenset(
-    {
-        "tipo_credito",
-        "plan_credito",
-        "antiguedad_laboral_meses",
-        "cumple_antiguedad",
-        "modelo_interes",
-        "estimated_value",
-        "nombre",
-    }
-)
-
-
-# Display labels used in the human-readable `text` of the system message.
-# The frontend can still render its own label from `metadata.event_type`
-# + `metadata.payload.field` if it wants tighter control.
-_FIELD_LABELS: dict[str, str] = {
-    "tipo_credito": "Tipo de crédito",
-    "plan_credito": "Plan de crédito",
-    "antiguedad_laboral_meses": "Antigüedad laboral (meses)",
-    "cumple_antiguedad": "Cumple antigüedad",
-    "modelo_interes": "Modelo de interés",
-    "estimated_value": "Valor estimado",
-    "nombre": "Nombre",
-    "marca": "Marca",
-    "city": "Ciudad",
-}
-
-
 def is_timeline_worthy_field(attr_key: str) -> bool:
-    """Public so the runner can decide which fields trigger a system bubble."""
-    return attr_key in _TIMELINE_WORTHY_FIELDS
+    """Return whether a configured field update should appear in chat."""
+    key = attr_key.strip().lower()
+    return bool(key) and not key.startswith("_") and not key.startswith("docs_")
 
 
 def _format_value(value: Any) -> str:
@@ -168,7 +135,7 @@ async def emit_field_updated(
     callers should still emit the underlying FIELD_EXTRACTED to keep
     analytics intact (see runner). Here we only handle the chat bubble.
     """
-    label = _FIELD_LABELS.get(attr_key, attr_key)
+    label = attr_key.replace("_", " ").strip().title() or attr_key
     payload = {
         "field": attr_key,
         "label": label,

@@ -1,0 +1,12 @@
+{
+  "version": "RC5",
+  "canary_stage": "5_percent",
+  "status": "not_executed",
+  "reason": "Canary activation did not occur.",
+  "tenants_rolled_back": [],
+  "post_rollback_validation": {
+    "integration_db": "not_run_no_rollback",
+    "provider_stability": "not_run_no_rollback",
+    "affected_conversation_replay": "not_run_no_affected_conversations"
+  }
+}

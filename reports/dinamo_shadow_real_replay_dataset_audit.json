@@ -1,0 +1,63 @@
+{
+  "decision": "DATASET_AUDIT_PASS",
+  "generated_at": "2026-06-04T05:52:17.012870+00:00",
+  "dataset": {
+    "path": "..\\reports\\dinamo_shadow_real_replay_dataset.anonymized.json",
+    "cases_total": 20,
+    "turns_total": 109,
+    "anonymized": true,
+    "raw_text_exported": false,
+    "source": "database_sampled_real_conversations"
+  },
+  "tenant_domain_contract": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "domain": "vehicle_credit_sales",
+    "runtime_mode": "v2_shadow_until_evaluated",
+    "pipeline_id": "dinamo_vehicle_credit_shadow",
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "canary_enabled": false,
+    "single_contact_smoke_enabled": false
+  },
+  "pii_scan": {
+    "patterns_checked": [
+      "phones",
+      "emails",
+      "private_links",
+      "unsafe_turn_texts",
+      "unanonymized_attachments"
+    ],
+    "matches": {
+      "phones": 0,
+      "emails": 0,
+      "private_links": 0,
+      "unsafe_turn_texts": 0,
+      "unanonymized_attachments": 0
+    },
+    "failed_checks": [],
+    "safe_customer_turn_vocab": [
+      "cliente comparte informacion sin datos personales",
+      "cliente menciona interes en moto modelo anonimo",
+      "cliente pide hablar con asesor humano",
+      "cliente pregunta por documentos requeridos",
+      "cliente solicita cotizacion",
+      "cliente solicita cotizacion de moto modelo anonimo"
+    ]
+  },
+  "low_sample_size": false,
+  "safety": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "traffic_real_activated": false,
+    "whatsapp_sent": false,
+    "config_live_applied": false,
+    "single_contact_smoke_enabled": false
+  },
+  "notes": [
+    "El dataset contiene turnos normalizados por intencion, no texto crudo.",
+    "conversation_hash/case_id son identificadores anonimizados truncados."
+  ]
+}

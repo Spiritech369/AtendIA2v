@@ -1,0 +1,121 @@
+{
+  "generated_at": "2026-06-05",
+  "decision": "NOT_READY_PREFLIGHT_FAILED",
+  "requested_command": "uv run pytest tests/runner/test_conversation_runner.py -q -vv",
+  "latest_runner_verification": {
+    "status": "blocked",
+    "reason": "Docker daemon unavailable; postgres-test could not be started",
+    "docker_error": "failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine",
+    "plain_pytest_after_marker": "pytest.exit: integration_db tests require ATENDIA_TEST_DATABASE_URL"
+  },
+  "failures": [
+    {
+      "test_name": "test_runner_validator_blocks_unsafe_composer_output",
+      "error_exact": "expected trace.outbound_messages is None, got ['Y para seguir, dime que modelo quieres revisar.']",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:790",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": true,
+      "affects_handoff": true,
+      "affects_outbox_send": true,
+      "affects_dinamo_smoke": true,
+      "classification": "MUST_FIX_BEFORE_SMOKE",
+      "minimal_fix": "Run composer validator, block outbound, record composer_validator error and create handoff when needs_handoff."
+    },
+    {
+      "test_name": "test_runner_24h_handoff_creates_row_no_compose",
+      "error_exact": "TypeError: build_handoff_summary() got an unexpected keyword argument 'document_requirements'",
+      "stack_relevant": "atendia/runner/conversation_runner.py:6296",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": false,
+      "affects_handoff": true,
+      "affects_outbox_send": false,
+      "affects_dinamo_smoke": false,
+      "classification": "LEGACY_ONLY_BUT_BLOCKS_RUNNER_SUITE",
+      "minimal_fix": "Allow document_requirements/document_requirements_field compatibility args in build_handoff_summary."
+    },
+    {
+      "test_name": "test_runner_composer_failure_creates_handoff",
+      "error_exact": "expected one human_handoffs row, got 0",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:988",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": true,
+      "affects_handoff": true,
+      "affects_outbox_send": true,
+      "affects_dinamo_smoke": true,
+      "classification": "MUST_FIX_BEFORE_SMOKE",
+      "minimal_fix": "Persist composer_failed handoff, block outbound and emit fallback=disabled."
+    },
+    {
+      "test_name": "test_runner_prefers_agent_flow_mode_rules_over_pipeline_rules",
+      "error_exact": "expected agent_retention:keyword_in_text, got agent_retention:keyword_in_text:agent_directed_from_ask_clarification",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:1384",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": false,
+      "affects_handoff": false,
+      "affects_outbox_send": false,
+      "affects_dinamo_smoke": false,
+      "classification": "LEGACY_EXPECTATION_NEEDS_UPDATE",
+      "minimal_fix": "Assert stable router trigger prefix."
+    },
+    {
+      "test_name": "test_pending_confirmation_si_assigns_tipo_credito",
+      "error_exact": "expected pending_confirmation is None, got is_nomina_tarjeta",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:1478",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": false,
+      "affects_handoff": false,
+      "affects_outbox_send": false,
+      "affects_dinamo_smoke": false,
+      "classification": "PREEXISTING_LEGACY_FAILURE",
+      "minimal_fix": "Restore legacy string pending_confirmation side effects for is_nomina_tarjeta."
+    },
+    {
+      "test_name": "test_pending_confirmation_no_to_negocio_sat_assigns_sin_comprobantes",
+      "error_exact": "expected pending_confirmation is None, got is_negocio_sat",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:1523",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": false,
+      "affects_handoff": false,
+      "affects_outbox_send": false,
+      "affects_dinamo_smoke": false,
+      "classification": "PREEXISTING_LEGACY_FAILURE",
+      "minimal_fix": "Restore legacy string pending_confirmation side effects for is_negocio_sat."
+    },
+    {
+      "test_name": "test_composer_pending_confirmation_set_persists",
+      "error_exact": "expected is_nomina_recibos, got None",
+      "stack_relevant": "tests/runner/test_conversation_runner.py:1606",
+      "affects_runtime_v2_enabled_true": false,
+      "affects_legacy_no_v2_only": true,
+      "affects_fallback_visible": false,
+      "affects_handoff": false,
+      "affects_outbox_send": false,
+      "affects_dinamo_smoke": false,
+      "classification": "PREEXISTING_LEGACY_FAILURE",
+      "minimal_fix": "Preserve composer pending_confirmation_set after response contract when explicitly provided."
+    }
+  ],
+  "fixes_applied": [
+    "handoff helper compatibility args",
+    "legacy pending confirmation mapping",
+    "composer_failed handoff restored",
+    "composer failure outbound blocked",
+    "composer validator outbound block and handoff",
+    "router trigger expectation updated to stable prefix",
+    "test_conversation_runner marked integration_db"
+  ],
+  "traffic_safety": {
+    "whatsapp_sent": false,
+    "outbox_live_written": false,
+    "live_config_applied": false,
+    "single_contact_smoke_activated": false,
+    "canary_activated": false,
+    "actions_or_workflow_side_effects_enabled": false
+  }
+}

@@ -101,6 +101,7 @@ const DIFFABLE_FIELDS: Array<{
 }> = [
   { key: "system_prompt", label: "Prompt maestro" },
   { key: "tone", label: "Tono" },
+  { key: "voice", label: "Guia de voz" },
   { key: "style", label: "Estilo" },
   { key: "goal", label: "Objetivo" },
   { key: "language", label: "Idioma" },
@@ -119,6 +120,7 @@ function snapshotFromAgent(agent: AgentItem): AgentVersionSnapshot {
     goal: agent.goal,
     style: agent.style,
     tone: agent.tone,
+    voice: agent.voice,
     language: agent.language,
     max_sentences: agent.max_sentences,
     no_emoji: agent.no_emoji,

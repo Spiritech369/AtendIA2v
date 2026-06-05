@@ -1,0 +1,152 @@
+{
+  "report": "tenant_domain_contract_loader_implementation",
+  "generated_at": "2026-06-03",
+  "decision": "TENANT_DOMAIN_CONTRACT_LOADER_READY",
+  "scope": {
+    "live_traffic_enabled": false,
+    "real_whatsapp_sent": false,
+    "dinamo_config_applied_to_database": false,
+    "frontend_modified": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false
+  },
+  "created_files": [
+    "core/atendia/agent_runtime/tenant_domain_contract.py",
+    "core/tests/agent_runtime/test_tenant_domain_contract.py",
+    "core/tests/agent_runtime/fixtures/tenant_domain_contracts/vehicle_credit_sales.json",
+    "core/tests/agent_runtime/fixtures/tenant_domain_contracts/appointment_services.json",
+    "reports/tenant_domain_contract_loader_implementation.md",
+    "reports/tenant_domain_contract_loader_implementation.json"
+  ],
+  "modified_files": [
+    "core/atendia/agent_runtime/schemas.py",
+    "core/atendia/agent_runtime/context_builder.py",
+    "core/atendia/agent_runtime/mandatory_tools.py",
+    "core/atendia/agent_runtime/advisor_pipeline.py",
+    "core/atendia/agent_runtime/__init__.py"
+  ],
+  "schema": {
+    "contract_version": "1.0",
+    "supported_domains": [
+      "vehicle_credit_sales",
+      "appointment_services",
+      "generic_lead_qualification"
+    ],
+    "root_fields": [
+      "contract_version",
+      "tenant_id",
+      "agent_id",
+      "domain",
+      "locale",
+      "timezone",
+      "entities",
+      "fields",
+      "tools",
+      "pipeline",
+      "workflow_events",
+      "guards",
+      "frontend",
+      "trace",
+      "safety",
+      "safe_mode"
+    ],
+    "safe_mode_fallback": {
+      "domain": "generic_lead_qualification",
+      "safe_mode": true,
+      "tools": [],
+      "fields": [],
+      "pipeline": {},
+      "guards": [
+        "mandatory_tool_guard",
+        "final_copy_guard"
+      ]
+    }
+  },
+  "fixtures": [
+    {
+      "file": "core/tests/agent_runtime/fixtures/tenant_domain_contracts/vehicle_credit_sales.json",
+      "tenant_id": "tenant_dinamo_fixture",
+      "domain": "vehicle_credit_sales",
+      "tools": [
+        "catalog.search",
+        "quote.resolve",
+        "requirements.lookup",
+        "faq.lookup",
+        "document.check"
+      ]
+    },
+    {
+      "file": "core/tests/agent_runtime/fixtures/tenant_domain_contracts/appointment_services.json",
+      "tenant_id": "tenant_barber_fixture",
+      "domain": "appointment_services",
+      "tools": [
+        "catalog.search",
+        "availability.check",
+        "booking.create",
+        "faq.lookup"
+      ]
+    }
+  ],
+  "context_builder_integration": {
+    "loads_from": [
+      "metadata.tenant_domain_contract",
+      "metadata.domain_contract",
+      "metadata.tenant_config.tenant_domain_contract",
+      "metadata.tenant_config.domain_contract",
+      "tenant_config inside agent_runtime_v2",
+      "runtime_config.tenant_domain_contract",
+      "runtime_config.domain_contract"
+    ],
+    "exposes": [
+      "tenant_config.tenant_domain_contract",
+      "tenant_config.domain",
+      "tenant_config.field_metadata",
+      "tenant_config.tool_metadata",
+      "tenant_config.pipeline_metadata",
+      "tenant_config.workflow_event_metadata",
+      "tenant_config.guard_metadata",
+      "tenant_config.frontend_metadata",
+      "tenant_config.safe_mode"
+    ]
+  },
+  "mandatory_tool_guard_integration": {
+    "uses_default_rules": true,
+    "uses_tenant_domain_rules": true,
+    "uses_tenant_tool_aliases": true,
+    "tenant_isolation_enforced": true,
+    "covered_topics": [
+      "offer_or_quote",
+      "requirements",
+      "policy_or_faq",
+      "document_status",
+      "availability",
+      "booking_or_action"
+    ]
+  },
+  "commands": [
+    {
+      "command": "uv run ruff check atendia/agent_runtime/tenant_domain_contract.py atendia/agent_runtime/mandatory_tools.py atendia/agent_runtime/context_builder.py tests/agent_runtime/test_tenant_domain_contract.py tests/agent_runtime/test_mandatory_tool_contract.py",
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_tenant_domain_contract.py tests/agent_runtime/test_mandatory_tool_contract.py tests/agent_runtime/test_agent_runtime_v2.py -q",
+      "result": "33 passed, 2 warnings in 1.69s"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -q",
+      "result": "blocked: integration_db tests require ATENDIA_TEST_DATABASE_URL"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "157 passed, 27 deselected, 2 warnings in 1.89s"
+    }
+  ],
+  "risks": [
+    "Database persistence and admin management for contracts are not implemented yet.",
+    "Frontend does not consume tenant domain metadata yet.",
+    "Workflows do not yet consume business event metadata from this contract.",
+    "Derived mandatory tool rules are conservative and may need tenant-level tuning.",
+    "integration_db tests were not run because ATENDIA_TEST_DATABASE_URL was not configured."
+  ],
+  "next_step_recommended": "Implement Prompt 3: declarative StateWriter field policies."
+}

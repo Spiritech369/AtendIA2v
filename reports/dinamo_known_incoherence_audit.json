@@ -1,0 +1,245 @@
+{
+  "generated_at": "2026-06-03",
+  "final_decision": "MOST_INCOHERENCE_COMES_FROM_NON_UNIFORM_TOOL_AND_STATE_AUTHORITY",
+  "risks": [
+    {
+      "rank": 1,
+      "incoherence": "credit intent receives cash quote",
+      "severity": "HIGH",
+      "required_owner": "quote.resolve plus QuoteSafetyGuard"
+    },
+    {
+      "rank": 2,
+      "incoherence": "generic documents after plan is known",
+      "severity": "HIGH",
+      "required_owner": "requirements.retrieve"
+    },
+    {
+      "rank": 3,
+      "incoherence": "documents requested before valid quote",
+      "severity": "HIGH",
+      "required_owner": "runtime policy plus requirements guard"
+    },
+    {
+      "rank": 4,
+      "incoherence": "repeat seniority or income question",
+      "severity": "MEDIUM",
+      "required_owner": "StateWriter plus operational state aliases"
+    },
+    {
+      "rank": 5,
+      "incoherence": "model or plan change keeps old quote",
+      "severity": "HIGH",
+      "required_owner": "StateWriter quote invalidation"
+    },
+    {
+      "rank": 6,
+      "incoherence": "por fuera interpreted as not eligible",
+      "severity": "MEDIUM",
+      "required_owner": "credit_plan.resolve"
+    },
+    {
+      "rank": 7,
+      "incoherence": "Buro causes automatic rejection",
+      "severity": "MEDIUM",
+      "required_owner": "FAQ policy plus no-hard-reject guard"
+    },
+    {
+      "rank": 8,
+      "incoherence": "ok/va/si after quote restarts flow",
+      "severity": "MEDIUM",
+      "required_owner": "conversation memory and post-quote policy"
+    },
+    {
+      "rank": 9,
+      "incoherence": "la primera/esa/la otra unresolved",
+      "severity": "MEDIUM",
+      "required_owner": "catalog.retrieve candidate memory"
+    },
+    {
+      "rank": 10,
+      "incoherence": "moto del anuncio saved as model",
+      "severity": "HIGH",
+      "required_owner": "StateWriter requiring catalog evidence"
+    },
+    {
+      "rank": 11,
+      "incoherence": "false handoff from fallback",
+      "severity": "MEDIUM",
+      "required_owner": "handoff policy with reason enum"
+    },
+    {
+      "rank": 12,
+      "incoherence": "paperwork incomplete stage without attachment",
+      "severity": "HIGH",
+      "required_owner": "document.check and lifecycle service"
+    },
+    {
+      "rank": 13,
+      "incoherence": "workflow fires from keyword",
+      "severity": "HIGH",
+      "required_owner": "workflow trigger contract"
+    },
+    {
+      "rank": 14,
+      "incoherence": "tool result becomes visible reply",
+      "severity": "HIGH",
+      "required_owner": "TurnOutput.final_message authority"
+    }
+  ],
+  "detail_matrix": [
+    {
+      "incoherence": "credit lead receives cash quote",
+      "possible_responsible_files": ["tools/quote.py", "quote_safety.py", "sales_advisor_decision_policy.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Quote Resolver / Guard",
+      "severity": "HIGH",
+      "how_to_reproduce": "User says quiero credito, then asks cuanto queda la model.",
+      "recommended_test": "Assert quote mode is credit or asks plan info; no cash-only quote.",
+      "recommended_fix": "Make quote.resolve mode mandatory and require snapshot before visible price.",
+      "change_type": "runtime/tool contract"
+    },
+    {
+      "incoherence": "generic documents when plan exists",
+      "possible_responsible_files": ["lookup_requirements.py", "FAQ_DINAMO.json", "Prompt Agente IA.txt"],
+      "responsible_layer": "Requirements Resolver / KB routing",
+      "severity": "HIGH",
+      "how_to_reproduce": "Resolve plan 5, then ask que documentos necesito.",
+      "recommended_test": "Assert only plan 5 docs are returned.",
+      "recommended_fix": "Route document questions to requirements.retrieve and make FAQ refuse owned topics.",
+      "change_type": "tool config/runtime routing"
+    },
+    {
+      "incoherence": "documents requested before quote",
+      "possible_responsible_files": ["advisor_brain_prompt.py", "sales_advisor_decision_policy.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Francisco Agent / Policy",
+      "severity": "HIGH",
+      "how_to_reproduce": "User passes seniority and gives plan but no model/quote.",
+      "recommended_test": "Assert bot asks model/quote path, not docs.",
+      "recommended_fix": "Docs request requires valid quote or explicit doc question/upload.",
+      "change_type": "runtime policy"
+    },
+    {
+      "incoherence": "repeats seniority already saved",
+      "possible_responsible_files": ["operational_state.py", "conversation_progress.py", "state_write_policy.py"],
+      "responsible_layer": "Intent/State Extractor",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "Save seniority true, next turn asks same question.",
+      "recommended_test": "Assert next step advances to plan/model.",
+      "recommended_fix": "Canonical aliases plus progress guard memory.",
+      "change_type": "runtime/state contract"
+    },
+    {
+      "incoherence": "repeats income or plan already saved",
+      "possible_responsible_files": ["operational_state.py", "credit_plan_invariants.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Credit Plan Resolver / State",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "Save plan, then ask quote.",
+      "recommended_test": "Assert no repeated income question.",
+      "recommended_fix": "Accept plan evidence once and use StateWriter aliases.",
+      "change_type": "runtime/state contract"
+    },
+    {
+      "incoherence": "model changes without quote invalidation",
+      "possible_responsible_files": ["state_writer.py", "quote_memory_policy.py", "state_write_policy.py"],
+      "responsible_layer": "State Writer / Quote",
+      "severity": "HIGH",
+      "how_to_reproduce": "Quote model A, then user changes to model B.",
+      "recommended_test": "Assert previous quote invalidated and new quote required.",
+      "recommended_fix": "StateWriter invalidation must cover all live paths.",
+      "change_type": "runtime/state contract"
+    },
+    {
+      "incoherence": "por fuera treated as not eligible",
+      "possible_responsible_files": ["credit_plan_invariants.py", "Prompt Agente IA.txt", "FAQ_DINAMO.json"],
+      "responsible_layer": "Credit Plan Resolver",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "User says trabajo por fuera or sin comprobantes.",
+      "recommended_test": "Assert plan resolves to configured informal/no-comprobante path if eligible.",
+      "recommended_fix": "Tool-owned alias mapping with no auto reject.",
+      "change_type": "tool config"
+    },
+    {
+      "incoherence": "Buro automatic rejection",
+      "possible_responsible_files": ["FAQ_DINAMO.json", "Prompt Agente IA.txt"],
+      "responsible_layer": "FAQ / Guard",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "User asks si tengo buro puedo.",
+      "recommended_test": "Assert no hard disqualification.",
+      "recommended_fix": "FAQ policy and no-hard-reject eval.",
+      "change_type": "KB/tool config"
+    },
+    {
+      "incoherence": "ok/va/si after quote does not advance",
+      "possible_responsible_files": ["acknowledgement_policy.py", "advisor_brain_prompt.py", "quote_memory_policy.py"],
+      "responsible_layer": "Conversation Progress",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "Send quote, then user replies va.",
+      "recommended_test": "Assert soft close or docs next step, not reset.",
+      "recommended_fix": "Bind short acknowledgement to last quote context.",
+      "change_type": "runtime/policy"
+    },
+    {
+      "incoherence": "la primera/esa/la otra not resolved",
+      "possible_responsible_files": ["catalog_reference_policy.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Catalog Resolver",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "Show candidates, user says la primera.",
+      "recommended_test": "Assert selected candidate or clarification if memory missing.",
+      "recommended_fix": "Make candidate references part of catalog.retrieve state.",
+      "change_type": "runtime/tool contract"
+    },
+    {
+      "incoherence": "moto del anuncio saved as model",
+      "possible_responsible_files": ["catalog_reference_policy.py", "state_writer.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Catalog Resolver / State Writer",
+      "severity": "HIGH",
+      "how_to_reproduce": "User says quiero la moto del anuncio.",
+      "recommended_test": "Assert no Moto write without canonical catalog match.",
+      "recommended_fix": "StateWriter requires catalog evidence.",
+      "change_type": "runtime/state contract"
+    },
+    {
+      "incoherence": "false handoff by fallback",
+      "possible_responsible_files": ["advisor_pipeline.py", "handoff_helper.py", "conversation_runner.py"],
+      "responsible_layer": "Handoff / Guard",
+      "severity": "MEDIUM",
+      "how_to_reproduce": "Provider fails or ambiguous message.",
+      "recommended_test": "Assert handoff requires reason enum or policy threshold.",
+      "recommended_fix": "Handoff event contract with explicit reason.",
+      "change_type": "runtime/workflow contract"
+    },
+    {
+      "incoherence": "paperwork incomplete without attachment",
+      "possible_responsible_files": ["state_writer.py", "pipeline_evaluator.py", "dinamo_agent_runtime.py"],
+      "responsible_layer": "Document Checker / Lifecycle",
+      "severity": "HIGH",
+      "how_to_reproduce": "User says ya mande papeles with no attachment.",
+      "recommended_test": "Assert no document accepted and no paperwork stage move.",
+      "recommended_fix": "document.check evidence required for doc lifecycle.",
+      "change_type": "runtime/state/workflow contract"
+    },
+    {
+      "incoherence": "workflow keyword trigger",
+      "possible_responsible_files": ["workflows/engine.py", "workflow definitions"],
+      "responsible_layer": "Workflow Engine",
+      "severity": "HIGH",
+      "how_to_reproduce": "Configure critical stage move using contains on message text.",
+      "recommended_test": "Assert lint blocks or marks dangerous for live.",
+      "recommended_fix": "Block keyword-only critical business triggers.",
+      "change_type": "runtime/workflow validation"
+    }
+  ],
+  "root_cause": "Tool, state and workflow authority is not yet uniform across live and v2 paths.",
+  "required_tests": [
+    "credit intent cannot receive cash quote",
+    "plan-specific docs only",
+    "post-quote acknowledgement does not restart qualification",
+    "quote invalidates after model or plan change",
+    "por fuera resolves through credit plan tool",
+    "Buro does not auto-reject",
+    "catalog candidate references are resolved safely",
+    "no document stage move without attachment/checklist evidence",
+    "business workflow triggers cannot be keyword-only",
+    "tool/action visible text keys are rejected"
+  ]
+}

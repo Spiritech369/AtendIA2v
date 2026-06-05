@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -50,3 +50,25 @@ class HumanHandoff(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LifecycleStageHistory(Base):
+    __tablename__ = "lifecycle_stage_history"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    from_stage: Mapped[str | None] = mapped_column(String(120))
+    to_stage: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    confidence: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(40), default="agent_runtime_v2")
+    trace_id: Mapped[str | None] = mapped_column(String(120))
+    created_by: Mapped[str | None] = mapped_column(String(120))
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

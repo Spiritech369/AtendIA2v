@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Sidecar Node.js que expone Baileys (WhatsApp QR) como HTTP API para el backend AtendIA",
   "main": "server.js",
+  "type": "module",
   "private": true,
   "engines": {
     "node": ">=20"

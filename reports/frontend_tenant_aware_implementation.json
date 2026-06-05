@@ -1,0 +1,86 @@
+{
+  "decision": "FRONTEND_TENANT_AWARE_READY",
+  "scope": {
+    "traffic_activated": false,
+    "dinamo_config_applied_to_db": false,
+    "real_actions_or_workflows_enabled": false,
+    "runtime_dinamo_hardcode_added": false
+  },
+  "created_files": [
+    "frontend/src/features/conversations/components/TenantFieldPanel.tsx",
+    "frontend/src/features/turn-traces/components/DecisionTimeline.tsx",
+    "frontend/src/features/turn-traces/components/ToolCards.tsx",
+    "frontend/src/features/turn-traces/components/GuardCards.tsx",
+    "frontend/src/features/turn-traces/components/StateWriterCards.tsx",
+    "frontend/src/features/turn-traces/components/PipelineCard.tsx",
+    "frontend/src/features/turn-traces/components/BusinessEventCards.tsx",
+    "frontend/src/features/turn-traces/components/UniversalTracePanel.tsx",
+    "frontend/src/features/turn-traces/lib/universalTrace.ts",
+    "frontend/tests/fixtures/universalTurnTrace.ts",
+    "frontend/tests/features/conversations/TenantFieldPanel.test.tsx",
+    "frontend/tests/features/turn-traces/UniversalTracePanel.test.tsx"
+  ],
+  "modified_files": [
+    "frontend/src/features/conversations/api.ts",
+    "frontend/src/features/conversations/components/ContactPanel.tsx",
+    "frontend/src/features/conversations/components/DebugPanel.tsx",
+    "frontend/src/features/turn-traces/api.ts",
+    "frontend/src/features/turn-traces/components/TurnTraceInspector.tsx"
+  ],
+  "components": {
+    "tenant_fields": "TenantFieldPanel renders tenant metadata fields with status/source/writer/confidence/trace/evidence and safe_mode/metadata_missing badges.",
+    "universal_trace": "UniversalTracePanel composes DecisionTimeline, ToolCards, StateWriterCards, GuardCards, PipelineCard and BusinessEventCards.",
+    "fallback": "If tenant_domain_contract exists but metadata is missing, ContactPanel shows metadata_missing and only basic fields. Legacy canonical fields are limited to conversations without tenant_domain_contract."
+  },
+  "states": ["validated", "proposed", "needs_review", "rejected", "blocked"],
+  "fixtures": [
+    "vehicleCreditFields",
+    "vehicleUniversalTrace",
+    "appointmentFields",
+    "appointmentUniversalTrace"
+  ],
+  "commands": [
+    {
+      "command": "npm exec -- vitest run tests/features/conversations/TenantFieldPanel.test.tsx tests/features/turn-traces/UniversalTracePanel.test.tsx",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "Test Files 2 passed (2); Tests 10 passed (10); Duration 2.67s"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "tsc --noEmit completed without errors"
+    },
+    {
+      "command": "npm exec -- biome check <17 touched files>",
+      "cwd": "frontend",
+      "status": "passed",
+      "result": "Checked 17 files in 84ms. No fixes applied."
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "frontend",
+      "status": "failed_unrelated_global_debt",
+      "result": "Checked 241 files; Found 309 errors, 38 warnings, 21 infos; examples include existing formatting/CRLF diagnostics in biome.json, package.json, playwright.config.ts, src/api/ws-client.ts and other files outside this change."
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "cwd": "core",
+      "status": "passed",
+      "result": "179 passed, 27 deselected, 2 warnings in 1.98s"
+    },
+    {
+      "command": "rg -n \"Dinamo|DINAMO|vehicle_credit_sales|Moto seleccionada|Papeler|Buro|Cotizacion validada\" frontend/src/features/conversations/components frontend/src/features/turn-traces",
+      "cwd": ".",
+      "status": "passed",
+      "result": "No matches in runtime components"
+    }
+  ],
+  "risks": [
+    "The backend/API must return customer_fields declarative metadata and trace_metadata.universal_turn_trace for the rich UI to render.",
+    "Legacy conversations without tenant_domain_contract still use the old compatibility grid.",
+    "Full frontend lint remains blocked by existing global formatting debt; touched files pass focused Biome."
+  ],
+  "next_step": "Review the real trace API shape and persistence of trace_metadata.universal_turn_trace in sandbox before enabling real traffic."
+}

@@ -63,9 +63,9 @@ export function ToneEditor() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tono</CardTitle>
+        <CardTitle>Voz predeterminada</CardTitle>
         <div className="text-xs text-muted-foreground">
-          Personalidad de las respuestas del bot. El composer lo incorpora al system prompt.
+          Fallback del tenant cuando el agente activo no tiene guia de voz propia.
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -1,57 +1,22 @@
-"""Output of OpenAI Vision classifier.
+"""Tenant-configurable image classification result.
 
-Fase 3c.2 → Fase 3 (motos crédito flow):
-
-Originally Vision returned just `category + confidence + metadata: dict`
-and the composer prompt inferred whether to accept the doc. That left
-the "accepted vs rejected" decision in LLM-land, which made the
-`docs_complete_for_plan` evaluator's status writes unreliable (the
-runner had nothing to write because no deterministic decision existed).
-
-This module now also defines `VisionQualityCheck` — a fixed-schema
-sub-object the model populates for doc categories. The runner reads
-it deterministically to decide:
-
-  - `valid_for_credit_file=true` → write `customer.attrs[DOCS_X] = {status:"ok"}`
-  - `valid_for_credit_file=false` → write `{status:"rejected",
-                                            rejection_reason: <model text>}`
-
-`quality_check` stays Optional for back-compat: legacy Vision calls
-(e.g. a tenant with an older prompt or a moto/unrelated category)
-return `None` and the runner falls back to its previous heuristic.
+The core contract is deliberately semantic-neutral: a tenant owns the
+category names through ``PipelineDefinition.vision_doc_mapping`` and the
+runner only distinguishes configured document categories from the generic
+``product`` and ``unrelated`` buckets.
 """
 
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-class VisionCategory(str, Enum):
-    """Categorías que el classifier puede asignar.
-
-    Las primeras 7 son tipos de doc del v1 prompt; "moto" y
-    "unrelated" capturan los casos donde el cliente mandó algo
-    fuera del flujo de papelería.
-    """
-
-    INE = "ine"
-    COMPROBANTE = "comprobante"
-    RECIBO_NOMINA = "recibo_nomina"
-    ESTADO_CUENTA = "estado_cuenta"
-    CONSTANCIA_SAT = "constancia_sat"
-    FACTURA = "factura"
-    IMSS = "imss"
-    MOTO = "moto"
-    UNRELATED = "unrelated"
+PRODUCT_CATEGORY = "product"
+UNRELATED_CATEGORY = "unrelated"
+RESERVED_NON_DOCUMENT_CATEGORIES = frozenset({PRODUCT_CATEGORY, UNRELATED_CATEGORY})
 
 
-class DocumentSide(str, Enum):
-    """Some docs are two-sided (INE). The side field tells the runner
-    which canonical attr key to write — DOCS_INE_FRENTE vs
-    DOCS_INE_REVERSO when the tenant configured that split. Defaults
-    to UNKNOWN, the runner then writes to the generic key when present
-    in `pipeline.vision_doc_mapping`.
-    """
+class DocumentSide(StrEnum):
+    """Optional side hint for two-sided files."""
 
     FRONT = "front"
     BACK = "back"
@@ -59,18 +24,7 @@ class DocumentSide(str, Enum):
 
 
 class VisionQualityCheck(BaseModel):
-    """Structured quality assessment of the submitted image.
-
-    Filled by the classifier when category is a doc class (not moto /
-    unrelated). The fields mirror what an operator visually checks
-    before approving a doc; the model fills them honestly so the
-    runner can reject deterministically (no "looks fine to me" LLM
-    judgment).
-
-    `valid_for_credit_file` is the runner's go/no-go signal — true =
-    accept, false = reject + use `rejection_reason` in the composer
-    reply.
-    """
+    """Structured quality assessment of a submitted image."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -80,20 +34,19 @@ class VisionQualityCheck(BaseModel):
     no_flash_glare: bool
     not_cut: bool
     side: DocumentSide = DocumentSide.UNKNOWN
-    valid_for_credit_file: bool
+    valid_for_file: bool
     rejection_reason: str | None = None
 
 
 class VisionResult(BaseModel):
-    """Resultado del classifier de imágenes.
+    """Classifier output consumed by the runner and trace layer."""
 
-    `metadata` is the legacy free dict (kept for back-compat with
-    existing prompts/snapshots). `quality_check` is the Fase 3
-    structured sub-object — populated only for doc-category images;
-    `None` for `moto` / `unrelated` / legacy outputs.
-    """
-
-    category: VisionCategory
+    category: str = Field(min_length=1, max_length=80)
     confidence: float = Field(ge=0.0, le=1.0)
     metadata: dict
     quality_check: VisionQualityCheck | None = None
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _normalize_category(cls, value: object) -> str:
+        return str(value).strip().lower()

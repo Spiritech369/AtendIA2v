@@ -52,7 +52,9 @@ function parseStringList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-function parseDraft(definition: Record<string, unknown> | undefined): ExpedienteDraft {
+export function parseExpedienteDraft(
+  definition: Record<string, unknown> | undefined,
+): ExpedienteDraft {
   const def = definition ?? {};
   const catalog: DocumentSpec[] = Array.isArray(def.documents_catalog)
     ? def.documents_catalog.flatMap((item) => {
@@ -69,14 +71,25 @@ function parseDraft(definition: Record<string, unknown> | undefined): Expediente
     : [];
 
   const docsByPlan: Record<string, string[]> = {};
-  if (typeof def.docs_per_plan === "object" && def.docs_per_plan !== null) {
-    for (const [plan, docs] of Object.entries(def.docs_per_plan as Record<string, unknown>)) {
+  const rawDocsByPlan =
+    typeof def.docs_per_plan === "object" && def.docs_per_plan !== null
+      ? def.docs_per_plan
+      : def.document_requirements;
+  if (typeof rawDocsByPlan === "object" && rawDocsByPlan !== null) {
+    for (const [plan, docs] of Object.entries(rawDocsByPlan as Record<string, unknown>)) {
       docsByPlan[plan] = parseStringList(docs);
     }
   }
 
+  const planField =
+    typeof def.docs_plan_field === "string"
+      ? def.docs_plan_field
+      : typeof def.document_requirements_field === "string"
+        ? def.document_requirements_field
+        : "";
+
   return {
-    docs_plan_field: typeof def.docs_plan_field === "string" ? def.docs_plan_field : "",
+    docs_plan_field: planField,
     docs_per_plan: docsByPlan,
     documents_catalog: catalog,
   };
@@ -115,14 +128,17 @@ function choicesFromFieldOptions(options: Record<string, unknown> | null): strin
   return raw.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
-function serialiseExpediente(draft: ExpedienteDraft): Record<string, unknown> {
+export function serialiseExpediente(draft: ExpedienteDraft): Record<string, unknown> {
+  const planField = draft.docs_plan_field.trim();
   return {
-    docs_plan_field: draft.docs_plan_field.trim(),
+    docs_plan_field: planField,
+    document_requirements_field: planField,
     documents_catalog: draft.documents_catalog.map((doc) => ({
       key: doc.key,
       label: doc.label.trim(),
     })),
     docs_per_plan: draft.docs_per_plan,
+    document_requirements: draft.docs_per_plan,
     vision_doc_mapping: {},
   };
 }
@@ -184,11 +200,14 @@ export function ExpedientePage() {
 
   useEffect(() => {
     if (query.data?.definition) {
-      setDraft(parseDraft(query.data.definition));
+      setDraft(parseExpedienteDraft(query.data.definition));
     }
   }, [query.data?.definition]);
 
-  const savedDraft = useMemo(() => parseDraft(query.data?.definition), [query.data?.definition]);
+  const savedDraft = useMemo(
+    () => parseExpedienteDraft(query.data?.definition),
+    [query.data?.definition],
+  );
   const legacyVisionMappingPresent = useMemo(
     () => hasLegacyVisionMapping(query.data?.definition),
     [query.data?.definition],

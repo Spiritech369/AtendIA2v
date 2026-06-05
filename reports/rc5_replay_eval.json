@@ -1,0 +1,41 @@
+{
+  "dataset": {
+    "path": "C:\\Users\\Sprt\\AppData\\Local\\Temp\\pytest-of-Sprt\\pytest-329\\test_replay_eval_still_blocks_0\\dataset.json",
+    "anonymized": true,
+    "version": 1
+  },
+  "summary": {
+    "replay_cases_total": 1,
+    "replay_cases_passed": 0,
+    "critical_failure_count": 1,
+    "quote_guard_blocks_total": 0,
+    "progress_guard_blocks_total": 0,
+    "provider_retry_count": 0,
+    "provider_fallback_response_count": 0,
+    "duplicate_side_effect_count": 0,
+    "handoff_false_positive_count": 0,
+    "documents_stage_false_positive_count": 0,
+    "avg_turns_to_quote": 0.0,
+    "avg_turns_to_handoff": 0.0,
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "repeated_question_rate": 0.0,
+    "definition_of_done_pass": false
+  },
+  "cases": [
+    {
+      "case_id": "sim_quote_without_product",
+      "passed": false,
+      "critical_failures": [
+        "expected_quote_not_replayable"
+      ],
+      "turns": 1,
+      "turns_to_quote": null,
+      "turns_to_handoff": null,
+      "expected_tags": [
+        "quote"
+      ]
+    }
+  ]
+}

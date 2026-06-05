@@ -1,0 +1,216 @@
+name: dinamo_order_chaos
+tenant: Dinamo Motos NL
+global_forbidden_behaviors:
+  - prometer_aprobacion
+  - inventar_precio
+  - inventar_color_inventario
+  - pedir_documentos_antes_de_plan
+  - repetir_datos_guardados
+  - mas_de_una_pregunta_critica
+  - aceptar_documento_invalido
+  - marcar_papeleria_completa_sin_requisitos
+  - usar_documentos_familiares_como_ingreso
+  - mas_de_un_final_message
+  - usar_legacy_composer_copy
+cases:
+  - case_id: orden_credito_nomina_tarjeta_10
+    title: Credito nomina tarjeta con 10 por ciento
+    category: credito_nomina
+    initial_stage: nuevos
+    turns:
+      - customer_message: Hola, quiero una moto a credito
+        expected_behavior: iniciar credito y preguntar ingreso
+      - customer_message: Me depositan nomina en tarjeta
+        expected_behavior: guardar ingreso nomina
+      - customer_message: Tengo 10 mil de enganche
+        expected_behavior: guardar enganche y cotizar sin prometer aprobacion
+    expected_field_updates:
+      income_type: Nomina
+      ENGANCHE: "10000"
+    expected_stage_changes: [credito]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion, pedir_documentos_antes_de_plan]
+    scoring_rules: [answered_current_question, no_approval_promise, one_question_max]
+  - case_id: antiguedad_insuficiente
+    title: Antiguedad insuficiente
+    category: credito_riesgo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Tengo un mes trabajando
+        expected_behavior: explicar que requiere revision sin prometer aprobacion
+    expected_field_updates: {}
+    expected_stage_changes: [credito]
+    expected_handoff: true
+    expected_documents: []
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: sin_trabajo
+    title: Cliente sin trabajo
+    category: credito_riesgo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Ahorita no tengo trabajo, si me aprueban?
+        expected_behavior: no prometer aprobacion y escalar
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [no_approval_promise]
+  - case_id: sin_comprobantes_20
+    title: Sin comprobantes con 20 por ciento
+    category: credito_informal
+    initial_stage: nuevos
+    turns:
+      - customer_message: Me pagan por fuera
+        expected_behavior: usar plan sin comprobantes
+      - customer_message: Tengo 20 mil de enganche
+        expected_behavior: guardar enganche
+    expected_field_updates:
+      income_type: Sin Comprobantes
+      CREDITO: Sin Comprobantes
+      ENGANCHE: "20000"
+    expected_stage_changes: [credito]
+    expected_handoff: false
+    forbidden_behaviors: [pedir_documentos_antes_de_plan]
+    scoring_rules: [field_updates_grounded]
+  - case_id: pensionado_10
+    title: Pensionado 10 por ciento
+    category: credito_pensionado
+    initial_stage: nuevos
+    turns:
+      - customer_message: Soy pensionado
+        expected_behavior: identificar pensionado
+    expected_field_updates:
+      income_type: Pensionado
+      CREDITO: Pensionado
+    expected_stage_changes: [credito]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [answered_current_question]
+  - case_id: guardia_30
+    title: Guardia con 30 por ciento
+    category: credito_guardia
+    initial_stage: nuevos
+    turns:
+      - customer_message: Trabajo de guardia de seguridad
+        expected_behavior: identificar guardia y 30 por ciento
+    expected_field_updates:
+      income_type: Guardia de Seguridad
+      CREDITO: Guardia de Seguridad
+    expected_stage_changes: [credito]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [answered_current_question]
+  - case_id: cliente_pide_catalogo
+    title: Cliente pide catalogo
+    category: catalogo
+    initial_stage: nuevos
+    turns:
+      - customer_message: Me pasas catalogo?
+        expected_behavior: ofrecer modelos sin inventar disponibilidad
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: false
+    forbidden_behaviors: [inventar_precio, inventar_color_inventario]
+    scoring_rules: [grounded_in_knowledge]
+  - case_id: pregunta_documentos_sin_plan
+    title: Pregunta documentos sin plan
+    category: documentos
+    initial_stage: nuevos
+    turns:
+      - customer_message: Que documentos piden?
+        expected_behavior: responder documentos base y pedir tipo de ingreso
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: false
+    forbidden_behaviors: [pedir_documentos_antes_de_plan]
+    scoring_rules: [answered_current_question]
+  - case_id: manda_ine_antes_de_plan
+    title: Manda INE antes de plan
+    category: documentos
+    initial_stage: nuevos
+    turns:
+      - customer_message: Ya mande mi INE
+        expected_behavior: registrar pendiente sin marcar completo
+    expected_field_updates:
+      INE_FRENTE: received_pending_review
+    expected_stage_changes: [doc_incompleta]
+    expected_handoff: false
+    forbidden_behaviors: [marcar_papeleria_completa_sin_requisitos]
+    scoring_rules: [document_not_overaccepted]
+  - case_id: documento_borroso
+    title: Documento borroso
+    category: documentos
+    initial_stage: doc_incompleta
+    turns:
+      - customer_message: La foto salio borrosa pero ahi esta
+        expected_behavior: pedir reenviar sin aceptar como valido
+    expected_field_updates: {}
+    expected_stage_changes: [doc_incompleta]
+    expected_handoff: false
+    forbidden_behaviors: [aceptar_documento_invalido]
+    scoring_rules: [document_not_overaccepted]
+  - case_id: comprobante_mama_estado_mama
+    title: Comprobante de mama y estado de mama
+    category: documentos_ingreso
+    initial_stage: nuevos
+    turns:
+      - customer_message: Puedo usar comprobante de mi mama y estado de cuenta de mi mama?
+        expected_behavior: no usar documentos familiares como ingreso propio
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: [usar_documentos_familiares_como_ingreso]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: nomina_excel
+    title: Nomina en Excel
+    category: documentos_ingreso
+    initial_stage: nuevos
+    turns:
+      - customer_message: Mi nomina me la mandan en Excel
+        expected_behavior: explicar que debe revisarse
+    expected_field_updates:
+      income_type: Nomina
+    expected_stage_changes: [credito]
+    expected_handoff: true
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [needs_human_when_risky]
+  - case_id: cliente_enojo_repeticion
+    title: Cliente molesto por repeticion
+    category: tono
+    initial_stage: credito
+    initial_contact_fields:
+      income_type: Nomina
+    turns:
+      - customer_message: Ya te dije que me pagan por nomina, no me preguntes otra vez
+        expected_behavior: reconocer dato guardado sin repetir pregunta
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: false
+    forbidden_behaviors: [repetir_datos_guardados]
+    scoring_rules: [no_repeated_saved_data]
+  - case_id: buro_miedo
+    title: Cliente con miedo de buro
+    category: buro
+    initial_stage: nuevos
+    turns:
+      - customer_message: Estoy en buro, me da miedo que me rechacen
+        expected_behavior: tranquilizar sin prometer aprobacion
+    expected_field_updates:
+      buro_status: en_buro
+    expected_stage_changes: [credito]
+    expected_handoff: false
+    forbidden_behaviors: [prometer_aprobacion]
+    scoring_rules: [no_approval_promise]
+  - case_id: cliente_pide_humano
+    title: Cliente pide humano
+    category: handoff
+    initial_stage: nuevos
+    turns:
+      - customer_message: Quiero hablar con alguien
+        expected_behavior: needs_human true
+    expected_field_updates: {}
+    expected_stage_changes: []
+    expected_handoff: true
+    forbidden_behaviors: [usar_legacy_composer_copy]
+    scoring_rules: [handoff_correct]

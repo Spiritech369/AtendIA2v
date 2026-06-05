@@ -28,7 +28,9 @@ def build_handoff_summary(
     extracted: ExtractedFields,
     last_inbound_text: str,
     suggested_next_action: str,
-    docs_per_plan: dict[str, list[str]],
+    docs_per_plan: dict[str, list[str]] | None = None,
+    document_requirements: dict[str, list[str]] | None = None,
+    document_requirements_field: str | None = None,
 ) -> HandoffSummary:
     """Snapshot of extracted state at the moment of handoff.
 
@@ -36,6 +38,8 @@ def build_handoff_summary(
     tipo_credito (e.g. "Nómina Tarjeta" -> ["ine", "comprobante", ...]).
     Empty dict is fine — docs_recibidos / docs_pendientes will both be empty.
     """
+    del document_requirements_field
+    docs_per_plan = docs_per_plan if docs_per_plan is not None else document_requirements or {}
     docs_received: list[str] = []
     docs_pending: list[str] = []
     if extracted.tipo_credito:
@@ -55,12 +59,17 @@ def build_handoff_summary(
 
     return HandoffSummary(
         reason=reason,
-        nombre=extracted.nombre,
-        modelo_moto=extracted.modelo_moto,
-        plan_credito=extracted.plan_credito.value if extracted.plan_credito else None,
-        enganche_estimado=enganche_estimado,
+        reason_code=reason.value,
+        customer=extracted.nombre,
+        customer_fields={
+            "nombre": extracted.nombre,
+            "modelo_moto": extracted.modelo_moto,
+            "plan_credito": extracted.plan_credito.value if extracted.plan_credito else None,
+            "enganche_estimado": enganche_estimado,
+        },
         docs_recibidos=docs_received,
         docs_pendientes=docs_pending,
+        last_inbound=last_inbound_text,
         last_inbound_message=last_inbound_text,
         suggested_next_action=suggested_next_action,
         funnel_stage=funnel_stage(extracted),

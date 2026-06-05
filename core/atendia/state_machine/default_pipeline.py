@@ -18,11 +18,7 @@ Design choices:
   / add stages through the editor, and ``put_pipeline``'s
   single-version policy means the starter is just overwritten on
   first save.
-* **No auto-enter rules.** A starter pipeline shouldn't move
-  conversations on its own — that would surprise operators who haven't
-  configured anything yet. The cliente-potencial rule from the
-  Crédito-Dinamo seed is vertical-specific and stays in
-  ``seed_zored_user.py``.
+* **No auto-enter rules.** A starter pipeline should not move conversations on its own. Business-specific examples stay in explicit seed/template scripts.
 * **Terminals marked.** ``ganado`` and ``perdido`` carry
   ``is_terminal=true`` so once an operator (or a future rule) closes a
   conversation it can't bounce back to the pipeline.
@@ -112,8 +108,8 @@ DEFAULT_PIPELINE_DEFINITION: dict = {
     # fallback or it raises at turn time. We can't just leave this empty
     # because the JSONB column doesn't trigger Pydantic's default_factory
     # — an explicit empty list defeats the default. Route everything to
-    # SUPPORT until the tenant authors explicit rules; SUPPORT keeps
-    # legacy 3a/3b composer behavior so the bot still answers.
+    # SUPPORT until the tenant authors explicit rules; SUPPORT keeps a
+    # generic answer path available so the bot still answers.
     "flow_mode_rules": [
         {
             "id": "default_always_support",
@@ -121,16 +117,17 @@ DEFAULT_PIPELINE_DEFINITION: dict = {
             "mode": "SUPPORT",
         }
     ],
-    "docs_per_plan": {},
+    "document_requirements": {},
     # Document catalog is intentionally empty — each tenant authors
     # their own list through the editor ("Catálogo de documentos"
-    # section). Shipping a starter list locks tenants into Mexican
-    # credit defaults that aren't applicable to motos, gym, services,
-    # etc. The runtime path is unaffected: a tenant can still save a
+    # section). Shipping a starter list locks tenants into industry-specific
+    # defaults that are not applicable to every tenant. The runtime
+    # path is unaffected: a tenant can still save a
     # pipeline that *references* DOCS_* keys in auto_enter_rules; the
     # contact panel falls back to humanize_doc_key for any key not in
     # the catalog.
     "documents_catalog": [],
+    "document_requirements_field": "selection",
 }
 
 

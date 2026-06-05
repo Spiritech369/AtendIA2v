@@ -1,0 +1,48 @@
+{
+    "generated_at":  "2026-06-03T05:49:44.6364985-06:00",
+    "decision":  "DATASET_AUDIT_PASS",
+    "dataset_path":  "reports/real_conversation_simulation_dataset.anonymized.json",
+    "anonymized":  true,
+    "raw_text_exported":  false,
+    "cases":  20,
+    "turns":  109,
+    "checks":  {
+                   "emails":  0,
+                   "urls":  0,
+                   "customer_phone_numbers":  0,
+                   "customer_contact_identifiers":  0,
+                   "raw_personal_text":  0,
+                   "conversation_uuid_fragments":  0,
+                   "operational_scope_uuid_matches":  2,
+                   "timestamp_regex_false_positives":  2
+               },
+    "regex_scan":  [
+                       {
+                           "pattern":  "email",
+                           "count":  0,
+                           "explanation":  "no matches"
+                       },
+                       {
+                           "pattern":  "phone",
+                           "count":  2,
+                           "explanation":  "timestamp false positives only"
+                       },
+                       {
+                           "pattern":  "url",
+                           "count":  0,
+                           "explanation":  "no matches"
+                       },
+                       {
+                           "pattern":  "uuid",
+                           "count":  2,
+                           "explanation":  "approved tenant/agent operational scope only"
+                       }
+                   ],
+    "privacy_controls":  [
+                             "customer messages converted to intent-level anonymized text",
+                             "case ids remapped to sim_###",
+                             "conversation hashes remapped to anon_conv_###",
+                             "no outbound text or private links exported",
+                             "tenant/agent ids retained only as approved operational scope"
+                         ]
+}

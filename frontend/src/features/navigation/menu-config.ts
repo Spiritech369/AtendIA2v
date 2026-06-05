@@ -41,6 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/dashboard",
         icon: LayoutDashboard,
         roles: OPERATOR_PLUS,
+        capability: "route.dashboard",
       },
     ],
   },
@@ -54,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/",
         icon: MessageCircle,
         roles: OPERATOR_PLUS,
+        capability: "route.conversations",
         exactMatch: true,
         activeAlsoOn: ["/conversations"],
         badgeKey: "conversations_open",
@@ -64,6 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/handoffs",
         icon: ShieldCheck,
         roles: OPERATOR_PLUS,
+        capability: "route.handoffs",
         badgeKey: "handoffs_open",
       },
       {
@@ -72,6 +75,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/customers",
         icon: Users,
         roles: OPERATOR_PLUS,
+        capability: "route.customers",
       },
       {
         id: "appointments",
@@ -79,6 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/appointments",
         icon: CalendarDays,
         roles: OPERATOR_PLUS,
+        capability: "route.appointments",
         badgeKey: "appointments_today",
       },
       {
@@ -87,6 +92,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/catalog",
         icon: Boxes,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.catalog",
       },
     ],
   },
@@ -100,6 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/agents",
         icon: Sparkles,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.agents",
       },
       {
         id: "composer",
@@ -107,6 +114,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/composer",
         icon: BotMessageSquare,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.composer",
       },
       {
         id: "customer-fields",
@@ -114,6 +122,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/customer-fields",
         icon: TableProperties,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.customer_fields",
       },
       {
         id: "pipeline",
@@ -121,6 +130,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/pipeline",
         icon: Columns3,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.pipeline",
       },
       {
         id: "ai-requirements",
@@ -128,6 +138,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/expediente",
         icon: ClipboardCheck,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.expediente",
       },
       {
         id: "knowledge",
@@ -135,6 +146,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/knowledge",
         icon: BookOpen,
         roles: OPERATOR_PLUS,
+        capability: "route.knowledge",
       },
       {
         id: "turn-traces",
@@ -142,6 +154,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/turn-traces",
         icon: Bug,
         roles: OPERATOR_PLUS,
+        capability: "route.turn_traces",
         badgeKey: "ai_debug_warnings",
       },
       {
@@ -150,6 +163,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/config-linter",
         icon: ListChecks,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.config_linter",
       },
     ],
   },
@@ -163,6 +177,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/workflows",
         icon: Network,
         roles: OPERATOR_PLUS,
+        capability: "route.workflows",
       },
       {
         id: "inbox-settings",
@@ -170,6 +185,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/inbox-settings",
         icon: SlidersHorizontal,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.inbox_settings",
       },
     ],
   },
@@ -183,6 +199,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/analytics",
         icon: BarChart3,
         roles: OPERATOR_PLUS,
+        capability: "route.analytics",
       },
       {
         id: "exports",
@@ -190,6 +207,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/exports",
         icon: Database,
         roles: OPERATOR_PLUS,
+        capability: "route.exports",
       },
     ],
   },
@@ -203,6 +221,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/users",
         icon: UserRound,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.users",
       },
       {
         id: "config",
@@ -210,6 +229,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/config",
         icon: Settings,
         roles: TENANT_ADMIN_PLUS,
+        capability: "route.config",
       },
       {
         id: "audit-log",
@@ -217,6 +237,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/audit-log",
         icon: FileText,
         roles: SUPERADMIN_ONLY,
+        capability: "route.audit_log",
       },
     ],
   },
@@ -231,6 +252,24 @@ export function filterMenuByRole(
     .map((g) => ({
       ...g,
       items: g.items.filter((it) => it.roles.includes(role)),
+    }))
+    .filter((g) => g.items.length > 0);
+}
+
+export function filterMenuByCapabilities(
+  groups: readonly NavGroup[],
+  role: Role | null | undefined,
+  capabilities: readonly string[] | null | undefined,
+): NavGroup[] {
+  if (!role) return [];
+  const capabilitySet = capabilities ? new Set(capabilities) : null;
+  return groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => {
+        if (!capabilitySet) return it.roles.includes(role);
+        return it.capability ? capabilitySet.has(it.capability) : it.roles.includes(role);
+      }),
     }))
     .filter((g) => g.items.length > 0);
 }

@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-06-05",
+  "decision": "NEEDS_RUNTIME_V2_SEND_PATH_INSTEAD",
+  "latest_requirement": "Legacy must not be fallback, escape hatch, or visible response path for runtime v2 tenants.",
+  "implemented": {
+    "legacy_fallback_removed_for_runtime_v2": true,
+    "bridge_alias_implemented": false,
+    "reason_bridge_not_implemented": "The latest user instruction removed legacy as fallback instead of repairing the bridge into legacy.",
+    "runtime_v2_no_send_when_not_ready": true
+  },
+  "files_modified": [
+    "core/atendia/runner/conversation_runner.py",
+    "core/tests/runner/test_conversation_runner.py",
+    "core/tests/architecture/test_legacy_deactivation_after_persistent_simulation.py",
+    "core/tests/architecture/test_dinamo_live_state_mismatch_regression.py",
+    "core/tests/agent_runtime/test_agent_runtime_v2.py"
+  ],
+  "behavior": {
+    "condition": "agent_runtime_v2.runtime_v2_enabled == true",
+    "legacy_composer_invoked": false,
+    "legacy_outbound_messages_written": false,
+    "trace_router_trigger": "legacy_runner_disabled_for_v2",
+    "visible_copy_written": false,
+    "fallback_flags_ignored": [
+      "legacy_runner_fallback_enabled",
+      "allow_legacy_runner_fallback",
+      "disable_legacy_runner_fallback"
+    ]
+  },
+  "validation": [
+    {
+      "command": "uv run pytest tests/architecture/test_dinamo_live_state_mismatch_regression.py -q",
+      "result": "3 passed, 2 warnings"
+    },
+    {
+      "command": "uv run pytest tests/architecture/test_dinamo_live_state_mismatch_regression.py tests/architecture/test_legacy_deactivation_after_persistent_simulation.py tests/runner/test_conversation_runner.py::test_v2_preview_only_tenant_skips_legacy_composer_and_visible_output tests/runner/test_conversation_runner.py::test_v2_auto_send_tenant_skips_legacy_composer_and_visible_output tests/runner/test_conversation_runner.py::test_v2_tenant_ignores_explicit_legacy_fallback_flags -q",
+      "result": "10 passed, 2 warnings"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "198 passed, 27 deselected, 2 warnings"
+    },
+    {
+      "command": "uv run ruff check tests/agent_runtime/test_agent_runtime_v2.py tests/architecture/test_legacy_deactivation_after_persistent_simulation.py tests/architecture/test_dinamo_live_state_mismatch_regression.py",
+      "result": "All checks passed"
+    }
+  ],
+  "not_clean": [
+    {
+      "scope": "full tests/runner collection",
+      "reason": "Existing unrelated import failures: VisionCategory and _render_structured_quote_messages."
+    },
+    {
+      "scope": "tests/runner/test_conversation_runner.py full file",
+      "reason": "Existing unrelated behavior mismatches remain in validator, handoff, router trigger, and pending confirmation tests."
+    },
+    {
+      "scope": "ruff over conversation_runner.py",
+      "reason": "Existing file-level lint debt remains unrelated to this logic change."
+    }
+  ],
+  "live_traffic": {
+    "whatsapp_sent": false,
+    "live_tenant_config_changed": false,
+    "test_database": "isolated postgres-test"
+  },
+  "remaining_work": [
+    "Enable or implement the runtime v2 live send path for Dinamo before expecting customer-visible answers.",
+    "Keep price, cash-payment, and manual-document policy handling inside tenant-scoped runtime v2 configuration/data.",
+    "Audit manual recovery scripts outside ConversationRunner because this change blocks the main runner path only."
+  ]
+}

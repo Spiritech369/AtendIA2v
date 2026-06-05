@@ -24,6 +24,7 @@ from atendia.api._deps import current_tenant_id, current_user
 from atendia.api._handoffs.command_center import router as _handoff_command_center_router
 from atendia.config import get_settings
 from atendia.db.models.lifecycle import HumanHandoff
+from atendia.db.models.tenant import Tenant
 from atendia.db.session import get_db_session
 from atendia.realtime.publisher import publish_event
 
@@ -111,6 +112,18 @@ async def list_handoffs(
     rows = (await session.execute(stmt)).scalars().all()
     has_more = len(rows) > limit
     page = rows[:limit]
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one_or_none()
+    if not (tenant and tenant.is_demo):
+        page = [
+            handoff
+            for handoff in page
+            if not (
+                isinstance(handoff.payload, dict)
+                and handoff.payload.get("source") == "mock"
+            )
+        ]
 
     items = [
         HandoffItem(

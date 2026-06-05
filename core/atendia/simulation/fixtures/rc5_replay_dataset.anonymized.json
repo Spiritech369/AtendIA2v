@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "anonymized": true,
+  "cases": [
+    {
+      "case_id": "anon_case_01",
+      "expected_tags": ["quote", "documents"],
+      "turns": [
+        {"customer": "Hola, quiero precio de la R4 de contado"},
+        {"customer": "Tambien dime que documentos ocupo"},
+        {"customer": "Tengo INE y comprobante", "attachments": [{"kind": "ine"}, {"kind": "address_proof"}]}
+      ]
+    },
+    {
+      "case_id": "anon_case_02",
+      "expected_tags": ["handoff"],
+      "turns": [
+        {"customer": "Quiero hablar con una persona"},
+        {"customer": "Tambien quiero saber donde estan"}
+      ]
+    },
+    {
+      "case_id": "anon_case_03",
+      "expected_tags": ["quote", "income"],
+      "turns": [
+        {"customer": "Me interesa la Adventure a credito"},
+        {"customer": "Tengo 2 anos trabajando"},
+        {"customer": "Me pagan por nomina"},
+        {"customer": "Cotizame esa"}
+      ]
+    }
+  ]
+}

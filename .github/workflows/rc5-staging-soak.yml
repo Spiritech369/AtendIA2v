@@ -1,0 +1,129 @@
+name: RC5 staging soak
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_provider_evals:
+        description: Run provider stability and provider eval
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+  schedule:
+    - cron: "0 10 * * *"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: >-
+          uv run ruff check
+          atendia/simulation/rc5_common.py
+          atendia/simulation/replay_eval.py
+          atendia/simulation/load_eval.py
+          atendia/simulation/chaos_eval.py
+          atendia/observability/rc5_metrics.py
+      - run: mkdir -p ../reports
+      - run: uv run python -m atendia.observability.rc5_metrics > ../reports/rc5_observability_config.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-lint-observability-reports
+          path: reports/rc5_observability_config.json
+
+  unit-agent-runtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run pytest tests/agent_runtime -m "not integration_db"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-unit-agent-runtime-reports
+          path: reports/**
+          if-no-files-found: ignore
+
+  integration-db-agent-runtime:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg15
+        env:
+          POSTGRES_USER: atendia
+          POSTGRES_PASSWORD: atendia
+          POSTGRES_DB: atendia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atendia -d atendia_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: core
+    env:
+      ATENDIA_TEST_DATABASE_URL: postgresql+asyncpg://atendia:atendia@localhost:5432/atendia_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run pytest tests/agent_runtime -m "integration_db"
+      - run: uv run pytest tests/agent_runtime
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-integration-db-agent-runtime-reports
+          path: reports/**
+          if-no-files-found: ignore
+
+  rc5-soak-simulations:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: mkdir -p ../reports
+      - run: >-
+          uv run python -m atendia.simulation.replay_eval
+          --dataset atendia/simulation/fixtures/rc5_replay_dataset.anonymized.json
+          --anonymized
+      - run: uv run python -m atendia.simulation.load_eval --conversations 50 --turns-per-conversation 5
+      - run: uv run python -m atendia.simulation.chaos_eval
+      - run: uv run python -m atendia.simulation.advisor_first_multiturn
+      - run: uv run python -m atendia.observability.rc5_metrics > ../reports/rc5_observability_config.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-soak-simulation-reports
+          path: reports/**
+
+  rc5-provider-evals:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_provider_evals == 'true')
+    defaults:
+      run:
+        working-directory: core
+    env:
+      ATENDIA_V2_AGENT_RUNTIME_V2_MODEL_PROVIDER: openai
+      ATENDIA_V2_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ATENDIA_V2_AGENT_RUNTIME_V2_MODEL_TIMEOUT_S: "30"
+      ATENDIA_V2_AGENT_RUNTIME_V2_PROVIDER_CIRCUIT_FAILURE_THRESHOLD: "100"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run python -m atendia.simulation.provider_stability_eval --runs 5
+      - run: uv run python -m atendia.simulation.provider_advisor_first_eval
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-provider-eval-reports
+          path: reports/**

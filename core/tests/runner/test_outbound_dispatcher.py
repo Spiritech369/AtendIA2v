@@ -84,12 +84,13 @@ async def test_enqueue_messages_idempotency_keys_unique(fake_arq, patch_enqueue_
 
 
 async def test_enqueue_messages_metadata_includes_index(fake_arq, patch_enqueue_outbound):
+    conversation_id = uuid4()
     await enqueue_messages(
         fake_arq,
         messages=["a", "b"],
         tenant_id=uuid4(),
         to_phone_e164="+x",
-        conversation_id=uuid4(),
+        conversation_id=conversation_id,
         turn_number=2,
         action="greet",
     )
@@ -97,11 +98,34 @@ async def test_enqueue_messages_metadata_includes_index(fake_arq, patch_enqueue_
         "action": "greet",
         "message_index": 0,
         "of": 2,
+        "conversation_id": str(conversation_id),
     }
     assert patch_enqueue_outbound[1].metadata == {
         "action": "greet",
         "message_index": 1,
         "of": 2,
+        "conversation_id": str(conversation_id),
+    }
+
+
+async def test_enqueue_messages_preserves_reply_channel_metadata(fake_arq, patch_enqueue_outbound):
+    conversation_id = uuid4()
+    await enqueue_messages(
+        fake_arq,
+        messages=["a"],
+        tenant_id=uuid4(),
+        to_phone_e164="+x",
+        conversation_id=conversation_id,
+        turn_number=2,
+        action="greet",
+        extra_metadata={"reply_channel": "baileys"},
+    )
+    assert patch_enqueue_outbound[0].metadata == {
+        "action": "greet",
+        "message_index": 0,
+        "of": 1,
+        "conversation_id": str(conversation_id),
+        "reply_channel": "baileys",
     }
 
 

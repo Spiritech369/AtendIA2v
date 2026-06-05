@@ -715,6 +715,7 @@ def _version_history(workflow: Workflow) -> list[dict]:
 def _item(row: Workflow) -> WorkflowItem:
     validation = _operational_validate(row)
     ops = _ops(row.definition)
+    definition = _normalize_workflow_definition(row.definition)
     return WorkflowItem(
         id=row.id,
         tenant_id=row.tenant_id,
@@ -722,7 +723,7 @@ def _item(row: Workflow) -> WorkflowItem:
         description=row.description,
         trigger_type=row.trigger_type,
         trigger_config=row.trigger_config or {},
-        definition=row.definition or {"nodes": [], "edges": []},
+        definition=definition,
         active=row.active,
         version=row.version,
         created_at=row.created_at,
@@ -745,6 +746,31 @@ def _item(row: Workflow) -> WorkflowItem:
             else None
         ),
     )
+
+
+def _normalize_workflow_definition(value: dict | None) -> dict:
+    definition = deepcopy(value or {"nodes": [], "edges": []})
+    if not isinstance(definition.get("nodes"), list):
+        definition["nodes"] = []
+    if not isinstance(definition.get("edges"), list):
+        definition["edges"] = []
+    normalized_nodes: list[dict] = []
+    for index, raw_node in enumerate(definition["nodes"], start=1):
+        if not isinstance(raw_node, dict):
+            continue
+        node = dict(raw_node)
+        node.setdefault("id", f"node_{index}")
+        node.setdefault("type", "message")
+        config = node.get("config")
+        if not isinstance(config, dict):
+            config = {}
+        if str(node.get("type") or "") == "detect_intent" and not config.get("intent"):
+            config["intent"] = "Sin intent"
+        node["config"] = config
+        normalized_nodes.append(node)
+    definition["nodes"] = normalized_nodes
+    definition["edges"] = [edge for edge in definition["edges"] if isinstance(edge, dict)]
+    return definition
 
 
 def _execution_replay(row: WorkflowExecution, workflow: Workflow | None = None) -> list[dict]:

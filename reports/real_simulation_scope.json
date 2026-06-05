@@ -1,0 +1,34 @@
+{
+    "generated_at":  "2026-06-03T05:49:44.6364985-06:00",
+    "status":  "REAL_SIMULATION_SCOPE_CONFIRMED",
+    "scope":  {
+                  "tenant_email":  "dinamomotosnl@gmail.com",
+                  "tenant_id":  "6ad78236-1fc9-467a-858d-90d248d57ee5",
+                  "tenant_name":  "Dinamo Motos NL",
+                  "tenant_status":  "active",
+                  "tenant_timezone":  "America/Mexico_City",
+                  "agent_id":  "c169deec-226d-55b7-bd07-270f339e75a6",
+                  "agent_name":  "Francisco de Dinamo NL",
+                  "agent_status":  "production",
+                  "execution_mode":  "offline_anonymized_replay",
+                  "provider_real":  true,
+                  "send_real_messages":  false,
+                  "actions_enabled":  false,
+                  "workflow_events_enabled":  false
+              },
+    "database_evidence":  {
+                              "tenant_user_role":  "tenant_admin",
+                              "conversations_assigned":  130,
+                              "inbound_messages_assigned":  674,
+                              "sampled_conversations":  20,
+                              "sampled_turns":  109
+                          },
+    "production_safety":  {
+                              "traffic_started":  false,
+                              "tenant_config_applied":  false,
+                              "send_real_messages":  false,
+                              "actions_enabled":  false,
+                              "workflow_events_enabled":  false,
+                              "side_effects":  0
+                          }
+}

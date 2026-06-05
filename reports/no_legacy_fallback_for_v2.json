@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-06-05",
+  "decision": "NO_LEGACY_FALLBACK_FOR_V2_PARTIAL",
+  "runtime_v2_or_no_send_invariant": {
+    "runtime_v2_legacy_composer_blocked": true,
+    "runtime_v2_legacy_outbox_blocked": true,
+    "runtime_v2_whatsapp_blocked": true,
+    "runtime_v2_failure_no_send": true,
+    "provider_fallback_visible_blocked": true,
+    "non_v2_legacy_allowed": true
+  },
+  "fixes_applied": [
+    "composer_failed handoff restored",
+    "composer failure outbound blocked",
+    "composer validator blocks unsafe visible output",
+    "handoff summary compatibility args restored",
+    "legacy pending_confirmation string mapping restored",
+    "composer pending_confirmation_set preserved",
+    "test_conversation_runner marked integration_db"
+  ],
+  "validation": [
+    {
+      "command": "uv run python -m py_compile atendia/runner/conversation_runner.py atendia/runner/confirmation_policy.py atendia/runner/handoff_helper.py tests/runner/test_conversation_runner.py",
+      "result": "passed"
+    },
+    {
+      "command": "uv run ruff check atendia/runner/confirmation_policy.py atendia/runner/handoff_helper.py",
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run pytest tests/architecture/test_dinamo_live_state_mismatch_regression.py -q",
+      "result": "3 passed, 2 warnings"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_runtime_v2_send_path_for_dinamo_smoke.py -m \"not integration_db\" -q",
+      "result": "3 passed, 7 deselected, 2 warnings"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_dinamo_shadow_e2e.py -q",
+      "result": "4 passed, 1 warning"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "214 passed, 43 deselected, 2 warnings"
+    }
+  ],
+  "blocked_validation": [
+    {
+      "command": "docker compose -f docker-compose.test.yml up -d postgres-test",
+      "result": "blocked: Docker daemon unavailable"
+    },
+    {
+      "command": "uv run pytest tests/runner/test_conversation_runner.py -q",
+      "result": "blocked without ATENDIA_TEST_DATABASE_URL after integration_db marker"
+    },
+    {
+      "command": "uv run pytest tests/runner/test_conversation_runner.py -q -vv",
+      "result": "not re-run with DB because Docker unavailable"
+    }
+  ],
+  "side_effects": {
+    "whatsapp_sent": false,
+    "outbox_live_written": false,
+    "config_live_applied": false,
+    "single_contact_smoke_activated": false,
+    "canary_activated": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false
+  },
+  "remaining_risk": "Runner integration suite must be re-run with postgres-test before promoting to READY."
+}

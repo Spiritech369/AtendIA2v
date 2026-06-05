@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-06-05",
+  "scope": {
+    "traffic_activated": false,
+    "whatsapp_sent_by_audit": false,
+    "live_config_modified": false,
+    "production_fix_applied": false
+  },
+  "conversation": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "conversation_id": "a2b48d30-623f-4502-8fd3-df55d265d194",
+    "contact_id": "05da6577-2647-4b79-ae24-2d233a22bbd3",
+    "channel": "whatsapp_meta"
+  },
+  "runtime_config": {
+    "runtime_v2_enabled": true,
+    "rollout_mode": "preview_only",
+    "send_enabled": false,
+    "outbox_enabled": false,
+    "actions_enabled": false,
+    "shadow_mode_enabled": false
+  },
+  "turns": [
+    {
+      "turn_number": 6,
+      "inbound_text": "hola me interesa credito",
+      "trace_id": "fe055c47-4abf-436a-855c-e4c9ff6cc213",
+      "runtime": "legacy_conversation_runner",
+      "composer_provider": "fallback",
+      "nlu_error": "APIConnectionError",
+      "composer_error": "ComposerProviderError",
+      "outbound": "Para no repetirlo igual, y para seguir, dime que modelo quieres revisar.",
+      "root_causes": ["LEGACY_RUNNER_USED", "PROVIDER_ERROR", "FALLBACK_VISIBLE_TO_CUSTOMER"]
+    },
+    {
+      "turn_number": 7,
+      "inbound_text": "rayo elite / hola me interesa credito",
+      "trace_id": "35142ed7-0f43-43b1-b02b-37d7a5b93ea9",
+      "runtime": "legacy_conversation_runner",
+      "composer_provider": "openai",
+      "state_after": {"Moto": "rayo elite"},
+      "outbound": "Recibi tu mensaje. En este momento sigo con intermitencia para validarlo automaticamente; queda registrado para seguimiento.",
+      "root_causes": ["LEGACY_RUNNER_USED", "FALLBACK_VISIBLE_TO_CUSTOMER"]
+    },
+    {
+      "turn_number": "manual-recovery",
+      "inbound_text": "recovery after rayo elite",
+      "trace_id": null,
+      "runtime": "manual_outbox_recovery",
+      "outbox_idempotency_key": "manual-recovery:3c9848aa-0bc2-4a3e-9506-7e7704a0a826",
+      "outbound": "Va, ya tengo el modelo Rayo Elite. Para ubicarte en el plan correcto, dime como recibes tus ingresos: nomina en tarjeta, recibos de nomina, negocio SAT, pensionado, por fuera, guardia o contado.",
+      "root_causes": ["STATEWRITER_NOT_APPLIED_TO_LIVE"]
+    },
+    {
+      "turn_number": 8,
+      "inbound_text": "me pagan en efectivo",
+      "trace_id": "63f51d19-cd18-4397-8450-93dc06351020",
+      "runtime": "legacy_conversation_runner",
+      "composer_provider": "fallback",
+      "nlu_error": "APIConnectionError",
+      "composer_error": "ComposerProviderError",
+      "composer_extracted_data": {
+        "Moto": "rayo elite",
+        "CREDITO": "Sin Comprobantes",
+        "ENGANCHE": "20%",
+        "Plan_Credito": "Sin Comprobantes"
+      },
+      "commercial_state": {
+        "model": null,
+        "income_type": "Sin Comprobantes",
+        "plan": "20%"
+      },
+      "outbound": "Y para seguir, dime que modelo quieres revisar.",
+      "root_causes": ["FIELD_ALIAS_MISMATCH", "CASH_CREDIT_MODE_MISMATCH", "FALLBACK_VISIBLE_TO_CUSTOMER"]
+    },
+    {
+      "turn_number": "manual-recovery-docs",
+      "inbound_text": "comando",
+      "trace_id": null,
+      "runtime": "manual_outbox_recovery",
+      "outbox_idempotency_key": "manual-recovery-docs:529bf73d-14e6-4d32-8d2b-679ec33ecdf8",
+      "outbound": "Perfecto, para Sin Comprobantes con 20% de enganche, lo que falta para avanzar es: INE ambos lados y comprobante de domicilio.",
+      "root_causes": ["REQUIREMENTS_ROUTED_TOO_EARLY", "CATALOG_CHANGE_NOT_APPLIED"]
+    },
+    {
+      "turn_number": 9,
+      "inbound_text": "pero cuanto es",
+      "trace_id": "c543fd1b-9bff-4999-8433-515df041a4ad",
+      "runtime": "legacy_conversation_runner",
+      "composer_provider": "fallback",
+      "nlu_error": "APIConnectionError",
+      "composer_error": "ComposerProviderError",
+      "composer_extracted_data": {
+        "Moto": "rayo elite",
+        "CREDITO": "Sin Comprobantes",
+        "ENGANCHE": "20%",
+        "Plan_Credito": "Sin Comprobantes"
+      },
+      "commercial_state": {
+        "model": null,
+        "income_type": "Sin Comprobantes",
+        "plan": "20%"
+      },
+      "outbound": "Te confirmo: Para darte precio correcto necesito tener modelo y plan confirmados.\n\nY para seguir, dime que modelo quieres revisar.",
+      "root_causes": ["FIELD_ALIAS_MISMATCH", "QUOTE_PRECONDITION_WRONG", "FALLBACK_VISIBLE_TO_CUSTOMER"]
+    }
+  ],
+  "visible_fields": {
+    "Moto": "rayo elite",
+    "Plan_Credito": "Sin Comprobantes",
+    "Plan_Enganche": "20",
+    "Cumple_Antiguedad": null,
+    "Cotizacion_Enviada": null,
+    "Ultima_Cotizacion": null
+  },
+  "consumed_legacy_fields": {
+    "model_field": "MOTO",
+    "income_type_field": "CREDITO",
+    "down_payment_field": "ENGANCHE",
+    "missing_mapping": ["Moto->MOTO", "Plan_Credito->CREDITO", "Plan_Enganche->ENGANCHE"]
+  },
+  "universal_turn_trace": {
+    "present": false,
+    "mandatory_tool_decisions_present": false,
+    "state_writer_present": false,
+    "action_execution_logs": 0
+  },
+  "tests": [
+    {
+      "path": "core/tests/architecture/test_dinamo_live_state_mismatch_regression.py",
+      "status": "created",
+      "verification": "2 xfailed"
+    }
+  ],
+  "decision": "LIVE_SMOKE_BLOCKED_MULTIPLE_CAUSES",
+  "recommended_next_fix_prompt": "Aplicar fix enfocado para el live smoke Dinamo: desactivar cualquier manual recovery customer-visible de documentos antes de cotizacion; mapear campos tenant Moto/Plan_Credito/Plan_Enganche/Cumple_Antiguedad/Cotizacion_Enviada/Ultima_Cotizacion a la capa legacy mientras siga como fallback; cambiar precondiciones para que precio con Moto+Plan_Credito+Plan_Enganche pregunte antiguedad o ejecute quote.resolve, nunca documentos; hacer que errores de provider/fallback no emitan texto de intermitencia al cliente. Mantener sin hardcodes Dinamo en core y pasar test_dinamo_live_state_mismatch_regression.py."
+}

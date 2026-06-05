@@ -49,6 +49,34 @@ def test_eval_confidence(ctx):
     assert evaluate("confidence < 0.5", ctx) is False
 
 
+def test_eval_extracted_boolean_field_with_single_equals(ctx):
+    ctx.extracted_data["Cumple_Antiguedad"] = False
+
+    assert evaluate("Cumple_Antiguedad=false", ctx) is True
+    assert evaluate("Cumple_Antiguedad=true", ctx) is False
+
+
+def test_eval_extracted_field_values(ctx):
+    assert evaluate("ciudad == CDMX", ctx) is True
+    assert evaluate("interes_producto != 250Z", ctx) is True
+
+
+def test_eval_extracted_field_presence(ctx):
+    assert evaluate("ciudad", ctx) is True
+    assert evaluate("Plan_Credito", ctx) is False
+
+
+def test_eval_extracted_field_exists_operator(ctx):
+    ctx.extracted_data["Plan_Enganche"] = "20%"
+
+    assert evaluate("Plan_Enganche exist", ctx) is True
+    assert evaluate("Plan_Credito exist", ctx) is False
+
+
+def test_eval_unknown_tenant_phrase_is_false(ctx):
+    assert evaluate("real document received", ctx) is False
+
+
 def test_eval_invalid_syntax_raises():
     from atendia.state_machine.conditions import ConditionSyntaxError
 

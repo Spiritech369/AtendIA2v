@@ -1,0 +1,123 @@
+{
+  "decision": "DINAMO_SHADOW_READY",
+  "generated_at": "2026-06-03T22:24:52.1570446-06:00",
+  "traffic_real_activated": false,
+  "whatsapp_sent": false,
+  "live_config_applied": false,
+  "actions_enabled": false,
+  "workflow_side_effects_enabled": false,
+  "canary_enabled": false,
+  "single_contact_smoke_enabled": false,
+  "legacy_runner_replaced": false,
+  "legacy_runner_fallback_required": true,
+  "files": {
+    "created": [
+      "core/tests/agent_runtime/fixtures/tenant_domain_contracts/dinamo_motos_nl_shadow.json",
+      "core/tests/agent_runtime/test_dinamo_shadow_e2e.py",
+      "frontend/src/features/turn-traces/__fixtures__/dinamoShadowUniversalTrace.ts",
+      "reports/dinamo_shadow_tenant_config.md",
+      "reports/dinamo_shadow_tenant_config.json",
+      "reports/dinamo_shadow_e2e_report.md",
+      "reports/dinamo_shadow_e2e_report.json",
+      "reports/dinamo_legacy_vs_universal_shadow.md",
+      "reports/dinamo_legacy_vs_universal_shadow.json",
+      "reports/dinamo_shadow_config_application_plan.md",
+      "reports/dinamo_shadow_config_application_plan.json",
+      "reports/dinamo_shadow_readiness.md",
+      "reports/dinamo_shadow_readiness.json"
+    ],
+    "modified": [
+      "frontend/tests/features/turn-traces/UniversalTracePanel.test.tsx"
+    ]
+  },
+  "tenant_config": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "domain": "vehicle_credit_sales",
+    "runtime_mode": "v2_shadow_until_evaluated",
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false
+  },
+  "e2e": {
+    "turn_count": 6,
+    "passed": true,
+    "business_events_dry_run": true,
+    "universal_trace_per_turn": true,
+    "approval_promised": false,
+    "document_promise_triggered_document_received": false,
+    "attachment_triggered_document_received": true
+  },
+  "business_events_generated": [
+    "lead_started",
+    "intent_identified",
+    "selection_identified",
+    "plan_identified",
+    "offer_quoted",
+    "requirements_requested",
+    "document_received",
+    "requirements_partial",
+    "requirements_complete",
+    "human_handoff_requested"
+  ],
+  "frontend_fixture": {
+    "path": "frontend/src/features/turn-traces/__fixtures__/dinamoShadowUniversalTrace.ts",
+    "tested_with": "UniversalTracePanel"
+  },
+  "legacy_vs_universal": {
+    "universal_shadow_result": "better traceability and validation in tested path",
+    "legacy_fallback": "required",
+    "production_replacement": false
+  },
+  "commands": [
+    {
+      "command": "uv run pytest tests/agent_runtime/test_dinamo_shadow_e2e.py -q",
+      "result": "4 passed, 1 warning"
+    },
+    {
+      "command": "uv run ruff check atendia/agent_runtime tests/agent_runtime/test_dinamo_shadow_e2e.py",
+      "result": "failed due pre-existing unrelated lint in broad atendia/agent_runtime scope"
+    },
+    {
+      "command": "uv run ruff check tests/agent_runtime/test_dinamo_shadow_e2e.py atendia/agent_runtime/business_events.py atendia/agent_runtime/universal_turn_trace.py atendia/agent_runtime/workflow_events.py atendia/agent_runtime/advisor_pipeline.py",
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime/test_dinamo_shadow_e2e.py tests/agent_runtime/test_business_events.py tests/agent_runtime/test_universal_turn_trace.py tests/agent_runtime/test_declarative_state_writer.py tests/agent_runtime/test_mandatory_tool_contract.py tests/agent_runtime/test_tenant_domain_contract.py -q",
+      "result": "54 passed, 1 warning"
+    },
+    {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "196 passed, 27 deselected, 2 warnings"
+    },
+    {
+      "command": "npm exec -- vitest run UniversalTracePanel",
+      "result": "1 passed, 8 tests passed"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "npm exec -- biome check src/features/turn-traces/__fixtures__/dinamoShadowUniversalTrace.ts tests/features/turn-traces/UniversalTracePanel.test.tsx",
+      "result": "Checked 2 files in 29ms. No fixes applied."
+    }
+  ],
+  "hardcode_scan": {
+    "dinamo_identifiers_in_core_runtime": false,
+    "new_core_runtime_hardcodes_added": false,
+    "pre_existing_generic_terms_found": [
+      "vehicle_credit_sales in tenant_domain_contract.py",
+      "moto/credito in quote_safety.py",
+      "moto in conversation_progress.py"
+    ]
+  },
+  "remaining_risks": [
+    "Config is fixture/report only and not persisted to DB",
+    "Legacy runner remains required for production fallback",
+    "Real workflow/action side effects remain disabled",
+    "Durable cross-turn idempotency should be added before live execution",
+    "Existing core runtime contains pre-existing generic vehicle-credit terms outside this task"
+  ],
+  "recommended_next_step": "Run a human-reviewed real replay dataset against this shadow config while all live/action/workflow flags remain false."
+}

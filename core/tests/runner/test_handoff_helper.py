@@ -38,9 +38,9 @@ def test_build_handoff_summary_complete_flow() -> None:
     # papeleria_completa is False here because two docs are pending,
     # so funnel_stage falls back to "doc" (model_moto set, papeles incompletos).
     assert summary.funnel_stage == "doc"
-    assert summary.modelo_moto == "Adventure 150 CC"
-    assert summary.plan_credito == "10%"
-    assert summary.enganche_estimado == "10% de enganche"
+    assert summary.customer_fields["modelo_moto"] == "Adventure 150 CC"
+    assert summary.customer_fields["plan_credito"] == "10%"
+    assert summary.customer_fields["enganche_estimado"] == "10% de enganche"
 
 
 def test_build_handoff_summary_empty_state_minimal_payload() -> None:
@@ -54,9 +54,9 @@ def test_build_handoff_summary_empty_state_minimal_payload() -> None:
     )
     assert summary.docs_recibidos == []
     assert summary.docs_pendientes == []
-    assert summary.nombre is None
-    assert summary.plan_credito is None
-    assert summary.enganche_estimado is None
+    assert summary.customer is None
+    assert summary.customer_fields["plan_credito"] is None
+    assert summary.customer_fields["enganche_estimado"] is None
     assert summary.funnel_stage == "plan"
 
 
@@ -76,6 +76,25 @@ def test_build_handoff_summary_sin_comprobantes_minimal_docs() -> None:
     )
     assert summary.docs_recibidos == ["ine"]
     assert summary.docs_pendientes == ["comprobante"]
+
+
+def test_build_handoff_summary_accepts_legacy_document_requirements_kwargs() -> None:
+    ext = ExtractedFields(
+        tipo_credito=TipoCredito.NOMINA_TARJETA,
+        docs_ine=True,
+    )
+
+    summary = build_handoff_summary(
+        reason=HandoffReason.COMPOSER_FAILED,
+        extracted=ext,
+        last_inbound_text="hola",
+        suggested_next_action="revisar",
+        document_requirements=_DOCS_PER_PLAN,
+        document_requirements_field="tipo_credito",
+    )
+
+    assert summary.docs_recibidos == ["ine"]
+    assert summary.docs_pendientes == ["comprobante", "estados_de_cuenta", "nomina"]
 
 
 def test_handoff_summary_json_serializes_reason_as_value_not_enum_repr() -> None:

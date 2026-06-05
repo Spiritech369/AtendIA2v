@@ -1,19 +1,26 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DEFAULT_ENV_FILE,
         env_prefix="ATENDIA_V2_",
         extra="ignore",
     )
 
     database_url: str = Field(
         default="postgresql+asyncpg://atendia:atendia@localhost:5432/atendia_v2"
+    )
+    test_database_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ATENDIA_TEST_DATABASE_URL", "ATENDIA_V2_TEST_DATABASE_URL"),
     )
     redis_url: str = Field(default="redis://localhost:6379/1")
     log_level: str = Field(default="INFO")
@@ -51,6 +58,25 @@ class Settings(BaseSettings):
     baileys_bridge_url: str = Field(default="http://baileys-bridge:7755")
     baileys_internal_token: str = Field(default="dev-only-baileys-token-change-me")
     baileys_timeout_s: float = Field(default=8.0)
+    dinamo_agent_first_enabled: bool = Field(default=False)
+    agent_runtime_v2_enabled: bool = Field(default=False)
+    agent_runtime_v2_send_enabled: bool = Field(default=False)
+    agent_runtime_v2_actions_enabled: bool = Field(default=False)
+    agent_runtime_v2_workflow_events_enabled: bool = Field(default=False)
+    agent_runtime_v2_model_provider: Literal["disabled", "openai"] = Field(default="disabled")
+    agent_runtime_v2_model: str = Field(default="gpt-4o-mini")
+    agent_runtime_v2_model_timeout_s: float = Field(default=8.0)
+    agent_runtime_v2_model_retry_delays_ms: list[int] = Field(default_factory=lambda: [500, 2000])
+    agent_runtime_v2_model_max_retries: int = Field(default=2, ge=0, le=8)
+    agent_runtime_v2_model_retry_base_delay_ms: int = Field(default=500, ge=0, le=30000)
+    agent_runtime_v2_model_retry_max_delay_ms: int = Field(default=4000, ge=0, le=60000)
+    agent_runtime_v2_model_retry_jitter_ms: int = Field(default=250, ge=0, le=10000)
+    agent_runtime_v2_provider_circuit_failure_threshold: int = Field(default=5, ge=1, le=100)
+    agent_runtime_v2_provider_circuit_cooldown_s: float = Field(default=30.0, ge=0.0)
+    agent_runtime_v2_max_actions_per_turn: int = Field(default=5, ge=1, le=20)
+    agent_runtime_v2_action_failure_policy: Literal["continue", "stop"] = Field(default="continue")
+    quote_safety_guard_mode: Literal["shadow", "block"] = Field(default="block")
+    conversation_progress_guard_mode: Literal["shadow", "block"] = Field(default="block")
 
 
 @lru_cache

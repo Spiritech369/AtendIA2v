@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { filterMenuByRole, NAV_GROUPS } from "@/features/navigation/menu-config";
+import {
+  filterMenuByCapabilities,
+  filterMenuByRole,
+  NAV_GROUPS,
+} from "@/features/navigation/menu-config";
 
 describe("NAV_GROUPS", () => {
   it("contains 6 groups in the expected order", () => {
@@ -62,5 +66,26 @@ describe("filterMenuByRole", () => {
     for (const g of groups) {
       expect(g.items.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("filterMenuByCapabilities", () => {
+  it("uses backend capabilities when provided", () => {
+    const groups = filterMenuByCapabilities(NAV_GROUPS, "tenant_admin", [
+      "route.dashboard",
+      "route.users",
+    ]);
+    const items = groups.flatMap((g) => g.items.map((i) => i.id));
+
+    expect(items).toEqual(["dashboard", "users"]);
+    expect(items).not.toContain("agents");
+    expect(items).not.toContain("config");
+  });
+
+  it("falls back to role filtering while capabilities are loading", () => {
+    const byRole = filterMenuByRole(NAV_GROUPS, "operator");
+    const byCapabilities = filterMenuByCapabilities(NAV_GROUPS, "operator", null);
+
+    expect(byCapabilities).toEqual(byRole);
   });
 });

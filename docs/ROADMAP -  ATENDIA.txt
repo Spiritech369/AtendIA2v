@@ -1,0 +1,1407 @@
+# Roadmap definitivo AtendIA — Agent‑First, Knowledge OS y Workflows
+
+**Fecha:** 2026-05-31
+**Archivo sugerido en repo:** `docs/roadmaps/2026-05-31-atendia-agent-first-roadmap.md`
+**Objetivo:** rediseñar AtendIA para lograr calidad de respuesta tipo respond.io, pero con mejor trazabilidad, mejor gobernanza de conocimiento, acciones configurables, lifecycle/pipeline y workflows, empezando por WhatsApp y sin hardcodear motocicletas.
+
+---
+
+## 0. Tesis ejecutiva
+
+AtendIA no debe seguir evolucionando como un sistema de parches sobre:
+
+```text
+NLU → Runner → Tools → Flow Router → Pipeline → Composer → Guardrails
+```
+
+Esa arquitectura produce síntomas de robotización:
+
+* respuestas sistemáticas o tipo formulario;
+* preguntas repetidas;
+* tools que compiten con el agente;
+* pipeline que secuestra la conversación;
+* capas duplicadas que redactan o deciden;
+* campos escritos sin evidencia clara;
+* conocimiento aislado de la respuesta real;
+* dificultad para probar si un cambio mejora o empeora.
+
+La fórmula recomendada es:
+
+```text
+AtendIA = AI Agent Runtime
+        + Knowledge OS
+        + Contact Memory
+        + Action Registry
+        + Lifecycle Engine
+        + Workflow Canvas
+        + Evaluation Lab
+        + Conversation Inbox
+```
+
+En una frase:
+
+> AtendIA debe ser una plataforma para crear agentes IA operativos que responden natural, usan conocimiento confiable, actualizan memoria, mueven lifecycle, ejecutan acciones y pueden probarse antes de publicarse.
+
+---
+
+## 1. Principios copiados conceptualmente de respond.io
+
+Estos principios se toman como referencia de producto, no como copia de código.
+
+### 1.1. El agente es el centro
+
+respond.io trata al AI Agent como una entidad configurada con instrucciones, conocimiento, acciones y pruebas. AtendIA debe dejar de hacer que el runner, flow router, tools y pipeline sean el cerebro principal.
+
+**Principio para AtendIA:**
+
+```text
+El agente conversa.
+Knowledge informa.
+Actions ejecutan.
+Lifecycle mide.
+Workflows automatizan.
+Policy valida.
+Eval Lab mejora.
+```
+
+### 1.2. Knowledge Sources deben vivir dentro de la experiencia del agente
+
+El conocimiento no debe ser un módulo suelto. Debe estar conectado al agente, al test chat, a las respuestas, a las fuentes usadas y a las métricas de calidad.
+
+AtendIA debe soportar desde el MVP:
+
+* PDF;
+* DOCX;
+* TXT/MD;
+* CSV/XLSX;
+* imágenes;
+* URLs;
+* website crawler;
+* FAQ manual;
+* tablas de precios;
+* catálogos;
+* políticas;
+* horarios;
+* reglas de agenda;
+* reglas de documentos.
+
+### 1.3. Acciones genéricas, no tools verticales hardcodeadas
+
+No construir `quote_motos_tool`, `requisitos_motos_tool`, `docs_dinamo_tool` como eje principal.
+
+Construir acciones universales:
+
+```text
+update_contact_field
+move_lifecycle
+assign_conversation
+add_tag
+close_conversation
+trigger_workflow
+call_webhook
+create_appointment
+create_estimate
+request_document
+classify_media
+```
+
+Después, cada vertical configura cómo las usa.
+
+### 1.4. Lifecycle es pipeline, pero no debe ser guion
+
+Lifecycle debe ser:
+
+* etapa del journey;
+* medición comercial;
+* disparador de workflows;
+* filtro de inbox;
+* contexto para el agente.
+
+No debe ser:
+
+* script conversacional rígido;
+* formulario obligatorio;
+* capa que decide el texto final.
+
+### 1.5. Testing antes de publicar
+
+El producto debe permitir probar agentes, knowledge, acciones y workflows antes de tocar clientes reales.
+
+AtendIA debe tener un **Agent Test Lab** donde se puedan probar:
+
+* mensajes de texto;
+* archivos;
+* imágenes;
+* audio transcrito;
+* distintos contact fields;
+* distintos lifecycle stages;
+* distintas knowledge sources;
+* acciones planeadas;
+* acciones ejecutadas;
+* fuentes usadas;
+* score de respuesta;
+* regresiones.
+
+---
+
+## 2. Arquitectura objetivo
+
+```text
+Channel Adapters
+WhatsApp primero / Instagram después / Webchat después
+        ↓
+Event Normalizer + Dedupe
+        ↓
+Conversation Store + Contact Memory
+        ↓
+Context Builder
+        ↓
+AI Agent Runtime
+        ↓
+Knowledge Retrieval + Action Planning
+        ↓
+TurnOutput único
+        ↓
+Policy Validator
+        ↓
+Send Final Response
+        ↓
+Post-Turn Action Executor
+        ↓
+Lifecycle / Fields / Workflows / Handoff
+        ↓
+Trace + Evaluation + Learning Loop
+```
+
+### 2.1. Rol de cada capa
+
+| Capa               | Rol correcto                         | Lo que NO debe hacer                |
+| ------------------ | ------------------------------------ | ----------------------------------- |
+| Channel Adapter    | Recibir/enviar mensajes por canal    | Decidir conversación                |
+| Normalizer         | Normalizar evento y deduplicar       | Interpretar negocio                 |
+| Conversation Store | Guardar mensajes, estado, historial  | Redactar respuesta                  |
+| Contact Memory     | Guardar datos con evidencia          | Escribir campos sin fuente          |
+| Context Builder    | Armar contexto útil para el agente   | Decidir mensaje final               |
+| AI Agent Runtime   | Responder natural y planear acciones | Ser reemplazado por flow rígido     |
+| Knowledge OS       | Aportar evidencia y fuentes          | Ser una KB mock o aislada           |
+| Action Registry    | Ejecutar capacidades configurables   | Escribir copy final                 |
+| Lifecycle Engine   | Medir etapa y disparar reglas        | Convertirse en formulario           |
+| Workflow Engine    | Automatizar eventos                  | Simular toda la conversación humana |
+| Policy Validator   | Bloquear invenciones/riesgos         | Reescribir sin contexto             |
+| Eval Lab           | Medir calidad y regresiones          | Ser solo una pantalla técnica       |
+
+---
+
+## 3. Contrato único por turno: `TurnOutput`
+
+Todo turno del agente debe terminar en un único objeto. Esto elimina duplicidad entre `conversation_runner`, `advisor_brain`, `sales_advisor_decision_policy`, `turn_resolver`, `response_frame`, `response_contract`, `composer` y `agent_final_response`.
+
+```json
+{
+  "final_message": "Claro, te explico...",
+  "language": "es",
+  "tone": "friendly_professional",
+  "knowledge_citations": [
+    {
+      "source_id": "ks_catalog_may_2026",
+      "chunk_id": "chunk_22",
+      "title": "Catálogo mayo 2026",
+      "reason": "precio del modelo consultado"
+    }
+  ],
+  "field_updates": [
+    {
+      "field": "interest",
+      "value": "Adventure 250",
+      "confidence": 0.91,
+      "evidence_message_id": "msg_123",
+      "write_mode": "auto"
+    }
+  ],
+  "lifecycle_update": {
+    "target_stage": "quoted",
+    "confidence": 0.86,
+    "reason": "se respondió una consulta de precio"
+  },
+  "actions": [
+    {
+      "type": "create_estimate",
+      "status": "planned",
+      "input": {
+        "product": "Adventure 250",
+        "down_payment": "20%"
+      },
+      "requires_human_approval": false
+    }
+  ],
+  "followup_recommendation": {
+    "type": "quote_no_reply_24h",
+    "enabled": true
+  },
+  "risk_flags": [],
+  "needs_human": false,
+  "confidence": 0.89
+}
+```
+
+### 3.1. Reglas obligatorias del `TurnOutput`
+
+* Un inbound genera máximo un `TurnOutput` principal.
+* Un `TurnOutput` genera máximo un `final_message` visible.
+* Ninguna tool/action redacta el mensaje final libre.
+* Cada field update lleva fuente, evidencia y confianza.
+* Cada lifecycle update lleva razón.
+* Cada action lleva input schema, permisos y trace.
+* Si hay baja confianza, el agente puede responder con incertidumbre o escalar.
+
+---
+
+## 4. Fórmula de calidad de respuesta
+
+La prioridad máxima del producto es la calidad de respuesta.
+
+```text
+Calidad de respuesta =
+  30% responde exactamente la pregunta actual
++ 25% usa knowledge correcto
++ 15% tono natural y humano
++ 10% usa memoria/contact fields sin repetir
++ 10% propone siguiente paso útil
++  5% ejecuta acción correcta
++  5% no inventa / cumple policy
+```
+
+### 4.1. Regla de oro
+
+```text
+Primero responde la pregunta actual.
+Después clasifica.
+Después actualiza memoria.
+Después mueve lifecycle.
+Después dispara workflows.
+```
+
+### 4.2. Regla anti-formulario
+
+El agente no debe preguntar tres cosas para poder responder una duda simple.
+
+Mal:
+
+```text
+Para ayudarte, dime tu nombre, enganche y tipo de crédito.
+```
+
+Mejor:
+
+```text
+Sí, te puedo orientar. Ese modelo tiene opciones de contado y financiamiento; si buscas crédito, el pago depende del enganche. ¿Lo quieres ver con enganche aproximado o primero te paso el precio base?
+```
+
+---
+
+## 5. Qué debe morir o degradarse
+
+| Componente actual               | Problema                         | Decisión recomendada                      |
+| ------------------------------- | -------------------------------- | ----------------------------------------- |
+| `advisor_brain` paralelo        | Duplica autoridad                | Fusionar en `AgentRuntime` o deprecar     |
+| `sales_advisor_decision_policy` | Vuelve ventas un script          | Convertir a blueprint rules configurables |
+| `flow_router` rígido            | Mete al cliente en modos         | Degradar a clasificador auxiliar          |
+| `turn_resolver` fuerte          | Puede resolver antes de entender | Limitar a referencias/contexto            |
+| `response_frame` redactando     | Genera mensajes sistemáticos     | Solo schema interno                       |
+| `response_contract` redactando  | Crea doble autoridad             | Solo validación                           |
+| tools con texto final           | Fragmentan el tono               | Devolver facts/actions                    |
+| pipeline como guion             | Robotiza al agente               | Convertir a Lifecycle Engine              |
+
+---
+
+## 6. Knowledge OS v2
+
+La Knowledge Base debe ser el corazón del producto junto con el Agent Runtime.
+
+### 6.1. MVP obligatorio
+
+* Crear knowledge sources por tenant.
+* Asociar knowledge sources a agentes.
+* Subir PDF/DOCX/TXT/MD/CSV/XLSX.
+* Subir imágenes.
+* Agregar URL pública.
+* Website crawler básico.
+* Resync manual.
+* Estado de procesamiento: `processing`, `ready`, `partial`, `error`.
+* Hybrid retrieval: keyword + vector.
+* Reranker.
+* Mostrar fuentes usadas en test chat.
+* Mostrar fuentes usadas en respuestas reales.
+* Log de retrieval por turno.
+
+### 6.2. Modelo `KnowledgeSource`
+
+```json
+{
+  "id": "ks_123",
+  "tenant_id": "tenant_1",
+  "name": "Catálogo mayo 2026",
+  "type": "file | url | table | faq | snippet | api_cache",
+  "content_type": "catalog | policy | pricing | faq | service_menu | appointment_rules",
+  "status": "draft | active | stale | expired | error",
+  "owner": "admin@cliente.com",
+  "valid_from": "2026-05-01",
+  "valid_until": "2026-06-01",
+  "priority": 80,
+  "visibility": ["sales_agent", "support_agent"],
+  "vertical": "automotive",
+  "metadata": {
+    "branch": "monterrey",
+    "currency": "MXN"
+  }
+}
+```
+
+### 6.3. Modelo `KnowledgeChunk`
+
+```json
+{
+  "id": "chunk_123",
+  "source_id": "ks_123",
+  "tenant_id": "tenant_1",
+  "title": "Adventure 250 - Precio",
+  "content": "Adventure 250 precio base...",
+  "content_hash": "...",
+  "page": 3,
+  "row": 12,
+  "embedding_id": "...",
+  "metadata": {
+    "product": "Adventure 250",
+    "topic": "pricing",
+    "valid_until": "2026-06-01"
+  }
+}
+```
+
+### 6.4. Evidence Pack para el agente
+
+El agente no debe recibir chunks sueltos sin estructura. Debe recibir un paquete limpio:
+
+```json
+{
+  "answerable": true,
+  "confidence": 0.88,
+  "sources": [
+    {
+      "title": "Catálogo mayo 2026",
+      "type": "pricing",
+      "valid_until": "2026-06-01",
+      "snippet": "Adventure 250: precio...",
+      "source_id": "ks_123"
+    }
+  ],
+  "conflicts": [],
+  "missing_info": [],
+  "recommended_answer_style": "brief"
+}
+```
+
+Si hay conflicto:
+
+```json
+{
+  "answerable": false,
+  "reason": "conflicting_sources",
+  "conflicts": [
+    "Catálogo abril dice $42,000",
+    "Catálogo mayo dice $44,000"
+  ],
+  "recommended_action": "use_latest_active_source_or_handoff"
+}
+```
+
+### 6.5. Knowledge Governance para superar a respond.io
+
+* Prioridad por fuente.
+* Vigencia por fuente.
+* Detección de documentos vencidos.
+* Detección de conflictos.
+* Preguntas sin respuesta.
+* Tests por knowledge source.
+* Métrica de fuentes que causan malas respuestas.
+* Aprobación antes de publicar.
+* Rollback de versión.
+
+---
+
+## 7. Contact Memory v2
+
+Los datos como modelo, enganche, tratamiento, fecha, presupuesto, sucursal o urgencia no deben ser hardcodeados. Deben ser **custom contact fields configurables**.
+
+### 7.1. Field definition
+
+```json
+{
+  "key": "budget",
+  "label": "Presupuesto",
+  "type": "money | text | enum | date | boolean | object | file",
+  "description": "Presupuesto aproximado del cliente",
+  "extractable_by_ai": true,
+  "evidence_required": true,
+  "confidence_threshold": 0.75,
+  "used_in_prompt": true,
+  "used_in_lifecycle": true,
+  "visible_in_inbox": true,
+  "write_policy": "ai_auto | ai_suggest | human_only"
+}
+```
+
+### 7.2. Field value con evidencia
+
+```json
+{
+  "field": "budget",
+  "value": "20000 MXN",
+  "source": "customer_message",
+  "evidence": "msg_987",
+  "confidence": 0.82,
+  "status": "confirmed",
+  "updated_by": "ai_agent",
+  "updated_at": "2026-05-31T15:22:00Z"
+}
+```
+
+### 7.3. Reglas de escritura
+
+* No sobrescribir datos confirmados con inferencias débiles.
+* Si el campo es sensible, pedir confirmación o revisión humana.
+* Si la evidencia es ambigua, guardar sugerencia, no valor final.
+* Cada cambio debe ser reversible.
+* Los cambios de campos pueden disparar workflows.
+
+---
+
+## 8. Action Registry
+
+Reemplaza el concepto de tools verticales por acciones configurables.
+
+### 8.1. Acción universal
+
+```json
+{
+  "id": "action_create_estimate",
+  "name": "Crear estimación",
+  "description": "Calcula o registra una estimación para un producto o servicio",
+  "enabled_for_agents": ["sales_agent"],
+  "when_to_use": "Cuando el cliente pida precio, mensualidad, rango o cotización",
+  "input_schema": {
+    "interest": "string",
+    "budget": "money?",
+    "payment_method": "enum?",
+    "term": "number?"
+  },
+  "requires": ["interest"],
+  "missing_input_behavior": "ask_one_question",
+  "risk_level": "medium",
+  "execution_mode": "pre_response | post_response | human_approval",
+  "response_mode": "agent_interprets_result",
+  "rollback": true
+}
+```
+
+### 8.2. Acciones P0/P1
+
+```text
+update_contact_field
+move_lifecycle
+add_tag
+assign_conversation
+close_conversation
+add_internal_comment
+trigger_workflow
+call_webhook
+```
+
+### 8.3. Acciones P2
+
+```text
+create_appointment
+create_estimate
+request_document
+classify_media
+send_payment_link
+check_availability
+create_crm_record
+```
+
+### 8.4. Reglas de acciones
+
+* Máximo 2–3 acciones por turno.
+* Las acciones deben seguir orden natural.
+* No ejecutar acciones contradictorias.
+* Si falta input, preguntar una sola cosa.
+* Si hay riesgo, requerir aprobación humana.
+* Toda acción debe guardar trace.
+
+---
+
+## 9. Lifecycle Engine
+
+Lifecycle reemplaza el pipeline rígido como una capa generalista.
+
+### 9.1. Stage definition
+
+```json
+{
+  "id": "appointment_proposed",
+  "name": "Cita propuesta",
+  "description": "El cliente recibió una propuesta de cita, pero aún no confirma",
+  "goal": "Convertir interés en cita confirmada",
+  "entry_conditions": ["appointment_options_sent = true"],
+  "exit_conditions": ["appointment_confirmed = true", "customer_declined = true"],
+  "recommended_fields": ["interest", "preferred_date", "preferred_branch"],
+  "recommended_actions": ["create_appointment", "followup_after_4h", "assign_human_if_urgent"],
+  "automation_policy": {
+    "agent_can_move": true,
+    "human_approval_required": false,
+    "workflow_triggers_allowed": true
+  }
+}
+```
+
+### 9.2. Regla principal
+
+```text
+Lifecycle orienta.
+Agent responde.
+Workflow automatiza.
+Policy valida.
+```
+
+Nunca:
+
+```text
+Stage = pregunta obligatoria del bot.
+```
+
+---
+
+## 10. Workflow Canvas
+
+Workflows sí son necesarios, pero deben rodear al agente, no reemplazarlo.
+
+### 10.1. Workflows correctos
+
+```text
+Nuevo lead → asignar AI Agent
+Baja confianza → handoff
+Lifecycle cambia a Cotizado → followup 24h
+Campo presupuesto existe → segmentar
+Cliente no responde → enviar template
+Documento llega → classify_media
+Cita confirmada → recordatorio
+Webhook n8n → actualizar campo
+```
+
+### 10.2. Workflows incorrectos
+
+```text
+Nodo 1: preguntar nombre
+Nodo 2: preguntar modelo
+Nodo 3: preguntar enganche
+Nodo 4: preguntar crédito
+Nodo 5: preguntar documentos
+Nodo 6: responder precio
+```
+
+Ese patrón mata la naturalidad.
+
+### 10.3. Nodos mínimos P1
+
+```text
+Trigger
+Condition
+Wait
+Send Message / Template
+Update Contact Field
+Move Lifecycle
+Assign Conversation
+Trigger AI Agent
+Call Webhook
+Human Approval
+Add Tag
+Close Conversation
+End
+```
+
+### 10.4. Triggers P1/P2
+
+```text
+conversation_opened
+message_received
+field_updated
+lifecycle_updated
+tag_added
+agent_confidence_low
+knowledge_gap_detected
+appointment_created
+estimate_sent
+file_received
+no_reply_after
+webhook_received
+manual_trigger
+```
+
+---
+
+## 11. Evaluation Lab
+
+AtendIA debe tener una ventaja fuerte: no solo configurar agentes, sino probarlos, compararlos y evitar regresiones.
+
+### 11.1. Funciones P0/P1
+
+* Test chat por agente.
+* Ver fuentes usadas.
+* Ver acciones planeadas/ejecutadas.
+* Editar contact fields simulados.
+* Cambiar lifecycle simulado.
+* Subir archivo de prueba.
+* Simular audio transcrito.
+* Resetear conversación.
+* Publicar solo si pasa tests mínimos.
+
+### 11.2. Funciones P2
+
+* Replay de conversaciones reales sin side effects.
+* A/B de prompts.
+* A/B de knowledge sources.
+* A/B de acciones.
+* Regression suite por vertical.
+* Score automático.
+* Human review.
+* Dataset de errores.
+* Release gates.
+
+### 11.3. Score automático
+
+```json
+{
+  "answered_current_question": 0.95,
+  "used_correct_knowledge": 0.88,
+  "did_not_hallucinate": 1.0,
+  "tone_quality": 0.91,
+  "asked_only_one_question": 1.0,
+  "field_updates_correct": 0.83,
+  "lifecycle_update_correct": 0.75,
+  "action_correct": 0.9,
+  "overall": 0.90
+}
+```
+
+### 11.4. Canaries obligatorios
+
+#### Motos / autos / inmobiliaria
+
+```text
+¿Cuánto cuesta?
+¿Tienes financiamiento?
+Tengo 20 de enganche.
+Estoy en buró.
+Quiero verla hoy.
+¿Aceptan pagos semanales?
+¿Me piden comprobante?
+Mando mi INE.
+La quiero en roja.
+¿Dónde están ubicados?
+```
+
+#### Clínicas dentales
+
+```text
+¿Cuánto cuesta un implante?
+Me duele una muela.
+¿Tienen ortodoncia?
+¿Atienden niños?
+¿Puedo ir hoy?
+¿Aceptan seguro?
+¿Duele?
+¿Cuánto dura el tratamiento?
+```
+
+#### Barberías / estéticas
+
+```text
+¿Cuánto corte y barba?
+¿Tienen espacio hoy?
+¿Con quién me recomiendas?
+¿Dónde están?
+¿Puedo apartar con depósito?
+¿Cuánto dura?
+¿Tienen uñas acrílicas?
+```
+
+### 11.5. Release gate mínimo
+
+No publicar un agente si falla en:
+
+* precios;
+* horarios;
+* ubicación;
+* agenda;
+* documentos;
+* financiamiento;
+* urgencia médica;
+* humano solicitado;
+* baja confianza;
+* contradicción de datos;
+* respuesta tipo formulario;
+* mensaje duplicado.
+
+---
+
+## 12. Blueprints por industria
+
+AtendIA debe ser generalista, pero con plantillas verticales para acelerar instalación.
+
+### 12.1. Blueprint motos / autos / inmobiliaria
+
+```text
+Campos:
+interest, model, property_type, budget, down_payment,
+payment_method, financing_type, location, documents_status
+
+Lifecycle:
+new_lead, qualified, quoted, appointment_proposed,
+appointment_confirmed, documents_pending, negotiation, won, lost
+
+Knowledge:
+catálogo, inventario, financiamiento, requisitos, políticas, ubicación
+
+Actions:
+create_estimate, check_availability, request_document,
+book_appointment, assign_sales
+
+Workflows:
+quote_no_reply_24h, docs_pending, appointment_pending,
+high_value_handoff, lost_reactivation
+```
+
+### 12.2. Blueprint clínicas dentales / médicas
+
+```text
+Campos:
+treatment_interest, urgency, symptoms, preferred_date,
+branch, insurance, budget, patient_type
+
+Lifecycle:
+new_inquiry, triaged, appointment_proposed,
+appointment_confirmed, attended, treatment_plan, followup, lost
+
+Knowledge:
+tratamientos, rangos, preparación, cuidados, horarios, sucursales
+
+Actions:
+book_appointment, classify_urgency, assign_specialist,
+send_preparation, trigger_followup
+
+Workflows:
+appointment_reminder, post_visit_followup, no_show_recovery,
+urgent_case_handoff
+```
+
+### 12.3. Blueprint barberías / estéticas / spas
+
+```text
+Campos:
+service_interest, preferred_staff, preferred_date,
+preferred_time, branch, deposit_status, preferences
+
+Lifecycle:
+new_inquiry, service_selected, appointment_proposed,
+confirmed, deposit_pending, completed, no_show, lost
+
+Knowledge:
+servicios, precios, duración, políticas de cancelación, sucursales
+
+Actions:
+book_appointment, reschedule, send_deposit_link, reminder
+
+Workflows:
+appointment_reminder, deposit_pending, no_show_recovery,
+review_request
+```
+
+---
+
+## 13. Roadmap por fases
+
+### Fase 0 — Reorientación arquitectónica
+
+**Objetivo:** dejar de parchar el runner actual y abrir camino Agent‑First.
+
+#### Construir
+
+```text
+feature flag: agent_runtime_v2
+TurnOutput schema
+AgentRuntime interface
+ContextBuilder v2
+KnowledgeRetriever v2 interface
+ActionRegistry interface
+PolicyValidator interface
+PostTurnActionExecutor
+```
+
+#### Degradar
+
+```text
+advisor_brain → deprecated
+sales_advisor_decision_policy → blueprint rules
+flow_router → helper classifier
+response_frame → internal schema only
+response_contract → validation only
+composer_* → one ResponseGenerator
+tools → actions/data providers
+pipeline → lifecycle engine
+```
+
+#### Criterios de aceptación
+
+```text
+1 inbound = 1 TurnOutput.
+1 TurnOutput = máximo 1 final_message.
+Ninguna tool escribe texto visible.
+Ningún pipeline stage dicta copy.
+Cada acción tiene trace.
+Cada field update tiene evidencia.
+```
+
+---
+
+### Fase 1 — Agent Runtime + Knowledge OS MVP
+
+**Objetivo:** igualar la experiencia básica de un agente moderno: responder natural, usar knowledge, mostrar fuentes y probar antes de publicar.
+
+#### Backend
+
+```text
+core/atendia/agent_runtime/runtime.py
+core/atendia/agent_runtime/context_builder.py
+core/atendia/agent_runtime/turn_output.py
+core/atendia/agent_runtime/policy_validator.py
+core/atendia/agent_runtime/action_planner.py
+core/atendia/agent_runtime/post_turn_executor.py
+```
+
+#### Knowledge
+
+```text
+knowledge_sources
+knowledge_chunks
+knowledge_versions
+knowledge_retrieval_logs
+knowledge_source_agent_map
+knowledge_tests
+```
+
+#### UI
+
+```text
+Agent Studio:
+- nombre
+- rol
+- tono
+- instrucciones
+- knowledge habilitada
+- acciones habilitadas
+- contact fields visibles
+- lifecycle permitido
+- test chat
+- publish / rollback
+```
+
+#### Criterios de aceptación
+
+* El agente responde 50 escenarios sin sonar como formulario.
+* Las respuestas con KB muestran fuentes.
+* El test chat permite simular contacto y lifecycle.
+* Se puede publicar/rollback un agente.
+
+---
+
+### Fase 2 — Contact Fields v2 + Lifecycle Engine
+
+**Objetivo:** que AtendIA tenga memoria y pipeline igual o mejor que respond.io, sin hardcodear verticales.
+
+#### Construir
+
+```text
+field_definitions_v2
+field_values_with_evidence
+field_write_policies
+field_extraction_policies
+lifecycle_stages_v2
+lifecycle_history
+lifecycle_stage_goals
+stage_entry_exit_conditions
+```
+
+#### Criterios de aceptación
+
+* Cada campo tiene evidencia/confianza.
+* El agente no repite preguntas si el dato ya existe.
+* Lifecycle se puede filtrar desde inbox.
+* Workflow puede dispararse por `field_updated` o `lifecycle_updated`.
+* El lifecycle no genera texto final.
+
+---
+
+### Fase 3 — Action Registry
+
+**Objetivo:** que el agente opere, no solo hable.
+
+#### Acciones P1
+
+```text
+update_contact_field
+move_lifecycle
+add_tag
+assign_conversation
+close_conversation
+add_internal_comment
+trigger_workflow
+call_webhook
+```
+
+#### Acciones P2
+
+```text
+create_appointment
+create_estimate
+request_document
+classify_media
+send_payment_link
+check_availability
+create_crm_record
+```
+
+#### Criterios de aceptación
+
+* Cada acción tiene schema.
+* Cada acción tiene permisos.
+* Cada acción tiene trace.
+* Acciones sensibles pueden requerir aprobación humana.
+* El agente puede pedir un dato faltante antes de ejecutar.
+
+---
+
+### Fase 4 — Workflow Canvas
+
+**Objetivo:** UX visual para automatizar alrededor del agente.
+
+#### Construir
+
+```text
+canvas visual
+node drawer
+draft/publish/stopped
+test workflow
+clone
+export/import JSON
+version history
+execution logs
+node metrics
+```
+
+#### Nodos mínimos
+
+```text
+Trigger
+Condition
+Wait
+Send Message
+Update Contact Field
+Move Lifecycle
+Assign Conversation
+Trigger AI Agent
+Call Webhook
+Human Approval
+Add Tag
+Close Conversation
+End
+```
+
+#### Criterios de aceptación
+
+* Workflow puede probarse antes de publicar.
+* Workflow no puede generar loops infinitos.
+* Logs muestran cada ejecución.
+* Node metrics muestran volumen/error.
+* Templates iniciales por vertical disponibles.
+
+---
+
+### Fase 5 — Knowledge OS avanzado
+
+**Objetivo:** superar a respond.io en gobernanza y calidad de conocimiento.
+
+#### Construir
+
+```text
+source priority
+source validity dates
+source owner
+source approval workflow
+source conflict detection
+stale source detector
+unanswered questions
+bad answer reports
+source performance
+agent-source mapping
+knowledge regression tests
+```
+
+#### Criterios de aceptación
+
+* El sistema detecta fuentes vencidas.
+* El sistema detecta conflictos de precio/política.
+* El admin ve preguntas sin respuesta.
+* Se puede probar una fuente antes de publicarla.
+* Se puede rollback de una fuente.
+
+---
+
+### Fase 6 — Eval Lab serio
+
+**Objetivo:** mejorar sin adivinar.
+
+#### Construir
+
+```text
+scenario runner
+conversation replay
+score response
+compare versions
+publish gate
+human review queue
+failure dataset
+```
+
+#### Criterios de aceptación
+
+* Se pueden repetir conversaciones reales sin side effects.
+* Se puede comparar agente actual vs agente nuevo.
+* El sistema detecta regresiones.
+* Hay score por respuesta.
+* Publicar agente requiere pasar suite mínima.
+
+---
+
+### Fase 7 — Onboarding SaaS
+
+**Objetivo:** que un cliente compre AtendIA y opere rápido.
+
+#### Wizard
+
+```text
+1. Crear negocio
+2. Elegir blueprint
+3. Conectar WhatsApp
+4. Cargar conocimiento
+5. Configurar campos
+6. Configurar lifecycle
+7. Probar agente
+8. Activar workflows
+9. Publicar
+10. Medir conversaciones
+```
+
+#### Criterios de aceptación
+
+* Tenant admin puede configurar sin tocar código.
+* El sistema avisa si falta knowledge crítica.
+* El agente no se publica sin tests mínimos.
+* Hay rollback.
+* Hay checklist de producción.
+
+---
+
+## 14. Backlog priorizado
+
+| Prioridad | Épica                | Por qué importa                  | Criterio de aceptación          |
+| --------- | -------------------- | -------------------------------- | ------------------------------- |
+| P0        | `agent_runtime_v2`   | Mata la robotización             | 1 turno = 1 TurnOutput          |
+| P0        | Knowledge OS MVP     | Sin KB buena no hay agente bueno | Respuestas muestran fuentes     |
+| P0        | TurnOutput único     | Elimina capas duplicadas         | No hay doble respuesta          |
+| P0        | Policy Validator     | Evita inventos/riesgos           | Bloquea precio no evidenciado   |
+| P0        | Test Chat            | Calidad antes de publicar        | Simula fields/lifecycle/sources |
+| P1        | Contact Fields v2    | Memoria generalista              | Campos con evidencia/confianza  |
+| P1        | Lifecycle Engine     | Pipeline sin rigidez             | Stage no redacta copy           |
+| P1        | Action Registry      | Agente operativo                 | Actions con schema/trace        |
+| P1        | Agent Studio         | Admin configura agente           | Instrucciones/actions/KB UI     |
+| P2        | Workflow Canvas      | UX SaaS madura                   | Draft/publish/test/logs         |
+| P2        | Eval Lab             | Diferenciador real               | Replay + A/B + scores           |
+| P2        | Knowledge Governance | Supera KB básica                 | Conflictos/vigencia/tests       |
+| P3        | Blueprints           | General sin hardcode             | 3 plantillas iniciales          |
+| P3        | Onboarding SaaS      | Time-to-value                    | Publicar sin developer          |
+| P4        | Instagram/Webchat    | Expansión                        | Después de respuesta/KB         |
+| P4        | n8n/Make/Zapier      | Ecosistema                       | Webhooks/API estables           |
+
+---
+
+## 15. Orden exacto para programar
+
+### Sprint 1: Contrato único del agente
+
+Crear:
+
+```text
+core/atendia/agent_runtime/
+  __init__.py
+  runtime.py
+  context_builder.py
+  turn_output.py
+  policy_validator.py
+  action_planner.py
+  post_turn_executor.py
+```
+
+Definir:
+
+```text
+TurnOutput
+KnowledgeCitation
+FieldUpdateIntent
+LifecycleUpdateIntent
+ActionIntent
+RiskFlag
+```
+
+### Sprint 2: Knowledge OS MVP
+
+Crear/unificar:
+
+```text
+knowledge_sources
+knowledge_chunks
+knowledge_versions
+knowledge_retrieval_logs
+knowledge_source_agent_map
+```
+
+Soportar:
+
+```text
+PDF
+DOCX
+TXT/MD
+CSV/XLSX
+URL
+```
+
+### Sprint 3: Agent Studio + Test Chat
+
+UI:
+
+```text
+Instrucciones
+Tono
+Knowledge habilitada
+Acciones habilitadas
+Contact fields visibles
+Lifecycle permitido
+Test chat
+Action log
+Sources used
+Publish/Rollback
+```
+
+### Sprint 4: Action Registry
+
+Implementar:
+
+```text
+update_contact_field
+move_lifecycle
+assign_conversation
+add_tag
+trigger_workflow
+call_webhook
+close_conversation
+```
+
+### Sprint 5: Lifecycle v2
+
+Rehacer pipeline como:
+
+```text
+stages
+lost stages
+goals
+entry/exit conditions
+stage history
+filters
+stage analytics
+```
+
+### Sprint 6: Eval Lab
+
+Construir:
+
+```text
+scenario runner
+conversation replay
+score response
+compare versions
+publish gate
+```
+
+### Sprint 7: Workflow Canvas básico
+
+Construir canvas con:
+
+```text
+Trigger
+Condition
+Wait
+Send Message
+Update Field
+Move Lifecycle
+Assign
+Trigger Agent
+Webhook
+End
+```
+
+---
+
+## 16. Prompt base recomendado para agente
+
+```text
+# CONTEXTO
+Eres el agente de atención y ventas de {{business.name}}.
+Atendemos por WhatsApp. Tu prioridad es ayudar al cliente de forma clara, natural y útil.
+
+# OBJETIVO
+Responde primero la pregunta actual del cliente.
+Después avanza la conversación con el siguiente paso más útil:
+cotizar, agendar, aclarar una duda, guardar un dato, mover lifecycle,
+pedir un documento, asignar a humano o disparar un workflow.
+
+# ESTILO
+Sé humano, breve y amable.
+No suenes como formulario.
+No hagas más de una pregunta importante por mensaje.
+No repitas preguntas si el dato ya existe en Contact Fields.
+Usa el idioma del cliente.
+
+# CONOCIMIENTO
+Usa Knowledge Sources como fuente de verdad.
+No inventes precios, horarios, políticas, disponibilidad, requisitos,
+tratamientos, financiamientos ni promesas.
+Si la fuente no contiene la respuesta, dilo con naturalidad y ofrece revisar con el equipo.
+
+# CAMPOS DEL CONTACTO
+Puedes actualizar campos solo cuando el cliente lo dijo claramente
+o cuando una acción/fuente lo confirme.
+No sobrescribas datos confirmados con inferencias débiles.
+Si hay duda, propón el cambio como sugerencia.
+
+# LIFECYCLE
+Puedes sugerir mover lifecycle solo si hay evidencia.
+Lifecycle orienta el proceso, pero no debe convertir la conversación en formulario.
+
+# ACCIONES
+Ejecuta acciones solo cuando aportan valor.
+Máximo 2 acciones por turno salvo casos explícitos.
+Si faltan datos para una acción, pregunta solo el dato más importante.
+Si el cliente pide humano, asigna a humano.
+
+# SEGURIDAD
+No des consejo médico, legal o financiero sensible.
+No prometas aprobación, disponibilidad o resultados garantizados.
+Escala si hay baja confianza, enojo, riesgo, urgencia o solicitud humana.
+
+# FORMATO
+Devuelve siempre:
+final_message
+field_updates
+lifecycle_update
+actions
+knowledge_citations
+confidence
+needs_human
+risk_flags
+```
+
+---
+
+## 17. Prompt para pedir implementación a Codex
+
+```text
+Quiero implementar el roadmap Agent‑First de AtendIA.
+Lee `docs/roadmaps/2026-05-31-atendia-agent-first-roadmap.md` y el estado actual del repo.
+
+Objetivo inicial:
+Crear `agent_runtime_v2` sin romper el runner actual.
+Debe quedar detrás de feature flag y con fallback al runner legacy.
+
+Primera entrega:
+1. Crear módulo `core/atendia/agent_runtime/`.
+2. Definir `TurnOutput` y submodelos Pydantic.
+3. Crear `ContextBuilder` que arme contexto desde conversación, customer fields, lifecycle y knowledge retrieval placeholder.
+4. Crear `AgentRuntime` que devuelva structured output.
+5. Crear `PolicyValidator` inicial:
+   - bloquea final_message vacío;
+   - bloquea más de una respuesta visible;
+   - bloquea field updates sin evidencia;
+   - bloquea lifecycle updates sin reason;
+   - bloquea precios sin knowledge citation o action result.
+6. Crear `PostTurnActionExecutor` dry-run.
+7. Agregar endpoint/test manual para ejecutar un turno con runtime v2.
+8. Agregar tests unitarios del contrato:
+   - 1 inbound = 1 TurnOutput;
+   - tools no escriben texto final;
+   - field update requiere evidencia;
+   - lifecycle update requiere reason;
+   - final message usa citations cuando responde precio/política.
+
+No eliminar legacy todavía.
+No tocar workflows canvas todavía.
+No agregar omnicanales todavía.
+Primero calidad de respuesta, knowledge y acciones.
+```
+
+---
+
+## 18. Fuentes de referencia pública usadas
+
+Estas fuentes son referencias de producto para entender el patrón de respond.io:
+
+* respond.io — Getting Started with AI Agents: https://respond.io/help/ai-agents/getting-started-with-ai-agents
+* respond.io — Managing AI Knowledge Sources: https://respond.io/help/ai-agents/managing-ai-knowledge-sources
+* respond.io — Using AI Agent Actions: https://respond.io/help/ai-agent-actions/using-ai-agent-actions
+* respond.io — AI Agent Action: Update Lifecycle stage: https://respond.io/help/ai-agent-actions/ai-agent-action-update-lifecycle-stage
+* respond.io — How to Test AI Agents: https://respond.io/help/ai-agents/how-to-test-ai-agents
+* respond.io — Workflows Overview: https://respond.io/help/workflows/workflows-overview
+* respond.io — Workflow Triggers: https://respond.io/help/workflows/workflow-triggers
+* respond.io — How to Use AI Agents for Automotive Sales: https://respond.io/help/ai-agent-guides/how-to-use-ai-agents-for-automotive-sales
+
+---
+
+## 19. Decisión estratégica final
+
+AtendIA no debe ser:
+
+```text
+Un bot de ventas con tools.
+```
+
+Debe ser:
+
+```text
+Una plataforma Agent‑First para crear agentes IA operativos.
+```
+
+La frase técnica:
+
+> Menos runner, más Agent Runtime. Menos tools hardcodeadas, más Actions configurables. Menos pipeline guionando, más Lifecycle midiendo. Menos parches, más Eval Lab.
+
+La frase comercial:
+
+> AtendIA permite que negocios de Latinoamérica atiendan, coticen, agenden, clasifiquen y den seguimiento por WhatsApp con agentes IA configurables, sin sonar como chatbot.

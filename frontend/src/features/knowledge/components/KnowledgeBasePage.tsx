@@ -38,7 +38,7 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
 
@@ -85,6 +85,7 @@ import {
 } from "@/features/knowledge/api";
 import { extractErrorDetail } from "@/lib/error-detail";
 import { cn } from "@/lib/utils";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 type Status = "good" | "warning" | "critical";
 type Severity = "low" | "medium" | "high" | "critical";
@@ -145,6 +146,7 @@ const SEVERITY_STYLES: Record<Severity, { label: string; className: string; dot:
 };
 
 const TAB_DEFS = [
+  { value: "sources", label: "Fuentes", sourceTypes: [] },
   { value: "faqs", label: "FAQs", sourceTypes: ["FAQ"] },
   { value: "catalog", label: "Catalogo", sourceTypes: ["Catalogo"] },
   { value: "documents", label: "Documentos", sourceTypes: ["Documento"] },
@@ -179,7 +181,7 @@ function buildSourceTestMessage(item: KnowledgeCommandItem): string {
 export function KnowledgeBasePage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<(typeof TAB_DEFS)[number]["value"]>("faqs");
+  const [activeTab, setActiveTab] = useState<(typeof TAB_DEFS)[number]["value"]>("sources");
   const [collection, setCollection] = useState("Todas");
   const [status, setStatus] = useState("Todos");
   const [risk, setRisk] = useState("Todos");
@@ -193,6 +195,15 @@ export function KnowledgeBasePage() {
   const [simulationMessage, setSimulationMessage] = useState("¿Aceptan INE de otro estado?");
   const [selectedAgent, setSelectedAgent] = useState("Sales Agent");
   const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
+  const allowMockModel = useCapabilitiesStore(
+    (s) => s.capabilities?.feature_flags.mock_knowledge_model === true,
+  );
+
+  useEffect(() => {
+    if (!allowMockModel && selectedModel === "mock-local") {
+      setSelectedModel("gpt-4o-mini");
+    }
+  }, [allowMockModel, selectedModel]);
 
   const healthQuery = useQuery({
     queryKey: QUERY_KEYS.health,
@@ -405,6 +416,7 @@ export function KnowledgeBasePage() {
     const countSources = (sourceTypes: readonly string[]) =>
       rows.filter((item) => sourceTypes.includes(item.source_type)).length;
     return {
+      sources: rows.length,
       faqs: countSources(["FAQ"]),
       catalog: countSources(["Catalogo"]),
       documents: countSources(["Documento"]),
@@ -461,6 +473,7 @@ export function KnowledgeBasePage() {
           setSearch={setSearch}
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
+          allowMockModel={allowMockModel}
           reindexing={reindexAll.isPending}
           uploading={uploadDocument.isPending}
           onUploadDocument={(file) => uploadDocument.mutate(file)}
@@ -599,6 +612,7 @@ function TopCommandBar({
   setSearch,
   selectedModel,
   setSelectedModel,
+  allowMockModel,
   reindexing,
   uploading,
   onUploadDocument,
@@ -611,6 +625,7 @@ function TopCommandBar({
   setSearch: (value: string) => void;
   selectedModel: string;
   setSelectedModel: (value: string) => void;
+  allowMockModel: boolean;
   reindexing: boolean;
   uploading: boolean;
   onUploadDocument: (file: File) => void;
@@ -745,7 +760,7 @@ function TopCommandBar({
           <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
             <SelectItem value="gpt-4o-mini">gpt-4o-mini</SelectItem>
             <SelectItem value="gpt-4.1-mini">gpt-4.1-mini</SelectItem>
-            <SelectItem value="mock-local">mock-local</SelectItem>
+            {allowMockModel && <SelectItem value="mock-local">mock-local</SelectItem>}
           </SelectContent>
         </Select>
       </div>

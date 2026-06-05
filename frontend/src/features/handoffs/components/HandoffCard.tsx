@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { HandoffItem } from "@/features/handoffs/api";
 import { useAssignHandoff, useResolveHandoff } from "@/features/handoffs/hooks/useHandoffs";
 import { useAuthStore } from "@/stores/auth";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 function ago(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -27,6 +28,7 @@ export function HandoffCard({ handoff }: { handoff: HandoffItem }) {
   const userId = useAuthStore((s) => s.user?.id);
   const assign = useAssignHandoff();
   const resolve = useResolveHandoff();
+  const demoMode = useCapabilitiesStore((s) => s.capabilities?.feature_flags.demo_mode === true);
   const [note, setNote] = useState("");
   const [showResolve, setShowResolve] = useState(false);
 
@@ -39,6 +41,7 @@ export function HandoffCard({ handoff }: { handoff: HandoffItem }) {
   const docsRecibidos = (p["docs_recibidos"] as string[] | undefined) ?? [];
   const docsPendientes = (p["docs_pendientes"] as string[] | undefined) ?? [];
   const isMock = (p["source"] as string | undefined) === "mock";
+  const showDemoBadge = demoMode && isMock;
 
   return (
     <Card>
@@ -47,7 +50,7 @@ export function HandoffCard({ handoff }: { handoff: HandoffItem }) {
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">
               {customer ?? "(cliente sin nombre)"}
-              {isMock && <DemoBadge className="ml-1.5 inline-block" />}
+              {showDemoBadge && <DemoBadge className="ml-1.5 inline-block" />}
             </CardTitle>
             {reasonCode && <Badge variant="outline">{reasonCode}</Badge>}
             <Badge

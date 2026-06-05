@@ -1,0 +1,64 @@
+{
+  "version": "RC5",
+  "gate": "single_contact_live_smoke",
+  "generated_at": "2026-06-03T17:18:31.5306424-06:00",
+  "status": "confirmed",
+  "owners": {
+    "business": {
+      "owner_identifier": "Francisco Esparza",
+      "role": "business",
+      "contact_channel": null,
+      "responsibility": "Approve the one-contact business scope, customer impact tolerance, and stop/continue decision.",
+      "approval_criterion": "Approves only one controlled contact/cellphone, one conversation, provider real and send real for that contact only.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    },
+    "runtime": {
+      "owner_identifier": "Felipe Balderas",
+      "role": "runtime",
+      "contact_channel": null,
+      "responsibility": "Own Agent Runtime V2 smoke readiness and stop decision for runtime P0/P1 signals.",
+      "approval_criterion": "Confirms preflight remains green and no runtime critical logic changed.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    },
+    "provider": {
+      "owner_identifier": "Felipe Balderas",
+      "role": "provider",
+      "contact_channel": null,
+      "responsibility": "Own provider real usage for the single-contact smoke and monitor 429/retry/fallback/latency.",
+      "approval_criterion": "Confirms provider stability 5/5 and no provider fallback before activation.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    },
+    "db": {
+      "owner_identifier": "Felipe Balderas",
+      "role": "db",
+      "contact_channel": null,
+      "responsibility": "Own DB safety, idempotency, write errors, and post-smoke DB validation.",
+      "approval_criterion": "Confirms tests/agent_runtime pass and duplicate side effects remain zero.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    },
+    "ops": {
+      "owner_identifier": "Felipe Balderas",
+      "role": "ops",
+      "contact_channel": null,
+      "responsibility": "Operate the supervised window, monitor stop conditions, and coordinate manual rollback.",
+      "approval_criterion": "Confirms approved test contact, window, and rollback procedure before activation.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    },
+    "rollback": {
+      "owner_identifier": "Felipe Balderas",
+      "role": "rollback",
+      "contact_channel": null,
+      "responsibility": "Own rollback SQL execution and validation if any stop condition triggers.",
+      "approval_criterion": "Confirms rollback SQL is ready and tested as proposal before activation.",
+      "signoff_status": "confirmed",
+      "assigned_at": "2026-06-03T17:18:31.5306424-06:00"
+    }
+  },
+  "scope_limit": "single_contact_live_smoke only; does not approve canary 5 percent, 10 percent, or broad production",
+  "blockers": []
+}

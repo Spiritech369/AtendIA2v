@@ -1,0 +1,181 @@
+name: dinamo_frontend_review_v2
+tenant: Dinamo Motos NL
+tenant_id: 6ad78236-1fc9-467a-858d-90d248d57ee5
+runtime: agent_runtime_v2
+rollout_mode: preview_only
+global_hard_fails:
+  - placeholder
+  - quote_without_quote_resolver
+  - markdown_catalog_link
+  - papeleria_incompleta_without_attachment
+  - doc_completos_without_accepted_checklist
+  - autorizado_written_by_ai
+  - automatic_move_to_sistema_or_cliente_cerrado
+  - handoff_as_stage
+  - conversation_runner_legacy_copy
+  - json_raw_visible_in_ui
+cases:
+  - case_id: credito_happy_path_nomina_tarjeta
+    title: Credito happy path nomina tarjeta
+    turns:
+      - customer: Hola, quiero una moto a credito.
+      - customer: Tengo 8 meses trabajando.
+      - customer: Me interesa la Comando.
+      - customer: Me depositan nomina en tarjeta.
+      - customer: Si tengo recibos de nomina.
+      - customer: Mi comprobante puede estar a otro nombre?
+      - customer: Que documentos siguen?
+      - customer: Te mando mi INE.
+        attachment: ine_ambos_lados.jpg
+      - customer: Tambien mando estado de cuenta, nomina y comprobante.
+        attachments: [estado_cuenta.pdf, nomina.pdf, comprobante.jpg]
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Nomina Tarjeta
+      Plan_Enganche: 10%
+      Cotizacion_Enviada: true
+      Doc_Completos: true
+      Handoff_Humano: true
+      stage_path: [cliente_potencial, papeleria_incompleta, papeleria_completa]
+  - case_id: contado_directo
+    title: Contado directo R4
+    turns:
+      - customer: Quiero comprar de contado la R4.
+      - customer: La puedo ver hoy?
+      - customer: Me puedes confirmar el precio de contado?
+      - customer: Va, me interesa.
+      - customer: Quiero que alguien me confirme disponibilidad.
+    expected:
+      Plan_Credito: Contado
+      Plan_Enganche: 100%
+      Cotizacion_Enviada: true
+      stage: cliente_potencial
+      no_credit_docs: true
+  - case_id: sin_comprobantes
+    title: Sin comprobantes con modelo
+    turns:
+      - customer: Tengo 1 ano trabajando.
+      - customer: Me pagan por fuera.
+      - customer: Quiero una U5.
+      - customer: Cotizamela porfa.
+      - customer: Que documentos necesito?
+      - customer: Te mando mi INE.
+        attachment: ine.jpg
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Sin Comprobantes
+      Plan_Enganche: 20%
+      Cotizacion_Enviada: true
+      stage_path: [plan, cliente_potencial, papeleria_incompleta]
+  - case_id: nomina_recibos
+    title: Nomina recibos efectivo
+    turns:
+      - customer: Tengo 10 meses en mi trabajo.
+      - customer: Me pagan en efectivo pero tengo recibos.
+      - customer: Los recibos son semanales.
+      - customer: Me interesa la Adventure.
+      - customer: Que documentos son?
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Nomina Recibos
+      Plan_Enganche: 15%
+      stage: cliente_potencial
+  - case_id: guardia
+    title: Guardia de seguridad
+    turns:
+      - customer: Quiero credito.
+      - customer: Tengo 2 anos trabajando.
+      - customer: Soy guardia de seguridad.
+      - customer: Me gusta la R4.
+      - customer: Que sigue?
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Guardia
+      Plan_Enganche: 30%
+      stage: plan
+  - case_id: documentos_mama
+    title: Documentos de mama
+    turns:
+      - customer: Hola, quiero credito.
+      - customer: Tengo 8 meses.
+      - customer: Puedo mandar documentos de mi mama?
+      - customer: Seria su comprobante de domicilio.
+      - customer: Y mis estados de cuenta no los tengo.
+    expected:
+      no_stage: papeleria_incompleta
+      Handoff_Humano: false
+  - case_id: documento_antes_de_plan
+    title: Documento antes de plan
+    turns:
+      - customer: Hola, quiero una moto.
+      - customer: Te mando mi INE.
+        attachment: ine.jpg
+      - customer: Que sigue?
+      - customer: Tengo 8 meses trabajando.
+      - customer: Me depositan en tarjeta.
+    expected:
+      Doc_Completos: false
+      no_stage: papeleria_completa
+      Plan_Credito: Nomina Tarjeta
+      Plan_Enganche: 10%
+  - case_id: documento_borroso
+    title: Documento borroso
+    turns:
+      - customer: Quiero credito.
+      - customer: Tengo 8 meses.
+      - customer: Me pagan por fuera.
+      - customer: Quiero la R4.
+      - customer: Te mando la INE borrosa.
+        attachment: ine_borrosa.jpg
+    expected:
+      Doc_Completos: false
+      stage: papeleria_incompleta
+  - case_id: galgo_antiguedad_baja
+    title: Galgo antiguedad baja
+    turns:
+      - customer: Quiero credito.
+      - customer: Tengo 2 meses trabajando.
+      - customer: Entonces si puedo?
+      - customer: Me interesa la R4.
+      - customer: Que documentos piden?
+    expected:
+      Cumple_Antiguedad: false
+      stage: galgo
+  - case_id: catalogo_y_modelo
+    title: Catalogo y modelo
+    turns:
+      - customer: Me pasas catalogo?
+      - customer: Me interesa la Adventure.
+      - customer: Tengo 8 meses trabajando.
+      - customer: Me depositan en tarjeta.
+      - customer: Cotizamela.
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Nomina Tarjeta
+      Plan_Enganche: 10%
+      Cotizacion_Enviada: true
+      stage: cliente_potencial
+  - case_id: cliente_pide_humano
+    title: Cliente pide humano
+    turns:
+      - customer: Hola.
+      - customer: Quiero una moto.
+      - customer: Tengo 8 meses.
+      - customer: Quiero hablar con alguien real.
+      - customer: Me urge que me llamen.
+    expected:
+      Handoff_Humano: true
+      no_stage_handoff: true
+  - case_id: moto_barata_para_trabajar
+    title: Moto barata para trabajar
+    turns:
+      - customer: Hola, quiero una moto barata para trabajar.
+      - customer: Tengo 1 ano trabajando.
+      - customer: Me pagan por fuera.
+      - customer: Cual me recomiendas?
+      - customer: Cotiza una opcion barata.
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Sin Comprobantes
+      Plan_Enganche: 20%
+      asks_recommendation: true

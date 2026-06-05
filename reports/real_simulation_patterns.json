@@ -1,0 +1,33 @@
+{
+    "generated_at":  "2026-06-03T05:49:44.6364985-06:00",
+    "patterns":  [
+                     {
+                         "pattern":  "cotizacion directa",
+                         "cases":  13,
+                         "pass_fail":  "pass",
+                         "example":  "sim_004",
+                         "recommendation":  "Mantener quote guard y snapshot obligatorio; recordar intencion si el producto aparece despues."
+                     },
+                     {
+                         "pattern":  "documentos",
+                         "cases":  12,
+                         "pass_fail":  "pass",
+                         "example":  "sim_001",
+                         "recommendation":  "Responder documentos segun plan; no mover etapa sin adjunto real."
+                     },
+                     {
+                         "pattern":  "handoff humano",
+                         "cases":  1,
+                         "pass_fail":  "pass",
+                         "example":  "sim_003",
+                         "recommendation":  "No crear handoff real en simulacion; pedir confirmacion/derivar solo bajo politica."
+                     },
+                     {
+                         "pattern":  "seguimiento/general",
+                         "cases":  0,
+                         "pass_fail":  "pass",
+                         "example":  "none",
+                         "recommendation":  "Responder duda directa y avanzar una sola pregunta."
+                     }
+                 ]
+}

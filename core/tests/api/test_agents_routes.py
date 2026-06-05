@@ -70,6 +70,32 @@ def test_moto_flow_mode_rules_roundtrip_on_agent(client_tenant_admin):
     assert detail.json()["flow_mode_rules"] == MOTOS_CREDITO_AGENT_FLOW_MODE_RULES
 
 
+def test_agent_voice_guide_roundtrip(client_tenant_admin):
+    voice = {
+        "personality": "Cercano y nada robotico.",
+        "tone_principles": "Responde primero y pide un solo dato.",
+        "preferred_examples": ["Va, lo reviso contigo."],
+        "forbidden_phrases": ["estimado cliente"],
+        "robotic_patterns_to_avoid": ["cerrar con quedo a tus ordenes"],
+    }
+    created = _create(client_tenant_admin, name="Voz Ventas", voice=voice)
+    assert created.status_code == 201, created.text
+    aid = created.json()["id"]
+    assert created.json()["voice"] == voice
+
+    updated_voice = {**voice, "personality": "Consultivo y directo."}
+    updated = client_tenant_admin.patch(
+        f"/api/v1/agents/{aid}",
+        json={"voice": updated_voice},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["voice"] == updated_voice
+
+    detail = client_tenant_admin.get(f"/api/v1/agents/{aid}")
+    assert detail.status_code == 200
+    assert detail.json()["voice"] == updated_voice
+
+
 def test_creating_second_default_clears_previous(client_tenant_admin):
     first = _create(client_tenant_admin, name="A", is_default=True).json()
     second = _create(client_tenant_admin, name="B", is_default=True).json()
@@ -241,7 +267,11 @@ def test_publish_captures_full_config_snapshot(client_tenant_admin):
 
     client_tenant_admin.patch(
         f"/api/v1/agents/{aid}",
-        json={"system_prompt": "Eres un asistente formal.", "max_sentences": 4},
+        json={
+            "system_prompt": "Eres un asistente formal.",
+            "max_sentences": 4,
+            "voice": {"personality": "Formal y breve."},
+        },
     )
 
     resp = client_tenant_admin.post(f"/api/v1/agents/{aid}/publish")
@@ -251,6 +281,7 @@ def test_publish_captures_full_config_snapshot(client_tenant_admin):
     snap = versions[0].get("snapshot")
     assert snap, "publish must persist a snapshot for the version it created"
     assert snap["tone"] == "formal"
+    assert snap["voice"] == {"personality": "Formal y breve."}
     assert snap["system_prompt"] == "Eres un asistente formal."
     assert snap["max_sentences"] == 4
 

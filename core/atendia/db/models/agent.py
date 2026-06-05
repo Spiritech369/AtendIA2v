@@ -31,6 +31,7 @@ class Agent(Base):
     tone: Mapped[str | None] = mapped_column(
         String(40), default="amigable", server_default="amigable"
     )
+    voice: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     language: Mapped[str | None] = mapped_column(String(20), default="es", server_default="es")
     max_sentences: Mapped[int | None] = mapped_column(Integer, default=5, server_default="5")
     no_emoji: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

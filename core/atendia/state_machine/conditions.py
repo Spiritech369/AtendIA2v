@@ -21,6 +21,43 @@ _TOKEN_AND = re.compile(r"\s+AND\s+", re.IGNORECASE)
 _TOKEN_OR = re.compile(r"\s+OR\s+", re.IGNORECASE)
 
 
+def _parse_literal(raw: str) -> Any:
+    value = raw.strip()
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
+        return value[1:-1]
+    lowered = value.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {"null", "none"}:
+        return None
+    try:
+        if "." in value:
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _compare(left: Any, op: str, right: Any) -> bool:
+    if op in {"=", "=="}:
+        return left == right
+    if op == "!=":
+        return left != right
+    if op == ">":
+        return left > right
+    if op == "<":
+        return left < right
+    if op == ">=":
+        return left >= right
+    if op == "<=":
+        return left <= right
+    raise ConditionSyntaxError(f"unknown operator {op!r}")
+
+
 def _eval_atom(expr: str, ctx: EvaluationContext) -> bool:
     e = expr.strip()
     if e == "true":
@@ -29,17 +66,29 @@ def _eval_atom(expr: str, ctx: EvaluationContext) -> bool:
         return False
     if e == "all_required_fields_present":
         return all(f in ctx.extracted_data for f in ctx.required_fields)
+    m = re.match(r"^([A-Za-z_][A-Za-z0-9_.:-]*)\s+exists?$", e, re.IGNORECASE)
+    if m:
+        return bool(ctx.extracted_data.get(m.group(1)))
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_.:-]*$", e):
+        return bool(ctx.extracted_data.get(e))
 
     # intent in [a, b, c]
     m = re.match(r"^intent\s+in\s+\[([^\]]+)\]$", e)
     if m:
-        values = [v.strip() for v in m.group(1).split(",")]
-        return ctx.nlu.intent.value in values
+        values = [v.strip().upper() for v in m.group(1).split(",")]
+        return ctx.nlu.intent.value.upper() in values
 
     # X op Y where X in {intent, sentiment, confidence, turn_count}
-    m = re.match(r"^(intent|sentiment|confidence|turn_count)\s*(==|!=|>=|<=|>|<)\s*(.+)$", e)
+    m = re.match(r"^(intent|sentiment|confidence|turn_count)\s*(==|=|!=|>=|<=|>|<)\s*(.+)$", e)
     if not m:
-        raise ConditionSyntaxError(f"cannot parse condition: {expr!r}")
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_.:-]*)\s*(==|=|!=|>=|<=|>|<)\s*(.+)$", e)
+        if not m:
+            return False
+        var, op, raw_val = m.group(1), m.group(2), m.group(3).strip()
+        if raw_val.startswith(("=", "<", ">", "!")):
+            raise ConditionSyntaxError(f"cannot parse condition: {expr!r}")
+        return _compare(ctx.extracted_data.get(var), op, _parse_literal(raw_val))
+
     var, op, raw_val = m.group(1), m.group(2), m.group(3).strip()
     if raw_val.startswith(("=", "<", ">", "!")):
         raise ConditionSyntaxError(f"cannot parse condition: {expr!r}")
@@ -50,8 +99,8 @@ def _eval_atom(expr: str, ctx: EvaluationContext) -> bool:
     left: Any
     right: Any
     if var == "intent":
-        left = ctx.nlu.intent.value
-        right = raw_val
+        left = ctx.nlu.intent.value.upper()
+        right = raw_val.upper()
     elif var == "sentiment":
         left = ctx.nlu.sentiment.value
         right = raw_val
@@ -70,19 +119,7 @@ def _eval_atom(expr: str, ctx: EvaluationContext) -> bool:
     else:
         raise ConditionSyntaxError(f"unknown variable {var!r}")
 
-    if op == "==":
-        return left == right
-    if op == "!=":
-        return left != right
-    if op == ">":
-        return left > right
-    if op == "<":
-        return left < right
-    if op == ">=":
-        return left >= right
-    if op == "<=":
-        return left <= right
-    raise ConditionSyntaxError(f"unknown operator {op!r}")
+    return _compare(left, op, right)
 
 
 def evaluate(expression: str, ctx: EvaluationContext) -> bool:

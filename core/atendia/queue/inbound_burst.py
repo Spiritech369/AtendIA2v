@@ -231,7 +231,7 @@ async def process_inbound_burst(
                 build_composer(settings, selection),
             )
             try:
-                await runner.run_turn(
+                legacy_trace = await runner.run_turn(
                     conversation_id=UUID(conversation_id),
                     tenant_id=tenant_uuid,
                     inbound=inbound,
@@ -254,6 +254,16 @@ async def process_inbound_burst(
                 await session.commit()
                 return {"status": "failed"}
 
+            await _run_agent_runtime_v2_shadow_after_legacy(
+                session_factory=session_factory,
+                tenant_id=tenant_uuid,
+                conversation_id=UUID(conversation_id),
+                inbound_message_id=UUID(str(latest_row["id"])),
+                inbound_text=inbound.text,
+                legacy_trace_id=legacy_trace.id,
+                legacy_output=legacy_trace.outbound_messages or [],
+            )
+
             return {"status": "processed", "batch_size": len(batch_rows)}
     finally:
         current_lock = _redis_value(await redis.get(lock_key))
@@ -265,3 +275,32 @@ async def process_inbound_burst(
             await engine.dispose()
         if redis_owned:
             await redis.aclose()
+
+
+async def _run_agent_runtime_v2_shadow_after_legacy(
+    *,
+    session_factory,
+    tenant_id: UUID,
+    conversation_id: UUID,
+    inbound_message_id: UUID,
+    inbound_text: str,
+    legacy_trace_id: UUID | None,
+    legacy_output: list[str],
+) -> None:
+    try:
+        from atendia.agent_runtime.shadow_service import AgentRuntimeShadowService
+
+        async with session_factory() as shadow_session:
+            await AgentRuntimeShadowService(shadow_session).run_shadow_for_inbound(
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                inbound_message_id=inbound_message_id,
+                inbound_text=inbound_text,
+                legacy_trace_id=legacy_trace_id,
+                legacy_output=legacy_output,
+            )
+            await shadow_session.commit()
+    except Exception:
+        # Shadow mode is observability only. It must never affect the legacy
+        # inbound runner or outbound delivery.
+        return

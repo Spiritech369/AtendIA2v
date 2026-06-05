@@ -1,8 +1,8 @@
-"""Phase 3c.1 — hybrid catalog search (alias-keyword first, semantic fallback).
+"""Hybrid catalog search (alias-keyword first, semantic fallback).
 
 `search_catalog(session, tenant_id, query, embedding=None, limit=5)` is the
-function-style interface the runner (T18) calls when the customer is browsing
-("muéstrame motonetas urbanas") instead of asking for a specific SKU.
+function-style interface the runner calls when the customer is browsing
+instead of asking for a specific SKU.
 
 Strategy (design doc decision #9):
 
@@ -30,18 +30,23 @@ from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.catalog_runtime import catalog_cash_price_mxn
+from atendia.commercial_catalog_service import (
+    has_published_catalogs,
+    search_catalog as search_published_catalog,
+)
 from atendia.db.models import TenantCatalogItem
+from atendia.text_normalization import normalize_whatsapp_text
 from atendia.tools.base import CatalogResult, Tool, ToolNoDataResult
 
 
 def _to_result(item: TenantCatalogItem, *, score: float) -> CatalogResult:
     """Project a TenantCatalogItem row into the lighter CatalogResult shape."""
-    attrs = item.attrs or {}
     return CatalogResult(
         sku=item.sku,
         name=item.name,
         category=item.category or "",
-        price_contado_mxn=Decimal(str(attrs.get("precio_contado", "0"))),
+        cash_price_mxn=Decimal(str(catalog_cash_price_mxn(item) or "0")),
         score=score,
         catalog_item_id=item.id,
         collection_id=item.collection_id,
@@ -78,12 +83,48 @@ async def search_catalog(
     # same row across calls. Without the ORDER BY, Postgres returned
     # whichever row its planner scanned first and that changed between
     # vacuum cycles — quotes pinned to a different product silently.
+    normalized_query = normalize_whatsapp_text(query, keep_percent=False) or query
+    published_hits = await search_published_catalog(
+        session,
+        tenant_id=tenant_id,
+        query=normalized_query,
+        limit=limit,
+    )
+    if published_hits:
+        results: list[CatalogResult] = []
+        for match in published_hits:
+            item = match.item
+            cash_price = item.get("base_price")
+            if cash_price in (None, ""):
+                cash_price = item.get("list_price")
+            results.append(
+                CatalogResult(
+                    sku=str(item.get("sku") or ""),
+                    name=str(item.get("name") or ""),
+                    category=str(item.get("category") or ""),
+                    cash_price_mxn=Decimal(str(cash_price or "0")),
+                    score=float(match.score),
+                    catalog_item_id=None,
+                    collection_id=None,
+                    source={
+                        "catalog_source": "atendia_catalog_published",
+                        "catalog_id": str(match.catalog_id),
+                        "catalog_name": match.catalog_name,
+                    },
+                )
+            )
+        return results
+    if await has_published_catalogs(session, tenant_id=tenant_id):
+        return ToolNoDataResult(hint=f"no published catalog match for {query!r}")
+
     keyword_stmt = (
         select(TenantCatalogItem)
         .where(
             TenantCatalogItem.tenant_id == tenant_id,
             TenantCatalogItem.active.is_(True),
-            text("attrs->'alias' ?| ARRAY[:alias_q]").bindparams(alias_q=query.lower()),
+            text("attrs->'alias' ?| ARRAY[:alias_q]").bindparams(
+                alias_q=normalized_query.lower()
+            ),
         )
         .order_by(TenantCatalogItem.sku)
         .limit(limit)
@@ -120,14 +161,7 @@ async def search_catalog(
 
 
 class SearchCatalogTool(Tool):  # pragma: no cover
-    """Legacy registry wrapper — delegates to `search_catalog()`.
-
-    Phase 3c.1's runner (T18) calls `search_catalog()` directly, so this
-    wrapper exists only to keep `register_all_tools()` returning the same
-    six tool names. Embedding generation is the caller's responsibility
-    (so the cost lands in `tool_cost_usd`); without one, this falls back
-    to alias-only search.
-    """
+    """Registry adapter for the function-style catalog search."""
 
     name = "search_catalog"
 

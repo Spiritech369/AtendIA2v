@@ -3,6 +3,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { RouteErrorFallback } from "@/components/RouteErrorFallback";
 import { useAuthStore } from "@/stores/auth";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 /**
  * Gated route group — every URL inside `(auth)/` requires a logged-in
@@ -20,6 +21,9 @@ export const Route = createFileRoute("/(auth)")({
     const state = useAuthStore.getState();
     const user = state.user ?? (await state.fetchMe());
     if (!user) throw redirect({ to: "/login" });
+    if (user.tenant_id) {
+      await useCapabilitiesStore.getState().fetchForTenant(user.tenant_id);
+    }
   },
   component: () => (
     <AppShell>

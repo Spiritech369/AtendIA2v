@@ -30,19 +30,19 @@ _DEFAULT_ACTIONS_ALLOWED: list[str] = [
 # "DOCS_INE.status" resolves to customer.attrs["DOCS_INE"]["status"].
 # The full path must be a sequence of segments where each segment looks
 # like a Python identifier (uppercase allowed because document keys use
-# DOCS_*); we accept both lowercase fields like "plan_credito" and
-# uppercase doc keys like "DOCS_INE".
+# DOCS_*).
 _RULE_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 # Operators that consume a value vs. operators that only check presence.
 # Mirror the frontend OperatorSelector so both sides stay in lockstep.
 #
-# `docs_complete_for_plan` is a plan-aware aggregate: its `field` names
-# the conversation/customer attribute that holds the plan id (typically
-# `plan_credito`), and the evaluator looks up the docs that plan requires
-# in `pipeline.docs_per_plan[plan]` and checks every `.status == "ok"`.
+# `documents_complete_for_selection` checks the documents configured for
+# the current tenant-defined selector value and verifies every
+# `.status == "ok"` without assuming a business domain.
 # Like the presence operators it takes no `value`.
-_PRESENCE_OPERATORS: frozenset[str] = frozenset({"exists", "not_exists", "docs_complete_for_plan"})
+_PRESENCE_OPERATORS: frozenset[str] = frozenset(
+    {"exists", "not_exists", "documents_complete_for_selection"}
+)
 _LIST_OPERATORS: frozenset[str] = frozenset({"in", "not_in"})
 _VALUE_OPERATORS: frozenset[str] = frozenset(
     {
@@ -61,7 +61,7 @@ OPERATORS: frozenset[str] = _PRESENCE_OPERATORS | _VALUE_OPERATORS
 def _default_flow_mode_rules() -> list[FlowModeRule]:
     """Phase 3c.2 — minimal fallback so the router never raises on a tenant
     that hasn't authored explicit rules. Routes everything to SUPPORT;
-    legacy 3a/3b tenants keep their FAQ-style behavior."""
+    tenants without explicit rules keep generic support behavior."""
     return [
         FlowModeRule(
             id="default_always_support",
@@ -127,7 +127,7 @@ class Condition(BaseModel):
         "less_than",
         "in",
         "not_in",
-        "docs_complete_for_plan",
+        "documents_complete_for_selection",
     ]
     value: Any | None = None
 
@@ -229,8 +229,8 @@ class StageDefinition(BaseModel):
     # any non-empty string is accepted.
     handoff_reason: str | None = None
     # Fase 6 — opt-in behaviour pin. When None (default), the per-turn
-    # flow router decides based on pipeline.flow_mode_rules (legacy
-    # behavior, no regression for tenants who already authored rules).
+    # flow router decides based on pipeline.flow_mode_rules (generic
+    # behavior for tenants who already authored rules).
     # When set, the runner uses this mode verbatim for the turn — handy
     # for tenants who want "this stage is always DOC mode" without
     # writing rule expressions.
@@ -305,7 +305,7 @@ class DocumentSpec(BaseModel):
 
 
 class PipelineDefinition(BaseModel):
-    version: int = Field(ge=1)
+    version: int = Field(default=1, ge=1)
     nlu: NLUConfig = Field(default_factory=NLUConfig)
     composer: ComposerConfig = Field(default_factory=ComposerConfig)
     stages: list[StageDefinition] = Field(min_length=1)
@@ -315,32 +315,30 @@ class PipelineDefinition(BaseModel):
     flow_mode_rules: list[FlowModeRule] = Field(
         default_factory=_default_flow_mode_rules,
     )
-    docs_per_plan: dict[str, list[str]] = Field(default_factory=dict)
-    # Customer field whose value selects the docs_per_plan entry to use.
-    # Defaults to the legacy `plan_credito`; tenants can point it to
-    # `tipo_credito`, `CREDITO_TIPO`, or any custom customer field.
-    docs_plan_field: str = "plan_credito"
+    document_requirements: dict[str, list[str]] = Field(default_factory=dict)
+    # Customer field whose value selects the document_requirements entry to use.
+    # Tenants should point this to one of their configured customer fields.
+    document_requirements_field: str = "selection"
+    # Optional labels and aliases for the selectable values above. Importers
+    # use this to bridge user-facing choices such as "5" or "20%" to the
+    # canonical document_requirements key.
+    selection_catalog: dict[str, dict[str, Any]] = Field(default_factory=dict)
     # Tenant-configurable document catalog. The Pipeline editor renders
     # this as the "Documentos requeridos" checklist; checking a doc
     # writes a `DOCS_<KEY>.status equals "ok"` condition into the
     # stage's auto_enter_rules. Order matters (display order in the UI).
     documents_catalog: list[DocumentSpec] = Field(default_factory=list)
-    # Fase 3 — mapping from Vision category to the canonical
-    # customer.attrs key(s) the runner writes when the image is
-    # accepted. Keys are vision categories ("ine", "comprobante", …);
-    # values are lists of DOCS_* keys. INE typically maps to a 2-key
-    # list (frente + reverso) so the runner writes both when
-    # quality_check.side == "unknown" AND metadata.ambos_lados is true.
-    # Empty dict = no auto-writing on Vision; tenants relying on
-    # manual operator marking keep that behaviour by leaving this empty.
+    # Mapping from tenant-authored Vision category keys to the canonical
+    # customer.attrs keys the runner writes when the image is accepted.
+    # Multi-key values use the generic quality_check.side hint. Empty
+    # dict = no auto-writing on Vision; tenants relying on manual
+    # operator marking keep that behaviour by leaving this empty.
     vision_doc_mapping: dict[str, list[str]] = Field(default_factory=dict)
     # Multi-tenant generalization: per-mode composer guidance authored by
     # the tenant (Pipeline editor). Keys are FlowMode string values
     # ("plan", "sales", …); the runner passes the matching entry to the
     # composer as `mode_guidance`. Empty/missing key → the composer uses
-    # its generic vertical-neutral default (NOT moto). Existing tenants
-    # are backfilled with the legacy moto playbook by migration so they
-    # do not regress.
+    # its generic vertical-neutral default.
     mode_prompts: dict[str, str] = Field(default_factory=dict)
     # Presentation-only aliases for the six internal flow modes. The
     # runner still receives PLAN/SALES/DOC/etc.; tenants can name those
@@ -351,7 +349,11 @@ class PipelineDefinition(BaseModel):
     # keep their prompts and remain valid in saved stages/rules; the UI
     # just keeps unused buckets out of the operator's way.
     hidden_modes: list[str] = Field(default_factory=list)
-
+    # Tenant-configurable action_payload builders. These let a tenant turn
+    # KB/catalog evidence plus customer fields into structured payloads
+    # before Composer runs, without hardcoding a vertical. The runner
+    # interprets this small DSL.
+    payload_resolvers: list[dict[str, Any]] = Field(default_factory=list)
     @field_validator("mode_prompts")
     @classmethod
     def _validate_mode_prompt_keys(cls, v: dict[str, str]) -> dict[str, str]:

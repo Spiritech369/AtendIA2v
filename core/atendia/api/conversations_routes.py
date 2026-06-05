@@ -14,7 +14,8 @@ from __future__ import annotations
 import base64
 import json
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from arq.connections import RedisSettings, create_pool
@@ -25,8 +26,25 @@ from sqlalchemy import and_, exists, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from atendia.agent_runtime import (
+    AgentRuntime,
+    AgentRuntimeV2PilotPolicyService,
+    ContextBuilder,
+    PolicyValidationError,
+    PolicyValidator,
+    PostTurnActionExecutor,
+    RolloutDecision,
+    RolloutPolicyService,
+    TurnContext,
+    TurnInput,
+    TurnOutput,
+)
+from atendia.agent_runtime.agent_config import action_registry_for_agent
+from atendia.agent_runtime.model_provider import build_agent_turn_provider
+from atendia.agent_runtime.pilot_policy import PilotDecision
+from atendia.agent_runtime.workflow_events import AgentWorkflowEventEmitter
 from atendia.api._auth_helpers import AuthUser
-from atendia.api._deps import current_tenant_id, current_user
+from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.api.message_attachments import list_attachments_for_messages
 from atendia.channels.base import OutboundMessage
 from atendia.config import get_settings
@@ -36,7 +54,9 @@ from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerF
 from atendia.db.models.customer_note import CustomerNote
 from atendia.db.models.lifecycle import HumanHandoff
 from atendia.db.models.message import MessageRow
+from atendia.db.models.turn_trace import TurnTrace
 from atendia.db.session import get_db_session
+from atendia.knowledge.os import UnifiedKnowledgeProvider
 from atendia.queue.enqueue import enqueue_outbound
 from atendia.queue.outbox import stage_outbound
 from atendia.realtime.publisher import publish_event
@@ -108,6 +128,11 @@ class CustomerFieldInfo(BaseModel):
     label: str
     field_type: str
     value: str | None
+    group: str = "datos_comerciales"
+    render_mode: str = "text"
+    render_payload: Any | None = None
+    display_order: int = 1000
+    is_debug: bool = False
 
 
 class CustomerNoteInfo(BaseModel):
@@ -266,9 +291,79 @@ async def _customer_fields(
             label=row.label,
             field_type=row.field_type,
             value=row.value,
+            **_customer_field_presentation(row.key, row.value),
         )
         for row in rows
     ]
+
+
+def _customer_field_presentation(key: str, value: str | None) -> dict[str, Any]:
+    display_order_by_key = {
+        "Cumple_Antiguedad": 10,
+        "Plan_Credito": 20,
+        "Plan_Enganche": 30,
+        "Moto": 40,
+        "Doc_Incompletos": 50,
+        "Doc_Completos": 60,
+        "Autorizado": 70,
+        "Cotizacion_Enviada": 110,
+        "Ultima_Cotizacion": 120,
+        "Docs_Checklist": 130,
+        "Handoff_Humano": 140,
+        "is_simulation": 210,
+        "simulation_run_id": 220,
+        "simulation_case_id": 230,
+        "initial_fields": 240,
+    }
+    commercial = {
+        "Cumple_Antiguedad",
+        "Plan_Credito",
+        "Plan_Enganche",
+        "Moto",
+        "Doc_Incompletos",
+        "Doc_Completos",
+        "Autorizado",
+    }
+    technical = {"Cotizacion_Enviada", "Ultima_Cotizacion", "Docs_Checklist", "Handoff_Humano"}
+    debug = {"is_simulation", "simulation_run_id", "simulation_case_id", "initial_fields"}
+    if key in technical:
+        group = "tecnicos"
+    elif key in debug:
+        group = "debug"
+    elif key in commercial:
+        group = "datos_comerciales"
+    else:
+        group = "datos_comerciales"
+
+    checkbox_keys = {
+        "Cumple_Antiguedad",
+        "Doc_Completos",
+        "Autorizado",
+        "Cotizacion_Enviada",
+        "Handoff_Humano",
+    }
+    render_mode = "checkbox" if key in checkbox_keys else "text"
+    payload = _json_value(value)
+    if key == "Ultima_Cotizacion":
+        render_mode = "quote_card"
+    elif key == "Docs_Checklist":
+        render_mode = "document_checklist"
+    return {
+        "group": group,
+        "render_mode": render_mode,
+        "render_payload": payload,
+        "display_order": display_order_by_key.get(key, 1000),
+        "is_debug": key in debug,
+    }
+
+
+def _json_value(value: str | None) -> Any | None:
+    if value in (None, ""):
+        return None
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return None
 
 
 async def _customer_notes(
@@ -508,8 +603,8 @@ async def list_conversations(
     )
 
     unread_count = _user_unread_count_expr(tenant_id=tenant_id, user_id=user.user_id)
-    from atendia.db.models.agent import Agent as _AgentList
-    from atendia.db.models.tenant import TenantUser as _TUList
+    from atendia.db.models.agent import Agent as AgentListRow
+    from atendia.db.models.tenant import TenantUser as TenantUserListRow
 
     stmt = (
         select(
@@ -529,8 +624,8 @@ async def list_conversations(
             last_msg.c.text.label("last_message_text"),
             last_msg.c.direction.label("last_message_direction"),
             pending_handoff_exists.label("has_pending_handoff"),
-            _TUList.email.label("assigned_user_email"),
-            _AgentList.name.label("assigned_agent_name"),
+            TenantUserListRow.email.label("assigned_user_email"),
+            AgentListRow.name.label("assigned_agent_name"),
         )
         .select_from(Conversation)
         .join(Customer, Customer.id == Conversation.customer_id)
@@ -539,8 +634,8 @@ async def list_conversations(
             ConversationStateRow.conversation_id == Conversation.id,
         )
         .outerjoin(last_msg, last_msg.c.cid == Conversation.id)
-        .outerjoin(_TUList, _TUList.id == Conversation.assigned_user_id)
-        .outerjoin(_AgentList, _AgentList.id == Conversation.assigned_agent_id)
+        .outerjoin(TenantUserListRow, TenantUserListRow.id == Conversation.assigned_user_id)
+        .outerjoin(AgentListRow, AgentListRow.id == Conversation.assigned_agent_id)
         .where(Conversation.tenant_id == tenant_id)
         .where(Conversation.deleted_at.is_(None))
         .order_by(Conversation.last_activity_at.desc(), Conversation.id.desc())
@@ -624,8 +719,8 @@ async def get_conversation(
     session: AsyncSession = Depends(get_db_session),
 ) -> ConversationDetail:
     unread_count = _user_unread_count_expr(tenant_id=tenant_id, user_id=user.user_id)
-    from atendia.db.models.agent import Agent as _AgentDetail
-    from atendia.db.models.tenant import TenantUser as _TU
+    from atendia.db.models.agent import Agent as AgentDetailRow
+    from atendia.db.models.tenant import TenantUser as TenantUserDetailRow
 
     last_inbound_sq = (
         select(
@@ -656,8 +751,8 @@ async def get_conversation(
             ConversationStateRow.extracted_data,
             ConversationStateRow.pending_confirmation,
             ConversationStateRow.last_intent,
-            _TU.email.label("assigned_user_email"),
-            _AgentDetail.name.label("assigned_agent_name"),
+            TenantUserDetailRow.email.label("assigned_user_email"),
+            AgentDetailRow.name.label("assigned_agent_name"),
             last_inbound_sq.label("last_inbound_at"),
         )
         .select_from(Conversation)
@@ -666,8 +761,8 @@ async def get_conversation(
             ConversationStateRow,
             ConversationStateRow.conversation_id == Conversation.id,
         )
-        .outerjoin(_TU, _TU.id == Conversation.assigned_user_id)
-        .outerjoin(_AgentDetail, _AgentDetail.id == Conversation.assigned_agent_id)
+        .outerjoin(TenantUserDetailRow, TenantUserDetailRow.id == Conversation.assigned_user_id)
+        .outerjoin(AgentDetailRow, AgentDetailRow.id == Conversation.assigned_agent_id)
         .where(
             Conversation.id == conversation_id,
             Conversation.tenant_id == tenant_id,
@@ -959,6 +1054,832 @@ class MessageSentResponse(BaseModel):
 
 class ProcessingResponse(BaseModel):
     status: str
+
+
+class AgentRuntimeV2ConversationResponse(BaseModel):
+    final_message: str
+    knowledge_citations: list[dict]
+    field_updates: list[dict]
+    lifecycle_update: dict | None
+    actions: list[dict]
+    confidence: float
+    needs_human: bool
+    risk_flags: list[str]
+    trace_metadata: dict
+    debug: dict
+
+
+class AgentRuntimeV2SendResponse(AgentRuntimeV2ConversationResponse):
+    message_id: UUID | None = None
+    outbox_id: UUID | None = None
+
+
+def _agent_runtime_v2_settings_or_403() -> object:
+    settings = get_settings()
+    if not settings.agent_runtime_v2_enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "agent_runtime_v2 is disabled")
+    return settings
+
+
+def _build_conversation_agent_runtime(context: TurnContext) -> AgentRuntime:
+    return AgentRuntime(
+        context_builder=_StaticContextBuilder(context),
+        provider=build_agent_turn_provider(
+            model_provider_allowed=_model_provider_allowed_from_context(context),
+        ),
+    )
+
+
+def _model_provider_allowed_from_context(context: TurnContext) -> bool | None:
+    rollout = context.metadata.get("rollout")
+    if not isinstance(rollout, dict):
+        return None
+    value = rollout.get("model_provider_allowed")
+    return value if isinstance(value, bool) else None
+
+
+def _rollout_http_error(decision: RolloutDecision) -> HTTPException:
+    return HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        {
+            "message": f"agent_runtime_v2 {decision.capability} is not allowed",
+            "rollout": decision.model_dump(mode="json"),
+        },
+    )
+
+
+class _StaticContextBuilder:
+    def __init__(self, context: TurnContext) -> None:
+        self._context = context
+
+    async def build(self, turn_input: TurnInput) -> TurnContext:
+        return self._context
+
+
+async def _load_conversation_or_404(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    conversation_id: UUID,
+) -> Conversation:
+    row = (
+        await session.execute(
+            select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.tenant_id == tenant_id,
+                Conversation.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversation not found")
+    return row
+
+
+async def _build_real_agent_runtime_context(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    conversation: Conversation,
+) -> TurnContext:
+    inbound_text = await _latest_inbound_text(session, conversation.id)
+    if not inbound_text:
+        inbound_text = await _latest_message_text(session, conversation.id)
+    if not inbound_text:
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation has no messages to answer")
+    provider = UnifiedKnowledgeProvider(session)
+    return await ContextBuilder(session=session, knowledge_provider=provider).build(
+        TurnInput(
+            tenant_id=str(tenant_id),
+            conversation_id=str(conversation.id),
+            inbound_text=inbound_text,
+            metadata={
+                "agent_id": str(conversation.assigned_agent_id)
+                if conversation.assigned_agent_id
+                else None,
+                "manual_agent_runtime_v2": True,
+            },
+        )
+    )
+
+
+async def _latest_inbound_text(session: AsyncSession, conversation_id: UUID) -> str | None:
+    return (
+        await session.execute(
+            select(MessageRow.text)
+            .where(
+                MessageRow.conversation_id == conversation_id,
+                MessageRow.direction == "inbound",
+                MessageRow.deleted_at.is_(None),
+            )
+            .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def _latest_message_text(session: AsyncSession, conversation_id: UUID) -> str | None:
+    return (
+        await session.execute(
+            select(MessageRow.text)
+            .where(
+                MessageRow.conversation_id == conversation_id,
+                MessageRow.deleted_at.is_(None),
+            )
+            .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def _latest_inbound_row(
+    session: AsyncSession,
+    conversation_id: UUID,
+) -> tuple[UUID | None, datetime | None]:
+    row = (
+        await session.execute(
+            select(MessageRow.id, MessageRow.sent_at)
+            .where(
+                MessageRow.conversation_id == conversation_id,
+                MessageRow.direction == "inbound",
+                MessageRow.deleted_at.is_(None),
+            )
+            .order_by(MessageRow.sent_at.desc(), MessageRow.id.desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None, None
+    return row.id, row.sent_at
+
+
+async def _conversation_is_paused(
+    session: AsyncSession,
+    conversation_id: UUID,
+) -> bool:
+    return bool(
+        (
+            await session.execute(
+                select(ConversationStateRow.bot_paused).where(
+                    ConversationStateRow.conversation_id == conversation_id
+                )
+            )
+        ).scalar_one_or_none()
+    )
+
+
+async def _has_open_handoff(session: AsyncSession, conversation_id: UUID) -> bool:
+    return bool(
+        (
+            await session.execute(
+                select(HumanHandoff.id)
+                .where(
+                    HumanHandoff.conversation_id == conversation_id,
+                    HumanHandoff.status == "open",
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+    )
+
+
+async def _ensure_send_allowed(session: AsyncSession, conversation: Conversation) -> None:
+    if conversation.status not in {"active", "open"}:
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation is not active")
+    if await _conversation_is_paused(session, conversation.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation is paused by human")
+    if await _has_open_handoff(session, conversation.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation has an open human handoff")
+    _message_id, last_inbound_at = await _latest_inbound_row(session, conversation.id)
+    if last_inbound_at is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation has no inbound message")
+    if datetime.now(UTC) - last_inbound_at > timedelta(hours=24):
+        raise HTTPException(status.HTTP_409_CONFLICT, "outside WhatsApp 24h window")
+
+
+async def _run_agent_runtime_v2_for_conversation(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    conversation: Conversation,
+    model_provider_allowed: bool | None = None,
+    workflow_events_real: bool = False,
+    rollout_decisions: list[RolloutDecision] | None = None,
+) -> tuple[TurnContext, TurnOutput]:
+    context = await _build_real_agent_runtime_context(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+    )
+    rollout_metadata = _rollout_debug_payload(rollout_decisions or [])
+    if model_provider_allowed is not None or rollout_metadata:
+        context = context.model_copy(
+            update={
+                "metadata": {
+                    **context.metadata,
+                    "rollout": {
+                        **rollout_metadata,
+                        "model_provider_allowed": model_provider_allowed,
+                    },
+                }
+            }
+        )
+    runtime = _build_conversation_agent_runtime(context)
+    try:
+        output = await runtime.run_turn(
+            TurnInput(
+                tenant_id=str(tenant_id),
+                conversation_id=str(conversation.id),
+                inbound_text=context.inbound_text,
+                metadata=context.metadata,
+            )
+        )
+    except PolicyValidationError as exc:
+        policy_issues = [
+            {"code": issue.code, "message": issue.message}
+            for issue in exc.issues
+        ]
+        await AgentWorkflowEventEmitter().emit_policy_blocked(
+            session,
+            context=context,
+            policy_issues=policy_issues,
+            dry_run=not workflow_events_real,
+            emit_real=workflow_events_real,
+        )
+        await _record_agent_runtime_v2_trace(
+            session,
+            tenant_id=tenant_id,
+            conversation=conversation,
+            context=None,
+            output=None,
+            mode="policy_error",
+            policy_issues=policy_issues,
+            action_results=[],
+            outbound_messages=[],
+            rollout_decisions=rollout_decisions or [],
+        )
+        await session.commit()
+        raise HTTPException(
+            422,
+            {
+                "message": "agent_runtime_v2 output failed policy validation",
+                "issues": policy_issues,
+            },
+        ) from exc
+    return context, output
+
+
+async def _record_agent_runtime_v2_trace(
+    session: AsyncSession,
+    *,
+    tenant_id: UUID,
+    conversation: Conversation,
+    context: TurnContext | None,
+    output: TurnOutput | None,
+    mode: str,
+    policy_issues: list[dict],
+    action_results: list[dict],
+    outbound_messages: list[str],
+    rollout_decisions: list[RolloutDecision] | None = None,
+    pilot_decision: PilotDecision | None = None,
+) -> TurnTrace:
+    rollout_payload = _rollout_debug_payload(rollout_decisions or [])
+    pilot_payload = (
+        pilot_decision.trace_payload()
+        if pilot_decision is not None and pilot_decision.policy.get("configured")
+        else None
+    )
+    inbound_message_id, _last_inbound_at = await _latest_inbound_row(session, conversation.id)
+    turn_number = (
+        await session.execute(
+            select(func.coalesce(func.max(TurnTrace.turn_number), 0) + 1).where(
+                TurnTrace.conversation_id == conversation.id
+            )
+        )
+    ).scalar_one()
+    trace = TurnTrace(
+        tenant_id=tenant_id,
+        conversation_id=conversation.id,
+        turn_number=int(turn_number),
+        inbound_message_id=inbound_message_id,
+        inbound_text=context.inbound_text if context else None,
+        state_before={
+            "conversation_id": str(conversation.id),
+            "current_stage": conversation.current_stage,
+            "status": conversation.status,
+            "context_summary": _agent_runtime_v2_context_summary(context) if context else None,
+        },
+        state_after={
+            "agent_runtime_v2": True,
+            "mode": mode,
+            "policy_valid": not policy_issues,
+            "actions_dry_run": _actions_were_dry_run(action_results),
+            "rollout": rollout_payload,
+            "pilot": pilot_payload,
+            "action_results": action_results,
+        },
+        composer_input={
+            "runtime": "agent_runtime_v2",
+            "context_summary": _agent_runtime_v2_context_summary(context) if context else None,
+        },
+        composer_output=output.model_dump(mode="json") if output else None,
+        composer_provider=(
+            "openai"
+            if output and output.trace_metadata.get("provider") == "openai"
+            else "fallback"
+        ),
+        outbound_messages=outbound_messages or None,
+        total_latency_ms=(
+            int(output.trace_metadata["latency_ms"])
+            if output and isinstance(output.trace_metadata.get("latency_ms"), int)
+            else None
+        ),
+        errors=policy_issues or None,
+        bot_paused=await _conversation_is_paused(session, conversation.id),
+        router_trigger=f"agent_runtime_v2_{mode}",
+        raw_llm_response=(
+            output.model_dump_json() if output and output.trace_metadata.get("provider") else None
+        ),
+        agent_id=conversation.assigned_agent_id,
+        kb_evidence={
+            "citations": [
+                citation.model_dump(mode="json")
+                for citation in (output.knowledge_citations if output else [])
+            ],
+            "retrieval": context.metadata.get("knowledge", {}) if context else {},
+            "pilot": pilot_payload,
+        },
+        rules_evaluated=[
+            {
+                "feature_flag": "agent_runtime_v2_enabled",
+                "passed": True,
+            },
+            *[
+                {
+                    "rollout_capability": decision.capability,
+                    "passed": decision.allowed,
+                    "reasons": decision.reasons,
+                }
+                for decision in (rollout_decisions or [])
+            ],
+            {
+                "rule": "policy_valid",
+                "passed": not policy_issues,
+            },
+        ],
+    )
+    session.add(trace)
+    await session.flush()
+    return trace
+
+
+def _agent_runtime_v2_context_summary(context: TurnContext | None) -> str:
+    if context is None:
+        return "context=unavailable"
+    return (
+        f"tenant={context.tenant_id}; conversation={context.conversation_id}; "
+        f"messages={len(context.messages)}; citations={len(context.knowledge_citations)}; "
+        f"stage={context.lifecycle.stage or 'none'}; agent="
+        f"{context.active_agent.id if context.active_agent else 'none'}"
+    )
+
+
+def _actions_were_dry_run(action_results: list[dict]) -> bool:
+    if not action_results:
+        return True
+    return all(
+        bool((result.get("trace_metadata") or {}).get("dry_run"))
+        for result in action_results
+    )
+
+
+def _rollout_debug_payload(decisions: list[RolloutDecision]) -> dict:
+    return {
+        decision.capability: decision.model_dump(mode="json")
+        for decision in decisions
+    }
+
+
+def _agent_runtime_v2_response(
+    *,
+    output: TurnOutput,
+    context: TurnContext,
+    trace: TurnTrace,
+    policy_issues: list[dict],
+    action_results: list[dict],
+    workflow_events: list[dict] | None = None,
+    mode: str,
+    message_id: UUID | None = None,
+    outbox_id: UUID | None = None,
+    pilot_decision: PilotDecision | None = None,
+) -> AgentRuntimeV2ConversationResponse | AgentRuntimeV2SendResponse:
+    payload = {
+        "final_message": output.final_message,
+        "knowledge_citations": [
+            citation.model_dump(mode="json") for citation in output.knowledge_citations
+        ],
+        "field_updates": [update.model_dump(mode="json") for update in output.field_updates],
+        "lifecycle_update": (
+            output.lifecycle_update.model_dump(mode="json")
+            if output.lifecycle_update is not None
+            else None
+        ),
+        "actions": [action.model_dump(mode="json") for action in output.actions],
+        "confidence": output.confidence,
+        "needs_human": output.needs_human,
+        "risk_flags": list(output.risk_flags),
+        "trace_metadata": output.trace_metadata,
+        "debug": {
+            "mode": mode,
+            "trace_id": str(trace.id),
+            "context_summary": _agent_runtime_v2_context_summary(context),
+            "retrieval": context.metadata.get("knowledge", {}),
+            "rollout": context.metadata.get("rollout", {}),
+            "pilot": pilot_decision.trace_payload() if pilot_decision else None,
+            "policy": {"valid": not policy_issues, "issues": policy_issues},
+            "actions": {"results": action_results},
+            "workflow_events": workflow_events or [],
+            "side_effects": {
+                "persisted_messages": message_id is not None,
+                "staged_outbox": outbox_id is not None,
+                "sent_whatsapp_direct": False,
+            },
+        },
+    }
+    if mode == "send":
+        return AgentRuntimeV2SendResponse(
+            **payload,
+            message_id=message_id,
+            outbox_id=outbox_id,
+        )
+    return AgentRuntimeV2ConversationResponse(**payload)
+
+
+@router.post(
+    "/{conversation_id}/agent-runtime-v2/preview",
+    response_model=AgentRuntimeV2ConversationResponse,
+)
+async def preview_agent_runtime_v2_for_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> AgentRuntimeV2ConversationResponse:
+    _agent_runtime_v2_settings_or_403()
+    conversation = await _load_conversation_or_404(
+        session,
+        tenant_id=tenant_id,
+        conversation_id=conversation_id,
+    )
+    rollout = RolloutPolicyService(session)
+    preview_decision = await rollout.can_preview(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    if not preview_decision.allowed:
+        raise _rollout_http_error(preview_decision)
+    model_provider_decision = await rollout.can_use_model_provider(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    context, output = await _run_agent_runtime_v2_for_conversation(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        model_provider_allowed=model_provider_decision.allowed,
+        rollout_decisions=[preview_decision, model_provider_decision],
+    )
+    policy_issues = [
+        {"code": issue.code, "message": issue.message}
+        for issue in PolicyValidator(
+            action_registry_for_agent(context.active_agent)
+        ).validate(output)
+    ]
+    trace = await _record_agent_runtime_v2_trace(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        context=context,
+        output=output,
+        mode="preview",
+        policy_issues=policy_issues,
+        action_results=[],
+        outbound_messages=[],
+        rollout_decisions=[preview_decision, model_provider_decision],
+    )
+    workflow_events = await AgentWorkflowEventEmitter().emit_for_turn(
+        session,
+        context=context,
+        output=output,
+        action_results=[],
+        policy_issues=policy_issues,
+        dry_run=True,
+        emit_real=False,
+    )
+    await session.commit()
+    return _agent_runtime_v2_response(
+        output=output,
+        context=context,
+        trace=trace,
+        policy_issues=policy_issues,
+        action_results=[],
+        workflow_events=[event.model_dump() for event in workflow_events],
+        mode="preview",
+    )
+
+
+@router.post(
+    "/{conversation_id}/agent-runtime-v2/shadow",
+    response_model=AgentRuntimeV2ConversationResponse,
+)
+async def shadow_agent_runtime_v2_for_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> AgentRuntimeV2ConversationResponse:
+    del user
+    _agent_runtime_v2_settings_or_403()
+    conversation = await _load_conversation_or_404(
+        session,
+        tenant_id=tenant_id,
+        conversation_id=conversation_id,
+    )
+    rollout = RolloutPolicyService(session)
+    shadow_decision = await rollout.can_shadow(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    if not shadow_decision.allowed:
+        raise _rollout_http_error(shadow_decision)
+    model_provider_decision = await rollout.can_use_model_provider(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    context, output = await _run_agent_runtime_v2_for_conversation(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        model_provider_allowed=model_provider_decision.allowed,
+        workflow_events_real=False,
+        rollout_decisions=[shadow_decision, model_provider_decision],
+    )
+    policy_issues = [
+        {"code": issue.code, "message": issue.message}
+        for issue in PolicyValidator(
+            action_registry_for_agent(context.active_agent)
+        ).validate(output)
+    ]
+    trace = await _record_agent_runtime_v2_trace(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        context=context,
+        output=output,
+        mode="shadow",
+        policy_issues=policy_issues,
+        action_results=[],
+        outbound_messages=[],
+        rollout_decisions=[shadow_decision, model_provider_decision],
+    )
+    workflow_events = await AgentWorkflowEventEmitter().emit_for_turn(
+        session,
+        context=context,
+        output=output,
+        action_results=[],
+        policy_issues=policy_issues,
+        dry_run=True,
+        emit_real=False,
+    )
+    await session.commit()
+    return _agent_runtime_v2_response(
+        output=output,
+        context=context,
+        trace=trace,
+        policy_issues=policy_issues,
+        action_results=[],
+        workflow_events=[event.model_dump() for event in workflow_events],
+        mode="shadow",
+    )
+
+
+@router.post(
+    "/{conversation_id}/agent-runtime-v2/send",
+    response_model=AgentRuntimeV2SendResponse,
+)
+async def send_agent_runtime_v2_for_conversation(
+    conversation_id: UUID,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> AgentRuntimeV2SendResponse:
+    del user
+    _agent_runtime_v2_settings_or_403()
+    conversation = await _load_conversation_or_404(
+        session,
+        tenant_id=tenant_id,
+        conversation_id=conversation_id,
+    )
+    rollout = RolloutPolicyService(session)
+    send_decision = await rollout.can_send(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    if not send_decision.allowed:
+        raise _rollout_http_error(send_decision)
+    actions_decision = await rollout.can_execute_actions(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    workflow_events_decision = await rollout.can_emit_workflow_events(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    model_provider_decision = await rollout.can_use_model_provider(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    rollout_decisions = [
+        send_decision,
+        actions_decision,
+        workflow_events_decision,
+        model_provider_decision,
+    ]
+    pilot_decision = await AgentRuntimeV2PilotPolicyService(session).can_send(
+        tenant_id=tenant_id,
+        agent_id=conversation.assigned_agent_id,
+        channel_id=conversation.channel,
+    )
+    if not pilot_decision.allowed:
+        await _record_agent_runtime_v2_trace(
+            session,
+            tenant_id=tenant_id,
+            conversation=conversation,
+            context=None,
+            output=None,
+            mode="pilot_blocked",
+            policy_issues=[
+                {"code": "pilot_policy_blocked", "message": reason}
+                for reason in pilot_decision.reasons
+            ],
+            action_results=[],
+            outbound_messages=[],
+            rollout_decisions=rollout_decisions,
+            pilot_decision=pilot_decision,
+        )
+        await session.commit()
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            {
+                "message": "agent_runtime_v2 pilot policy blocks send",
+                "pilot": pilot_decision.trace_payload(),
+            },
+        )
+    pilot_configured = bool(pilot_decision.policy.get("configured"))
+    actions_real_allowed = actions_decision.allowed and not (
+        pilot_configured and pilot_decision.policy.get("actions_dry_run_required", True)
+    )
+    workflow_events_real_allowed = workflow_events_decision.allowed and not (
+        pilot_configured
+        and pilot_decision.policy.get("workflow_events_dry_run_required", True)
+    )
+    await _ensure_send_allowed(session, conversation)
+    context, output = await _run_agent_runtime_v2_for_conversation(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        model_provider_allowed=model_provider_decision.allowed,
+        workflow_events_real=workflow_events_real_allowed,
+        rollout_decisions=rollout_decisions,
+    )
+    if not output.final_message.strip():
+        raise HTTPException(422, "final_message is empty")
+    policy_issues = [
+        {"code": issue.code, "message": issue.message}
+        for issue in PolicyValidator(
+            action_registry_for_agent(context.active_agent)
+        ).validate(output)
+    ]
+    if policy_issues:
+        await AgentWorkflowEventEmitter().emit_for_turn(
+            session,
+            context=context,
+            output=output,
+            action_results=[],
+            policy_issues=policy_issues,
+            dry_run=not workflow_events_real_allowed,
+            emit_real=workflow_events_real_allowed,
+        )
+        trace = await _record_agent_runtime_v2_trace(
+            session,
+            tenant_id=tenant_id,
+            conversation=conversation,
+            context=context,
+            output=output,
+            mode="send_blocked",
+            policy_issues=policy_issues,
+            action_results=[],
+            outbound_messages=[],
+            rollout_decisions=rollout_decisions,
+            pilot_decision=pilot_decision,
+        )
+        await session.commit()
+        raise HTTPException(
+            422,
+            {
+                "message": "agent_runtime_v2 output failed policy validation",
+                "trace_id": str(trace.id),
+            },
+        )
+    action_results = await PostTurnActionExecutor(
+        dry_run=not actions_real_allowed,
+        session=session,
+        max_actions_per_turn=send_decision.policy.get("max_actions_per_turn"),
+        require_runtime_enabled=True,
+    ).execute(output, context=context)
+    workflow_events = await AgentWorkflowEventEmitter().emit_for_turn(
+        session,
+        context=context,
+        output=output,
+        action_results=action_results,
+        policy_issues=[],
+        dry_run=not workflow_events_real_allowed,
+        emit_real=workflow_events_real_allowed,
+    )
+    now = datetime.now(UTC)
+    customer_phone = (
+        await session.execute(
+            select(Customer.phone_e164).where(Customer.id == conversation.customer_id)
+        )
+    ).scalar_one()
+    outbound = OutboundMessage(
+        tenant_id=str(tenant_id),
+        to_phone_e164=customer_phone,
+        text=output.final_message,
+        idempotency_key=f"agent-runtime-v2:{conversation.id}:{int(now.timestamp() * 1000)}",
+        metadata={
+            "source": "agent_runtime_v2",
+            "conversation_id": str(conversation.id),
+            "actions_dry_run": not actions_real_allowed,
+            "workflow_events_dry_run": not workflow_events_real_allowed,
+            "rollout": _rollout_debug_payload(rollout_decisions),
+            "pilot": pilot_decision.trace_payload(),
+        },
+    )
+    outbox_id = await stage_outbound(session, outbound)
+    session.add(
+        MessageRow(
+            id=outbox_id,
+            tenant_id=tenant_id,
+            conversation_id=conversation.id,
+            direction="outbound",
+            text=output.final_message,
+            sent_at=now,
+            delivery_status="queued",
+            metadata_json={
+                "source": "agent_runtime_v2",
+                "trace_metadata": output.trace_metadata,
+                "pilot": pilot_decision.trace_payload(),
+            },
+        )
+    )
+    await session.execute(
+        update(Conversation).where(Conversation.id == conversation.id).values(last_activity_at=now)
+    )
+    trace = await _record_agent_runtime_v2_trace(
+        session,
+        tenant_id=tenant_id,
+        conversation=conversation,
+        context=context,
+        output=output,
+        mode="send",
+        policy_issues=[],
+        action_results=[result.model_dump(mode="json") for result in action_results],
+        outbound_messages=[output.final_message],
+        rollout_decisions=rollout_decisions,
+        pilot_decision=pilot_decision,
+    )
+    await session.commit()
+    return _agent_runtime_v2_response(
+        output=output,
+        context=context,
+        trace=trace,
+        policy_issues=[],
+        action_results=[result.model_dump(mode="json") for result in action_results],
+        workflow_events=[event.model_dump() for event in workflow_events],
+        mode="send",
+        message_id=outbox_id,
+        outbox_id=outbox_id,
+        pilot_decision=pilot_decision,
+    )
 
 
 @router.post("/{conversation_id}/intervene", response_model=MessageSentResponse)

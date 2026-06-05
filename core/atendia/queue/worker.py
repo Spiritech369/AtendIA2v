@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
 from arq.connections import RedisSettings, create_pool
@@ -27,11 +27,17 @@ from atendia.queue.outbox import get_or_stage_outbound
 from atendia.queue.workflow_jobs import execute_workflow_step, poll_workflow_triggers
 
 
-async def _should_route_baileys(session, tenant_id_str: str) -> bool:
-    """True when the tenant has Baileys enabled, connected and preferred.
+async def _should_route_baileys(
+    session,
+    tenant_id_str: str,
+    metadata: dict[str, Any] | None = None,
+) -> bool:
+    """True when Baileys should be used for this outbound.
 
-    Read-only DB hit; safe to call per outbound. Returns False on any
-    error so the dispatcher falls back to Meta.
+    Tenant preference is the default switch, but a reply to a message that
+    arrived through Baileys should stay on Baileys when the session is connected.
+    Read-only DB hit; safe to call per outbound. Returns False on any error so
+    the dispatcher falls back to Meta.
     """
     try:
         row = (
@@ -51,7 +57,12 @@ async def _should_route_baileys(session, tenant_id_str: str) -> bool:
         return False
     if row is None:
         return False
-    return bool(row["enabled"] and row["prefer_over_meta"] and row["last_status"] == "connected")
+    if not bool(row["enabled"] and row["last_status"] == "connected"):
+        return False
+    metadata = metadata or {}
+    if str(metadata.get("reply_channel") or metadata.get("channel") or "").strip() == "baileys":
+        return True
+    return bool(row["prefer_over_meta"])
 
 
 async def _send_via_baileys(
@@ -132,7 +143,7 @@ async def send_outbound(ctx: dict, msg_dict: dict) -> dict:
             if outbox.status == "sent" and outbox.sent_message_id is not None:
                 return {"message_id": str(outbox.sent_message_id), "status": "sent"}
 
-            use_baileys = await _should_route_baileys(session, msg.tenant_id)
+            use_baileys = await _should_route_baileys(session, msg.tenant_id, msg.metadata)
             outbox.status = "sending"
             outbox.attempts += 1
             outbox.last_error = None

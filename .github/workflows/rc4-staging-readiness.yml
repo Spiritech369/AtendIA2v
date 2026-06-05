@@ -1,0 +1,98 @@
+name: RC4 staging readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_provider_stability:
+        description: Run provider stability eval
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+  schedule:
+    - cron: "0 9 * * *"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: >-
+          uv run ruff check
+          atendia/config.py
+          atendia/simulation/provider_advisor_first_eval.py
+          tests/conftest.py
+          tests/agent_runtime/test_action_layer_v2.py
+          tests/agent_runtime/test_rollout_policy.py
+          tests/agent_runtime/test_shadow_service.py
+          tests/agent_runtime/test_rc4_db_idempotency.py
+
+  unit-agent-runtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run pytest tests/agent_runtime -m "not integration_db"
+
+  integration-db-agent-runtime:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg15
+        env:
+          POSTGRES_USER: atendia
+          POSTGRES_PASSWORD: atendia
+          POSTGRES_DB: atendia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atendia -d atendia_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: core
+    env:
+      ATENDIA_TEST_DATABASE_URL: postgresql+asyncpg://atendia:atendia@localhost:5432/atendia_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run pytest tests/agent_runtime -m "integration_db"
+      - run: uv run pytest tests/agent_runtime
+
+  local-deterministic-simulation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run python -m atendia.simulation.advisor_first_multiturn
+
+  provider-stability-eval:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_provider_stability == 'true')
+    defaults:
+      run:
+        working-directory: core
+    env:
+      ATENDIA_V2_AGENT_RUNTIME_V2_MODEL_PROVIDER: openai
+      ATENDIA_V2_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ATENDIA_V2_AGENT_RUNTIME_V2_MODEL_TIMEOUT_S: "30"
+      ATENDIA_V2_AGENT_RUNTIME_V2_PROVIDER_CIRCUIT_FAILURE_THRESHOLD: "100"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run python -m atendia.simulation.provider_stability_eval --runs 5

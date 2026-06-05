@@ -32,7 +32,31 @@ export interface ConversationDetail extends ConversationListItem {
   pending_confirmation: string | null;
   last_intent: string | null;
   last_inbound_at: string | null;
-  customer_fields: Array<{ key: string; label: string; field_type: string; value: string | null }>;
+  customer_fields: Array<{
+    key: string;
+    label: string;
+    field_type: string;
+    value: string | null;
+    group?: "datos_comerciales" | "tecnicos" | "debug" | string;
+    domain_role?: string | null;
+    display_format?: string | null;
+    status?: "validated" | "proposed" | "needs_review" | "rejected" | "blocked" | string | null;
+    source?: string | null;
+    writer?: string | null;
+    confidence?: number | string | null;
+    last_trace_id?: string | null;
+    evidence_id?: string | null;
+    evidence_refs?: string[] | null;
+    render_mode?: "quote_card" | "document_checklist" | "checkbox" | "text" | string;
+    render_payload?: unknown;
+    display_order?: number;
+    is_debug?: boolean;
+  }>;
+  tenant_domain_contract?: {
+    domain?: string | null;
+    safe_mode?: boolean | null;
+    reason?: string | null;
+  } | null;
   customer_notes: Array<{
     id: string;
     author_email: string | null;

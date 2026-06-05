@@ -70,6 +70,7 @@ import {
 } from "@/features/handoffs/api";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 const DEFAULT_FILTERS: CommandCenterFilters = {
   urgency: "all",
@@ -211,6 +212,7 @@ export function HandoffQueue() {
   useTenantStream();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const demoMode = useCapabilitiesStore((s) => s.capabilities?.feature_flags.demo_mode === true);
   const [filters, setFilters] = useState<CommandCenterFilters>(DEFAULT_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [roleView, setRoleView] = useState(roleLabel(user?.role ?? "operator"));
@@ -239,7 +241,11 @@ export function HandoffQueue() {
     refetchInterval: 30_000,
   });
 
-  const items = commandQuery.data?.items ?? [];
+  const items = useMemo(
+    () =>
+      (commandQuery.data?.items ?? []).filter((item) => demoMode || item.source !== "mock"),
+    [commandQuery.data?.items, demoMode],
+  );
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   const snapshot = commandQuery.data;
 

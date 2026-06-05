@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   type AgentItem,
   type AgentPayload,
+  type AgentStudioOption,
   agentsApi,
   type DecisionMap,
   type ExtractionField,
@@ -63,6 +64,7 @@ import {
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
+import { AgentTestChatV2 } from "./AgentTestChatV2";
 import { AgentWorkflowRefs } from "./AgentWorkflowRefs";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { VersionHistoryButton } from "./VersionHistoryDrawer";
@@ -105,12 +107,14 @@ const intentOptions = [
 // flagged in each panel) so the operator can author, run and audit.
 const tabs = [
   "Resumen",
+  "Agent Studio",
   "Identidad",
   "Guardrails",
   "Knowledge",
   "Extracción",
   "Decision Map",
   "Pruebas",
+  "Runtime v2",
   "Historial",
 ] as const;
 
@@ -227,6 +231,7 @@ function agentPatch(agent: AgentItem): Partial<AgentPayload> {
     goal: agent.goal,
     style: agent.style,
     tone: agent.tone,
+    voice: agent.voice ?? {},
     language: agent.language,
     max_sentences: agent.max_sentences,
     no_emoji: agent.no_emoji,
@@ -239,6 +244,15 @@ function agentPatch(agent: AgentItem): Partial<AgentPayload> {
     knowledge_config: agent.knowledge_config,
     flow_mode_rules: agent.flow_mode_rules,
     ops_config: agent.ops_config,
+    template: agent.template,
+    instructions: agent.instructions,
+    language_policy: agent.language_policy,
+    enabled_knowledge_source_ids: agent.enabled_knowledge_source_ids,
+    enabled_action_ids: agent.enabled_action_ids,
+    visible_contact_field_keys: agent.visible_contact_field_keys,
+    allowed_lifecycle_stage_ids: agent.allowed_lifecycle_stage_ids,
+    escalation_policy: agent.escalation_policy,
+    metadata: agent.metadata,
   };
 }
 
@@ -248,6 +262,24 @@ function compactPatchKey(agent: AgentItem): string {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function voiceText(voice: Record<string, unknown>, key: string): string {
+  const value = voice[key];
+  return typeof value === "string" ? value : "";
+}
+
+function voiceListText(voice: Record<string, unknown>, key: string): string {
+  const value = voice[key];
+  if (Array.isArray(value)) return value.map(String).join("\n");
+  return typeof value === "string" ? value : "";
+}
+
+function textToVoiceList(value: string): string[] {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function downloadJson(filename: string, value: unknown): void {
@@ -619,6 +651,10 @@ function IdentityPanel({
       : [...draft.active_intents, intent];
     onChange({ active_intents: next });
   };
+  const voice = asRecord(draft.voice);
+  const updateVoice = (patch: Record<string, unknown>) => {
+    onChange({ voice: { ...voice, ...patch } });
+  };
 
   return (
     <Panel title="Identidad del agente" icon={<Bot className="h-4 w-4 text-sky-300" />}>
@@ -721,6 +757,74 @@ function IdentityPanel({
           Una o dos oraciones. Se inyecta al prompt como meta del turno.
         </span>
       </label>
+
+      <div className="mt-3 space-y-3">
+        <div>
+          <div className="text-[11px] text-slate-400">Guia de voz del agente</div>
+          <div className="text-[10px] text-slate-500">
+            Esta guia manda para este agente; si queda vacia, runtime usa la voz
+            predeterminada del tenant.
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-[11px] text-slate-400">Personalidad</span>
+            <Textarea
+              value={voiceText(voice, "personality")}
+              onChange={(event) => updateVoice({ personality: event.target.value })}
+              rows={3}
+              placeholder="Ej. Cercano, seguro y directo; evita sonar institucional."
+              className="min-h-20 border-white/10 bg-black/20 text-sm text-slate-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[11px] text-slate-400">Principios de voz</span>
+            <Textarea
+              value={voiceText(voice, "tone_principles")}
+              onChange={(event) => updateVoice({ tone_principles: event.target.value })}
+              rows={3}
+              placeholder="Ej. Responder primero, pedir un solo dato, usar frases cortas."
+              className="min-h-20 border-white/10 bg-black/20 text-sm text-slate-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[11px] text-slate-400">Ejemplos preferidos</span>
+            <Textarea
+              value={voiceListText(voice, "preferred_examples")}
+              onChange={(event) =>
+                updateVoice({ preferred_examples: textToVoiceList(event.target.value) })
+              }
+              rows={4}
+              placeholder="Una frase por linea"
+              className="min-h-24 border-white/10 bg-black/20 text-sm text-slate-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[11px] text-slate-400">Frases prohibidas</span>
+            <Textarea
+              value={voiceListText(voice, "forbidden_phrases")}
+              onChange={(event) =>
+                updateVoice({ forbidden_phrases: textToVoiceList(event.target.value) })
+              }
+              rows={4}
+              placeholder="Una frase por linea"
+              className="min-h-24 border-white/10 bg-black/20 text-sm text-slate-100"
+            />
+          </label>
+          <label className="space-y-1.5 md:col-span-2">
+            <span className="text-[11px] text-slate-400">Patrones roboticos a evitar</span>
+            <Textarea
+              value={voiceListText(voice, "robotic_patterns_to_avoid")}
+              onChange={(event) =>
+                updateVoice({ robotic_patterns_to_avoid: textToVoiceList(event.target.value) })
+              }
+              rows={3}
+              placeholder="Ej. Repetir el mismo saludo, cerrar con 'quedo a tus ordenes', listar demasiadas opciones."
+              className="min-h-20 border-white/10 bg-black/20 text-sm text-slate-100"
+            />
+          </label>
+        </div>
+      </div>
 
       {/* Prompt Maestro — the canonical user-authored system prompt.
           Goes into `agent.system_prompt`, which the runner already
@@ -1164,6 +1268,281 @@ function KnowledgeRealPanel({
 // ── Real Monitor: pulls runtime metrics from /agents/{id}/monitor,
 // which aggregates over `turn_traces` joined through
 // `conversations.assigned_agent_id`. Refreshes every 30s.
+function AgentStudioV2Panel({
+  draft,
+  onChange,
+  onSave,
+  saving,
+}: {
+  draft: AgentItem;
+  onChange: (patch: Partial<AgentItem>) => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  const actions = useQuery({
+    queryKey: ["agents", "studio", "actions"],
+    queryFn: agentsApi.studioActions,
+    staleTime: 30_000,
+  });
+  const knowledge = useQuery({
+    queryKey: ["agents", "studio", "knowledge-sources"],
+    queryFn: agentsApi.studioKnowledgeSources,
+    staleTime: 30_000,
+  });
+  const fields = useQuery({
+    queryKey: ["agents", "studio", "contact-fields"],
+    queryFn: agentsApi.studioContactFields,
+    staleTime: 30_000,
+  });
+  const stages = useQuery({
+    queryKey: ["agents", "studio", "lifecycle-stages"],
+    queryFn: agentsApi.studioLifecycleStages,
+    staleTime: 30_000,
+  });
+  const languagePolicy = asRecord(draft.language_policy);
+  const updateLanguagePolicy = (patch: Record<string, unknown>) =>
+    onChange({ language_policy: { ...languagePolicy, ...patch } });
+
+  return (
+    <div className="space-y-3">
+      <Panel
+        title="Agent Studio v2"
+        icon={<BrainCircuit className="h-4 w-4 text-sky-300" />}
+        action={
+          <Button
+            size="sm"
+            className="h-7 bg-sky-600 text-xs hover:bg-sky-500"
+            onClick={onSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="mr-1 h-3.5 w-3.5" />
+            )}
+            Save config
+          </Button>
+        }
+      >
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+          <div className="space-y-3">
+            <label
+              htmlFor="agent-studio-instructions"
+              className="block space-y-1 text-xs text-slate-400"
+            >
+              Instructions
+              <Textarea
+                id="agent-studio-instructions"
+                value={draft.instructions ?? ""}
+                onChange={(event) =>
+                  onChange({ instructions: event.target.value, system_prompt: event.target.value })
+                }
+                className="min-h-44 border-white/10 bg-black/20 text-sm text-slate-100"
+              />
+            </label>
+            <div className="grid gap-2 md:grid-cols-3">
+              <label htmlFor="agent-studio-tone" className="space-y-1 text-xs text-slate-400">
+                Tone
+                <Input
+                  id="agent-studio-tone"
+                  value={draft.tone ?? ""}
+                  onChange={(event) => onChange({ tone: event.target.value })}
+                  list="agent-studio-tone-options"
+                  className="h-8 border-white/10 bg-black/20 text-sm text-slate-100"
+                />
+                <datalist id="agent-studio-tone-options">
+                  {toneOptions.map((tone) => (
+                    <option key={tone} value={tone} />
+                  ))}
+                </datalist>
+              </label>
+              <label
+                htmlFor="agent-studio-language-primary"
+                className="space-y-1 text-xs text-slate-400"
+              >
+                Language
+                <select
+                  id="agent-studio-language-primary"
+                  value={String(languagePolicy.primary ?? draft.language ?? "es")}
+                  onChange={(event) => {
+                    updateLanguagePolicy({ primary: event.target.value });
+                    onChange({ language: event.target.value });
+                  }}
+                  className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-sm text-slate-100"
+                >
+                  {languageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label
+                htmlFor="agent-studio-language-mode"
+                className="space-y-1 text-xs text-slate-400"
+              >
+                Policy
+                <select
+                  id="agent-studio-language-mode"
+                  value={String(languagePolicy.mode ?? "match_customer")}
+                  onChange={(event) => updateLanguagePolicy({ mode: event.target.value })}
+                  className="h-8 w-full rounded-md border border-white/10 bg-black/20 px-2 text-sm text-slate-100"
+                >
+                  <option value="match_customer">match_customer</option>
+                  <option value="force_primary">force_primary</option>
+                  <option value="bilingual_allowed">bilingual_allowed</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <StudioOptionList
+              title="Knowledge sources"
+              options={knowledge.data}
+              loading={knowledge.isLoading}
+              selected={draft.enabled_knowledge_source_ids ?? []}
+              onSelected={(ids) =>
+                onChange({
+                  enabled_knowledge_source_ids: ids,
+                  knowledge_config: { ...(draft.knowledge_config ?? {}), enabled_source_ids: ids },
+                })
+              }
+            />
+            <StudioOptionList
+              title="Actions"
+              options={actions.data}
+              loading={actions.isLoading}
+              selected={draft.enabled_action_ids ?? []}
+              onSelected={(ids) =>
+                onChange({
+                  enabled_action_ids: ids,
+                  auto_actions: { ...(draft.auto_actions ?? {}), enabled_action_ids: ids },
+                })
+              }
+            />
+          </div>
+        </div>
+      </Panel>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <StudioOptionList
+          title="Visible contact fields"
+          options={fields.data}
+          loading={fields.isLoading}
+          selected={draft.visible_contact_field_keys ?? []}
+          onSelected={(ids) =>
+            onChange({
+              visible_contact_field_keys: ids,
+              extraction_config: {
+                ...(draft.extraction_config ?? {}),
+                visible_contact_field_keys: ids,
+              },
+            })
+          }
+        />
+        <StudioOptionList
+          title="Allowed lifecycle stages"
+          options={stages.data}
+          loading={stages.isLoading}
+          selected={draft.allowed_lifecycle_stage_ids ?? []}
+          onSelected={(ids) =>
+            onChange({
+              allowed_lifecycle_stage_ids: ids,
+              flow_mode_rules: { ...(draft.flow_mode_rules ?? {}), allowed_stage_ids: ids },
+            })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function StudioOptionList({
+  title,
+  options,
+  loading,
+  selected,
+  onSelected,
+}: {
+  title: string;
+  options: AgentStudioOption[] | undefined;
+  loading: boolean;
+  selected: string[];
+  onSelected: (ids: string[]) => void;
+}) {
+  const selectedSet = new Set(selected);
+  const toggle = (id: string) => {
+    const next = new Set(selectedSet);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelected(Array.from(next));
+  };
+  return (
+    <Panel
+      title={title}
+      icon={<ListChecks className="h-4 w-4 text-emerald-300" />}
+      action={
+        <Badge
+          variant="outline"
+          className="border-white/10 bg-white/[0.035] text-[10px] text-slate-300"
+        >
+          {selected.length} selected
+        </Badge>
+      }
+    >
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 bg-white/10" />
+          <Skeleton className="h-8 bg-white/10" />
+        </div>
+      ) : !options || options.length === 0 ? (
+        <div className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-slate-500">
+          No options available.
+        </div>
+      ) : (
+        <div className="max-h-80 space-y-1.5 overflow-auto pr-1">
+          {options.map((option) => {
+            const checked = selectedSet.has(option.id);
+            const badge = String(option.metadata?.badge ?? option.type ?? "");
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => toggle(option.id)}
+                aria-pressed={checked}
+                className={cn(
+                  "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition",
+                  checked
+                    ? "border-sky-500/50 bg-sky-500/10"
+                    : "border-white/10 bg-black/20 hover:bg-white/[0.04]",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border text-[10px]",
+                    checked ? "border-sky-400 bg-sky-500 text-white" : "border-white/20",
+                  )}
+                >
+                  {checked ? <Check className="h-3 w-3" /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-slate-100">{option.label}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
+                    {badge ? <span>{badge}</span> : null}
+                    {option.type ? <span>{option.type}</span> : null}
+                    {option.description ? (
+                      <span className="truncate">{option.description}</span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function MonitorRealPanel({ agentId }: { agentId: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ["agents", agentId, "monitor"],
@@ -2469,6 +2848,513 @@ function ValidationBeforePublishCard({
   );
 }
 
+function OnboardingReadinessPanel() {
+  const queryClient = useQueryClient();
+  const stateQuery = useQuery({
+    queryKey: ["onboarding", "state"],
+    queryFn: agentsApi.onboardingState,
+    staleTime: 20_000,
+  });
+  const [validation, setValidation] = useState<Awaited<ReturnType<typeof agentsApi.validateOnboarding>> | null>(null);
+  const validateMutation = useMutation({
+    mutationFn: agentsApi.validateOnboarding,
+    onSuccess: (result) => {
+      setValidation(result);
+      queryClient.setQueryData(["onboarding", "state"], result.state);
+      toast[result.ready ? "success" : "warning"](
+        result.ready ? "Onboarding ready" : "Onboarding has blockers",
+      );
+    },
+    onError: (error: Error) =>
+      toast.error("No se pudo validar onboarding", { description: error.message }),
+  });
+  const readinessMutation = useMutation({
+    mutationFn: agentsApi.publishReadiness,
+    onSuccess: (result) => {
+      setValidation(result);
+      queryClient.setQueryData(["onboarding", "state"], result.state);
+      toast[result.ready ? "success" : "warning"](
+        result.ready ? "Publish readiness passed" : "Publish readiness blocked",
+      );
+    },
+    onError: (error: Error) =>
+      toast.error("No se pudo revisar readiness", { description: error.message }),
+  });
+  const state = validation?.state ?? stateQuery.data;
+  const checks = validation?.checks ?? stateChecksFromState(state);
+
+  return (
+    <Panel
+      title="Onboarding readiness"
+      icon={<ClipboardCheck className="h-4 w-4 text-emerald-300" />}
+      action={
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+            onClick={() => validateMutation.mutate()}
+            disabled={validateMutation.isPending || stateQuery.isLoading}
+          >
+            {validateMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              "Validate"
+            )}
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 bg-emerald-600 text-xs hover:bg-emerald-500"
+            onClick={() => readinessMutation.mutate()}
+            disabled={readinessMutation.isPending || stateQuery.isLoading}
+          >
+            {readinessMutation.isPending ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="mr-1 h-3.5 w-3.5" />
+            )}
+            Run readiness eval
+          </Button>
+        </div>
+      }
+    >
+      {stateQuery.isLoading && !state ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 bg-white/10" />
+          <Skeleton className="h-8 bg-white/10" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {checks.map((check) => (
+              <div
+                key={check.code}
+                className={cn(
+                  "rounded-md border px-2.5 py-2 text-xs",
+                  check.passed
+                    ? "border-emerald-300/20 bg-emerald-500/5"
+                    : "border-amber-300/30 bg-amber-500/10",
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium text-slate-100">{check.label}</span>
+                  {check.passed ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                  ) : (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
+                  )}
+                </div>
+                {!check.passed && check.message ? (
+                  <div className="mt-1 text-[10px] text-amber-100/90">{check.message}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {validation && validation.blocking_codes.length > 0 ? (
+            <div className="rounded-md border border-red-300/30 bg-red-500/10 p-2 text-xs text-red-100">
+              {validation.blocking_codes.join(", ")}
+            </div>
+          ) : null}
+          {state?.checklist?.expected_knowledge_categories ? (
+            <div className="flex flex-wrap gap-1 text-[10px] text-slate-400">
+              {(state.checklist.expected_knowledge_categories as string[]).map((category) => (
+                <Badge key={category} variant="outline" className="border-white/10 text-slate-300">
+                  {category}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function RuntimeV2OperationsPanel({ agent }: { agent: AgentItem }) {
+  const [traceId, setTraceId] = useState("");
+  const [conversationId, setConversationId] = useState("");
+  const shadowQuery = useQuery({
+    queryKey: ["agent-runtime-v2", "shadow-report", agent.id],
+    queryFn: () =>
+      agentsApi.shadowReport({
+        agent_id: agent.id,
+        include_examples: true,
+        limit: 5,
+      }),
+    staleTime: 20_000,
+  });
+  const pilotQuery = useQuery({
+    queryKey: ["agent-runtime-v2", "pilot-report"],
+    queryFn: agentsApi.pilotReport,
+    staleTime: 20_000,
+  });
+  const whyMutation = useMutation({
+    mutationFn: () =>
+      agentsApi.whyAnswer(traceId.trim(), {
+        conversation_id: conversationId.trim() || undefined,
+      }),
+    onError: (error: Error) =>
+      toast.error("No se pudo cargar why-this-answer", { description: error.message }),
+  });
+  const refreshReports = () => {
+    void shadowQuery.refetch();
+    void pilotQuery.refetch();
+  };
+  const shadow = shadowQuery.data;
+  const pilot = pilotQuery.data;
+
+  return (
+    <div className="space-y-3">
+      <Panel
+        title="Runtime v2 operations"
+        icon={<Activity className="h-4 w-4 text-sky-300" />}
+        action={
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 border-white/10 bg-white/[0.035] text-xs text-slate-200"
+            onClick={refreshReports}
+            disabled={shadowQuery.isFetching || pilotQuery.isFetching}
+          >
+            {shadowQuery.isFetching || pilotQuery.isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
+        }
+      >
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <MiniOpsMetric
+                label="Shadow turns"
+                value={metric(shadow?.summary, "shadow_turns")}
+                loading={shadowQuery.isLoading}
+              />
+              <MiniOpsMetric
+                label="Avg confidence"
+                value={percentMetric(shadow?.summary, "avg_confidence")}
+                loading={shadowQuery.isLoading}
+              />
+              <MiniOpsMetric
+                label="Policy blocks"
+                value={metric(shadow?.summary, "policy_blocked_count")}
+                loading={shadowQuery.isLoading}
+                tone="warn"
+              />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <MiniOpsMetric
+                label="Pilot sends"
+                value={pilot ? String(pilot.sends) : "0"}
+                loading={pilotQuery.isLoading}
+              />
+              <MiniOpsMetric
+                label="Pilot failures"
+                value={pilot ? String(pilot.policy_failures) : "0"}
+                loading={pilotQuery.isLoading}
+                tone="warn"
+              />
+              <MiniOpsMetric
+                label="Error rate"
+                value={pilot ? percentValue(pilot.error_rate) : "0%"}
+                loading={pilotQuery.isLoading}
+                tone={(pilot?.error_rate ?? 0) > 0 ? "bad" : "neutral"}
+              />
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+            <TopOpsList title="Risk flags" items={shadow?.top_risk_flags ?? []} />
+            <TopOpsList title="Policy issues" items={shadow?.top_policy_issues ?? []} />
+            <TopOpsList title="Knowledge sources" items={shadow?.top_knowledge_sources ?? []} />
+          </div>
+        </div>
+      </Panel>
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <Panel title="Shadow report" icon={<ShieldCheck className="h-4 w-4 text-emerald-300" />}>
+          {shadowQuery.isLoading ? (
+            <OpsSkeleton />
+          ) : shadow ? (
+            <div className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <MiniOpsMetric
+                  label="V2 empty"
+                  value={metric(shadow.legacy_vs_v2, "v2_empty_count")}
+                  tone="warn"
+                />
+                <MiniOpsMetric
+                  label="Similar"
+                  value={metric(shadow.legacy_vs_v2, "same_or_similar_count")}
+                />
+                <MiniOpsMetric
+                  label="Needs human"
+                  value={metric(shadow.summary, "needs_human_count")}
+                  tone="warn"
+                />
+              </div>
+              <RuntimeJsonBlock title="Pilot inputs" value={shadow.pilot_inputs ?? {}} />
+              <ShadowExamples examples={shadow.examples} />
+            </div>
+          ) : (
+            <EmptyOpsState text="No hay shadow report disponible." />
+          )}
+        </Panel>
+
+        <Panel title="Pilot report" icon={<Zap className="h-4 w-4 text-amber-300" />}>
+          {pilotQuery.isLoading ? (
+            <OpsSkeleton />
+          ) : pilot ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <MiniOpsMetric label="Trace count" value={String(pilot.trace_count)} />
+                <MiniOpsMetric
+                  label="Confidence"
+                  value={pilot.average_confidence == null ? "n/a" : percentValue(pilot.average_confidence)}
+                />
+                <MiniOpsMetric
+                  label="Knowledge gaps"
+                  value={String(pilot.knowledge_gap_count)}
+                  tone="warn"
+                />
+                <MiniOpsMetric
+                  label="Needs human"
+                  value={String(pilot.needs_human_count)}
+                  tone="warn"
+                />
+                <MiniOpsMetric label="Actions" value={String(pilot.actions_proposed)} />
+                <MiniOpsMetric label="Fields" value={`${pilot.fields_suggested}/${pilot.fields_applied}`} />
+              </div>
+              <RuntimeJsonBlock title="Pilot raw" value={pilot} />
+            </div>
+          ) : (
+            <EmptyOpsState text="No hay pilot report disponible." />
+          )}
+        </Panel>
+      </div>
+
+      <Panel title="Why this answer" icon={<Search className="h-4 w-4 text-violet-300" />}>
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <label htmlFor="why-answer-trace" className="space-y-1 text-xs text-slate-400">
+            Trace ID
+            <Input
+              id="why-answer-trace"
+              value={traceId}
+              onChange={(event) => setTraceId(event.target.value)}
+              placeholder="turn_trace uuid"
+              className="h-8 border-white/10 bg-black/20 text-xs text-slate-100"
+            />
+          </label>
+          <label htmlFor="why-answer-conversation" className="space-y-1 text-xs text-slate-400">
+            Conversation ID
+            <Input
+              id="why-answer-conversation"
+              value={conversationId}
+              onChange={(event) => setConversationId(event.target.value)}
+              placeholder="optional"
+              className="h-8 border-white/10 bg-black/20 text-xs text-slate-100"
+            />
+          </label>
+          <div className="flex items-end">
+            <Button
+              size="sm"
+              className="h-8 bg-violet-600 text-xs hover:bg-violet-500"
+              onClick={() => whyMutation.mutate()}
+              disabled={!traceId.trim() || whyMutation.isPending}
+            >
+              {whyMutation.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Search className="mr-1 h-3.5 w-3.5" />
+              )}
+              Explain
+            </Button>
+          </div>
+        </div>
+        <WhyAnswerResult result={whyMutation.data} />
+      </Panel>
+
+      <OnboardingReadinessPanel />
+    </div>
+  );
+}
+
+function MiniOpsMetric({
+  label,
+  value,
+  loading = false,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  loading?: boolean;
+  tone?: "neutral" | "warn" | "bad";
+}) {
+  const color =
+    tone === "bad" ? "text-red-300" : tone === "warn" ? "text-amber-300" : "text-slate-100";
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] px-2.5 py-2">
+      <div className="text-[10px] text-slate-500">{label}</div>
+      {loading ? (
+        <Skeleton className="mt-1 h-5 w-14 bg-white/10" />
+      ) : (
+        <div className={cn("mt-0.5 text-base font-semibold", color)}>{value}</div>
+      )}
+    </div>
+  );
+}
+
+function TopOpsList({ title, items }: { title: string; items: Array<{ value: string; count: number }> }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+      <div className="mb-1 text-[10px] font-semibold uppercase text-slate-500">{title}</div>
+      {items.length === 0 ? (
+        <div className="text-[11px] text-slate-500">No data</div>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {items.slice(0, 4).map((item) => (
+            <Badge key={item.value} variant="outline" className="border-white/10 text-slate-300">
+              {item.value} {item.count}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShadowExamples({ examples }: { examples: Array<Record<string, unknown>> }) {
+  if (examples.length === 0) return <EmptyOpsState text="Sin ejemplos recientes." />;
+  return (
+    <div className="space-y-2">
+      {examples.map((example, index) => (
+        <details
+          key={String(example.trace_id ?? index)}
+          className="rounded-md border border-white/10 bg-black/20"
+        >
+          <summary className="cursor-pointer px-2.5 py-2 text-xs font-semibold text-slate-100">
+            {String(example.trace_id ?? `example-${index + 1}`)}
+          </summary>
+          <pre className="max-h-64 overflow-auto border-t border-white/10 p-2 text-[11px] text-slate-300">
+            {JSON.stringify(example, null, 2)}
+          </pre>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function WhyAnswerResult({ result }: { result: Awaited<ReturnType<typeof agentsApi.whyAnswer>> | undefined }) {
+  if (!result) return <EmptyOpsState text="Carga un trace para ver la explicación completa." />;
+  return (
+    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+      <div className="space-y-2">
+        <div className="rounded-md border border-white/10 bg-black/20 p-3">
+          <div className="text-[10px] uppercase text-slate-500">Final message</div>
+          <div className="mt-1 whitespace-pre-wrap text-sm text-slate-100">
+            {result.final_message || "No final_message"}
+          </div>
+        </div>
+        {result.human_summary ? (
+          <div className="rounded-md border border-sky-300/20 bg-sky-500/10 p-3 text-xs text-sky-100">
+            {result.human_summary}
+          </div>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-3">
+          <MiniOpsMetric
+            label="Confidence"
+            value={result.confidence == null ? "n/a" : percentValue(result.confidence)}
+          />
+          <MiniOpsMetric
+            label="Citations"
+            value={String(result.knowledge?.citations?.length ?? 0)}
+          />
+          <MiniOpsMetric
+            label="Dry-run actions"
+            value={String(result.actions?.dry_run?.length ?? 0)}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <RuntimeJsonBlock title="Knowledge" value={result.knowledge} />
+        <RuntimeJsonBlock title="Actions" value={result.actions} />
+        <RuntimeJsonBlock title="Field updates" value={result.field_updates} />
+        <RuntimeJsonBlock title="Lifecycle" value={result.lifecycle_update} />
+        <RuntimeJsonBlock title="Policy" value={result.policy} />
+        <RuntimeJsonBlock title="Workflows/readiness" value={{ workflow_events: result.workflow_events, readiness: result.readiness }} />
+      </div>
+    </div>
+  );
+}
+
+function RuntimeJsonBlock({ title, value }: { title: string; value: unknown }) {
+  return (
+    <details className="rounded-md border border-white/10 bg-white/[0.035]">
+      <summary className="cursor-pointer px-2.5 py-2 text-xs font-semibold text-slate-100">
+        {title}
+      </summary>
+      <pre className="max-h-60 overflow-auto border-t border-white/10 p-2 text-[11px] text-slate-300">
+        {JSON.stringify(value ?? null, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
+function OpsSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-10 bg-white/10" />
+      <Skeleton className="h-10 bg-white/10" />
+      <Skeleton className="h-20 bg-white/10" />
+    </div>
+  );
+}
+
+function EmptyOpsState({ text }: { text: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+function metric(values: Record<string, number> | undefined, key: string): string {
+  return String(values?.[key] ?? 0);
+}
+
+function percentMetric(values: Record<string, number> | undefined, key: string): string {
+  return percentValue(values?.[key] ?? 0);
+}
+
+function percentValue(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function stateChecksFromState(
+  state: Awaited<ReturnType<typeof agentsApi.onboardingState>> | undefined,
+) {
+  if (!state) return [];
+  return [
+    ["blueprint_selected", "Blueprint selected", Boolean(state.selected_blueprint_id)],
+    ["channel_connected", "Channel connected", state.channel_connected],
+    ["knowledge_uploaded", "Knowledge uploaded", state.knowledge_uploaded],
+    ["agent_configured", "Agent configured", state.agent_configured],
+    ["contact_fields_ready", "Contact fields ready", state.contact_fields_ready],
+    ["lifecycle_ready", "Lifecycle ready", state.lifecycle_ready],
+    ["test_passed", "Test passed", state.test_passed],
+    ["published", "Published", state.published],
+  ].map(([code, label, passed]) => ({
+    code: String(code),
+    label: String(label),
+    passed: Boolean(passed),
+    severity: "critical",
+    message: passed ? "" : "Pending",
+    metadata: {},
+  }));
+}
+
 function ScenarioSimulatorSummaryCard({
   agent,
   onStressTest,
@@ -2710,6 +3596,7 @@ function ResumenTab({
         <KnowledgeCoverageCard agent={agent} />
         <ExtractionStatusCard agent={agent} />
       </div>
+      <OnboardingReadinessPanel />
       <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
         <WhatsAppPreview
           draft={agent}
@@ -2964,6 +3851,8 @@ function PruebasTab({
 }) {
   return (
     <div className="space-y-3">
+      <AgentTestChatV2 agent={agent} />
+      <OnboardingReadinessPanel />
       <Panel
         title="Escenarios"
         icon={<FlaskConical className="h-4 w-4 text-emerald-300" />}
@@ -3822,6 +4711,14 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
             ) : (
               <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
                 <div className="space-y-3">
+                  {activeTab === "Agent Studio" ? (
+                    <AgentStudioV2Panel
+                      draft={activeAgent}
+                      onChange={updateDraft}
+                      onSave={saveActive}
+                      saving={saveMutation.isPending}
+                    />
+                  ) : null}
                   {activeTab === "Identidad" ? (
                     <IdentityPanel draft={activeAgent} onChange={updateDraft} />
                   ) : null}
@@ -3859,6 +4756,7 @@ export function AgentsPage({ initialAgentId }: { initialAgentId?: string } = {})
                       stressLoading={stressMutation.isPending}
                     />
                   ) : null}
+                  {activeTab === "Runtime v2" ? <RuntimeV2OperationsPanel agent={activeAgent} /> : null}
                   {activeTab === "Historial" ? (
                     <HistorialTab agent={activeAgent} auditLogs={auditQuery.data ?? []} />
                   ) : null}

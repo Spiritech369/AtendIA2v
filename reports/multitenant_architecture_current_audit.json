@@ -1,0 +1,121 @@
+{
+  "report": "multitenant_architecture_current_audit",
+  "generated_at": "2026-06-03",
+  "scope": {
+    "mode": "read_only_audit",
+    "runtime_modified": false,
+    "live_traffic": false,
+    "config_applied": false,
+    "real_messages_sent": false
+  },
+  "decision": "READY_FOR_UNIVERSAL_CONTRACT_IMPLEMENTATION",
+  "recommended_first_step": "mandatory_tool_contract",
+  "components": [
+    {
+      "name": "agent_runtime_v2",
+      "files": [
+        "core/atendia/agent_runtime/runtime.py",
+        "core/atendia/agent_runtime/schemas.py",
+        "core/atendia/agent_runtime/advisor_pipeline.py"
+      ],
+      "status": "target_base_exists",
+      "generalizable": true,
+      "risk": "medium",
+      "gap": "No real mandatory tool layer is wired for all sensitive facts."
+    },
+    {
+      "name": "state_writer",
+      "files": [
+        "core/atendia/agent_runtime/state_writer.py",
+        "core/atendia/contact_memory/service.py"
+      ],
+      "status": "strong_base_exists",
+      "generalizable": true,
+      "risk": "medium",
+      "gap": "Rules need to become domain and tenant declarative."
+    },
+    {
+      "name": "legacy_runner",
+      "files": [
+        "core/atendia/runner/conversation_runner.py",
+        "core/atendia/runner/advisor_brain.py",
+        "core/atendia/runner/dinamo_agent_runtime.py"
+      ],
+      "status": "fallback_only",
+      "generalizable": false,
+      "risk": "high",
+      "gap": "Contains Dinamo, motos, credito and document assumptions."
+    },
+    {
+      "name": "workflow_engine",
+      "files": [
+        "core/atendia/workflows/engine.py",
+        "core/atendia/agent_runtime/workflow_events.py"
+      ],
+      "status": "reusable",
+      "generalizable": true,
+      "risk": "medium",
+      "gap": "Business event vocabulary needs a universal contract."
+    },
+    {
+      "name": "turn_traces",
+      "files": [
+        "core/atendia/db/models/turn_trace.py",
+        "core/atendia/api/turn_traces_routes.py",
+        "core/atendia/observability/why_answer.py"
+      ],
+      "status": "strong_base_exists",
+      "generalizable": true,
+      "risk": "medium",
+      "gap": "Needs proposed vs validated state and mandatory tool trace."
+    },
+    {
+      "name": "frontend_conversation",
+      "files": [
+        "frontend/src/features/conversations/components/ContactPanel.tsx",
+        "frontend/src/features/conversations/components/ConversationDetail.tsx",
+        "frontend/src/features/turn-traces"
+      ],
+      "status": "usable_but_coupled",
+      "generalizable": false,
+      "risk": "high",
+      "gap": "Field presentation and aliases should come from tenant metadata."
+    }
+  ],
+  "hardcoded_findings": [
+    {
+      "file": "core/atendia/runner/dinamo_agent_runtime.py",
+      "finding": "Contains explicit Dinamo tenant routing and must remain fallback-only."
+    },
+    {
+      "file": "core/atendia/runner/advisor_brain.py",
+      "finding": "Contains legacy Dinamo/credit/document patterns."
+    },
+    {
+      "file": "core/atendia/runner/state_write_policy.py",
+      "finding": "Uses protected fields such as MOTO, CREDITO, ENGANCHE and FILTRO."
+    },
+    {
+      "file": "core/atendia/api/conversations_routes.py",
+      "finding": "Customer field presentation contains Dinamo-like names."
+    },
+    {
+      "file": "frontend/src/features/conversations/components/ContactPanel.tsx",
+      "finding": "Canonical field aliases are currently coupled to Dinamo-style fields."
+    }
+  ],
+  "critical_gaps": [
+    "tenant_domain_contract",
+    "mandatory_tool_contract",
+    "universal_turn_trace_contract",
+    "tenant_aware_frontend_metadata",
+    "business_event_contract"
+  ],
+  "recommendations": [
+    "Implement tenant-scoped domain contracts before runtime rollout.",
+    "Enforce mandatory tools for product, price, requirements, documents and policy facts.",
+    "Expose GPT proposed vs AtendIA validated decisions in traces and frontend.",
+    "Keep legacy runner as fallback until comparative evaluation passes.",
+    "Use simulations and fixtures only before any live canary."
+  ]
+}

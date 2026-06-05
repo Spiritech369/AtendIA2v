@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-06-03T17:18:31.5306424-06:00",
+  "status": "ready_for_human_approval",
+  "decision": "READY_FOR_SINGLE_CONTACT_LIVE_SMOKE_APPROVAL",
+  "package_type": "single_contact_live_smoke_activation_packet",
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "tenant_name": "Dinamo Motos NL",
+  "tenant_email": "dinamomotosnl@gmail.com",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "agent_name": "Francisco de Dinamo NL",
+  "owners": {
+    "business": "Francisco Esparza",
+    "runtime": "Felipe Balderas",
+    "provider": "Felipe Balderas",
+    "db": "Felipe Balderas",
+    "ops": "Felipe Balderas",
+    "rollback": "Felipe Balderas"
+  },
+  "approved_test_phone": "+528212889421",
+  "expected_volume": "1 conversation / 5-15 turns",
+  "recommended_window": "30-60 minute supervised business-hours window in America/Mexico_City after final approval",
+  "required_flags": {
+    "ATENDIA_V2_QUOTE_SAFETY_GUARD_MODE": "block",
+    "ATENDIA_V2_CONVERSATION_PROGRESS_GUARD_MODE": "block",
+    "runtime_send_global_flags": "only at final manual activation for the approved contact"
+  },
+  "verified_contact_gate": {
+    "supported": true,
+    "mechanism": "dinamo_agent_first_live_limited",
+    "focused_test_result": "3 passed, 1 skipped",
+    "evidence_report": "reports/rc5_single_contact_smoke_contact_gate_verification.md"
+  },
+  "tenant_config_proposal": {
+    "features": {
+      "dinamo_agent_first": true
+    },
+    "agent_runtime_v2": {
+      "runtime_v2_enabled": true,
+      "shadow_mode_enabled": true,
+      "preview_enabled": true,
+      "send_enabled": true,
+      "actions_enabled": false,
+      "workflow_events_enabled": false,
+      "model_provider_enabled": true,
+      "rollout_mode": "manual_send",
+      "allowed_agent_ids": [
+        "c169deec-226d-55b7-bd07-270f339e75a6"
+      ],
+      "metadata": {
+        "rc5_stage": "single_contact_live_smoke",
+        "expected_volume": "1 conversation / 5-15 turns",
+        "business_owner": "Francisco Esparza"
+      }
+    },
+    "dinamo_agent_first_live_limited": {
+      "enabled": true,
+      "allow_real_outbox": true,
+      "human_monitoring_active": true,
+      "rollback_ready": true,
+      "restrict_to_allowlist": true,
+      "allowed_tenant_ids": [
+        "6ad78236-1fc9-467a-858d-90d248d57ee5"
+      ],
+      "allowed_contact_ids": [],
+      "allowed_phone_numbers": [
+        "+528212889421"
+      ],
+      "run_id": "rc5_single_contact_live_smoke_2026_06_03"
+    }
+  },
+  "activation_sql_proposal": "-- PROPOSAL ONLY. Do not run until final human approval.\nUPDATE tenants\nSET config =\n  jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        COALESCE(config, '{}'::jsonb),\n        '{features,dinamo_agent_first}',\n        'true'::jsonb,\n        true\n      ),\n      '{agent_runtime_v2}',\n      '{\"runtime_v2_enabled\":true,\"shadow_mode_enabled\":true,\"preview_enabled\":true,\"send_enabled\":true,\"actions_enabled\":false,\"workflow_events_enabled\":false,\"model_provider_enabled\":true,\"rollout_mode\":\"manual_send\",\"allowed_agent_ids\":[\"c169deec-226d-55b7-bd07-270f339e75a6\"],\"metadata\":{\"rc5_stage\":\"single_contact_live_smoke\",\"expected_volume\":\"1 conversation / 5-15 turns\",\"business_owner\":\"Francisco Esparza\"}}'::jsonb,\n      true\n    ),\n    '{dinamo_agent_first_live_limited}',\n    '{\"enabled\":true,\"allow_real_outbox\":true,\"human_monitoring_active\":true,\"rollback_ready\":true,\"restrict_to_allowlist\":true,\"allowed_tenant_ids\":[\"6ad78236-1fc9-467a-858d-90d248d57ee5\"],\"allowed_contact_ids\":[],\"allowed_phone_numbers\":[\"+528212889421\"],\"run_id\":\"rc5_single_contact_live_smoke_2026_06_03\"}'::jsonb,\n    true\n  )\nWHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+  "rollback_sql_proposal": "-- PROPOSAL ONLY. Restores the agent_runtime_v2 config observed before this smoke package and removes the live-limited smoke gate.\nUPDATE tenants\nSET config =\n  jsonb_set(\n    COALESCE(config, '{}'::jsonb) - 'dinamo_agent_first_live_limited',\n    '{agent_runtime_v2}',\n    '{\"runtime_v2_enabled\":true,\"shadow_mode_enabled\":false,\"preview_enabled\":true,\"send_enabled\":false,\"manual_send_enabled\":false,\"auto_send_enabled\":false,\"outbox_enabled\":false,\"actions_enabled\":false,\"workflow_events_enabled\":false,\"model_provider_enabled\":true,\"rollout_mode\":\"preview_only\",\"required_eval_suite_passed\":false,\"min_eval_score\":0.9,\"last_readiness_score\":0.9852,\"ready_for_shadow\":false,\"ready_for_manual_send\":false,\"ready_for_live_preview\":false,\"metadata\":{\"owner\":\"dinamomotosnl@gmail.com\",\"setup\":\"dinamo_fresh_tenant_v1\",\"live_ready\":false}}'::jsonb,\n    true\n  )\nWHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+  "preflight": {
+    "ruff": "pass",
+    "observability_export": "pass",
+    "agent_runtime_tests": "169 passed, 2 warnings",
+    "provider_stability": "5/5 pass",
+    "provider_fallback_response_count": 0,
+    "side_effects": 0,
+    "contact_gate_focused_tests": "3 passed, 1 skipped"
+  },
+  "stop_conditions": [
+    "Any P0 alert from rc5_metrics.",
+    "Any provider fallback response.",
+    "Any provider retry exhausted spike.",
+    "Any stale quote.",
+    "Any price without snapshot.",
+    "Any quoted without canonical product.",
+    "Any duplicate side effect.",
+    "Any false handoff.",
+    "Any unsafe customer-visible message.",
+    "Any message/contact outside +528212889421.",
+    "Any owner requests immediate stop."
+  ],
+  "traffic_started": false,
+  "tenant_config_applied": false,
+  "canary_5_percent_activated": false,
+  "actions_enabled": false,
+  "workflow_events_enabled": false,
+  "blockers": [
+    "Final human approval is still required before manually applying the proposed config."
+  ]
+}

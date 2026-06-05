@@ -1,0 +1,326 @@
+{
+    "generated_at":  "2026-06-03T05:49:44.6364985-06:00",
+    "conversations":  [
+                          {
+                              "conversation_id":  "sim_001",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_002",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_003",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_004",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_005",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_006",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_007",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_008",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_009",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_010",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_011",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_012",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_013",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_014",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_015",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_016",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_017",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_018",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_019",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          },
+                          {
+                              "conversation_id":  "sim_020",
+                              "scores":  {
+                                             "naturalidad":  4,
+                                             "precision_comercial":  4,
+                                             "uso_correcto_estado_contexto":  4,
+                                             "seguridad_cotizacion":  5,
+                                             "avance_flujo":  4,
+                                             "manejo_documentos":  4,
+                                             "manejo_dudas_mezcladas":  4,
+                                             "tono_francisco_whatsapp":  4,
+                                             "riesgo_enviar_cliente_real":  2
+                                         },
+                              "classification":  "READY_FOR_CANARY_SAMPLE",
+                              "notes":  "Replay anonimizado pass; provider comparison failed globally and blocks canary readiness."
+                          }
+                      ],
+    "scale":  "1-5, higher is better except riesgo_enviar_cliente_real where lower is safer"
+}

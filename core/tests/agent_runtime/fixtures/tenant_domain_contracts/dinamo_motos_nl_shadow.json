@@ -1,0 +1,351 @@
+{
+  "contract_version": "1.0",
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "name": "Dinamo Motos NL",
+  "agent_name": "Francisco de Dinamo NL",
+  "business_owner": "Francisco Esparza",
+  "technical_rollback_owner": "Felipe Balderas",
+  "domain": "vehicle_credit_sales",
+  "locale": "es-MX",
+  "timezone": "America/Mexico_City",
+  "runtime_mode": "v2_shadow_until_evaluated",
+  "live_send_enabled": false,
+  "actions_enabled": false,
+  "workflow_side_effects_enabled": false,
+  "canary_enabled": false,
+  "single_contact_smoke_enabled": false,
+  "entities": {
+    "product": "vehicle",
+    "quote": "financing_offer",
+    "requirements": "credit_documents",
+    "human_review": "sales_advisor_review"
+  },
+  "fields": [
+    {
+      "key": "product_selection",
+      "label": "Moto seleccionada",
+      "type": "text",
+      "domain_role": "selection",
+      "aliases": ["MOTO", "MODELO_INTERES", "product", "model", "modelo"],
+      "write_policy": "auto_apply_when_catalog_match",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message", "catalog.search"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "product_catalog_id",
+      "label": "ID catalogo",
+      "type": "text",
+      "domain_role": "selection_metadata",
+      "aliases": ["catalog_id", "product_id"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["catalog.search"],
+      "evidence_required": true
+    },
+    {
+      "key": "purchase_type",
+      "label": "Tipo de compra",
+      "type": "text",
+      "domain_role": "intent",
+      "aliases": ["tipo_compra", "purchase"],
+      "write_policy": "auto_apply_when_explicit",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message"],
+      "evidence_required": true
+    },
+    {
+      "key": "employment_seniority",
+      "label": "Antiguedad",
+      "type": "number",
+      "domain_role": "eligibility",
+      "aliases": ["ANTIGUEDAD", "meses_trabajo"],
+      "write_policy": "auto_apply_when_explicit",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "eligibility_seniority",
+      "label": "Cumple antiguedad",
+      "type": "boolean",
+      "domain_role": "eligibility",
+      "aliases": ["seniority_ok"],
+      "write_policy": "system_derived",
+      "owner": "StateWriter",
+      "allowed_sources": ["credit_plan.resolve", "system"],
+      "evidence_required": true
+    },
+    {
+      "key": "plan_selection",
+      "label": "Plan de credito",
+      "type": "text",
+      "domain_role": "plan",
+      "aliases": ["CREDITO", "PLAN", "PLAN_CREDITO"],
+      "write_policy": "auto_apply_when_valid_plan",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "down_payment_percent",
+      "label": "Enganche %",
+      "type": "number",
+      "domain_role": "plan",
+      "aliases": ["enganche", "enganche_porcentaje"],
+      "write_policy": "auto_apply_when_valid_plan",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "evidence_required": true,
+      "invalidates_roles": ["quote"]
+    },
+    {
+      "key": "quote_snapshot_id",
+      "label": "Cotizacion validada",
+      "type": "text",
+      "domain_role": "quote",
+      "aliases": ["quote_snapshot", "ULTIMA_COTIZACION"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["quote.resolve"],
+      "evidence_required": true,
+      "value_path": "snapshot_id"
+    },
+    {
+      "key": "payment_amount",
+      "label": "Pago",
+      "type": "currency",
+      "domain_role": "quote",
+      "aliases": ["pago", "mensualidad", "abono"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["quote.resolve"],
+      "evidence_required": true,
+      "value_path": "pricing.payment_amount"
+    },
+    {
+      "key": "cash_price",
+      "label": "Precio contado",
+      "type": "currency",
+      "domain_role": "quote",
+      "aliases": ["precio_contado", "precio"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["quote.resolve"],
+      "evidence_required": true,
+      "value_path": "pricing.cash_price"
+    },
+    {
+      "key": "requirements_checklist",
+      "label": "Checklist documentos",
+      "type": "json",
+      "domain_role": "document",
+      "aliases": ["requisitos", "checklist"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["requirements.lookup"],
+      "evidence_required": true
+    },
+    {
+      "key": "requirements_missing",
+      "label": "Documentos faltantes",
+      "type": "json",
+      "domain_role": "document",
+      "aliases": ["docs_faltantes", "missing_documents"],
+      "write_policy": "system_derived",
+      "owner": "StateWriter",
+      "allowed_sources": ["document.check", "system"],
+      "evidence_required": true
+    },
+    {
+      "key": "requirements_complete",
+      "label": "Papeleria completa",
+      "type": "boolean",
+      "domain_role": "document",
+      "aliases": ["Doc_Completos", "docs_complete"],
+      "write_policy": "system_derived",
+      "owner": "StateWriter",
+      "allowed_sources": ["requirements.lookup", "document.check", "system"],
+      "evidence_required": true,
+      "required_tools": ["requirements.lookup", "document.check"]
+    },
+    {
+      "key": "bureau_mentioned",
+      "label": "Buro mencionado",
+      "type": "boolean",
+      "domain_role": "eligibility",
+      "aliases": ["Buro", "BURO"],
+      "write_policy": "auto_apply_when_explicit",
+      "owner": "StateWriter",
+      "allowed_sources": ["user_message"],
+      "evidence_required": true
+    },
+    {
+      "key": "bureau_status",
+      "label": "Estado buro",
+      "type": "text",
+      "domain_role": "eligibility",
+      "aliases": ["estado_buro"],
+      "write_policy": "suggest_review",
+      "owner": "human_review",
+      "allowed_sources": ["faq.lookup", "human_review"],
+      "evidence_required": true
+    },
+    {
+      "key": "human_handoff_needed",
+      "label": "Requiere humano",
+      "type": "boolean",
+      "domain_role": "handoff",
+      "aliases": ["handoff_needed"],
+      "write_policy": "system_derived",
+      "owner": "StateWriter",
+      "allowed_sources": ["handoff.create", "system"],
+      "evidence_required": true
+    },
+    {
+      "key": "handoff_reason",
+      "label": "Motivo handoff",
+      "type": "text",
+      "domain_role": "handoff",
+      "aliases": ["handoff_reason"],
+      "write_policy": "system_derived",
+      "owner": "StateWriter",
+      "allowed_sources": ["handoff.create", "system"],
+      "evidence_required": true
+    },
+    {
+      "key": "followup_status",
+      "label": "Seguimiento",
+      "type": "text",
+      "domain_role": "followup",
+      "aliases": ["followup"],
+      "write_policy": "tool_only",
+      "owner": "StateWriter",
+      "allowed_sources": ["followup.schedule"],
+      "evidence_required": true
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "catalog.search",
+      "topic": "catalog_or_listing",
+      "aliases": ["catalog", "modelos", "inventario"]
+    },
+    {
+      "tool_id": "credit_plan.resolve",
+      "topic": "plan_or_financing",
+      "aliases": ["plan", "credit_plan", "enganche"]
+    },
+    {
+      "tool_id": "quote.resolve",
+      "topic": "offer_or_quote",
+      "aliases": ["quote", "cotizacion", "precio"]
+    },
+    {
+      "tool_id": "requirements.lookup",
+      "topic": "requirements",
+      "aliases": ["requirements", "requisitos", "papeleria"]
+    },
+    {
+      "tool_id": "faq.lookup",
+      "topic": "policy_or_faq",
+      "aliases": ["faq", "buro", "ubicacion", "politicas"]
+    },
+    {
+      "tool_id": "document.check",
+      "topic": "document_status",
+      "aliases": ["document", "documentos", "vision.document_check"]
+    },
+    {
+      "tool_id": "handoff.create",
+      "topic": "handoff_or_action",
+      "aliases": ["handoff", "human_review"]
+    },
+    {
+      "tool_id": "followup.schedule",
+      "topic": "followup_or_action",
+      "aliases": ["followup", "seguimiento"]
+    }
+  ],
+  "pipeline": {
+    "id": "dinamo_vehicle_credit_shadow",
+    "stages": [
+      "nuevo",
+      "primer_contacto",
+      "moto_identificada",
+      "plan_identificado",
+      "cotizado",
+      "papeleria_solicitada",
+      "papeleria_recibida",
+      "papeleria_completa",
+      "en_revision_humana",
+      "cerrado_ganado",
+      "cerrado_perdido"
+    ],
+    "dry_run": true,
+    "side_effects_enabled": false
+  },
+  "workflow_events": [
+    "lead_started",
+    "intent_identified",
+    "selection_identified",
+    "plan_identified",
+    "offer_quoted",
+    "requirements_requested",
+    "document_received",
+    "requirements_partial",
+    "requirements_complete",
+    "human_handoff_requested",
+    "followup_scheduled",
+    "policy_blocked",
+    "conversation_closed"
+  ],
+  "guards": [
+    "mandatory_tool_guard",
+    "quote_snapshot_guard",
+    "no_cash_quote_for_credit_guard",
+    "requirements_plan_guard",
+    "attachment_evidence_guard",
+    "doc_complete_guard",
+    "no_approval_guard",
+    "bureau_no_auto_reject_guard",
+    "workflow_idempotency_guard",
+    "provider_fallback_guard",
+    "repetition_progress_guard"
+  ],
+  "frontend": {
+    "field_groups": [
+      "selection",
+      "plan",
+      "quote",
+      "requirements",
+      "eligibility",
+      "handoff",
+      "followup"
+    ],
+    "primary_fields": [
+      "product_selection",
+      "plan_selection",
+      "quote_snapshot_id",
+      "requirements_complete",
+      "human_handoff_needed"
+    ]
+  },
+  "trace": {
+    "universal_turn_trace": true,
+    "business_events": true,
+    "workflow_results": true
+  },
+  "safety": {
+    "shadow_only": true,
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "legacy_runner_fallback": true,
+    "requires_human_approval_before_live_apply": true
+  }
+}

@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AgentsPage } from "@/features/agents/components/AgentsPage";
-import { requireRole } from "@/lib/auth-guards";
+import { requireCapability } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/agents/$agentId")({
-  beforeLoad: requireRole(["tenant_admin", "superadmin"]),
+  beforeLoad: requireCapability("route.agents", ["tenant_admin", "superadmin"]),
   component: AgentRoute,
 });
 

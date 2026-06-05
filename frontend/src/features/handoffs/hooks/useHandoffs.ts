@@ -1,16 +1,33 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import {
   type HandoffListResponse,
   handoffsApi,
   type ListHandoffsParams,
 } from "@/features/handoffs/api";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 
 export function useHandoffs(filters: ListHandoffsParams = {}) {
-  return useInfiniteQuery<HandoffListResponse, Error>({
-    queryKey: ["handoffs", filters],
+  const demoMode = useCapabilitiesStore((s) => s.capabilities?.feature_flags.demo_mode === true);
+  return useInfiniteQuery<HandoffListResponse, Error, InfiniteData<HandoffListResponse>>({
+    queryKey: ["handoffs", filters, { demoMode }],
     queryFn: ({ pageParam }) =>
       handoffsApi.list({ ...filters, cursor: pageParam as string | null }),
+    select: (data) =>
+      demoMode
+        ? data
+        : {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              items: page.items.filter((item) => item.payload?.source !== "mock"),
+            })),
+          },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
   });

@@ -17,6 +17,7 @@ from atendia.api.agents_routes import (
 from atendia.api.agents_routes import (
     router as agents_router,
 )
+from atendia.api.agent_runtime_v2_routes import router as agent_runtime_v2_router
 from atendia.api.analytics_routes import router as analytics_router
 from atendia.api.appointments_routes import router as appointments_router
 from atendia.api.audit_log_routes import router as audit_log_router
@@ -27,6 +28,7 @@ from atendia.api.baileys_routes import (
 from atendia.api.baileys_routes import (
     internal_router as baileys_internal_router,
 )
+from atendia.api.blueprints_routes import router as blueprints_router
 from atendia.api.channel_status_routes import router as channel_status_router
 from atendia.api.conversations_routes import router as conversations_router
 from atendia.api.customer_fields_routes import (
@@ -64,7 +66,10 @@ from atendia.api.integrations_routes import router as integrations_router
 from atendia.api.knowledge_routes import router as knowledge_router
 from atendia.api.navigation_routes import router as navigation_router
 from atendia.api.notifications_routes import router as notifications_router
+from atendia.api.onboarding_routes import router as onboarding_router
 from atendia.api.pipeline_routes import router as pipeline_router
+from atendia.api.product_config_routes import router as product_config_router
+from atendia.api.product_config_routes import tenant_capabilities_router
 from atendia.api.reports_routes import router as reports_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
@@ -145,11 +150,28 @@ app.include_router(
     tags=["field-suggestions"],
 )
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(onboarding_router, prefix="/api/v1/onboarding", tags=["onboarding"])
+app.include_router(blueprints_router, prefix="/api/v1/blueprints", tags=["blueprints"])
 app.include_router(pipeline_router, prefix="/api/v1/pipeline", tags=["pipeline"])
+app.include_router(
+    product_config_router,
+    prefix="/api/v1/product-config",
+    tags=["product-config"],
+)
 app.include_router(tenants_router, prefix="/api/v1/tenants", tags=["tenants"])
+app.include_router(
+    tenant_capabilities_router,
+    prefix="/api/v1/tenants",
+    tags=["tenant-capabilities"],
+)
 app.include_router(turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(
+    agent_runtime_v2_router,
+    prefix="/api/v1/agent-runtime-v2",
+    tags=["agent-runtime-v2"],
+)
 app.include_router(guardrails_router, prefix="/api/v1/guardrails", tags=["guardrails"])
 app.include_router(
     extraction_fields_router,

@@ -173,7 +173,10 @@ export const pipelineStagesApi = {
 };
 
 export const workflowsApi = {
-  list: async () => (await api.get<WorkflowItem[]>("/workflows")).data,
+  list: async () => {
+    const data = (await api.get<WorkflowItem[] | { items?: WorkflowItem[] }>("/workflows")).data;
+    return Array.isArray(data) ? data : (data.items ?? []);
+  },
   get: async (id: string) => (await api.get<WorkflowItem>(`/workflows/${id}`)).data,
   create: async (body: Partial<WorkflowItem>) =>
     (await api.post<WorkflowItem>("/workflows", body)).data,

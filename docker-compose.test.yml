@@ -1,0 +1,17 @@
+services:
+  postgres-test:
+    image: pgvector/pgvector:0.8.2-pg15
+    container_name: atendia_postgres_test
+    environment:
+      POSTGRES_USER: atendia
+      POSTGRES_PASSWORD: atendia
+      POSTGRES_DB: atendia_test
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atendia -d atendia_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

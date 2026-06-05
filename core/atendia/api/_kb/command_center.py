@@ -27,6 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, demo_tenant
 from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
+from atendia.db.models.knowledge_os import (
+    KnowledgeItem as KnowledgeOSItem,
+)
+from atendia.db.models.knowledge_os import (
+    KnowledgeOSChunk,
+    KnowledgeSource,
+)
 from atendia.db.models.tenant import Tenant
 from atendia.db.models.tenant_config import TenantCatalogItem, TenantFAQ
 from atendia.db.session import get_db_session
@@ -953,6 +960,29 @@ async def _get_live_knowledge_items(
     page: int,
     page_size: int,
 ) -> KnowledgeItemsResponse:
+    native_rows = (
+        await session.execute(
+            select(
+                KnowledgeSource.id,
+                KnowledgeSource.name,
+                KnowledgeSource.type,
+                KnowledgeSource.content_type,
+                KnowledgeSource.status,
+                KnowledgeSource.priority,
+                KnowledgeSource.updated_at,
+                KnowledgeSource.created_at,
+                KnowledgeSource.metadata_json,
+                func.count(func.distinct(KnowledgeOSItem.id)).label("items_count"),
+                func.count(func.distinct(KnowledgeOSChunk.id)).label("chunks_count"),
+            )
+            .outerjoin(KnowledgeOSItem, KnowledgeOSItem.source_id == KnowledgeSource.id)
+            .outerjoin(KnowledgeOSChunk, KnowledgeOSChunk.source_id == KnowledgeSource.id)
+            .where(KnowledgeSource.tenant_id == tenant_id)
+            .group_by(KnowledgeSource.id)
+            .order_by(KnowledgeSource.priority.desc(), KnowledgeSource.updated_at.desc())
+            .limit(100)
+        )
+    ).mappings().all()
     faq_rows = (
         await session.execute(
             sql_text(
@@ -985,6 +1015,40 @@ async def _get_live_knowledge_items(
     ).mappings().all()
 
     items: list[KnowledgeItem] = []
+    for row in native_rows:
+        updated_at = row.get("updated_at") or row.get("created_at")
+        days = _kb_days_since(updated_at)
+        metadata = dict(row.get("metadata_json") or {})
+        content_type = str(row.get("content_type") or "general")
+        role = str(metadata.get("role") or metadata.get("original_content_type") or "")
+        source_type, collection_label = _native_knowledge_source_labels(
+            name=str(row["name"]),
+            content_type=content_type,
+            role=role,
+        )
+        counts = f"{int(row.get('items_count') or 0)} items / {int(row.get('chunks_count') or 0)} chunks"
+        flags = []
+        if metadata.get("retrieval_enabled") is False:
+            flags.append("retrieval off")
+        if metadata.get("enabled_for_agent") is False:
+            flags.append("agent off")
+        suffix = f" ({counts}{'; ' + ', '.join(flags) if flags else ''})"
+        items.append(
+            KnowledgeItem(
+                id=f"knowledge-os-{row['id']}",
+                title=f"{row['name']}{suffix}",
+                source_type=source_type,
+                collection=collection_label,
+                retrieval_score=_kb_score(row.get("priority"), 0.9),
+                status=_kb_status_label(row.get("status")),
+                freshness=_kb_freshness_label(days),
+                freshness_days=days,
+                conflicts=0,
+                last_used_at=_kb_last_used_label(updated_at),
+                risk_level="low",
+                owner=str(metadata.get("owner") or row.get("type") or "Knowledge OS"),
+            )
+        )
     for row in faq_rows:
         updated_at = row.get("updated_at") or row.get("created_at")
         days = _kb_days_since(updated_at)
@@ -1059,6 +1123,21 @@ async def _get_live_knowledge_items(
         page=page,
         page_size=page_size,
     )
+
+
+def _native_knowledge_source_labels(*, name: str, content_type: str, role: str) -> tuple[str, str]:
+    normalized = f"{name} {content_type} {role}".casefold()
+    if "catalog" in content_type or "catalogo" in normalized:
+        return "Catalogo", "Knowledge OS v2"
+    if "faq" in content_type or "faq" in normalized:
+        return "FAQ", "Knowledge OS v2"
+    if role in {"agent_instructions", "instructions"} or "prompt_agente" in normalized:
+        return "Documento", "Non-factual"
+    if role in {"eval_scenarios", "simulation"} or "flujo_dinamo" in normalized:
+        return "Documento", "Non-factual"
+    if content_type in {"credit_policy", "document_rules", "policy"}:
+        return "Documento", "Credito"
+    return "Documento", "Knowledge OS v2"
 
 
 @router.get("/items", response_model=KnowledgeItemsResponse)

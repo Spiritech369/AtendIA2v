@@ -1,0 +1,254 @@
+{
+  "dataset": {
+    "path": "C:\\Users\\Sprt\\Documents\\Proyectos IA\\AtendIA-v2\\reports\\real_conversation_simulation_dataset.anonymized.json",
+    "anonymized": true,
+    "version": 1
+  },
+  "summary": {
+    "replay_cases_total": 20,
+    "replay_cases_passed": 20,
+    "critical_failure_count": 0,
+    "quote_guard_blocks_total": 0,
+    "progress_guard_blocks_total": 0,
+    "provider_retry_count": 0,
+    "provider_fallback_response_count": 0,
+    "duplicate_side_effect_count": 0,
+    "handoff_false_positive_count": 0,
+    "documents_stage_false_positive_count": 0,
+    "avg_turns_to_quote": 3.3077,
+    "avg_turns_to_handoff": 1.8,
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "repeated_question_rate": 0.0,
+    "definition_of_done_pass": true
+  },
+  "cases": [
+    {
+      "case_id": "sim_001",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_002",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 3,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_003",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "handoff"
+      ]
+    },
+    {
+      "case_id": "sim_004",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_005",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 6,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_006",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_007",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 5,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_008",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 5,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_009",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_010",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_011",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 9,
+      "turns_to_quote": 1,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_012",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 1,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_013",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_014",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_015",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 3,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_016",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 4,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_017",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 9,
+      "turns_to_quote": 1,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote",
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_018",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 5,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "quote"
+      ]
+    },
+    {
+      "case_id": "sim_019",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": null,
+      "turns_to_handoff": 1,
+      "expected_tags": [
+        "documents"
+      ]
+    },
+    {
+      "case_id": "sim_020",
+      "passed": true,
+      "critical_failures": [],
+      "turns": 5,
+      "turns_to_quote": 1,
+      "turns_to_handoff": 2,
+      "expected_tags": [
+        "quote"
+      ]
+    }
+  ]
+}

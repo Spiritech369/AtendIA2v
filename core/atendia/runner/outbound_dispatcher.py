@@ -16,11 +16,16 @@ from atendia.queue.outbox import stage_outbound
 COMPOSED_ACTIONS: set[str] = {
     "greet",
     "ask_field",
+    "ask_credit_context",
     "lookup_faq",
     "ask_clarification",
+    "resolve_credit_plan",
+    "classify_document",
     "agent_response",
     "quote",
+    "search_catalog",
     "explain_payment_options",
+    "soft_close",
     "close",
 }
 
@@ -28,7 +33,6 @@ SKIP_ACTIONS: set[str] = {
     "escalate_to_human",
     "schedule_followup",
     "book_appointment",
-    "search_catalog",
 }
 
 
@@ -47,7 +51,12 @@ async def enqueue_messages(
     """Enqueue N OutboundMessage jobs (one per message)."""
     job_ids: list[str] = []
     for i, text in enumerate(messages):
-        metadata = {"action": action, "message_index": i, "of": len(messages)}
+        metadata = {
+            "action": action,
+            "message_index": i,
+            "of": len(messages),
+            "conversation_id": str(conversation_id),
+        }
         if extra_metadata:
             metadata.update(extra_metadata)
         msg = OutboundMessage(

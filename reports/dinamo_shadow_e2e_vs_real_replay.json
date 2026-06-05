@@ -1,0 +1,115 @@
+{
+  "generated_at": "2026-06-04T05:52:17.025904+00:00",
+  "tenant_domain_contract": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "domain": "vehicle_credit_sales",
+    "runtime_mode": "v2_shadow_until_evaluated",
+    "pipeline_id": "dinamo_vehicle_credit_shadow",
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "canary_enabled": false,
+    "single_contact_smoke_enabled": false
+  },
+  "safety": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "traffic_real_activated": false,
+    "whatsapp_sent": false,
+    "config_live_applied": false,
+    "single_contact_smoke_enabled": false
+  },
+  "e2e_source": "C:\\Users\\Sprt\\Documents\\Proyectos IA\\AtendIA-v2\\reports\\dinamo_shadow_e2e_report.json",
+  "e2e_decision": "DINAMO_SHADOW_READY",
+  "real_replay_summary": {
+    "replay_cases_total": 20,
+    "replay_cases_passed": 20,
+    "critical_failure_count": 0,
+    "quote_guard_blocks_total": 0,
+    "progress_guard_blocks_total": 0,
+    "provider_retry_count": 0,
+    "provider_fallback_response_count": 0,
+    "duplicate_side_effect_count": 0,
+    "handoff_false_positive_count": 0,
+    "documents_stage_false_positive_count": 0,
+    "avg_turns_to_quote": 3.3077,
+    "avg_turns_to_handoff": 1.8,
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "repeated_question_rate": 0.0,
+    "definition_of_done_pass": true,
+    "dataset_cases_total": 20,
+    "dataset_turns_total": 109,
+    "tenant_domain_contract_path": "tests\\agent_runtime\\fixtures\\tenant_domain_contracts\\dinamo_motos_nl_shadow.json",
+    "tenant_domain_contract_loaded": true,
+    "tenant_contract_safety_flags_pass": true,
+    "side_effect_count": 0,
+    "whatsapp_sent_count": 0,
+    "outbox_count": 0,
+    "workflow_side_effect_count": 0,
+    "price_without_quote_count": 0,
+    "stale_quote_count": 0,
+    "requirements_mixed_count": 0,
+    "document_received_without_attachment_count": 0,
+    "approval_promised_count": 0,
+    "false_handoff_count": 0,
+    "provider_invoked": false,
+    "provider_fallback_count": 0
+  },
+  "covered_in_both": {
+    "tools": [
+      "catalog.search",
+      "credit_plan.resolve",
+      "handoff.create",
+      "quote.resolve",
+      "requirements.lookup"
+    ],
+    "business_events": [
+      "human_handoff_requested",
+      "intent_identified",
+      "lead_started",
+      "offer_quoted",
+      "requirements_requested",
+      "selection_identified"
+    ]
+  },
+  "real_only_patterns": {
+    "turn_types": {
+      "cliente comparte informacion sin datos personales": 56,
+      "cliente menciona interes en moto modelo anonimo": 14,
+      "cliente pregunta por documentos requeridos": 21,
+      "cliente pide hablar con asesor humano": 1,
+      "cliente solicita cotizacion": 13,
+      "cliente solicita cotizacion de moto modelo anonimo": 4
+    },
+    "tools": [],
+    "business_events": []
+  },
+  "e2e_only_coverage": {
+    "tools": [
+      "document.check",
+      "faq.lookup"
+    ],
+    "business_events": [
+      "document_received",
+      "plan_identified",
+      "requirements_complete",
+      "requirements_partial"
+    ],
+    "scenarios": [
+      "buro explicito sin rechazo automatico",
+      "por fuera -> Sin Comprobantes / 20%",
+      "document.check con adjunto parcial y completo",
+      "handoff dry-run por papeleria completa"
+    ]
+  },
+  "gaps": [
+    "El replay real anonimizado trae 56 turnos genericos de informacion sin PII que el E2E no modela.",
+    "No hay adjuntos reales anonimizados; document.check queda validado por E2E deterministico.",
+    "Referencias como 'esa/la otra/moto del anuncio' no son distinguibles tras la anonimizacion segura.",
+    "Solo una conversacion real contiene solicitud explicita de humano."
+  ]
+}

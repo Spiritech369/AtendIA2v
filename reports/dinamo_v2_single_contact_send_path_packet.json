@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-06-05",
+  "status": "PROPOSAL_ONLY",
+  "applied": false,
+  "tenant": {
+    "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "tenant_email": "dinamomotosnl@gmail.com",
+    "agent_name": "Francisco de Dinamo NL",
+    "business_owner": "Francisco Esparza",
+    "technical_rollback_owner": "Felipe Balderas"
+  },
+  "required_flags": {
+    "runtime_v2_enabled": true,
+    "rollout_mode": "single_contact_smoke",
+    "send_enabled": true,
+    "outbox_enabled": true,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "single_contact_smoke_enabled": true,
+    "send_scope": "approved_contact_only",
+    "allowed_contact_ids": ["<approved-contact-id>"],
+    "allowed_test_phones": ["<approved-phone>"],
+    "legacy_fallback_disabled_when_v2_enabled": true
+  },
+  "gates": {
+    "legacy_runner_blocked_when_v2_enabled": true,
+    "visible_copy_authority": "TurnOutput.final_message",
+    "contact_allowlist_required": true,
+    "single_contact_only": true,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "provider_fallback_blocks_prepared_send": true,
+    "packet_executes_outbox_or_whatsapp": false
+  },
+  "sql_proposal_only": "UPDATE tenants SET config = jsonb_set(coalesce(config, '{}'::jsonb), '{agent_runtime_v2}', (coalesce(config->'agent_runtime_v2', '{}'::jsonb) || jsonb_build_object('runtime_v2_enabled', true, 'rollout_mode', 'single_contact_smoke', 'send_enabled', true, 'outbox_enabled', true, 'actions_enabled', false, 'workflow_side_effects_enabled', false, 'single_contact_smoke_enabled', true, 'send_scope', 'approved_contact_only', 'allowed_contact_ids', jsonb_build_array('<approved-contact-id>'), 'allowed_test_phones', jsonb_build_array('<approved-phone>'))), true) WHERE id = '6ad78236-1fc9-467a-858d-90d248d57ee5';",
+  "blockers": [
+    "MISSING_APPROVED_CONTACT",
+    "CONTRACT_NOT_PERSISTED_LIVE_YET",
+    "PREFLIGHT_RUNNER_FILE_FAILED_EXISTING"
+  ]
+}

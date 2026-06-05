@@ -1,6 +1,16 @@
+from atendia.db.models.action_execution import ActionExecutionLog
 from atendia.db.models.advisor import Advisor, Vehicle
 from atendia.db.models.agent import Agent
 from atendia.db.models.appointment import Appointment
+from atendia.db.models.business_event_ledger import BusinessEventLedgerRow
+from atendia.db.models.commercial_catalog import (
+    Catalog,
+    CatalogExportJob,
+    CatalogImportJob,
+    CatalogItem,
+    CatalogItemPlan,
+    CatalogVersion,
+)
 from atendia.db.models.conversation import Conversation, ConversationRead, ConversationStateRow
 from atendia.db.models.customer import (
     Customer,
@@ -11,8 +21,13 @@ from atendia.db.models.customer import (
     CustomerScore,
     CustomerTimelineEvent,
 )
-from atendia.db.models.customer_fields import CustomerFieldDefinition, CustomerFieldValue
+from atendia.db.models.customer_fields import (
+    CustomerFieldDefinition,
+    CustomerFieldUpdateEvidence,
+    CustomerFieldValue,
+)
 from atendia.db.models.customer_note import CustomerNote
+from atendia.db.models.eval_readiness import AgentReadinessEvalResult
 from atendia.db.models.event import EventRow
 from atendia.db.models.field_suggestion import FieldSuggestion
 from atendia.db.models.kb_agent_permission import KbAgentPermission
@@ -26,10 +41,17 @@ from atendia.db.models.kb_test_run import KbTestRun
 from atendia.db.models.kb_unanswered_question import KbUnansweredQuestion
 from atendia.db.models.kb_version import KbVersion
 from atendia.db.models.knowledge_document import KnowledgeChunk, KnowledgeDocument
-from atendia.db.models.lifecycle import FollowupScheduled, HumanHandoff
-from atendia.db.models.message_attachment import MessageAttachmentRow
+from atendia.db.models.knowledge_os import (
+    KnowledgeItem,
+    KnowledgeOSChunk,
+    KnowledgeRetrievalLog,
+    KnowledgeSource,
+)
+from atendia.db.models.lifecycle import FollowupScheduled, HumanHandoff, LifecycleStageHistory
 from atendia.db.models.message import MessageRow
+from atendia.db.models.message_attachment import MessageAttachmentRow
 from atendia.db.models.notification import Notification
+from atendia.db.models.onboarding import OnboardingState
 from atendia.db.models.outbound_outbox import OutboundOutbox
 from atendia.db.models.tenant import Tenant, TenantUser
 from atendia.db.models.tenant_baileys_config import TenantBaileysConfig
@@ -61,11 +83,20 @@ from atendia.db.models.workflow import (
 
 __all__ = [
     "AIAgent",
+    "ActionExecutionLog",
     "Advisor",
     "AdvisorPool",
     "Agent",
+    "AgentReadinessEvalResult",
     "Appointment",
+    "BusinessEventLedgerRow",
     "BusinessHoursRule",
+    "Catalog",
+    "CatalogExportJob",
+    "CatalogImportJob",
+    "CatalogItem",
+    "CatalogItemPlan",
+    "CatalogVersion",
     "Conversation",
     "ConversationRead",
     "ConversationStateRow",
@@ -73,6 +104,7 @@ __all__ = [
     "CustomerAIReviewItem",
     "CustomerDocument",
     "CustomerFieldDefinition",
+    "CustomerFieldUpdateEvidence",
     "CustomerFieldValue",
     "CustomerNextBestAction",
     "CustomerNote",
@@ -96,9 +128,15 @@ __all__ = [
     "KnowledgeBaseSource",
     "KnowledgeChunk",
     "KnowledgeDocument",
-    "MessageRow",
+    "KnowledgeItem",
+    "KnowledgeOSChunk",
+    "KnowledgeRetrievalLog",
+    "KnowledgeSource",
+    "LifecycleStageHistory",
     "MessageAttachmentRow",
+    "MessageRow",
     "Notification",
+    "OnboardingState",
     "OutboundOutbox",
     "SafetyRule",
     "Tenant",

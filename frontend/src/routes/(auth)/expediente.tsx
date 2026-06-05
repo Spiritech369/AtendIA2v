@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ExpedientePage } from "@/features/expediente/components/ExpedientePage";
-import { requireRole } from "@/lib/auth-guards";
+import { requireCapability } from "@/lib/auth-guards";
 
 export const Route = createFileRoute("/(auth)/expediente")({
-  beforeLoad: requireRole(["tenant_admin", "superadmin"]),
+  beforeLoad: requireCapability("route.expediente", ["tenant_admin", "superadmin"]),
   component: ExpedientePage,
 });

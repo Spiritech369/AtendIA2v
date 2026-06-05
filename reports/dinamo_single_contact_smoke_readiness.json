@@ -1,0 +1,117 @@
+{
+  "generated_at": "2026-06-03T23:52:46-06:00",
+  "decision": "NOT_READY_CONTACT_GATE_NOT_SUPPORTED",
+  "allowed_decisions": [
+    "READY_FOR_SINGLE_CONTACT_SMOKE_APPROVAL",
+    "NOT_READY_MISSING_APPROVED_TEST_CONTACT",
+    "NOT_READY_CONTACT_GATE_NOT_SUPPORTED",
+    "NOT_READY_PREFLIGHT_FAILED",
+    "NOT_READY_REPLAY_REGRESSION",
+    "NOT_READY_ROLLBACK_INCOMPLETE"
+  ],
+  "traffic_started": false,
+  "tenant_config_applied": false,
+  "whatsapp_sent": false,
+  "actions_enabled": false,
+  "workflow_side_effects_enabled": false,
+  "canary_5_percent_activated": false,
+  "tenant": {
+    "id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+    "name": "Dinamo Motos NL",
+    "email": "dinamomotosnl@gmail.com",
+    "domain": "vehicle_credit_sales"
+  },
+  "agent": {
+    "id": "c169deec-226d-55b7-bd07-270f339e75a6",
+    "name": "Francisco de Dinamo NL",
+    "status": "production"
+  },
+  "approved_contact": {
+    "phone": "+528212889421",
+    "phone_approved": true,
+    "contact_id": null,
+    "contact_id_status": "UNRESOLVED_DB_UNAVAILABLE"
+  },
+  "contact_gate": {
+    "universal_agent_runtime_v2_supported": false,
+    "decision": "CONTACT_GATE_NOT_SUPPORTED",
+    "separate_dinamo_specific_gate_supported": true,
+    "separate_gate_focused_test": "3 passed, 1 skipped, 2 warnings",
+    "report": "reports/dinamo_single_contact_gate_verification.md"
+  },
+  "packets": {
+    "scope": "reports/dinamo_single_contact_smoke_scope.md",
+    "gate_verification": "reports/dinamo_single_contact_gate_verification.md",
+    "activation": {
+      "path": "reports/dinamo_single_contact_smoke_activation_packet.md",
+      "status": "blocked_not_prepared_for_application"
+    },
+    "rollback": {
+      "path": "reports/dinamo_single_contact_smoke_rollback.md",
+      "status": "ready_as_proposal_only"
+    },
+    "human_approval_request": {
+      "path": "reports/dinamo_single_contact_smoke_human_approval_request.md",
+      "status": "blocked_draft_only"
+    },
+    "post_report_template": "reports/dinamo_single_contact_smoke_post_report_template.md"
+  },
+  "preflight": {
+    "dinamo_shadow_e2e": {
+      "command": "uv run pytest tests/agent_runtime/test_dinamo_shadow_e2e.py -q",
+      "exit_code": 0,
+      "result": "4 passed, 1 warning in 0.21s"
+    },
+    "agent_runtime_no_db": {
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "exit_code": 0,
+      "result": "196 passed, 27 deselected, 2 warnings in 3.78s"
+    },
+    "real_replay_shadow": {
+      "command": "uv run python -m atendia.simulation.replay_eval --dataset ..\\reports\\dinamo_shadow_real_replay_dataset.anonymized.json --tenant-domain-contract tests\\agent_runtime\\fixtures\\tenant_domain_contracts\\dinamo_motos_nl_shadow.json --anonymized",
+      "exit_code": 0,
+      "result": {
+        "replay_cases_passed": 20,
+        "replay_cases_total": 20,
+        "dataset_turns_total": 109,
+        "definition_of_done_pass": true,
+        "critical_failure_count": 0,
+        "side_effect_count": 0,
+        "whatsapp_sent_count": 0,
+        "outbox_count": 0,
+        "workflow_side_effect_count": 0,
+        "provider_fallback_count": 0,
+        "provider_fallback_response_count": 0,
+        "provider_invoked": false,
+        "stale_quote_count": 0,
+        "price_without_quote_count": 0,
+        "requirements_mixed_count": 0,
+        "document_received_without_attachment_count": 0,
+        "approval_promised_count": 0,
+        "false_handoff_count": 0
+      }
+    },
+    "high_risk_conversations": {
+      "source": "reports/dinamo_shadow_human_sales_quality_review.json",
+      "value": 0
+    }
+  },
+  "warnings": [
+    "No real anonymized attachments existed in real replay; document.check real path remains covered by deterministic E2E.",
+    "Coverage gaps remain: por_fuera_como_no_apto, buro_como_rechazo_automatico, ok/va/si despues de cotizacion, referencias tipo la primera/esa/la otra.",
+    "uv run pytest tests/simulation -q previously had one preexisting advisor_first_multiturn case_05 repetition_detected failure.",
+    "Separate Dinamo-specific live-limited gate exists but is not the universal path requested."
+  ],
+  "remaining_risks": [
+    "Universal send path could send to any eligible conversation once tenant/agent/channel send is enabled.",
+    "Approved contact_id is unresolved because local DB was unavailable.",
+    "Activation packet intentionally has no runnable SQL until the gate is implemented or an exception is approved."
+  ],
+  "required_before_real_test": [
+    "Implement and test a universal agent_runtime_v2 contact/phone allowlist before outbox staging, or obtain explicit human exception to use the separate Dinamo-specific live-limited path.",
+    "Resolve or confirm the approved contact_id if contact ID gating will be canonical.",
+    "Regenerate activation packet with enforceable proposal-only config.",
+    "Get explicit human approval using the approval text.",
+    "Manually apply approved config only after approval."
+  ]
+}

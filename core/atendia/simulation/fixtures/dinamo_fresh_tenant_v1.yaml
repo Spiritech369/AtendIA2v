@@ -1,0 +1,106 @@
+name: dinamo_fresh_tenant_v1
+tenant: Dinamo Motos NL
+tenant_id: 6ad78236-1fc9-467a-858d-90d248d57ee5
+runtime: agent_runtime_v2
+rollout_mode: preview_only
+global_hard_fails:
+  - quote_placeholders
+  - papeleria_incompleta_without_attachment
+  - doc_completos_without_accepted_checklist
+  - quote_without_quote_resolver
+  - autorizado_written_by_ai
+  - automatic_move_to_sistema_or_cliente_cerrado
+  - flujo_used_as_factual_source
+cases:
+  - case_id: credito_happy_path_nomina_tarjeta
+    turns:
+      - customer: Hola, quiero una moto a credito.
+      - customer: Tengo 8 meses trabajando.
+      - customer: Me interesa la Comando.
+      - customer: Me depositan en tarjeta.
+      - customer: Si me dan recibos.
+      - customer: Mi comprobante puede estar a otro nombre?
+      - customer: Que documentos siguen?
+      - customer: Mando mi INE.
+        attachment: ine_ambos_lados.jpg
+      - customer: Mando estado de cuenta, nomina y comprobante.
+        attachments: [estado_cuenta.pdf, nomina.pdf, comprobante.jpg]
+    expected:
+      Cumple_Antiguedad: true
+      Plan_Credito: Nomina Tarjeta
+      Plan_Enganche: 10%
+      Cotizacion_Enviada: true
+      stage_after_quote: cliente_potencial
+      stage_after_first_attachment: papeleria_incompleta
+      Doc_Completos: true
+      Handoff_Humano: true
+  - case_id: no_cumple_antiguedad
+    turns:
+      - customer: Quiero credito.
+      - customer: Tengo 2 meses trabajando.
+    expected:
+      Cumple_Antiguedad: false
+      stage: galgo
+      no_plan: true
+      no_docs: true
+  - case_id: contado_directo
+    turns:
+      - customer: Quiero comprar de contado la R4.
+    expected:
+      Plan_Credito: Contado
+      Plan_Enganche: 100%
+      Cotizacion_Enviada: true
+      stage: cliente_potencial
+      no_credit_docs: true
+  - case_id: sin_comprobantes
+    turns:
+      - customer: Tengo 1 ano trabajando.
+      - customer: Me pagan por fuera.
+      - customer: Quiero una U5.
+    expected:
+      Plan_Credito: Sin Comprobantes
+      Plan_Enganche: 20%
+      required_docs: [INE_AMBOS_LADOS, COMPROBANTE_DOMICILIO]
+  - case_id: nomina_recibos
+    turns:
+      - customer: Tengo 10 meses.
+      - customer: Me pagan efectivo pero tengo recibos.
+    expected:
+      Plan_Credito: Nomina Recibos
+      Plan_Enganche: 15%
+  - case_id: guardia
+    turns:
+      - customer: Tengo 2 anos trabajando.
+      - customer: Soy guardia de seguridad.
+    expected:
+      Plan_Credito: Guardia
+      Plan_Enganche: 30%
+  - case_id: documentos_mama
+    turns:
+      - customer: Puedo mandar documentos de mi mama?
+    expected:
+      answer_mentions: [comprobante domicilio puede ser familiar, ingresos deben ser del cliente]
+      no_stage: papeleria_incompleta
+  - case_id: documento_antes_de_plan
+    turns:
+      - customer: Te mando mi INE.
+        attachment: ine.jpg
+      - customer: Que sigue?
+    expected:
+      Doc_Completos: false
+      no_stage: papeleria_completa
+      asks_missing_data: true
+  - case_id: modelo_ambiguo
+    turns:
+      - customer: Quiero la R4.
+    expected:
+      resolve_exact_if_catalog_allows: true
+      max_options_if_ambiguous: 3
+      no_invention: true
+  - case_id: cliente_pide_humano
+    turns:
+      - customer: Quiero hablar con alguien.
+    expected:
+      Handoff_Humano: true
+      needs_human: true
+      no_stage_handoff: true

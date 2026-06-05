@@ -18,6 +18,10 @@ def test_kb_models_importable() -> None:
         KbVersion,
         KnowledgeChunk,
         KnowledgeDocument,
+        KnowledgeItem,
+        KnowledgeOSChunk,
+        KnowledgeRetrievalLog,
+        KnowledgeSource,
         TenantCatalogItem,
         TenantFAQ,
     )
@@ -97,3 +101,15 @@ def test_kb_models_importable() -> None:
 
     assert KbSafeAnswerSetting.__tablename__ == "kb_safe_answer_settings"
     assert hasattr(KbSafeAnswerSetting, "default_fallback_message")
+
+    assert KnowledgeSource.__tablename__ == "knowledge_sources"
+    assert hasattr(KnowledgeSource, "content_type")
+
+    assert KnowledgeItem.__tablename__ == "knowledge_items"
+    assert hasattr(KnowledgeItem, "structured_data")
+
+    assert KnowledgeOSChunk.__tablename__ == "knowledge_os_chunks"
+    assert hasattr(KnowledgeOSChunk, "chunk_text")
+
+    assert KnowledgeRetrievalLog.__tablename__ == "knowledge_retrieval_logs"
+    assert hasattr(KnowledgeRetrievalLog, "citations_json")

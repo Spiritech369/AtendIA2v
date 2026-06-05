@@ -1,0 +1,46 @@
+{
+  "decision": "legacy fallback necesario",
+  "generated_at": "2026-06-03T22:24:52.1570446-06:00",
+  "production_runner_replaced": false,
+  "legacy_fallback_required": true,
+  "comparison": {
+    "visible_response": {
+      "legacy": "current production authority",
+      "universal_shadow": "TurnOutput.final_message in preview"
+    },
+    "fields": {
+      "legacy": "existing runtime path",
+      "universal_shadow": "declarative StateWriter accept/block decisions"
+    },
+    "pipeline": {
+      "legacy": "unchanged",
+      "universal_shadow": [
+        "plan_identificado",
+        "cotizado",
+        "papeleria_solicitada",
+        "papeleria_recibida",
+        "en_revision_humana"
+      ]
+    },
+    "workflows": {
+      "legacy": "unchanged",
+      "universal_shadow": "business events dry-run only"
+    },
+    "tool_usage": {
+      "legacy": "existing behavior",
+      "universal_shadow": "mandatory tool facts and tenant-scoped structured results"
+    },
+    "risk_of_incoherence": {
+      "legacy": "fallback still necessary",
+      "universal_shadow": "lower in tested path because GPT proposed is separated from AtendIA validation"
+    }
+  },
+  "per_turn": [
+    {"turn": 1, "decision": "universal mejor; legacy fallback necesario"},
+    {"turn": 2, "decision": "universal mejor; legacy fallback necesario"},
+    {"turn": 3, "decision": "universal mejor; legacy fallback necesario"},
+    {"turn": 4, "decision": "universal mejor; legacy fallback necesario"},
+    {"turn": 5, "decision": "universal mejor; legacy fallback necesario"},
+    {"turn": 6, "decision": "universal mejor; legacy fallback necesario"}
+  ]
+}

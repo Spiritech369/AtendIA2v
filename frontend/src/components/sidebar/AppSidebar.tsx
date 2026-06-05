@@ -3,9 +3,10 @@ import { useMemo } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavBadges } from "@/features/navigation/hooks";
-import { filterMenuByRole, NAV_GROUPS } from "@/features/navigation/menu-config";
+import { filterMenuByCapabilities, NAV_GROUPS } from "@/features/navigation/menu-config";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
+import { useCapabilitiesStore } from "@/stores/capabilities";
 import { useSidebarStore } from "@/stores/sidebar-store";
 
 import { SidebarFooter } from "./SidebarFooter";
@@ -21,10 +22,14 @@ import { SidebarHeader } from "./SidebarHeader";
 export function AppSidebar() {
   const user = useAuthStore((s) => s.user);
   const compact = useSidebarStore((s) => s.compact);
+  const capabilities = useCapabilitiesStore((s) => s.capabilities?.current_user.capabilities);
   const path = useRouterState({ select: (s) => s.location.pathname });
   const badges = useNavBadges();
 
-  const groups = useMemo(() => filterMenuByRole(NAV_GROUPS, user?.role), [user?.role]);
+  const groups = useMemo(
+    () => filterMenuByCapabilities(NAV_GROUPS, user?.role, capabilities),
+    [capabilities, user?.role],
+  );
 
   return (
     <aside

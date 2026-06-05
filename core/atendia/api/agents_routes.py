@@ -7,21 +7,55 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select, text, update
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from atendia.agent_runtime import (
+    AgentRuntime,
+    ContextBuilder,
+    PolicyValidationError,
+    PolicyValidator,
+    PostTurnActionExecutor,
+    RolloutDecision,
+    RolloutPolicyService,
+    TurnContext,
+    TurnInput,
+)
+from atendia.agent_runtime.action_registry import default_action_registry
+from atendia.agent_runtime.agent_config import (
+    AGENT_STUDIO_V2_KEY,
+    AGENT_TEMPLATES,
+    action_registry_for_agent,
+    agent_studio_config_from_values,
+    list_string_values,
+)
+from atendia.agent_runtime.model_provider import build_agent_turn_provider
+from atendia.agent_runtime.schemas import (
+    ActiveAgentContext,
+    ContactFieldDefinitionContext,
+    LifecycleContext,
+    MessageContext,
+)
 from atendia.api._audit import emit_admin_event
 from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
+from atendia.config import get_settings
 from atendia.config_validation import (
     validate_agent_activation_config,
+)
+from atendia.config_validation import (
     validate_agent_config as validate_agent_references,
 )
-from atendia.config import get_settings
 from atendia.db.models.agent import Agent
+from atendia.db.models.customer_fields import CustomerFieldDefinition
+from atendia.db.models.knowledge_document import KnowledgeDocument
+from atendia.db.models.knowledge_os import KnowledgeSource as KnowledgeSourceRow
+from atendia.db.models.tenant_config import TenantCatalogItem, TenantFAQ, TenantPipeline
 from atendia.db.models.workflow import Workflow
 from atendia.db.session import get_db_session
+from atendia.eval_lab.readiness import ReadinessService, readiness_result_payload
+from atendia.knowledge.os import UnifiedKnowledgeProvider
 
 router = APIRouter()
 guardrails_router = APIRouter()
@@ -32,6 +66,7 @@ scenarios_router = APIRouter()
 AGENT_ROLES = {
     "sales",
     "support",
+    "receptionist",
     "collections",
     "documentation",
     "reception",
@@ -74,6 +109,7 @@ class AgentItem(BaseModel):
     goal: str | None
     style: str | None
     tone: str | None
+    voice: dict
     language: str | None
     max_sentences: int | None
     no_emoji: bool
@@ -86,6 +122,15 @@ class AgentItem(BaseModel):
     knowledge_config: dict
     flow_mode_rules: dict | None
     ops_config: dict
+    template: str
+    instructions: str
+    language_policy: dict
+    enabled_knowledge_source_ids: list[str]
+    enabled_action_ids: list[str]
+    visible_contact_field_keys: list[str]
+    allowed_lifecycle_stage_ids: list[str]
+    escalation_policy: dict
+    metadata: dict
     created_at: datetime
     updated_at: datetime
     health: dict
@@ -103,6 +148,7 @@ class AgentItem(BaseModel):
 class AgentBody(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     role: str = "custom"
+    template: str | None = None
     status: str = "production"
     behavior_mode: str = "normal"
     version: str = "v2.4"
@@ -111,6 +157,7 @@ class AgentBody(BaseModel):
     goal: str | None = None
     style: str | None = Field(default=None, max_length=200)
     tone: str | None = Field(default="amigable", max_length=40)
+    voice: dict = Field(default_factory=dict)
     language: str | None = Field(default="es", max_length=20)
     max_sentences: int | None = Field(default=3, ge=1, le=5)
     no_emoji: bool = False
@@ -123,12 +170,27 @@ class AgentBody(BaseModel):
     knowledge_config: dict = Field(default_factory=dict)
     flow_mode_rules: dict | None = None
     ops_config: dict = Field(default_factory=dict)
+    instructions: str | None = None
+    language_policy: dict | None = None
+    enabled_knowledge_source_ids: list[UUID | str] | None = None
+    enabled_action_ids: list[str] | None = None
+    visible_contact_field_keys: list[str] | None = None
+    allowed_lifecycle_stage_ids: list[str] | None = None
+    escalation_policy: dict | None = None
+    metadata: dict | None = None
 
     @field_validator("role")
     @classmethod
     def _role(cls, value: str) -> str:
         if value not in AGENT_ROLES:
             raise ValueError("invalid agent role")
+        return value
+
+    @field_validator("template")
+    @classmethod
+    def _template(cls, value: str | None) -> str | None:
+        if value is not None and value not in AGENT_TEMPLATES:
+            raise ValueError("invalid agent template")
         return value
 
     @field_validator("status")
@@ -159,6 +221,7 @@ class AgentPatch(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     role: str | None = None
+    template: str | None = None
     status: str | None = None
     behavior_mode: str | None = None
     version: str | None = None
@@ -167,6 +230,7 @@ class AgentPatch(BaseModel):
     goal: str | None = None
     style: str | None = Field(default=None, max_length=200)
     tone: str | None = Field(default=None, max_length=40)
+    voice: dict | None = None
     language: str | None = Field(default=None, max_length=20)
     max_sentences: int | None = Field(default=None, ge=1, le=5)
     no_emoji: bool | None = None
@@ -179,12 +243,27 @@ class AgentPatch(BaseModel):
     knowledge_config: dict | None = None
     flow_mode_rules: dict | None = None
     ops_config: dict | None = None
+    instructions: str | None = None
+    language_policy: dict | None = None
+    enabled_knowledge_source_ids: list[UUID | str] | None = None
+    enabled_action_ids: list[str] | None = None
+    visible_contact_field_keys: list[str] | None = None
+    allowed_lifecycle_stage_ids: list[str] | None = None
+    escalation_policy: dict | None = None
+    metadata: dict | None = None
 
     @field_validator("role")
     @classmethod
     def _patch_role(cls, value: str | None) -> str | None:
         if value is not None and value not in AGENT_ROLES:
             raise ValueError("invalid agent role")
+        return value
+
+    @field_validator("template")
+    @classmethod
+    def _patch_template(cls, value: str | None) -> str | None:
+        if value is not None and value not in AGENT_TEMPLATES:
+            raise ValueError("invalid agent template")
         return value
 
     @field_validator("status")
@@ -221,6 +300,54 @@ class AgentTestResponse(BaseModel):
     response: str
     flow_mode: str
     intent: str
+
+
+class TestTurnHistoryItem(BaseModel):
+    role: str = Field(pattern="^(customer|agent|system)$")
+    text: str = Field(min_length=1, max_length=4000)
+    sent_at: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class TestTurnContactField(BaseModel):
+    key: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=200)
+    field_type: str = Field(default="text", max_length=40)
+    options: dict | None = None
+
+
+class AgentTestTurnV2Body(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    test_message: str = Field(min_length=1, max_length=4000)
+    conversation_history: list[TestTurnHistoryItem] = Field(default_factory=list, max_length=30)
+    contact_fields: list[TestTurnContactField] = Field(default_factory=list, max_length=80)
+    lifecycle_stage: str | None = Field(default=None, max_length=80)
+    knowledge_source_ids: list[UUID] | None = None
+    save_readiness_evidence: bool = False
+    requires_knowledge_citation: bool = False
+    metadata: dict = Field(default_factory=dict)
+
+
+class AgentTestTurnV2Response(BaseModel):
+    final_message: str
+    knowledge_citations: list[dict]
+    field_updates: list[dict]
+    lifecycle_update: dict | None
+    actions: list[dict]
+    confidence: float
+    needs_human: bool
+    risk_flags: list[str]
+    trace_metadata: dict
+    debug: dict
+
+
+class AgentStudioOption(BaseModel):
+    id: str
+    label: str
+    type: str | None = None
+    description: str | None = None
+    metadata: dict = Field(default_factory=dict)
 
 
 class PreviewBody(BaseModel):
@@ -403,7 +530,16 @@ def _default_extraction_fields(role: str) -> list[dict]:
             "last_value": "nómina" if key == "tipo_credito" else "Juan Pérez",
             "status": "confirmed" if not requires_confirmation else "pending",
         }
-        for key, label, field_type, required, threshold, auto_save, requires_confirmation, source in fields
+        for (
+            key,
+            label,
+            field_type,
+            required,
+            threshold,
+            auto_save,
+            requires_confirmation,
+            source,
+        ) in fields
     ]
 
 
@@ -634,8 +770,23 @@ def _merged_ops(row: Agent) -> dict:
     return merged
 
 
+def _studio_config(row: Agent) -> dict:
+    return agent_studio_config_from_values(
+        role=row.role,
+        system_prompt=row.system_prompt,
+        tone=row.tone,
+        language=row.language,
+        knowledge_config=row.knowledge_config or {},
+        auto_actions=row.auto_actions or {},
+        extraction_config=row.extraction_config or {},
+        flow_mode_rules=row.flow_mode_rules or {},
+        ops_config=row.ops_config or {},
+    )
+
+
 def _item(row: Agent) -> AgentItem:
     ops = _merged_ops(row)
+    studio = _studio_config(row)
     return AgentItem(
         id=row.id,
         tenant_id=row.tenant_id,
@@ -649,6 +800,7 @@ def _item(row: Agent) -> AgentItem:
         goal=row.goal,
         style=row.style,
         tone=row.tone,
+        voice=row.voice or {},
         language=row.language,
         max_sentences=row.max_sentences,
         no_emoji=row.no_emoji,
@@ -665,6 +817,15 @@ def _item(row: Agent) -> AgentItem:
         knowledge_config=row.knowledge_config or {},
         flow_mode_rules=row.flow_mode_rules,
         ops_config=row.ops_config or {},
+        template=studio["template"],
+        instructions=studio["instructions"],
+        language_policy=studio["language_policy"],
+        enabled_knowledge_source_ids=studio["enabled_knowledge_source_ids"],
+        enabled_action_ids=studio["enabled_action_ids"],
+        visible_contact_field_keys=studio["visible_contact_field_keys"],
+        allowed_lifecycle_stage_ids=studio["allowed_lifecycle_stage_ids"],
+        escalation_policy=studio["escalation_policy"],
+        metadata=studio["metadata"],
         created_at=row.created_at,
         updated_at=row.updated_at,
         health=ops["health"],
@@ -697,6 +858,341 @@ async def _get_agent_or_404(session: AsyncSession, agent_id: UUID, tenant_id: UU
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "agent not found")
     return row
+
+
+STUDIO_FIELD_NAMES = {
+    "template",
+    "instructions",
+    "language_policy",
+    "enabled_knowledge_source_ids",
+    "enabled_action_ids",
+    "visible_contact_field_keys",
+    "allowed_lifecycle_stage_ids",
+    "escalation_policy",
+    "metadata",
+}
+
+
+def _normalize_uuid_strings(values: list[UUID | str] | None, field_name: str) -> list[str]:
+    if values is None:
+        return []
+    normalized: list[str] = []
+    for value in values:
+        try:
+            normalized.append(str(UUID(str(value))))
+        except ValueError as exc:
+            raise HTTPException(422, f"{field_name} contains an invalid UUID") from exc
+    return list(dict.fromkeys(normalized))
+
+
+def _normalize_string_list(values: list[str] | None) -> list[str]:
+    return list_string_values(values or [])
+
+
+def _merge_studio_values(values: dict, studio_values: dict) -> dict:
+    merged = dict(values)
+    if not studio_values:
+        return merged
+
+    ops = deepcopy(merged.get("ops_config") or {})
+    studio = deepcopy(ops.get(AGENT_STUDIO_V2_KEY) or {})
+    knowledge = deepcopy(merged.get("knowledge_config") or {})
+    actions = deepcopy(merged.get("auto_actions") or {})
+    extraction = deepcopy(merged.get("extraction_config") or {})
+    flow_rules = deepcopy(merged.get("flow_mode_rules") or {})
+
+    if "template" in studio_values:
+        template = studio_values["template"] or "custom"
+        studio["template"] = template
+        if template != "custom" and "role" not in merged:
+            merged["role"] = template
+    if "instructions" in studio_values:
+        merged["system_prompt"] = studio_values["instructions"]
+        studio["instructions"] = studio_values["instructions"] or ""
+    if "language_policy" in studio_values:
+        studio["language_policy"] = studio_values["language_policy"] or {}
+    if "enabled_knowledge_source_ids" in studio_values:
+        ids = _normalize_uuid_strings(
+            studio_values["enabled_knowledge_source_ids"],
+            "enabled_knowledge_source_ids",
+        )
+        knowledge["enabled_source_ids"] = ids
+        studio["enabled_knowledge_source_ids"] = ids
+    if "enabled_action_ids" in studio_values:
+        ids = _normalize_string_list(studio_values["enabled_action_ids"])
+        actions["enabled_action_ids"] = ids
+        studio["enabled_action_ids"] = ids
+    if "visible_contact_field_keys" in studio_values:
+        keys = _normalize_string_list(studio_values["visible_contact_field_keys"])
+        extraction["visible_contact_field_keys"] = keys
+        studio["visible_contact_field_keys"] = keys
+    if "allowed_lifecycle_stage_ids" in studio_values:
+        ids = _normalize_string_list(studio_values["allowed_lifecycle_stage_ids"])
+        flow_rules["allowed_stage_ids"] = ids
+        studio["allowed_lifecycle_stage_ids"] = ids
+    if "escalation_policy" in studio_values:
+        studio["escalation_policy"] = studio_values["escalation_policy"] or {}
+    if "metadata" in studio_values:
+        studio["metadata"] = studio_values["metadata"] or {}
+
+    ops[AGENT_STUDIO_V2_KEY] = studio
+    merged["ops_config"] = ops
+    merged["knowledge_config"] = knowledge
+    merged["auto_actions"] = actions
+    merged["extraction_config"] = extraction
+    merged["flow_mode_rules"] = flow_rules
+    return merged
+
+
+async def _validate_agent_studio_values(
+    session: AsyncSession,
+    tenant_id: UUID,
+    studio_values: dict,
+) -> None:
+    if "enabled_action_ids" in studio_values:
+        available = {
+            definition.name
+            for definition in default_action_registry().list_definitions()
+            if definition.enabled
+        }
+        unknown = sorted(
+            set(_normalize_string_list(studio_values["enabled_action_ids"])) - available
+        )
+        if unknown:
+            raise HTTPException(422, f"unknown enabled_action_ids: {', '.join(unknown)}")
+
+    if "enabled_knowledge_source_ids" in studio_values:
+        requested = set(
+            _normalize_uuid_strings(
+                studio_values["enabled_knowledge_source_ids"],
+                "enabled_knowledge_source_ids",
+            )
+        )
+        if requested:
+            available = await _tenant_knowledge_source_ids(session, tenant_id)
+            unknown = sorted(requested - available)
+            if unknown:
+                raise HTTPException(
+                    422,
+                    f"enabled_knowledge_source_ids outside tenant or missing: {', '.join(unknown)}",
+                )
+
+    if "visible_contact_field_keys" in studio_values:
+        requested = set(_normalize_string_list(studio_values["visible_contact_field_keys"]))
+        if requested:
+            available = await _tenant_contact_field_keys(session, tenant_id)
+            unknown = sorted(requested - available)
+            if unknown:
+                raise HTTPException(
+                    422,
+                    f"unknown visible_contact_field_keys: {', '.join(unknown)}",
+                )
+
+    if "allowed_lifecycle_stage_ids" in studio_values:
+        requested = set(_normalize_string_list(studio_values["allowed_lifecycle_stage_ids"]))
+        if requested:
+            available = await _tenant_lifecycle_stage_ids(session, tenant_id)
+            unknown = sorted(requested - available)
+            if unknown:
+                raise HTTPException(
+                    422,
+                    f"unknown allowed_lifecycle_stage_ids: {', '.join(unknown)}",
+                )
+
+
+async def _tenant_contact_field_keys(session: AsyncSession, tenant_id: UUID) -> set[str]:
+    rows = (
+        await session.execute(
+            select(CustomerFieldDefinition.key).where(
+                CustomerFieldDefinition.tenant_id == tenant_id
+            )
+        )
+    ).scalars()
+    return {str(key) for key in rows.all()}
+
+
+async def _tenant_lifecycle_stage_ids(session: AsyncSession, tenant_id: UUID) -> set[str]:
+    definition = (
+        await session.execute(
+            select(TenantPipeline.definition)
+            .where(TenantPipeline.tenant_id == tenant_id, TenantPipeline.active.is_(True))
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    stages = (definition or {}).get("stages")
+    if not isinstance(stages, list):
+        return set()
+    return {str(stage.get("id")) for stage in stages if isinstance(stage, dict) and stage.get("id")}
+
+
+async def _tenant_knowledge_source_ids(session: AsyncSession, tenant_id: UUID) -> set[str]:
+    source_ids: set[str] = set()
+    faq_ids = (
+        await session.execute(select(TenantFAQ.id).where(TenantFAQ.tenant_id == tenant_id))
+    ).scalars()
+    source_ids.update(str(value) for value in faq_ids.all())
+    catalog_ids = (
+        await session.execute(
+            select(TenantCatalogItem.id).where(TenantCatalogItem.tenant_id == tenant_id)
+        )
+    ).scalars()
+    source_ids.update(str(value) for value in catalog_ids.all())
+    doc_ids = (
+        await session.execute(
+            select(KnowledgeDocument.id).where(KnowledgeDocument.tenant_id == tenant_id)
+        )
+    ).scalars()
+    source_ids.update(str(value) for value in doc_ids.all())
+    if await _knowledge_os_tables_available(session):
+        rows = (
+            await session.execute(
+                select(KnowledgeSourceRow.id).where(KnowledgeSourceRow.tenant_id == tenant_id)
+            )
+        ).scalars()
+        source_ids.update(str(value) for value in rows.all())
+    return source_ids
+
+
+async def _knowledge_os_tables_available(session: AsyncSession) -> bool:
+    try:
+        value = (await session.execute(text("SELECT to_regclass('knowledge_sources')"))).scalar()
+    except ProgrammingError:
+        await session.rollback()
+        return False
+    return bool(value)
+
+
+class _StaticContextBuilder:
+    def __init__(self, context: TurnContext) -> None:
+        self._context = context
+
+    async def build(self, turn_input: TurnInput) -> TurnContext:
+        return self._context
+
+
+def _build_test_turn_runtime(context: TurnContext) -> AgentRuntime:
+    return AgentRuntime(
+        context_builder=_StaticContextBuilder(context),
+        provider=build_agent_turn_provider(
+            model_provider_allowed=_model_provider_allowed_from_context(context),
+        ),
+    )
+
+
+def _model_provider_allowed_from_context(context: TurnContext) -> bool | None:
+    rollout = context.metadata.get("rollout")
+    if not isinstance(rollout, dict):
+        return None
+    value = rollout.get("model_provider_allowed")
+    return value if isinstance(value, bool) else None
+
+
+def _rollout_http_error(decision: RolloutDecision) -> HTTPException:
+    return HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        {
+            "message": f"agent_runtime_v2 {decision.capability} is not allowed",
+            "rollout": decision.model_dump(mode="json"),
+        },
+    )
+
+
+async def _build_test_turn_context(
+    *,
+    session: AsyncSession,
+    tenant_id: UUID,
+    agent: Agent,
+    body: AgentTestTurnV2Body,
+) -> TurnContext:
+    metadata = {
+        **body.metadata,
+        "agent_id": str(agent.id),
+        "test_harness": "agent_test_turn_v2",
+    }
+    studio_config = _studio_config(agent)
+    enabled_source_ids = (
+        _normalize_uuid_strings(body.knowledge_source_ids, "knowledge_source_ids")
+        if body.knowledge_source_ids
+        else studio_config["enabled_knowledge_source_ids"]
+    )
+    if enabled_source_ids:
+        metadata["enabled_knowledge_source_ids"] = enabled_source_ids
+    knowledge_provider = UnifiedKnowledgeProvider(session)
+    base = await ContextBuilder(knowledge_provider=knowledge_provider).build(
+        TurnInput(
+            tenant_id=str(tenant_id),
+            conversation_id=str(uuid4()),
+            inbound_text=body.test_message,
+            metadata=metadata,
+        )
+    )
+    history = [
+        MessageContext(
+            role=item.role, text=item.text, sent_at=item.sent_at, metadata=item.metadata
+        )
+        for item in body.conversation_history
+    ]
+    if not history:
+        history = list(base.messages)
+    elif not any(item.text == body.test_message and item.role == "customer" for item in history):
+        history.append(MessageContext(role="customer", text=body.test_message))
+    visible_keys = set(studio_config["visible_contact_field_keys"])
+    contact_fields = [
+        ContactFieldDefinitionContext(
+            key=field.key,
+            label=field.label,
+            field_type=field.field_type,
+            options=field.options,
+        )
+        for field in body.contact_fields
+        if not visible_keys or field.key in visible_keys
+    ]
+    return base.model_copy(
+        update={
+            "messages": history,
+            "contact_fields": contact_fields,
+            "lifecycle": LifecycleContext(
+                stage=body.lifecycle_stage,
+                status="test",
+                metadata={"source": "test_turn_v2"},
+            ),
+            "active_agent": ActiveAgentContext(
+                id=str(agent.id),
+                name=agent.name,
+                role=agent.role,
+                behavior_mode=agent.behavior_mode,
+                instructions=studio_config["instructions"],
+                tone=studio_config["tone"],
+                language_policy=studio_config["language_policy"],
+                enabled_knowledge_source_ids=studio_config["enabled_knowledge_source_ids"],
+                enabled_action_ids=studio_config["enabled_action_ids"],
+                visible_contact_field_keys=studio_config["visible_contact_field_keys"],
+                allowed_lifecycle_stage_ids=studio_config["allowed_lifecycle_stage_ids"],
+                escalation_policy=studio_config["escalation_policy"],
+                metadata={
+                    "status": agent.status,
+                    "test_harness": True,
+                    "template": studio_config["template"],
+                    "enabled_action_ids": studio_config["enabled_action_ids"],
+                    "enabled_knowledge_source_ids": enabled_source_ids,
+                },
+            ),
+            "metadata": {
+                **base.metadata,
+                **metadata,
+            },
+        }
+    )
+
+
+def _context_summary(context: TurnContext) -> str:
+    return (
+        f"tenant={context.tenant_id}; conversation={context.conversation_id}; "
+        f"messages={len(context.messages)}; contact_fields={len(context.contact_fields)}; "
+        f"citations={len(context.knowledge_citations)}; "
+        f"stage={context.lifecycle.stage or 'none'}"
+    )
 
 
 async def _find_agent_by_nested_id(
@@ -964,7 +1460,11 @@ async def _preview_response(row: Agent, message: str, draft_config: dict | None 
             {
                 "step": "llm_call",
                 "status": "ok",
-                "detail": f"{resp.model} · {latency_ms}ms · {resp.usage.prompt_tokens}in/{resp.usage.completion_tokens}out",
+                "detail": (
+                    f"{resp.model} · {latency_ms}ms · "
+                    f"{resp.usage.prompt_tokens}in/"
+                    f"{resp.usage.completion_tokens}out"
+                ),
             },
         ],
         "systemPrompt": sys_prompt,
@@ -998,7 +1498,15 @@ async def create_agent(
     tenant_id: UUID = Depends(current_tenant_id),
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
-    body_data = body.model_dump()
+    raw = body.model_dump()
+    studio_values = {}
+    for key in list(raw):
+        if key in STUDIO_FIELD_NAMES:
+            value = raw.pop(key)
+            if value is not None:
+                studio_values[key] = value
+    await _validate_agent_studio_values(session, tenant_id, studio_values)
+    body_data = _merge_studio_values(raw, studio_values)
     if body.is_default:
         await _clear_default(session, tenant_id)
     row = Agent(tenant_id=tenant_id, **body_data)
@@ -1076,6 +1584,217 @@ async def compare_agents(
     }
 
 
+@router.get("/studio/actions", response_model=list[AgentStudioOption])
+async def list_agent_studio_actions(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+) -> list[AgentStudioOption]:
+    return [
+        AgentStudioOption(
+            id=definition.name,
+            label=definition.name.replace("_", " ").title(),
+            type="action",
+            description=definition.description,
+            metadata={
+                "input_schema": definition.input_schema,
+                "permissions": definition.permissions,
+                "capabilities": definition.capabilities,
+                "risk_level": definition.risk_level,
+                "execution_mode": definition.execution_mode,
+                "sensitive": definition.sensitive,
+                "requires_evidence": definition.requires_evidence,
+                "requires_approval": definition.requires_approval,
+                "tenant_id": str(tenant_id),
+            },
+        )
+        for definition in default_action_registry().list_definitions()
+        if definition.enabled
+    ]
+
+
+@router.get("/studio/knowledge-sources", response_model=list[AgentStudioOption])
+async def list_agent_studio_knowledge_sources(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AgentStudioOption]:
+    options: list[AgentStudioOption] = []
+    if await _knowledge_os_tables_available(session):
+        source_rows = (
+            (
+                await session.execute(
+                    select(KnowledgeSourceRow)
+                    .where(KnowledgeSourceRow.tenant_id == tenant_id)
+                    .order_by(KnowledgeSourceRow.name)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in source_rows:
+            options.append(
+                AgentStudioOption(
+                    id=str(row.id),
+                    label=row.name,
+                    type=row.type,
+                    metadata={
+                        "source_kind": "native",
+                        "badge": "native",
+                        "status": row.status,
+                        "content_type": row.content_type,
+                        "priority": row.priority,
+                        **dict(row.metadata_json or {}),
+                    },
+                )
+            )
+    faq_rows = (
+        (
+            await session.execute(
+                select(TenantFAQ)
+                .where(TenantFAQ.tenant_id == tenant_id)
+                .order_by(TenantFAQ.question)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in faq_rows:
+        options.append(
+            AgentStudioOption(
+                id=str(row.id),
+                label=row.question,
+                type="faq",
+                metadata={
+                    "source_kind": "legacy",
+                    "adapted": True,
+                    "badge": "legacy",
+                    "legacy_table": "tenant_faqs",
+                    "status": row.status,
+                    "priority": row.priority,
+                    "content_type": "faq",
+                },
+            )
+        )
+    catalog_rows = (
+        (
+            await session.execute(
+                select(TenantCatalogItem)
+                .where(TenantCatalogItem.tenant_id == tenant_id)
+                .order_by(TenantCatalogItem.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in catalog_rows:
+        options.append(
+            AgentStudioOption(
+                id=str(row.id),
+                label=row.name,
+                type="table",
+                metadata={
+                    "source_kind": "legacy",
+                    "adapted": True,
+                    "badge": "legacy",
+                    "legacy_table": "tenant_catalogs",
+                    "status": row.status,
+                    "active": row.active,
+                    "priority": row.priority,
+                    "content_type": "catalog",
+                    "sku": row.sku,
+                    "category": row.category,
+                },
+            )
+        )
+    document_rows = (
+        (
+            await session.execute(
+                select(KnowledgeDocument)
+                .where(KnowledgeDocument.tenant_id == tenant_id)
+                .order_by(KnowledgeDocument.filename)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in document_rows:
+        options.append(
+            AgentStudioOption(
+                id=str(row.id),
+                label=row.filename,
+                type="file",
+                metadata={
+                    "source_kind": "legacy",
+                    "adapted": True,
+                    "badge": "legacy",
+                    "legacy_table": "knowledge_documents",
+                    "status": row.status,
+                    "category": row.category,
+                    "content_type": row.category or "general",
+                    "priority": row.priority,
+                },
+            )
+        )
+    return options
+
+
+@router.get("/studio/contact-fields", response_model=list[AgentStudioOption])
+async def list_agent_studio_contact_fields(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AgentStudioOption]:
+    rows = (
+        (
+            await session.execute(
+                select(CustomerFieldDefinition)
+                .where(CustomerFieldDefinition.tenant_id == tenant_id)
+                .order_by(CustomerFieldDefinition.ordering, CustomerFieldDefinition.label)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        AgentStudioOption(
+            id=row.key,
+            label=row.label,
+            type=row.field_type,
+            metadata={"definition_id": str(row.id), "field_options": row.field_options},
+        )
+        for row in rows
+    ]
+
+
+@router.get("/studio/lifecycle-stages", response_model=list[AgentStudioOption])
+async def list_agent_studio_lifecycle_stages(
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[AgentStudioOption]:
+    definition = (
+        await session.execute(
+            select(TenantPipeline.definition)
+            .where(TenantPipeline.tenant_id == tenant_id, TenantPipeline.active.is_(True))
+            .order_by(TenantPipeline.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    stages = (definition or {}).get("stages")
+    if not isinstance(stages, list):
+        return []
+    return [
+        AgentStudioOption(
+            id=str(stage.get("id")),
+            label=str(stage.get("label") or stage.get("name") or stage.get("id")),
+            type="lifecycle_stage",
+            metadata={key: value for key, value in stage.items() if key not in {"id", "label"}},
+        )
+        for stage in stages
+        if isinstance(stage, dict) and stage.get("id")
+    ]
+
+
 @router.get("/{agent_id}", response_model=AgentItem)
 async def get_agent(
     agent_id: UUID,
@@ -1087,6 +1806,127 @@ async def get_agent(
     return _item(row)
 
 
+@router.post("/{agent_id}/test-turn-v2", response_model=AgentTestTurnV2Response)
+async def test_agent_turn_v2(
+    agent_id: UUID,
+    body: AgentTestTurnV2Body,
+    user: AuthUser = Depends(require_tenant_admin),
+    tenant_id: UUID = Depends(current_tenant_id),
+    session: AsyncSession = Depends(get_db_session),
+) -> AgentTestTurnV2Response:
+    agent = await _get_agent_or_404(session, agent_id, tenant_id)
+    rollout = RolloutPolicyService(session)
+    preview_decision = await rollout.can_preview(tenant_id=tenant_id, agent_id=agent_id)
+    if not preview_decision.allowed:
+        raise _rollout_http_error(preview_decision)
+    model_provider_decision = await rollout.can_use_model_provider(
+        tenant_id=tenant_id,
+        agent_id=agent_id,
+    )
+    context = await _build_test_turn_context(
+        session=session,
+        tenant_id=tenant_id,
+        agent=agent,
+        body=body,
+    )
+    context = context.model_copy(
+        update={
+            "metadata": {
+                **context.metadata,
+                "rollout": {
+                    "preview": preview_decision.model_dump(mode="json"),
+                    "model_provider": model_provider_decision.model_dump(mode="json"),
+                    "model_provider_allowed": model_provider_decision.allowed,
+                },
+            }
+        }
+    )
+    runtime = _build_test_turn_runtime(context)
+    try:
+        output = await runtime.run_turn(
+            TurnInput(
+                tenant_id=str(tenant_id),
+                conversation_id=context.conversation_id,
+                inbound_text=body.test_message,
+                metadata=context.metadata,
+            )
+        )
+    except PolicyValidationError as exc:
+        raise HTTPException(
+            422,
+            {
+                "message": "agent_runtime_v2 output failed policy validation",
+                "issues": [
+                    {"code": issue.code, "message": issue.message}
+                    for issue in exc.issues
+                ],
+            },
+        ) from exc
+
+    policy_issues = PolicyValidator(
+        action_registry_for_agent(context.active_agent)
+    ).validate(output)
+    action_results = await PostTurnActionExecutor(dry_run=True).execute(output, context=context)
+    readiness_result = None
+    if body.save_readiness_evidence:
+        readiness_result = await ReadinessService(session).record_test_turn_evidence(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            output=output,
+            policy_issues=policy_issues,
+            requires_knowledge=body.requires_knowledge_citation,
+            created_by=user.user_id,
+            metadata={
+                "test_message": body.test_message,
+                "knowledge_source_ids": [
+                    str(value) for value in (body.knowledge_source_ids or [])
+                ],
+            },
+        )
+        await session.commit()
+    return AgentTestTurnV2Response(
+        final_message=output.final_message,
+        knowledge_citations=[
+            citation.model_dump(mode="json") for citation in output.knowledge_citations
+        ],
+        field_updates=[update.model_dump(mode="json") for update in output.field_updates],
+        lifecycle_update=(
+            output.lifecycle_update.model_dump(mode="json")
+            if output.lifecycle_update is not None
+            else None
+        ),
+        actions=[action.model_dump(mode="json") for action in output.actions],
+        confidence=output.confidence,
+        needs_human=output.needs_human,
+        risk_flags=list(output.risk_flags),
+        trace_metadata=output.trace_metadata,
+        debug={
+            "context_summary": _context_summary(context),
+            "retrieval": context.metadata.get("knowledge", {}),
+            "rollout": context.metadata.get("rollout", {}),
+            "policy": {
+                "valid": not policy_issues,
+                "issues": [
+                    {"code": issue.code, "message": issue.message}
+                    for issue in policy_issues
+                ],
+            },
+            "actions": {
+                "dry_run": True,
+                "results": [result.model_dump(mode="json") for result in action_results],
+            },
+            "readiness": readiness_result_payload(readiness_result),
+            "side_effects": {
+                "persisted_messages": False,
+                "sent_whatsapp": False,
+                "updated_customer_fields": False,
+                "moved_lifecycle": False,
+                "triggered_workflows": False,
+            },
+        },
+    )
+
+
 @router.patch("/{agent_id}", response_model=AgentItem)
 async def patch_agent(
     agent_id: UUID,
@@ -1096,7 +1936,20 @@ async def patch_agent(
     session: AsyncSession = Depends(get_db_session),
 ) -> AgentItem:
     row = await _get_agent_or_404(session, agent_id, tenant_id)
-    values = body.model_dump(exclude_unset=True)
+    raw_values = body.model_dump(exclude_unset=True)
+    studio_values = {
+        key: raw_values.pop(key)
+        for key in list(raw_values)
+        if key in STUDIO_FIELD_NAMES
+    }
+    await _validate_agent_studio_values(session, tenant_id, studio_values)
+    if studio_values:
+        raw_values.setdefault("ops_config", deepcopy(row.ops_config or {}))
+        raw_values.setdefault("knowledge_config", deepcopy(row.knowledge_config or {}))
+        raw_values.setdefault("auto_actions", deepcopy(row.auto_actions or {}))
+        raw_values.setdefault("extraction_config", deepcopy(row.extraction_config or {}))
+        raw_values.setdefault("flow_mode_rules", deepcopy(row.flow_mode_rules or {}))
+    values = _merge_studio_values(raw_values, studio_values)
     if not values:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no fields to update")
     if {"extraction_config", "system_prompt"} & set(values):
@@ -1184,6 +2037,7 @@ async def duplicate_agent(
         goal=row.goal,
         style=row.style,
         tone=row.tone,
+        voice=deepcopy(row.voice or {}),
         language=row.language,
         max_sentences=row.max_sentences,
         no_emoji=row.no_emoji,
@@ -1328,9 +2182,13 @@ async def get_agent_config(
     item = _item(row)
     return {
         "name": item.name,
-        "tone": item.tone,
-        "style": item.style,
         "role": item.role,
+        "template": item.template,
+        "instructions": item.instructions,
+        "tone": item.tone,
+        "voice": item.voice,
+        "style": item.style,
+        "language_policy": item.language_policy,
         "max_sentences": item.max_sentences,
         "emoji_policy": "no_emoji" if item.no_emoji else "allow",
         "response_language": item.language,
@@ -1340,6 +2198,12 @@ async def get_agent_config(
         "dealership_id": item.dealership_id,
         "branch_id": item.branch_id,
         "linked_knowledge_bases": item.knowledge_config.get("linked_sources", []),
+        "enabled_knowledge_source_ids": item.enabled_knowledge_source_ids,
+        "enabled_action_ids": item.enabled_action_ids,
+        "visible_contact_field_keys": item.visible_contact_field_keys,
+        "allowed_lifecycle_stage_ids": item.allowed_lifecycle_stage_ids,
+        "escalation_policy": item.escalation_policy,
+        "metadata": item.metadata,
         "linked_whatsapp_inboxes": item.knowledge_config.get(
             "linked_inboxes", ["whatsapp_monterrey"]
         ),
@@ -1725,14 +2589,18 @@ _SNAPSHOT_FIELDS: tuple[str, ...] = (
     "goal",
     "style",
     "tone",
+    "voice",
     "language",
     "max_sentences",
     "no_emoji",
     "return_to_flow",
     "system_prompt",
     "active_intents",
+    "extraction_config",
+    "auto_actions",
     "knowledge_config",
     "flow_mode_rules",
+    "ops_config",
 )
 
 

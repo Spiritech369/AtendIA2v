@@ -1,0 +1,91 @@
+{
+  "version": "RC5",
+  "generated_at": "2026-06-03",
+  "status": "pass",
+  "commands": [
+    {
+      "name": "ruff_rc5_scoped",
+      "command": "uv run ruff check atendia/simulation/rc5_common.py atendia/simulation/replay_eval.py atendia/simulation/load_eval.py atendia/simulation/chaos_eval.py atendia/observability/rc5_metrics.py",
+      "result": "pass"
+    },
+    {
+      "name": "unit_agent_runtime_without_db",
+      "command": "uv run pytest tests/agent_runtime -m \"not integration_db\" -q",
+      "result": "142 passed, 27 deselected"
+    },
+    {
+      "name": "integration_db_agent_runtime",
+      "command": "ATENDIA_TEST_DATABASE_URL=postgresql+asyncpg://atendia:atendia@localhost:55432/atendia_test uv run pytest tests/agent_runtime -m \"integration_db\" -q",
+      "result": "27 passed, 142 deselected"
+    },
+    {
+      "name": "full_agent_runtime",
+      "command": "ATENDIA_TEST_DATABASE_URL=postgresql+asyncpg://atendia:atendia@localhost:55432/atendia_test uv run pytest tests/agent_runtime -q",
+      "result": "169 passed"
+    },
+    {
+      "name": "replay_eval",
+      "command": "uv run python -m atendia.simulation.replay_eval --dataset atendia/simulation/fixtures/rc5_replay_dataset.anonymized.json --anonymized",
+      "result": "3/3 pass"
+    },
+    {
+      "name": "load_eval",
+      "command": "uv run python -m atendia.simulation.load_eval --conversations 50 --turns-per-conversation 5",
+      "result": "250/250 turns, pass"
+    },
+    {
+      "name": "chaos_eval",
+      "command": "uv run python -m atendia.simulation.chaos_eval",
+      "result": "10/10 scenarios pass"
+    },
+    {
+      "name": "local_deterministic",
+      "command": "uv run python -m atendia.simulation.advisor_first_multiturn",
+      "result": "10/10 pass"
+    },
+    {
+      "name": "provider_stability",
+      "command": "uv run python -m atendia.simulation.provider_stability_eval --runs 5",
+      "result": "5/5 pass"
+    },
+    {
+      "name": "provider_eval",
+      "command": "uv run python -m atendia.simulation.provider_advisor_first_eval",
+      "result": "40/40 pass"
+    }
+  ],
+  "metrics": {
+    "quoted_without_canonical_product_rate": 0.0,
+    "price_without_snapshot_rate": 0.0,
+    "stale_quote_rate": 0.0,
+    "repeated_question_rate": 0.0,
+    "exact_response_repeat_rate": 0.0,
+    "duplicate_side_effect_count": 0,
+    "side_effects": {
+      "database_writes": 0,
+      "outbox": 0,
+      "whatsapp": 0
+    },
+    "provider_stability_runs_passed": 5,
+    "provider_eval_cases_passed": 40,
+    "agent_runtime_tests_passed": 169,
+    "integration_db_tests_passed": 27,
+    "local_deterministic_cases_passed": 10,
+    "replay_cases_passed": 3,
+    "load_turns_total": 250,
+    "chaos_scenarios_passed": 10
+  },
+  "artifacts": [
+    "reports/rc5_replay_eval.md",
+    "reports/rc5_replay_eval.json",
+    "reports/rc5_load_eval.md",
+    "reports/rc5_load_eval.json",
+    "reports/rc5_chaos_eval.md",
+    "reports/rc5_chaos_eval.json",
+    "reports/rc5_observability_config.json",
+    "reports/rc5_provider_stability_eval.md",
+    "reports/rc5_provider_stability_eval.json",
+    "reports/rc5_provider_advisor_first_eval.md",
+    "reports/rc5_provider_advisor_first_eval.json"
+  ]
+}

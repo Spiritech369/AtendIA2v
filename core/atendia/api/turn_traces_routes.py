@@ -9,8 +9,10 @@ Two endpoints:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -24,6 +26,7 @@ from atendia.api._deps import current_tenant_id, current_user
 from atendia.db.models.conversation import Conversation
 from atendia.db.models.turn_trace import TurnTrace
 from atendia.db.session import get_db_session
+from atendia.observability.why_answer import WhyAnswerAggregator, WhyAnswerNotFoundError
 
 router = APIRouter()
 
@@ -98,6 +101,11 @@ class TurnTraceDetail(TurnTraceListItem):
     agent_id: UUID | None
     kb_evidence: dict | None
     rules_evaluated: list | None
+    # Agent Runtime v2 stores TurnOutput.trace_metadata inside JSON
+    # payloads already persisted on the trace row. Surface it here so the
+    # frontend can consume universal_turn_trace without changing the DB
+    # schema or breaking the legacy raw trace shape.
+    trace_metadata: dict | None = None
 
 
 @router.get("", response_model=TurnTraceListResponse)
@@ -232,6 +240,7 @@ async def get_turn_trace(
         agent_id=row.agent_id,
         kb_evidence=row.kb_evidence,
         rules_evaluated=row.rules_evaluated,
+        trace_metadata=_extract_trace_metadata(row),
         tool_calls=[
             ToolCallOut(
                 id=tc.id,
@@ -245,3 +254,54 @@ async def get_turn_trace(
             for tc in row.tool_calls
         ],
     )
+
+
+def _extract_trace_metadata(row: TurnTrace) -> dict[str, Any] | None:
+    """Return persisted TurnOutput.trace_metadata from legacy-safe payloads."""
+
+    for payload in (row.composer_output, row.state_after):
+        trace_metadata = _trace_metadata_from_payload(payload)
+        if trace_metadata is not None:
+            return trace_metadata
+
+    if row.raw_llm_response:
+        try:
+            raw_payload = json.loads(row.raw_llm_response)
+        except (TypeError, json.JSONDecodeError):
+            raw_payload = None
+        trace_metadata = _trace_metadata_from_payload(raw_payload)
+        if trace_metadata is not None:
+            return trace_metadata
+
+    return None
+
+
+def _trace_metadata_from_payload(payload: Any) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    trace_metadata = payload.get("trace_metadata")
+    if isinstance(trace_metadata, dict):
+        return trace_metadata
+    universal_turn_trace = payload.get("universal_turn_trace")
+    if isinstance(universal_turn_trace, dict):
+        return {"universal_turn_trace": universal_turn_trace}
+    return None
+
+
+@router.get("/{trace_id}/why-answer-v2")
+async def why_answer_v2(
+    trace_id: UUID,
+    user: AuthUser = Depends(current_user),
+    tenant_id: UUID = Depends(current_tenant_id),
+    conversation_id: UUID | None = Query(None),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    del user
+    try:
+        return await WhyAnswerAggregator(session).explain(
+            tenant_id=tenant_id,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
+    except WhyAnswerNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "trace not found") from exc
