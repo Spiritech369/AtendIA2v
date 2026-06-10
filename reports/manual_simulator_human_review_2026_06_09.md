@@ -278,3 +278,47 @@ in order of leverage:
 2. F17 exact handoff targets (one render line).
 
 Still NO AgentService and NO smoke until >= 4.2.
+
+---
+
+# Round 7 — gpt-4o + F20 general-requirements KB grounding (2026-06-10)
+
+F20 (config only, no runtime change): KB snippet
+`general_credit_requirements` (citable as `kb:general_credit_requirements`)
+with the safe general list + "exact list depends on income type"; tenant
+instruction to answer early requirements asks from that source and pivot
+to the missing datum. Verified before the battery: general claim + kb ref
+→ send; exact requirements without tool → still blocked (hard policy
+untouched).
+
+## F20 verdict: `GENERAL_REQUIREMENTS_KB_GROUNDING_READY` — target closed
+
+The stubborn pattern that defined c03/c07 is GONE:
+- c03 "qué ocupo para sacar una moto" → general list + "la lista exacta
+  depende de cómo recibes tus ingresos" (was silence in R1-R6).
+- c03 "pero dime los papeles primero" → answered again, calmly.
+- c07 "qué ocupo" → general list (was silence in R6).
+
+## Battery result: avg 3.95 — full gate NOT passed this round
+
+Scores: c01 4.5, c02 3.5, c03 4.0, c04 4.5, c05 3.0, c06 4.5, c07 3.5,
+c08 4.0, c09 3.5, c10 4.5 → 3.95 (R6 was 4.25 with the same model/code
+minus F20). 66/71 answered, 0 leaks, 0 unsupported price/requirements,
+0 legacy copy, 0 outbox, 0 side effects.
+
+New failure causes this round (all named, none related to F20):
+
+| Cause | Where | Classification |
+|---|---|---|
+| "Italika Metro 125cc 2024" — brand/cc/year NOT in catalog, stated twice | c05 | **MODEL_LIMITATION** (product-identity fabrication; below the price/requirements hard-policy radar) → fix F22: grounding line "never add brand/cc/year/specs not present in catalog facts" |
+| JSONDecodeError on the validator-retry call (×2, both under heavy 429 pressure: 11 and 20 transient retries absorbed in those conversations) | c03 t6, c05 t7 | **RUNTIME_DEFECT** → fix F21: parse failures in the validator-retry path should get the same parse-retry treatment; review max_output_tokens=900 truncation risk with gpt-4o's verbose JSON |
+| internal_text_visible tripwire on the compound first message; raw output not persisted for blocked turns so the trigger is undiagnosable | c02 t2 | **VALIDATION block, content unknown** → fix F23: persist raw model output in blocked-turn evidence |
+| hard_policy requirements on a follow-up ("ya te dije que quiero crédito no?") | c07 t3 | **VALIDATION_CORRECT_BLOCK** |
+
+## Honest read
+
+Two consecutive gpt-4o batteries scored 4.25 and 3.95 around the 4.2 bar —
+single-battery scoring has ±0.3 run variance, so the gate needs either a
+two-battery confirmation rule or a higher margin. The fix list is now
+three small items (F21 runtime, F22 prompt line, F23 instrumentation),
+none architectural. Still NO AgentService and NO smoke.
