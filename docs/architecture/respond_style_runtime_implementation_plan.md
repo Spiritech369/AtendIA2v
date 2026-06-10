@@ -550,3 +550,43 @@ final copy restated the stale 15):
   the update explicitly and never restates the stale value — scenario
   score 4.5 (>=4.2). 12/12 answered, outbox delta 0, legacy false.
   Suite 218 tests, ruff clean.
+
+## Phase 18 - Real Traffic Shadow Soak Pilot (2026-06-10)
+
+Status: `PHASE_18_REAL_TRAFFIC_SHADOW_SOAK_PILOT_READY`
+
+Scope: real inbound traffic only, Respond-Style in parallel, mandatory
+no-send. The current live response path remains the only customer-visible
+authority; Respond-Style produces operator-review evidence only.
+
+- Pilot activation is deployment metadata driven:
+  `respond_style_inbound_shadow_enabled=true` and optional
+  `respond_style_inbound_shadow_allowed_phones`.
+- The phone allowlist accepts local 10-digit entries and MX WhatsApp variants
+  (`+52...` / `+521...`) so a single-contact pilot can be restricted to the
+  approved sender before broader traffic.
+- Each real inbound with a message id records a Respond-Style shadow
+  `turn_traces` row with `router_trigger=respond_style_inbound_shadow_auto`,
+  route evidence, `legacy_path_used`, validator/tool/field evidence,
+  candidate copy, no-send decision, outbox attempt flag, side-effect flags,
+  and operator-review placeholders.
+- Idempotency is per inbound message + router trigger; duplicate inbound
+  delivery does not rerun Respond-Style shadow.
+- The AgentService/ProductAgentRuntime path is unchanged: same direct no-send
+  route, same shadow field memory, same canonical-state-over-transcript
+  correction rules, same publish gates.
+
+Gate to advance beyond F18:
+
+- 30 real turns or 72 hours, whichever happens first.
+- 0 Respond-Style outbox writes or attempts.
+- 0 Respond-Style delivery/action/workflow/field-write side effects.
+- 0 internal leaks.
+- 0 unsupported price, requirement, product identity, or business-policy
+  claims.
+- 0 turns with `legacy_path_used=true`.
+- Human review average score >= 4.2.
+- No critical turn scored below 4.
+
+This phase is not smoke, canary, live-candidate send, outbox activation,
+workflow/action activation, or production rollout.

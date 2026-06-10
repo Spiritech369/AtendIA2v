@@ -87,6 +87,23 @@ It is not a live-send gate. Advancement beyond no-send still requires separate
 approval, Publish Control consumption of the verified latest required run
 evidence, and no-send/live-candidate parity for send scope.
 
+## Respond-Style Real-Traffic Shadow Pilot - 2026-06-10
+
+Respond-Style is ready for a limited real-inbound shadow soak, still
+mandatory no-send. Pilot deployments can opt in with
+`respond_style_inbound_shadow_enabled=true` and restrict the window to a
+single approved sender with `respond_style_inbound_shadow_allowed_phones`.
+Real Baileys inbound now passes message id and normalized phone into the
+shadow runner, which records `turn_traces` evidence under
+`router_trigger=respond_style_inbound_shadow_auto` without changing the live
+response path.
+
+This readiness state does not authorize smoke, canary, live-candidate send,
+outbox writes, actions, workflow side effects, or production rollout. The next
+gate is 30 real turns or 72 hours, 0 outbox, 0 side effects, 0 leaks, 0
+unsupported claims, 0 `legacy_path_used=true`, human score >= 4.2, and no
+critical turn below 4.
+
 ## Readiness Advancement Rules
 
 - `implemented` means code or docs exist, but not necessarily wired end to end.

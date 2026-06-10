@@ -19,7 +19,12 @@ from atendia.agent_runtime import (
 from atendia.agent_runtime.agent_service import AgentService
 from atendia.agent_runtime.schemas import TurnContext, TurnOutput
 
-BRIDGE_SOURCE = Path("core/atendia/product_agents/agent_service_bridge.py")
+BRIDGE_SOURCE = (
+    Path(__file__).resolve().parents[2]
+    / "atendia"
+    / "product_agents"
+    / "agent_service_bridge.py"
+)
 
 
 class _ScriptedProvider:
@@ -736,6 +741,245 @@ async def test_16_inbound_shadow_routes_through_agent_service(monkeypatch) -> No
     assert summaries[0]["field_state"] == {"shadow_only": True}
     assert summaries[0]["no_send_followup"] == {"action": "none"}
     assert summaries[0]["outbox_write_attempted"] is False
+
+
+# --- Phase 18 ----------------------------------------------------------------
+
+
+def test_18_phone_allowlist_accepts_mx_variants() -> None:
+    from atendia.product_agents import inbound_shadow
+
+    deployment = SimpleNamespace(
+        metadata_json={
+            "respond_style_inbound_shadow_allowed_phones": ["8128889241"]
+        }
+    )
+
+    assert inbound_shadow._deployment_allows_phone(deployment, "+5218128889241")
+    assert inbound_shadow._deployment_allows_phone(deployment, "+528128889241")
+    assert not inbound_shadow._deployment_allows_phone(deployment, "+5218111111111")
+
+
+@pytest.mark.asyncio
+async def test_18_inbound_shadow_skips_non_allowlisted_phone(monkeypatch) -> None:
+    from atendia.product_agents import inbound_shadow
+
+    tenant_id = uuid4()
+    deployment = SimpleNamespace(
+        id=uuid4(),
+        tenant_id=tenant_id,
+        agent_id=uuid4(),
+        active_version_id=uuid4(),
+        channel="whatsapp",
+        metadata_json={
+            "respond_style_enabled": True,
+            "respond_style_inbound_shadow_enabled": True,
+            "respond_style_inbound_shadow_allowed_phones": ["8128889241"],
+        },
+    )
+
+    async def fake_opted_in(session, *, tenant_id):
+        return [deployment]
+
+    monkeypatch.setattr(inbound_shadow, "_opted_in_deployments", fake_opted_in)
+    monkeypatch.setattr(
+        inbound_shadow,
+        "get_settings",
+        lambda: SimpleNamespace(openai_api_key="test-key"),
+    )
+
+    class _UnexpectedAgentService:
+        def __init__(self, *, session):
+            raise AssertionError("shadow should not run for this phone")
+
+    import atendia.agent_runtime.agent_service as agent_service_module
+
+    monkeypatch.setattr(
+        agent_service_module, "AgentService", _UnexpectedAgentService
+    )
+
+    summaries = await inbound_shadow.run_inbound_shadow(
+        object(),  # type: ignore[arg-type]
+        tenant_id=tenant_id,
+        conversation_id=uuid4(),
+        inbound_text="hola",
+        from_phone_e164="+5218111111111",
+    )
+
+    assert summaries == []
+
+
+@pytest.mark.asyncio
+async def test_18_inbound_shadow_is_idempotent_per_inbound(monkeypatch) -> None:
+    from atendia.product_agents import inbound_shadow
+
+    tenant_id = uuid4()
+    deployment = SimpleNamespace(
+        id=uuid4(),
+        tenant_id=tenant_id,
+        agent_id=uuid4(),
+        active_version_id=uuid4(),
+        channel="whatsapp",
+        metadata_json={
+            "respond_style_enabled": True,
+            "respond_style_inbound_shadow_enabled": True,
+            "respond_style_inbound_shadow_allowed_phones": ["8128889241"],
+        },
+    )
+
+    async def fake_opted_in(session, *, tenant_id):
+        return [deployment]
+
+    async def fake_preview(session, *, tenant_id):
+        return [
+            {
+                "deployment_id": str(deployment.id),
+                "route_preview": "product_agent_direct",
+            }
+        ]
+
+    async def fake_existing(session, **kwargs):
+        return True
+
+    monkeypatch.setattr(inbound_shadow, "_opted_in_deployments", fake_opted_in)
+    monkeypatch.setattr(inbound_shadow, "preview_respond_style_routing", fake_preview)
+    monkeypatch.setattr(inbound_shadow, "_existing_shadow_trace", fake_existing)
+    monkeypatch.setattr(
+        inbound_shadow,
+        "get_settings",
+        lambda: SimpleNamespace(openai_api_key="test-key"),
+    )
+
+    class _UnexpectedAgentService:
+        def __init__(self, *, session):
+            raise AssertionError("duplicate inbound should not rerun shadow")
+
+    import atendia.agent_runtime.agent_service as agent_service_module
+
+    monkeypatch.setattr(
+        agent_service_module, "AgentService", _UnexpectedAgentService
+    )
+
+    summaries = await inbound_shadow.run_inbound_shadow(
+        object(),  # type: ignore[arg-type]
+        tenant_id=tenant_id,
+        conversation_id=uuid4(),
+        inbound_text="hola",
+        inbound_message_id=uuid4(),
+        from_phone_e164="+5218128889241",
+    )
+
+    assert summaries == []
+
+
+@pytest.mark.asyncio
+async def test_18_inbound_shadow_records_turn_trace_evidence(monkeypatch) -> None:
+    from atendia.product_agents import inbound_shadow
+
+    tenant_id = uuid4()
+    deployment = SimpleNamespace(
+        id=uuid4(),
+        tenant_id=tenant_id,
+        agent_id=uuid4(),
+        active_version_id=uuid4(),
+        channel="whatsapp",
+        metadata_json={
+            "respond_style_enabled": True,
+            "respond_style_inbound_shadow_enabled": True,
+            "respond_style_inbound_shadow_allowed_phones": ["8128889241"],
+        },
+    )
+
+    async def fake_opted_in(session, *, tenant_id):
+        return [deployment]
+
+    async def fake_preview(session, *, tenant_id):
+        return [
+            {
+                "deployment_id": str(deployment.id),
+                "route_preview": "product_agent_direct",
+            }
+        ]
+
+    async def fake_existing(session, **kwargs):
+        return False
+
+    captured_record: dict = {}
+
+    async def fake_record(session, **kwargs):
+        captured_record.update(kwargs)
+        return uuid4()
+
+    monkeypatch.setattr(inbound_shadow, "_opted_in_deployments", fake_opted_in)
+    monkeypatch.setattr(inbound_shadow, "preview_respond_style_routing", fake_preview)
+    monkeypatch.setattr(inbound_shadow, "_existing_shadow_trace", fake_existing)
+    monkeypatch.setattr(inbound_shadow, "_record_shadow_trace", fake_record)
+    monkeypatch.setattr(
+        inbound_shadow,
+        "get_settings",
+        lambda: SimpleNamespace(openai_api_key="test-key"),
+    )
+
+    class _FakeAgentService:
+        def __init__(self, *, session):
+            pass
+
+        async def handle_turn(self, **kwargs):
+            from atendia.agent_runtime.send_adapter import SendAdapterResult
+            from atendia.agent_runtime.send_policy import PreparedSendDecision
+
+            return SimpleNamespace(
+                output=SimpleNamespace(
+                    trace_metadata={
+                        "respond_style_agent_service": {
+                            "route": "respond_style_agent_service_no_send",
+                            "legacy_path_used": False,
+                            "send_decision": "no_send",
+                            "deployment_id": str(deployment.id),
+                            "agent_version_id": str(deployment.active_version_id),
+                            "final_message_candidate": "Hola, te ayudo.",
+                            "tool_results": [],
+                            "field_state": {"shadow_only": True},
+                            "side_effects": {
+                                "delivery": False,
+                                "workflows": False,
+                                "actions": False,
+                                "field_writes": False,
+                            },
+                        }
+                    }
+                ),
+                send=SendAdapterResult(
+                    mode="no_send",
+                    send_decision=PreparedSendDecision(
+                        status="blocked", allowed=False, dry_run=True, reason="x"
+                    ),
+                    delivery_status={"status": "not_attempted"},
+                    outbox_write_attempted=False,
+                ),
+            )
+
+    import atendia.agent_runtime.agent_service as agent_service_module
+
+    monkeypatch.setattr(agent_service_module, "AgentService", _FakeAgentService)
+
+    inbound_message_id = uuid4()
+    summaries = await inbound_shadow.run_inbound_shadow(
+        object(),  # type: ignore[arg-type]
+        tenant_id=tenant_id,
+        conversation_id=uuid4(),
+        inbound_text="hola",
+        inbound_message_id=inbound_message_id,
+        from_phone_e164="+5218128889241",
+    )
+
+    assert summaries[0]["turn_trace_id"]
+    assert captured_record["inbound_message_id"] == inbound_message_id
+    assert captured_record["from_phone_e164"] == "+5218128889241"
+    assert captured_record["summary"]["route"] == "respond_style_agent_service_no_send"
+    assert captured_record["summary"]["legacy_path_used"] is False
+    assert captured_record["summary"]["outbox_write_attempted"] is False
+    assert not any(captured_record["summary"]["side_effects"].values())
 
 
 # --- Phase 17 ----------------------------------------------------------------

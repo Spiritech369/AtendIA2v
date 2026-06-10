@@ -14,8 +14,8 @@ Design: `docs/plans/2026-05-13-baileys-integration-design.md`.
 
 from __future__ import annotations
 
-import json as _json
 import base64
+import json as _json
 import mimetypes
 from datetime import UTC, datetime
 from pathlib import Path
@@ -259,7 +259,9 @@ def _persist_baileys_media(body: BaileysInboundBody) -> tuple[dict | None, list]
     settings = get_settings()
     suffix = mimetypes.guess_extension(mime_type) or ".bin"
     safe_message_id = "".join(
-        ch for ch in str(body.message_id or datetime.now(UTC).timestamp()) if ch.isalnum() or ch in "-_"
+        ch
+        for ch in str(body.message_id or datetime.now(UTC).timestamp())
+        if ch.isalnum() or ch in "-_"
     )[:120]
     rel_path = Path(str(body.tenant_id)) / f"{safe_message_id}{suffix}"
     target = Path(settings.upload_dir) / rel_path
@@ -619,6 +621,8 @@ async def _run_inbound_pipeline(
         tenant_id=tenant_id,
         conversation_id=conversation_id,
         inbound_text=text_body,
+        inbound_message_id=message_id,
+        from_phone_e164=from_phone_e164,
     )
 
     # 3. Live notification (best-effort).
