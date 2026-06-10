@@ -1,0 +1,74 @@
+{
+  "decision": "PHASE_7_RESPOND_STYLE_CONTEXT_PACKAGE_BUILDER_READY",
+  "mode": "no_send",
+  "results": [
+    {
+      "tenant": "generic_sales",
+      "turn_input_valid": true,
+      "context_package_valid": true,
+      "send_mode": "no_send",
+      "runtime_path": "respond_style_no_send",
+      "tool_count": 3,
+      "tools_all_no_customer_copy": true,
+      "workflows_all_dry_run_no_side_effects": true,
+      "actions_all_no_side_effects": true,
+      "kb_snippets_have_source_id": true,
+      "hard_policy_count": 2,
+      "missing_fields_as_data": [
+        "product_interest",
+        "income_type",
+        "employment_seniority"
+      ],
+      "no_final_message": true,
+      "no_question_fields": true,
+      "handoff_message_authored_by_llm": true
+    },
+    {
+      "tenant": "generic_scheduling",
+      "turn_input_valid": true,
+      "context_package_valid": true,
+      "send_mode": "no_send",
+      "runtime_path": "respond_style_no_send",
+      "tool_count": 1,
+      "tools_all_no_customer_copy": true,
+      "workflows_all_dry_run_no_side_effects": true,
+      "actions_all_no_side_effects": true,
+      "kb_snippets_have_source_id": true,
+      "hard_policy_count": 1,
+      "missing_fields_as_data": [
+        "appointment_date",
+        "service_type"
+      ],
+      "no_final_message": true,
+      "no_question_fields": true,
+      "handoff_message_authored_by_llm": true
+    },
+    {
+      "tenant": "generic_support",
+      "turn_input_valid": true,
+      "context_package_valid": true,
+      "send_mode": "no_send",
+      "runtime_path": "respond_style_no_send",
+      "tool_count": 2,
+      "tools_all_no_customer_copy": true,
+      "workflows_all_dry_run_no_side_effects": true,
+      "actions_all_no_side_effects": true,
+      "kb_snippets_have_source_id": true,
+      "hard_policy_count": 1,
+      "missing_fields_as_data": [
+        "issue_type",
+        "urgency"
+      ],
+      "no_final_message": true,
+      "no_question_fields": true,
+      "handoff_message_authored_by_llm": true
+    }
+  ],
+  "side_effects": {
+    "outbox": false,
+    "workflows": false,
+    "actions": false,
+    "delivery": false,
+    "db_writes": false
+  }
+}

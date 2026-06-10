@@ -233,3 +233,58 @@ business policy hardcoding.
 - production
 - destructive git/filesystem cleanup
 - legacy deletion
+
+## Phase 0.5 Amendment (2026-06-09)
+
+Status: `RESPOND_STYLE_CONTRACT_VALIDATOR_AMENDED_VERIFIED_NO_SEND`
+
+- `turn_kind = tool_request | final_response | handoff_request` in the turn
+  contract; `final_message` is null for `tool_request` and customer copy
+  there is a parse error.
+- Validator fact gates apply only to visible copy; `tool_request` turns are
+  never fact-gated, so tool proposals are no longer dropped by topic regexes.
+- Declarative tenant `hard_policies` (`trigger_patterns` + `requires_any` of
+  `tool:<name>` / `basis:<claim_basis>`). Built-in bilingual defaults act as
+  safety tripwire only. Malformed tenant policy fails closed.
+- Verified against real OpenAI no-send: the Phase 6 fail-closed "model"
+  scenario now completes tool_request -> tool_result -> final_response.
+  Evidence: `reports/respond_style_phase_0_5_amended_no_send_2026_06_09.md`.
+
+## Phase 7 — Respond-Style Context Package Builder (2026-06-09)
+
+Status: `PHASE_7_RESPOND_STYLE_CONTEXT_PACKAGE_BUILDER_READY`
+
+File: `core/atendia/agent_runtime/respond_style_context_builder.py`
+
+`RespondStyleContextPackageBuilder` is a pure, no-live packager: it builds
+`AgentTurnInput` + `AgentContextPackage` from an already-loaded
+`RespondStyleContextSnapshot` (tests/runners today; a Product Agent config
+adapter supplies snapshots in Phase 8). It performs no I/O, no DB writes, no
+tool/action/workflow execution, no field writes, no delivery, and authors no
+customer copy or questions.
+
+Normalization invariants:
+
+- Transcript stays ordered and structured (`customer | assistant |
+  system_internal`), never flattened to a blob and never synthesized.
+- Fields are exposed as data (`missing=true`), never as questions; no
+  `next_best_question` / `suggested_question` / `pending_slot` anywhere.
+- Tools are capabilities: preconditions, required_context,
+  `output_facts_schema`, `produces_claim_support`, forced
+  `no_customer_copy=true`.
+- Workflows default `dry_run_only=true`, `approval_required=true`;
+  `side_effects_allowed` is forced false in no_send mode. Actions likewise.
+- KB snippets require a stable `source_id` (build fails closed without it)
+  so validator claims can cite them.
+- Tenant `hard_policies` are structurally validated at build time; malformed
+  config raises `ContextSnapshotError` (fail closed in Test Lab).
+- Handoff policy declares `customer_message_authored_by_llm=true`; the
+  builder never writes the message.
+
+Evidence: `reports/respond_style_context_builder_no_send_2026_06_09.md`,
+runner `tools/run_respond_style_context_builder_no_send_2026_06_09.py`
+(three generic tenants: sales, scheduling, support — all tenant-neutral).
+
+Next phase: Phase 8 — ProductAgentRuntime direct path no-send (deployment
+resolver + snapshot adapter from Product Agent config + tool executor
+fact-only + the amended provider/tool loop/validator, end to end, no send).
