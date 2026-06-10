@@ -38,6 +38,9 @@ from atendia.product_agents.inbound_shadow import run_inbound_shadow
 from atendia.product_agents.publish_gates import respond_style_publish_blockers
 from atendia.product_agents.test_lab_direct_adapter import run_direct_test_suite
 
+# The model that passed the manual battery gate (r8o, 4.45/5).
+MODEL = "gpt-4o"
+
 SCENARIOS = [
     ("catalogo_primero", ["hola", "que motos manejas?", "busco algo economico"]),
     (
@@ -45,6 +48,10 @@ SCENARIOS = [
         ["hola", "tengo 3 años trabajando", "me pagan por tarjeta", "qué ocupo"],
     ),
     ("requisitos_primero", ["qué ocupo", "dame los papeles primero"]),
+    (
+        "eligibilidad_y_modelo",
+        ["revisan buro?", "me interesa la R4", "tengo 2 años trabajando y me pagan por nomina, que ocupo"],
+    ),
 ]
 
 
@@ -127,11 +134,35 @@ async def main() -> int:
                 )
             )
         await session.flush()
+        from atendia.agent_runtime import (
+            DryFactsToolExecutor,
+            RespondStyleLLMTurnProvider,
+            RespondStyleToolLoop,
+        )
+        from atendia.agent_runtime.respond_style_llm_provider import (
+            RespondStyleLLMTurnProviderConfig,
+        )
+        from atendia.agent_runtime.respond_style_tool_loop import (
+            RespondStyleToolLoopConfig,
+        )
+        from atendia.config import get_settings
+
+        def _gate_factory(cfg):
+            return RespondStyleToolLoop(
+                provider=RespondStyleLLMTurnProvider(
+                    api_key=get_settings().openai_api_key,
+                    config=RespondStyleLLMTurnProviderConfig(model=MODEL),
+                ),
+                executor=DryFactsToolExecutor(cfg.tool_bindings),
+                config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+            )
+
         run = await run_direct_test_suite(
             session,
             tenant_id=tenant_id,
             suite_id=suite.id,
             created_by_user_id=None,
+            tool_loop_factory=_gate_factory,
         )
         print(
             json.dumps(
@@ -155,6 +186,7 @@ async def main() -> int:
             "respond_style_enabled": True,
             "respond_style_inbound_shadow_enabled": True,
             "respond_style_inbound_shadow_allowed_phones": [allowed_phone],
+            "respond_style_model": MODEL,
         }
         existing = (
             await session.execute(

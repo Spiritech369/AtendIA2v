@@ -115,7 +115,7 @@ def _patch_bridge(monkeypatch, *, deployment, version, blockers=None, decisions=
         monkeypatch.setattr(
             bridge,
             "build_tool_loop",
-            lambda config, api_key: RespondStyleToolLoop(
+            lambda config, api_key, model=None: RespondStyleToolLoop(
                 provider=_ScriptedProvider(list(decisions)),
                 executor=_NoToolExecutor(),
             ),

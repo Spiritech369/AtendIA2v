@@ -180,9 +180,10 @@ async def _handle_opted_in_turn(
         field_values=shadow_values,
         corrected_fields=corrected_fields,
     )
+    model_override = (deployment.metadata_json or {}).get("respond_style_model")
     runtime = ProductAgentRuntime(
         snapshot_adapter=_StaticSources(config, state),
-        tool_loop=build_tool_loop(config, api_key),
+        tool_loop=build_tool_loop(config, api_key, model=model_override),
     )
     result = await runtime.run_turn(
         ProductAgentRuntimeInput(
@@ -322,12 +323,19 @@ async def _save_shadow_fields(
 
 
 def build_tool_loop(
-    config: ProductAgentPublishedConfig, api_key: str
+    config: ProductAgentPublishedConfig,
+    api_key: str,
+    model: str | None = None,
 ) -> RespondStyleToolLoop:
+    provider_config = (
+        RespondStyleLLMTurnProviderConfig(model=model)
+        if model
+        else RespondStyleLLMTurnProviderConfig()
+    )
     return RespondStyleToolLoop(
         provider=RespondStyleLLMTurnProvider(
             api_key=api_key,
-            config=RespondStyleLLMTurnProviderConfig(),
+            config=provider_config,
         ),
         executor=DryFactsToolExecutor(config.tool_bindings),
         config=RespondStyleToolLoopConfig(max_tool_rounds=3, max_elapsed_seconds=120.0),
