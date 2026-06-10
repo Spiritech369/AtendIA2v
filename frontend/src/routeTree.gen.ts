@@ -34,6 +34,7 @@ import { Route as authAuditLogRouteImport } from './routes/(auth)/audit-log'
 import { Route as authAppointmentsRouteImport } from './routes/(auth)/appointments'
 import { Route as authAnalyticsRouteImport } from './routes/(auth)/analytics'
 import { Route as authAgentsRouteImport } from './routes/(auth)/agents'
+import { Route as authAgentBuilderRouteImport } from './routes/(auth)/agent-builder'
 import { Route as authCustomersCustomerIdRouteImport } from './routes/(auth)/customers.$customerId'
 import { Route as authConversationsConversationIdRouteImport } from './routes/(auth)/conversations.$conversationId'
 import { Route as authAgentsAgentIdRouteImport } from './routes/(auth)/agents.$agentId'
@@ -162,6 +163,11 @@ const authAgentsRoute = authAgentsRouteImport.update({
   path: '/agents',
   getParentRoute: () => authRouteRoute,
 } as any)
+const authAgentBuilderRoute = authAgentBuilderRouteImport.update({
+  id: '/agent-builder',
+  path: '/agent-builder',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const authCustomersCustomerIdRoute = authCustomersCustomerIdRouteImport.update({
   id: '/$customerId',
   path: '/$customerId',
@@ -181,6 +187,7 @@ const authAgentsAgentIdRoute = authAgentsAgentIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
+  '/agent-builder': typeof authAgentBuilderRoute
   '/agents': typeof authAgentsRouteWithChildren
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
@@ -210,6 +217,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/agent-builder': typeof authAgentBuilderRoute
   '/agents': typeof authAgentsRouteWithChildren
   '/analytics': typeof authAnalyticsRoute
   '/appointments': typeof authAppointmentsRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)': typeof authRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/(auth)/agent-builder': typeof authAgentBuilderRoute
   '/(auth)/agents': typeof authAgentsRouteWithChildren
   '/(auth)/analytics': typeof authAnalyticsRoute
   '/(auth)/appointments': typeof authAppointmentsRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/login'
+    | '/agent-builder'
     | '/agents'
     | '/analytics'
     | '/appointments'
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/agent-builder'
     | '/agents'
     | '/analytics'
     | '/appointments'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/(auth)'
     | '/login'
+    | '/(auth)/agent-builder'
     | '/(auth)/agents'
     | '/(auth)/analytics'
     | '/(auth)/appointments'
@@ -541,6 +553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAgentsRouteImport
       parentRoute: typeof authRouteRoute
     }
+    '/(auth)/agent-builder': {
+      id: '/(auth)/agent-builder'
+      path: '/agent-builder'
+      fullPath: '/agent-builder'
+      preLoaderRoute: typeof authAgentBuilderRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(auth)/customers/$customerId': {
       id: '/(auth)/customers/$customerId'
       path: '/$customerId'
@@ -601,6 +620,7 @@ const authCustomersRouteWithChildren = authCustomersRoute._addFileChildren(
 )
 
 interface authRouteRouteChildren {
+  authAgentBuilderRoute: typeof authAgentBuilderRoute
   authAgentsRoute: typeof authAgentsRouteWithChildren
   authAnalyticsRoute: typeof authAnalyticsRoute
   authAppointmentsRoute: typeof authAppointmentsRoute
@@ -627,6 +647,7 @@ interface authRouteRouteChildren {
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
+  authAgentBuilderRoute: authAgentBuilderRoute,
   authAgentsRoute: authAgentsRouteWithChildren,
   authAnalyticsRoute: authAnalyticsRoute,
   authAppointmentsRoute: authAppointmentsRoute,
