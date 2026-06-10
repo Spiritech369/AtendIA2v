@@ -76,6 +76,8 @@ class AgentService:
             conversation_id=conversation_id,
             inbound_text=inbound_text,
             mode=str(mode),
+            channel=(metadata or {}).get("reply_channel")
+            or (metadata or {}).get("channel"),
         )
         if respond_style is not None:
             return _respond_style_agent_service_result(

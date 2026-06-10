@@ -502,3 +502,24 @@ Status: `PHASE_15_RESPOND_STYLE_FIELD_STATE_AND_NO_SEND_HANDOFF_READY`
   answered, NO seniority re-ask after "15 meses", final "?" resolved
   requirements using income_type from shadow state persisted two turns
   earlier. Outbox delta 0, 0 leaks. Suite 211 tests, ruff clean.
+
+## Phase 16 — Inbound Shadow Soak + Operator Review (2026-06-10)
+
+Status: `PHASE_16_INBOUND_SHADOW_SOAK_AND_OPERATOR_REVIEW_READY`
+
+- Inbound shadow (Baileys step 2c function) now delegates to the REAL
+  AgentService no-send per opted-in inbound: publish gates, shadow field
+  memory, no_send_followup and multi-deployment resolution all exercised
+  exactly as the future live route. Full per-turn evidence.
+- 15C extension: channel signal disambiguates multi-deployment tenants;
+  no signal + multiple matches still fails closed.
+- Soak harness (Docker, real DB+OpenAI, 4 conversations / 12 inbounds):
+  12/12 answered, all AgentService route, legacy_path_used=false, outbox
+  delta 0, 4 shadow-field rows persisted. Operator review produced; main
+  watch-item: copy/state divergence on corrections (state right, words
+  stale) — prompt iteration item for the real soak.
+- Suite 215 tests, ruff clean.
+
+Path to controlled smoke: flip the two flags on the pilot deployment for
+a real-traffic shadow window, review with the Phase 16 format, then the
+smoke decision gated by parity + publish gates + rollback packet.

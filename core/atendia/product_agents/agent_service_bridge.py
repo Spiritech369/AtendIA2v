@@ -84,12 +84,14 @@ async def maybe_handle_respond_style_turn(
     conversation_id: str,
     inbound_text: str,
     mode: str,
+    channel: str | None = None,
 ) -> RespondStyleBridgeOutcome | None:
     """Returns None when no deployment opted in (previous path continues).
     Otherwise ALWAYS returns a no-send outcome — opted-in turns never fall
-    back to the legacy composer path."""
+    back to the legacy composer path. ``channel`` disambiguates when more
+    than one deployment qualifies (15C)."""
     deployment, ambiguous = await _resolve_opted_in_deployment(
-        session, tenant_id=tenant_id
+        session, tenant_id=tenant_id, channel=channel
     )
     if ambiguous:
         # 15C: more than one direct-route deployment matches and there is no
@@ -295,6 +297,7 @@ async def _resolve_opted_in_deployment(
     session: Any,
     *,
     tenant_id: str,
+    channel: str | None = None,
 ) -> tuple[AgentDeployment | None, bool]:
     """Opt-in = the resolver previews product_agent_direct for a deployment
     (requires metadata respond_style_enabled + published state + active
@@ -314,16 +317,27 @@ async def _resolve_opted_in_deployment(
     }
     if not direct_ids:
         return None, False
-    if len(direct_ids) > 1:
-        return None, True
     from sqlalchemy import select
 
     rows = await session.execute(
         select(AgentDeployment).where(AgentDeployment.tenant_id == UUID(str(tenant_id)))
     )
-    for deployment in rows.scalars():
-        if str(deployment.id) in direct_ids:
-            return deployment, False
+    candidates = [
+        deployment
+        for deployment in rows.scalars()
+        if str(deployment.id) in direct_ids
+    ]
+    if channel and len(candidates) > 1:
+        # 15C: a channel signal disambiguates multi-deployment tenants.
+        channel_matches = [
+            deployment for deployment in candidates if deployment.channel == channel
+        ]
+        if channel_matches:
+            candidates = channel_matches
+    if len(candidates) > 1:
+        return None, True
+    if candidates:
+        return candidates[0], False
     return None, False
 
 

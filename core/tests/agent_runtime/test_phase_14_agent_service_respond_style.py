@@ -83,7 +83,7 @@ def _version(tenant_id, version_id) -> SimpleNamespace:
 def _patch_bridge(monkeypatch, *, deployment, version, blockers=None, decisions=None):
     from atendia.product_agents import agent_service_bridge as bridge
 
-    async def fake_resolve(session, *, tenant_id):
+    async def fake_resolve(session, *, tenant_id, channel=None):
         return deployment, False
 
     async def fake_blockers(session, *, tenant_id, version_id, deployment):
@@ -212,7 +212,7 @@ async def test_opted_in_turn_uses_product_agent_runtime(monkeypatch) -> None:
 async def test_non_opted_in_tenant_keeps_previous_path(monkeypatch) -> None:
     from atendia.product_agents import agent_service_bridge as bridge
 
-    async def fake_resolve(session, *, tenant_id):
+    async def fake_resolve(session, *, tenant_id, channel=None):
         return None, False
 
     monkeypatch.setattr(bridge, "_resolve_opted_in_deployment", fake_resolve)
@@ -318,7 +318,7 @@ async def test_bridge_error_fails_closed_not_legacy(monkeypatch) -> None:
     tenant_id = uuid4()
     deployment = _deployment(tenant_id)
 
-    async def fake_resolve(session, *, tenant_id):
+    async def fake_resolve(session, *, tenant_id, channel=None):
         return deployment, False
 
     async def boom(session, **kwargs):
@@ -581,7 +581,7 @@ async def test_15b_answered_turn_has_no_followup(monkeypatch) -> None:
 async def test_15c_ambiguous_deployments_fail_closed(monkeypatch) -> None:
     from atendia.product_agents import agent_service_bridge as bridge
 
-    async def fake_resolve(session, *, tenant_id):
+    async def fake_resolve(session, *, tenant_id, channel=None):
         return None, True  # ambiguous
 
     monkeypatch.setattr(bridge, "_resolve_opted_in_deployment", fake_resolve)
@@ -600,3 +600,139 @@ async def test_15c_ambiguous_deployments_fail_closed(monkeypatch) -> None:
     trace = result.output.trace_metadata["respond_style_agent_service"]
     assert trace["blocked_reason"] == "respond_style_deployment_ambiguous"
     assert result.send.send_decision.allowed is False
+
+
+# --- Phase 16 ----------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_15c_channel_signal_disambiguates(monkeypatch) -> None:
+    from atendia.product_agents import agent_service_bridge as bridge
+
+    tenant_id = uuid4()
+    dep_whatsapp = SimpleNamespace(
+        id=uuid4(), tenant_id=tenant_id, channel="whatsapp"
+    )
+    dep_lab = SimpleNamespace(id=uuid4(), tenant_id=tenant_id, channel="test_lab")
+
+    async def fake_preview(session, *, tenant_id):
+        return [
+            {"deployment_id": str(dep_whatsapp.id), "route_preview": "product_agent_direct"},
+            {"deployment_id": str(dep_lab.id), "route_preview": "product_agent_direct"},
+        ]
+
+    monkeypatch.setattr(bridge, "preview_respond_style_routing", fake_preview)
+
+    class _Session:
+        async def execute(self, query):
+            deployments = [dep_whatsapp, dep_lab]
+
+            class _R:
+                def scalars(self):
+                    return deployments
+
+            return _R()
+
+    chosen, ambiguous = await bridge._resolve_opted_in_deployment(
+        _Session(), tenant_id=str(tenant_id), channel="whatsapp"
+    )
+    assert ambiguous is False
+    assert chosen is dep_whatsapp
+
+    none_chosen, still_ambiguous = await bridge._resolve_opted_in_deployment(
+        _Session(), tenant_id=str(tenant_id), channel=None
+    )
+    assert still_ambiguous is True
+    assert none_chosen is None
+
+
+@pytest.mark.asyncio
+async def test_16_inbound_shadow_routes_through_agent_service(monkeypatch) -> None:
+    from atendia.product_agents import inbound_shadow
+
+    tenant_id = uuid4()
+    deployment = SimpleNamespace(
+        id=uuid4(),
+        tenant_id=tenant_id,
+        agent_id=uuid4(),
+        active_version_id=uuid4(),
+        channel="whatsapp",
+        metadata_json={
+            "respond_style_enabled": True,
+            "respond_style_inbound_shadow_enabled": True,
+        },
+    )
+
+    async def fake_opted_in(session, *, tenant_id):
+        return [deployment]
+
+    async def fake_preview(session, *, tenant_id):
+        return [
+            {
+                "deployment_id": str(deployment.id),
+                "route_preview": "product_agent_direct",
+            }
+        ]
+
+    monkeypatch.setattr(inbound_shadow, "_opted_in_deployments", fake_opted_in)
+    monkeypatch.setattr(inbound_shadow, "preview_respond_style_routing", fake_preview)
+    monkeypatch.setattr(
+        inbound_shadow,
+        "get_settings",
+        lambda: SimpleNamespace(openai_api_key="test-key"),
+    )
+
+    captured: dict = {}
+
+    class _FakeAgentService:
+        def __init__(self, *, session):
+            captured["session"] = session
+
+        async def handle_turn(self, **kwargs):
+            captured["kwargs"] = kwargs
+            from atendia.agent_runtime.send_adapter import SendAdapterResult
+            from atendia.agent_runtime.send_policy import PreparedSendDecision
+
+            return SimpleNamespace(
+                output=SimpleNamespace(
+                    trace_metadata={
+                        "respond_style_agent_service": {
+                            "route": "respond_style_agent_service_no_send",
+                            "legacy_path_used": False,
+                            "send_decision": "no_send",
+                            "deployment_id": str(deployment.id),
+                            "final_message_candidate": "Hola, te ayudo.",
+                            "field_state": {"shadow_only": True},
+                            "no_send_followup": {"action": "none"},
+                            "tool_results": [],
+                            "side_effects": {"delivery": False},
+                        }
+                    }
+                ),
+                send=SendAdapterResult(
+                    mode="no_send",
+                    send_decision=PreparedSendDecision(
+                        status="blocked", allowed=False, dry_run=True, reason="x"
+                    ),
+                    delivery_status={"status": "not_attempted"},
+                ),
+            )
+
+    import atendia.agent_runtime.agent_service as agent_service_module
+
+    monkeypatch.setattr(agent_service_module, "AgentService", _FakeAgentService)
+
+    summaries = await inbound_shadow.run_inbound_shadow(
+        object(),  # type: ignore[arg-type]
+        tenant_id=tenant_id,
+        conversation_id=uuid4(),
+        inbound_text="hola",
+    )
+
+    assert captured["kwargs"]["mode"] == "no_send"
+    assert captured["kwargs"]["metadata"]["inbound_shadow"] is True
+    assert summaries[0]["route"] == "respond_style_agent_service_no_send"
+    assert summaries[0]["legacy_path_used"] is False
+    assert summaries[0]["field_state"] == {"shadow_only": True}
+    assert summaries[0]["no_send_followup"] == {"action": "none"}
+    assert summaries[0]["outbox_write_attempted"] is False

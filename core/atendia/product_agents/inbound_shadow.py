@@ -19,21 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.agent_runtime import (
     ConversationStateSnapshot,
-    DryFactsToolExecutor,
-    ProductAgentConfigSnapshotAdapter,
     ProductAgentPublishedConfig,
-    ProductAgentRuntime,
-    ProductAgentRuntimeInput,
-    RespondStyleLLMTurnProvider,
-    RespondStyleToolLoop,
     TranscriptMessage,
 )
-from atendia.agent_runtime.respond_style_tool_loop import RespondStyleToolLoopConfig
 from atendia.config import get_settings
 from atendia.db.models.message import MessageRow
-from atendia.db.models.product_agent import AgentDeployment, AgentVersion
+from atendia.db.models.product_agent import AgentDeployment
 from atendia.product_agents.routing_preview import preview_respond_style_routing
-from atendia.product_agents.test_lab_direct_adapter import _config_from_version
 
 logger = logging.getLogger(__name__)
 
@@ -79,54 +71,53 @@ async def run_inbound_shadow(
         item["deployment_id"]: item
         for item in await preview_respond_style_routing(session, tenant_id=tenant_id)
     }
-    transcript = await _recent_transcript(session, conversation_id=conversation_id)
-
     summaries: list[dict[str, Any]] = []
     for deployment in opted_in:
         preview = previews.get(str(deployment.id))
         if preview is None or preview["route_preview"] != "product_agent_direct":
             continue
-        version = await session.get(AgentVersion, deployment.active_version_id)
-        if version is None or version.tenant_id != tenant_id:
-            continue
-        config = _config_from_version(version)
-        state = ConversationStateSnapshot(recent_messages=transcript)
-        runtime = ProductAgentRuntime(
-            snapshot_adapter=ProductAgentConfigSnapshotAdapter(
-                config_source=_StaticSources(config, state),
-                state_source=_StaticSources(config, state),
-            ),
-            tool_loop=RespondStyleToolLoop(
-                provider=RespondStyleLLMTurnProvider(api_key=api_key),
-                executor=DryFactsToolExecutor(config.tool_bindings),
-                config=RespondStyleToolLoopConfig(
-                    max_tool_rounds=3, max_elapsed_seconds=60.0
-                ),
-            ),
+        # Phase 16: the shadow turn runs through the REAL AgentService so it
+        # exercises the same publish gates, shadow field memory and
+        # no_send_followup policy as the future live route. The bridge
+        # resolves the deployment itself; legacy never runs because the
+        # preview above guarantees a direct-route deployment exists.
+        from atendia.agent_runtime.agent_service import AgentService
+
+        service = AgentService(session=session)
+        outcome = await service.handle_turn(
+            tenant_id=str(tenant_id),
+            conversation_id=str(conversation_id),
+            inbound_text=inbound_text,
+            turn_number=0,
+            mode="no_send",
+            metadata={"channel": deployment.channel, "inbound_shadow": True},
         )
-        result = await runtime.run_turn(
-            ProductAgentRuntimeInput(
-                tenant_id=str(tenant_id),
-                agent_id=str(deployment.agent_id),
-                conversation_id=str(conversation_id),
-                channel="inbound_shadow_no_send",
-                inbound_text=inbound_text,
-            )
-        )
+        trace = (
+            (outcome.output.trace_metadata or {}).get("respond_style_agent_service")
+            if outcome.output is not None
+            else None
+        ) or {}
         summaries.append(
             {
-                "deployment_id": str(deployment.id),
-                "agent_version_id": result.agent_version_id,
-                "send_decision": result.send_decision,
-                "blocked_reason": result.blocked_reason,
-                "final_message_candidate": result.final_message,
+                "deployment_id": trace.get("deployment_id") or str(deployment.id),
+                "agent_version_id": trace.get("agent_version_id"),
+                "route": trace.get("route"),
+                "legacy_path_used": trace.get("legacy_path_used"),
+                "send_decision": trace.get("send_decision", "no_send"),
+                "send_allowed": outcome.send.send_decision.allowed,
+                "outbox_write_attempted": outcome.send.outbox_write_attempted,
+                "blocked_reason": trace.get("blocked_reason"),
+                "final_message_candidate": trace.get("final_message_candidate"),
                 "tools": [
                     {"tool_name": item.get("tool_name"), "status": item.get("status")}
-                    for item in result.tool_results
+                    for item in trace.get("tool_results") or []
                 ],
-                "field_update_proposals": result.field_update_proposals,
-                "handoff_proposal": result.handoff_proposal,
-                "side_effects": result.side_effects,
+                "field_state": trace.get("field_state"),
+                "field_update_proposals": trace.get("field_update_proposals"),
+                "handoff_proposal": trace.get("handoff_proposal"),
+                "no_send_followup": trace.get("no_send_followup"),
+                "validator": trace.get("validator"),
+                "side_effects": trace.get("side_effects"),
             }
         )
     return summaries
