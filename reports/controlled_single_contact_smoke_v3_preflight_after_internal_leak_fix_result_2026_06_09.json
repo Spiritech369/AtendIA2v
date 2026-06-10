@@ -1,0 +1,1092 @@
+{
+  "openai_api_key_present": true,
+  "openai_api_key_length": 164,
+  "send_enabled": false,
+  "actions_enabled": false,
+  "workflow_events_enabled": false,
+  "model_provider": "openai",
+  "model": "gpt-4o-mini",
+  "composer_model": "gpt-4o-mini",
+  "scenario_count": 1,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "agent_version_id": "ae37c6a6-b07a-420d-8bd2-cc14d9e1c1f6",
+  "binding_result": {
+    "knowledge_source_count": 5,
+    "knowledge_source_ids": [
+      "4d6bc8b7-7f35-5892-8eca-9722f351dc20",
+      "53eaf979-15a6-58ae-907a-c1c990702446",
+      "9810c15b-43b7-566e-93e1-5dc873f316ce",
+      "3d8b4ebe-a6e0-5886-8fbd-58313f5b2b77",
+      "6250db63-6ade-546d-896f-cc6a13a792cc"
+    ],
+    "tool_binding_count": 7,
+    "field_permission_count": 11
+  },
+  "db_audit_before": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "suite_id": "13a3883f-64ad-4489-aeeb-bc673188c64e",
+  "test_run_id": "2347e012-ffd6-4bf3-93ca-e2385c98872c",
+  "run_status": "passed",
+  "run_decision": "TEST_LAB_PASSED",
+  "scenario_results": [
+    {
+      "scenario_id": "0dcce47a-2fbe-4eb4-9386-edfff69af72c",
+      "status": "passed",
+      "failures": [],
+      "turn_count": 5
+    }
+  ],
+  "turn_results": [
+    {
+      "turn_number": 1,
+      "status": "passed",
+      "failures": [],
+      "inbound": "hola",
+      "input": "hola",
+      "final_message": "¡Hola! Para continuar, ¿cuánto tiempo llevas trabajando?",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63",
+        "user_act": "greeting",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "greeting",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Para continuar, ¿cuánto tiempo llevas trabajando?",
+          "language": "es",
+          "reasoning_summary_safe": "The user greeted, and I need to ask about their employment seniority to proceed.",
+          "used_facts": [],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1533
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 641,
+        "output_tokens": 59,
+        "total_tokens": 700
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 641,
+        "output_tokens": 59,
+        "total_tokens": 700
+      },
+      "failure_reason": null,
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 2,
+      "status": "passed",
+      "failures": [],
+      "inbound": "info porfavor",
+      "input": "info porfavor",
+      "final_message": "¿Cuánto tiempo llevas trabajando en tu empleo actual?",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cuánto tiempo llevas trabajando en tu empleo actual?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending question about employment seniority, and the next best question is to ask how long they have been working.",
+          "used_facts": [],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2111
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 640,
+        "output_tokens": 66,
+        "total_tokens": 706
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 640,
+        "output_tokens": 66,
+        "total_tokens": 706
+      },
+      "failure_reason": null,
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 3,
+      "status": "passed",
+      "failures": [],
+      "inbound": "15 meses",
+      "input": "15 meses",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 15,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "15 meses"
+          ],
+          "confidence": 0.0,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "cumple_antiguedad",
+          "value": true,
+          "reason": "employment_seniority validated against minimum 6 months.",
+          "evidence": [
+            "15 meses"
+          ],
+          "confidence": 0.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "system_derived": true,
+            "derived_from_field": "employment_seniority",
+            "minimum_months": 6,
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 15
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 15,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:15 meses"
+              ],
+              "confidence": 0.0
+            },
+            {
+              "target": "contact_field",
+              "key": "cumple_antiguedad",
+              "field": "cumple_antiguedad",
+              "decision": "accepted",
+              "source": "system",
+              "writer": "StateWriter",
+              "reason": "employment_seniority_eligibility_derived",
+              "evidence_refs": [
+                "15 meses"
+              ],
+              "confidence": 0.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has provided their employment seniority, and the next step is to clarify the type of income they receive.",
+          "used_facts": [
+            "employment_seniority: 15"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2095
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.0,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "cumple_antiguedad",
+            "source": "action",
+            "confidence": 0.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "system_derived": true,
+              "derived_from_field": "employment_seniority",
+              "minimum_months": 6,
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 813,
+        "output_tokens": 74,
+        "total_tokens": 887
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 813,
+        "output_tokens": 74,
+        "total_tokens": 887
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_state_writes": [
+          "employment_seniority"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 4,
+      "status": "passed",
+      "failures": [],
+      "inbound": "me pagan por transferencia",
+      "input": "me pagan por transferencia",
+      "final_message": "Para continuar, ¿qué modelo de moto quieres revisar?",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "plan_selection",
+          "value": "10%",
+          "reason": "credit_plan.resolve validated income-to-plan mapping.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "down_payment_percent",
+          "value": 10,
+          "reason": "credit_plan.resolve validated down payment percent.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "product_selection",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 15,
+          "credit_plan": {
+            "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+            "query": "nomina_tarjeta",
+            "raw_answer": "me pagan por transferencia",
+            "income_candidate": "nomina_tarjeta",
+            "pending_slot": "income_type",
+            "last_bot_question": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "plan_id": "nomina_tarjeta_10",
+            "tipo_credito": "Nómina Tarjeta",
+            "plan_credito": "10%",
+            "down_payment_percent": 10,
+            "field_updates": [
+              {
+                "key": "plan_selection",
+                "value": "10%",
+                "reason": "credit_plan.resolve validated income-to-plan mapping.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "down_payment_percent",
+                "value": 10,
+                "reason": "credit_plan.resolve validated down payment percent.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "down_payment_percent",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "pending_slot",
+              "plan_credito",
+              "plan_id",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id",
+              "tipo_credito"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "plan_selection",
+              "field": "plan_selection",
+              "proposed_value": "10%",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "down_payment_percent",
+              "field": "down_payment_percent",
+              "proposed_value": 10,
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "que modelo de moto quieres revisar",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "product_selection",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿qué modelo de moto quieres revisar?",
+          "language": "es",
+          "reasoning_summary_safe": "The user is in a pending state regarding product selection, and the next best question is about the motorcycle model they want to review.",
+          "used_facts": [
+            "plan_selection: 10%",
+            "down_payment_percent: 10",
+            "employment_seniority: 15"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 1875
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "plan_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "down_payment_percent",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "product_selection",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1162,
+        "output_tokens": 83,
+        "total_tokens": 1245
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1162,
+        "output_tokens": 83,
+        "total_tokens": 1245
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_tools": [
+          "credit_plan.resolve"
+        ],
+        "expected_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 5,
+      "status": "passed",
+      "failures": [],
+      "inbound": "?",
+      "input": "?",
+      "final_message": "Hola, ¿qué modelo de moto quieres revisar?",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "product_selection",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 15
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "que modelo de moto quieres revisar",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_invalid_output",
+          "ValidationError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "product_selection",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Hola, ¿qué modelo de moto quieres revisar?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has not specified a motorcycle model yet, so I'm asking for clarification to proceed.",
+          "used_facts": [],
+          "risk_flags": [
+            "semantic_interpreter_invalid_output",
+            "ValidationError"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1489
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_invalid_output",
+        "ValidationError"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "product_selection",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 671,
+        "output_tokens": 61,
+        "total_tokens": 732
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 671,
+        "output_tokens": 61,
+        "total_tokens": 732
+      },
+      "failure_reason": null,
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    }
+  ],
+  "turn_summary": [
+    {
+      "turn_number": 1,
+      "inbound": "hola",
+      "final_message": "¡Hola! Para continuar, ¿cuánto tiempo llevas trabajando?",
+      "user_act": "greeting",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "failures": []
+    },
+    {
+      "turn_number": 2,
+      "inbound": "info porfavor",
+      "final_message": "¿Cuánto tiempo llevas trabajando en tu empleo actual?",
+      "user_act": "question",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "failures": []
+    },
+    {
+      "turn_number": 3,
+      "inbound": "15 meses",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "income_type",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [
+        "cumple_antiguedad",
+        "employment_seniority"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "failures": []
+    },
+    {
+      "turn_number": 4,
+      "inbound": "me pagan por transferencia",
+      "final_message": "Para continuar, ¿qué modelo de moto quieres revisar?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "product_selection",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "down_payment_percent",
+        "plan_selection"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "failures": []
+    },
+    {
+      "turn_number": 5,
+      "inbound": "?",
+      "final_message": "Hola, ¿qué modelo de moto quieres revisar?",
+      "user_act": "unknown",
+      "pending_slot": "product_selection",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+      "failures": []
+    }
+  ],
+  "trace_ids": [
+    "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+    "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+    "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+    "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown",
+    "e9e3211c-9ad5-4a3a-a50e-ea9d72357a63:unknown"
+  ],
+  "outbox_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "side_effect_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "coverage_summary": {
+    "scope": "product_first_test_lab",
+    "execution_mode": "runtime_v2_agent_service",
+    "send_mode": "no_send",
+    "openai_api_real": true,
+    "runtime_v2_agent_service": true,
+    "readiness_eligible": true,
+    "max_scenarios": 2,
+    "max_turns_per_scenario": 6,
+    "max_output_tokens": 350,
+    "temperature": 0.2
+  },
+  "token_totals": {
+    "input_tokens": 3927,
+    "output_tokens": 343,
+    "total_tokens": 4270
+  },
+  "db_audit_after": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "readiness_audit": {
+    "status": "passed",
+    "failures": []
+  },
+  "decision": "SMOKE_V3_PREFLIGHT_NO_SEND_AFTER_INTERNAL_LEAK_FIX_READY"
+}

@@ -1,0 +1,274 @@
+{
+  "contract_version": "1.0",
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "name": "Dinamo Motos NL Runtime V2 Product Agent",
+  "domain": "vehicle_credit_sales",
+  "locale": "es-MX",
+  "timezone": "America/Mexico_City",
+  "agent_persona": {
+    "name": "Francisco Esparza",
+    "role": "asesor de creditos de Dinamo Motos NL",
+    "tone": "WhatsApp humano, breve, claro y asesor",
+    "language": "es-MX"
+  },
+  "knowledge_os": {
+    "mode": "tenant_structured_sources",
+    "sources": {
+      "catalog": {
+        "source_id": "dinamo_catalogo_junio_2026",
+        "path": "docs/tenant_sources/dinamo/CatalogoMotos2026_DINAMO.json",
+        "official_docx": "docs/tenant_sources/dinamo/Catalogo_Dinamo-Junio2026.docx"
+      },
+      "requirements": {
+        "source_id": "dinamo_requisitos_junio_2026",
+        "path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+        "official_docx": "docs/tenant_sources/dinamo/Requisitos_Dinamo-Junio2026.docx"
+      },
+      "faq": {
+        "source_id": "dinamo_faq_junio_2026",
+        "path": "docs/tenant_sources/dinamo/FAQ_DINAMO.json",
+        "official_docx": "docs/tenant_sources/dinamo/FAQ_Dinamo-Junio2026.docx"
+      },
+      "flow": {
+        "source_id": "dinamo_flujo_orden_caos_2026",
+        "path": "docs/tenant_sources/dinamo/Flujo_Dinamo_Orden_y_Caos.docx"
+      },
+      "prompt": {
+        "source_id": "dinamo_prompt_francisco_2026",
+        "path": "docs/tenant_sources/dinamo/Prompt.txt"
+      }
+    }
+  },
+  "lifecycle_stages": [
+    "Nuevo",
+    "Plan",
+    "Cliente Potencial / Moto Cotizada",
+    "Papeleria Incompleta",
+    "Papeleria Completa",
+    "Handoff Humano / Revision"
+  ],
+  "fields": [
+    {
+      "key": "product_selection",
+      "label": "Modelo de moto",
+      "type": "json",
+      "domain_role": "selection",
+      "aliases": ["modelo_moto", "Moto", "MODELO_INTERES"],
+      "write_policy": "auto_apply_when_catalog_match",
+      "allowed_sources": ["catalog.search"],
+      "evidence_required": true
+    },
+    {
+      "key": "product_catalog_id",
+      "label": "ID catalogo modelo",
+      "type": "text",
+      "domain_role": "selection_metadata",
+      "aliases": ["modelo_moto_id", "catalog_id", "product_id"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["catalog.search"],
+      "evidence_required": true
+    },
+    {
+      "key": "employment_seniority",
+      "label": "Antiguedad laboral",
+      "type": "number",
+      "domain_role": "employment_seniority",
+      "aliases": [
+        "antiguedad",
+        "meses_trabajo",
+        "employment_seniority_months",
+        "antiguedad_laboral",
+        "work_seniority"
+      ],
+      "write_policy": "auto_apply_when_explicit",
+      "allowed_sources": ["user_message"],
+      "evidence_required": true,
+      "validation": {"minimum_months": 6}
+    },
+    {
+      "key": "cumple_antiguedad",
+      "label": "Cumple antiguedad",
+      "type": "boolean",
+      "domain_role": "employment_seniority_eligibility",
+      "aliases": [
+        "Cumple_Antiguedad",
+        "CUMPLE_ANTIGUEDAD",
+        "seniority_eligibility",
+        "employment_seniority_eligibility"
+      ],
+      "write_policy": "system_derived",
+      "allowed_sources": ["system"],
+      "evidence_required": true,
+      "validation": {"source_field": "employment_seniority", "minimum_months": 6}
+    },
+    {
+      "key": "income_type",
+      "label": "Tipo de ingreso",
+      "type": "text",
+      "domain_role": "income",
+      "aliases": ["tipo_credito"],
+      "write_policy": "semantic_signal_only",
+      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "evidence_required": true
+    },
+    {
+      "key": "plan_selection",
+      "label": "Plan de credito",
+      "type": "text",
+      "domain_role": "plan",
+      "aliases": ["plan_credito", "tipo_credito"],
+      "write_policy": "auto_apply_when_valid_plan",
+      "allowed_sources": ["credit_plan.resolve", "requirements.lookup"],
+      "evidence_required": true
+    },
+    {
+      "key": "down_payment_percent",
+      "label": "Enganche",
+      "type": "number",
+      "domain_role": "plan",
+      "aliases": ["enganche", "enganche_porcentaje", "Plan_Enganche"],
+      "write_policy": "auto_apply_when_valid_plan",
+      "allowed_sources": ["credit_plan.resolve", "requirements.lookup"],
+      "evidence_required": true
+    },
+    {
+      "key": "quote_snapshot_id",
+      "label": "Ultima cotizacion",
+      "type": "text",
+      "domain_role": "quote",
+      "aliases": ["ultima_cotizacion", "Ultima_Cotizacion"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["quote.resolve"],
+      "evidence_required": true,
+      "value_path": "snapshot_id"
+    },
+    {
+      "key": "requirements_checklist",
+      "label": "Checklist documentos",
+      "type": "json",
+      "domain_role": "document",
+      "aliases": ["docs_checklist", "Docs_Checklist"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["requirements.lookup", "expediente.evaluate"],
+      "evidence_required": true
+    },
+    {
+      "key": "requirements_complete",
+      "label": "Documentos completos",
+      "type": "boolean",
+      "domain_role": "document",
+      "aliases": ["doc_completos", "Doc_Completos"],
+      "write_policy": "tool_only",
+      "allowed_sources": ["expediente.evaluate"],
+      "evidence_required": true
+    },
+    {
+      "key": "pending_slot",
+      "label": "Dato pendiente",
+      "type": "text",
+      "domain_role": "runtime_memory",
+      "write_policy": "runtime_memory_only",
+      "allowed_sources": ["runtime"],
+      "evidence_required": false
+    }
+  ],
+  "tools": [
+    {"tool_id": "catalog.search", "topic": "catalog_or_listing", "aliases": ["catalog", "modelos", "inventario"]},
+    {"tool_id": "credit_plan.resolve", "topic": "plan_or_financing", "aliases": ["plan", "credit_plan", "enganche"]},
+    {"tool_id": "quote.resolve", "topic": "offer_or_quote", "aliases": ["quote", "cotizacion", "precio"]},
+    {"tool_id": "requirements.lookup", "topic": "requirements", "aliases": ["requirements", "requisitos", "papeleria"]},
+    {"tool_id": "faq.lookup", "topic": "policy_or_faq", "aliases": ["faq", "buro", "politicas"]},
+    {"tool_id": "document.check", "topic": "document_status", "aliases": ["document", "documentos"]},
+    {"tool_id": "expediente.evaluate", "topic": "document_completeness", "aliases": ["expediente", "documentos_completos"]}
+  ],
+  "flow_policy": {
+    "single_question_per_turn": true,
+    "do_not_repeat_saved_data": true,
+    "do_not_request_documents_before_quote": true,
+    "do_not_promise_approval": true,
+    "document_received_is_not_document_approved": true,
+    "ask_only_missing_documents": true,
+    "seniority_before_income": true,
+    "seniority_slot": "employment_seniority",
+    "income_slot": "income_type",
+    "seniority_minimum_months": 6,
+    "business_activity_ambiguous_slot": "business_tax_status",
+    "business_activity_clarification": "Va, si tienes negocio. Para darte el plan correcto dime si estas dado de alta en SAT/RIF o si lo manejas sin comprobantes.",
+    "vehicle_use_signal": "vehicle_use",
+    "vehicle_use_does_not_write_income": true
+  },
+  "income_resolution_policy": {
+    "source": "Requisitos_Dinamo-Junio2026",
+    "ambiguous_signals": [
+      "tengo negocio",
+      "negocio propio",
+      "vendo comida",
+      "vendo comida desde mi casa",
+      "trabajo por mi cuenta",
+      "tengo mi local",
+      "soy independiente"
+    ],
+    "ambiguous_pending_slot": "business_tax_status",
+    "ambiguous_clarification": "Va, si tienes negocio. Para darte el plan correcto dime si estas dado de alta en SAT/RIF o si lo manejas sin comprobantes.",
+    "resolution_rules": [
+      {
+        "candidate": "nomina_tarjeta",
+        "plan_id": "nomina_tarjeta_10",
+        "evidence_any": ["me depositan en tarjeta", "me pagan por tarjeta", "nomina en tarjeta", "me pagan por banco", "deposito de nomina"]
+      },
+      {
+        "candidate": "nomina_recibos",
+        "plan_id": "nomina_recibos_15",
+        "evidence_any": ["tengo recibos", "recibos de nomina", "me pagan con recibos", "comprobantes de nomina"]
+      },
+      {
+        "candidate": "pensionado",
+        "plan_id": "pensionados_imss_10",
+        "evidence_any": ["soy pensionado", "recibo pension", "pensionado imss", "jubilado"]
+      },
+      {
+        "candidate": "negocio_sat",
+        "plan_id": "negocio_sat_15",
+        "evidence_any": ["estoy dado de alta en sat", "tengo sat", "tengo rif", "constancia fiscal", "facturo", "tengo negocio registrado"]
+      },
+      {
+        "candidate": "sin_comprobantes",
+        "plan_id": "sin_comprobantes_20",
+        "evidence_any": ["no tengo sat", "no tengo rif", "no estoy dado de alta", "no tengo comprobantes", "me pagan en efectivo", "informal", "no declaro", "sin comprobar ingresos"]
+      },
+      {
+        "candidate": "guardia_seguridad",
+        "plan_id": "guardia_seguridad_30",
+        "evidence_any": ["guardia de seguridad", "soy guardia", "seguridad privada", "vigilante", "custodio", "policia", "fuerza civil"]
+      }
+    ]
+  },
+  "required_tools_policy": {
+    "price_requires": ["catalog.search", "credit_plan.resolve", "quote.resolve"],
+    "model_write_requires": ["catalog.search"],
+    "requirements_requires": ["requirements.lookup"],
+    "plan_write_requires": ["credit_plan.resolve"],
+    "document_status_requires": ["document.check"],
+    "expediente_complete_requires": ["expediente.evaluate"],
+    "tool_skipped_or_failed_blocks_visible_send": true
+  },
+  "pipeline": {
+    "id": "dinamo_product_agent_runtime_v2_no_send",
+    "dry_run": true,
+    "side_effects_enabled": false
+  },
+  "safety": {
+    "live_send_enabled": false,
+    "actions_enabled": false,
+    "workflow_side_effects_enabled": false,
+    "canary_enabled": false,
+    "open_production_enabled": false
+  },
+  "trace": {
+    "universal_turn_trace_required": true,
+    "record_tool_results": true,
+    "record_state_writer_decisions": true,
+    "record_policy_result": true
+  }
+}

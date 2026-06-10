@@ -1,0 +1,67 @@
+{
+  "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+  "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+  "manifest_version": "2026-06-07",
+  "status": "healthy_expected",
+  "sources": [
+    {
+      "source_id": "dinamo_catalogo_junio_2026",
+      "name": "Dinamo Catalogo Junio 2026",
+      "type": "file",
+      "content_type": "catalog",
+      "status": "active",
+      "priority": 100,
+      "path": "docs/tenant_sources/dinamo/CatalogoMotos2026_DINAMO.json",
+      "official_path": "docs/tenant_sources/dinamo/Catalogo_Dinamo-Junio2026.docx",
+      "binding_mode": "read",
+      "required": true
+    },
+    {
+      "source_id": "dinamo_requisitos_junio_2026",
+      "name": "Dinamo Requisitos Credito Junio 2026",
+      "type": "file",
+      "content_type": "requirements",
+      "status": "active",
+      "priority": 100,
+      "path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+      "official_path": "docs/tenant_sources/dinamo/Requisitos_Dinamo-Junio2026.docx",
+      "binding_mode": "read",
+      "required": true
+    },
+    {
+      "source_id": "dinamo_faq_junio_2026",
+      "name": "Dinamo FAQ Junio 2026",
+      "type": "file",
+      "content_type": "faq",
+      "status": "active",
+      "priority": 80,
+      "path": "docs/tenant_sources/dinamo/FAQ_DINAMO.json",
+      "official_path": "docs/tenant_sources/dinamo/FAQ_Dinamo-Junio2026.docx",
+      "binding_mode": "read",
+      "required": true
+    },
+    {
+      "source_id": "dinamo_flujo_orden_caos_2026",
+      "name": "Dinamo Flujo Orden y Caos",
+      "type": "file",
+      "content_type": "flow_policy",
+      "status": "active",
+      "priority": 70,
+      "path": "docs/tenant_sources/dinamo/Flujo_Dinamo_Orden_y_Caos.docx",
+      "binding_mode": "read",
+      "required": true
+    },
+    {
+      "source_id": "dinamo_prompt_francisco_2026",
+      "name": "Dinamo Prompt Francisco",
+      "type": "file",
+      "content_type": "prompt",
+      "status": "active",
+      "priority": 60,
+      "path": "docs/tenant_sources/dinamo/Prompt.txt",
+      "official_path": "docs/tenant_sources/dinamo/Prompt Agente IA.txt",
+      "binding_mode": "read",
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,904 @@
+{
+  "openai_api_key_present": true,
+  "openai_api_key_length": 164,
+  "send_enabled": false,
+  "actions_enabled": false,
+  "workflow_events_enabled": false,
+  "model_provider": "openai",
+  "model": "gpt-4o-mini",
+  "composer_model": "gpt-4o-mini",
+  "scenario_count": 1,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "agent_version_id": "ae37c6a6-b07a-420d-8bd2-cc14d9e1c1f6",
+  "binding_result": {
+    "knowledge_source_count": 5,
+    "knowledge_source_ids": [
+      "4d6bc8b7-7f35-5892-8eca-9722f351dc20",
+      "53eaf979-15a6-58ae-907a-c1c990702446",
+      "9810c15b-43b7-566e-93e1-5dc873f316ce",
+      "3d8b4ebe-a6e0-5886-8fbd-58313f5b2b77",
+      "6250db63-6ade-546d-896f-cc6a13a792cc"
+    ],
+    "tool_binding_count": 7,
+    "field_permission_count": 11
+  },
+  "db_audit_before": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "suite_id": "ebff1421-7b45-4ee1-83be-4c8d46787bbb",
+  "test_run_id": "06e52b2c-00e6-48bc-8b6a-741169c90191",
+  "run_status": "blocked",
+  "run_decision": "REAL_AGENT_TEST_LAB_BLOCKED_BY_OPENAI_API",
+  "scenario_results": [
+    {
+      "scenario_id": "dc647657-912b-42c4-8997-541b0a06cf3f",
+      "status": "failed",
+      "failures": [
+        "openai_provider_error",
+        "openai_provider_error",
+        "openai_provider_error",
+        "missing_tool:credit_plan.resolve",
+        "missing_state_write:plan_selection",
+        "missing_state_write:down_payment_percent",
+        "openai_provider_error",
+        "openai_provider_error"
+      ],
+      "turn_count": 5
+    }
+  ],
+  "turn_results": [
+    {
+      "turn_number": 1,
+      "status": "failed",
+      "failures": [
+        "openai_provider_error"
+      ],
+      "inbound": "hola",
+      "input": "hola",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "8531c0fd-aa02-46d9-86a9-478dd777c412",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_provider_error",
+          "APIConnectionError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": null,
+        "policy_issues": [
+          {
+            "code": "human_response_composer_provider_failed",
+            "message": "Connection error."
+          }
+        ],
+        "latency_ms": 2
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_provider_error",
+        "APIConnectionError",
+        "human_response_composer_provider_failed"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {},
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "token_usage_missing"
+      },
+      "failure_reason": "openai_provider_error",
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 2,
+      "status": "failed",
+      "failures": [
+        "openai_provider_error"
+      ],
+      "inbound": "info porfavor",
+      "input": "info porfavor",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "8531c0fd-aa02-46d9-86a9-478dd777c412",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_provider_error",
+          "APIConnectionError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": null,
+        "policy_issues": [
+          {
+            "code": "human_response_composer_provider_failed",
+            "message": "Connection error."
+          }
+        ],
+        "latency_ms": 3
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_provider_error",
+        "APIConnectionError",
+        "human_response_composer_provider_failed"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {},
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "token_usage_missing"
+      },
+      "failure_reason": "openai_provider_error",
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 3,
+      "status": "failed",
+      "failures": [
+        "openai_provider_error"
+      ],
+      "inbound": "tengo 2 años",
+      "input": "tengo 2 años",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 24,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "tengo 2 años"
+          ],
+          "confidence": 0.0,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "cumple_antiguedad",
+          "value": true,
+          "reason": "employment_seniority validated against minimum 6 months.",
+          "evidence": [
+            "tengo 2 años"
+          ],
+          "confidence": 0.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "system_derived": true,
+            "derived_from_field": "employment_seniority",
+            "minimum_months": 6,
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "8531c0fd-aa02-46d9-86a9-478dd777c412",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 24
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 24,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:tengo 2 años"
+              ],
+              "confidence": 0.0
+            },
+            {
+              "target": "contact_field",
+              "key": "cumple_antiguedad",
+              "field": "cumple_antiguedad",
+              "decision": "accepted",
+              "source": "system",
+              "writer": "StateWriter",
+              "reason": "employment_seniority_eligibility_derived",
+              "evidence_refs": [
+                "tengo 2 años"
+              ],
+              "confidence": 0.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_provider_error",
+          "APIConnectionError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": null,
+        "policy_issues": [
+          {
+            "code": "human_response_composer_provider_failed",
+            "message": "Connection error."
+          }
+        ],
+        "latency_ms": 3
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_provider_error",
+        "APIConnectionError",
+        "human_response_composer_provider_failed"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.0,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "cumple_antiguedad",
+            "source": "action",
+            "confidence": 0.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "system_derived": true,
+              "derived_from_field": "employment_seniority",
+              "minimum_months": 6,
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {},
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "token_usage_missing"
+      },
+      "failure_reason": "openai_provider_error",
+      "expected": {
+        "expected_state_writes": [
+          "employment_seniority"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 4,
+      "status": "failed",
+      "failures": [
+        "missing_tool:credit_plan.resolve",
+        "missing_state_write:plan_selection",
+        "missing_state_write:down_payment_percent",
+        "openai_provider_error"
+      ],
+      "inbound": "me pagan por transferencia",
+      "input": "me pagan por transferencia",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "8531c0fd-aa02-46d9-86a9-478dd777c412",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 24
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_provider_error",
+          "APIConnectionError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": null,
+        "policy_issues": [
+          {
+            "code": "human_response_composer_provider_failed",
+            "message": "Connection error."
+          }
+        ],
+        "latency_ms": 3
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_provider_error",
+        "APIConnectionError",
+        "human_response_composer_provider_failed"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {},
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "token_usage_missing"
+      },
+      "failure_reason": "missing_tool:credit_plan.resolve, missing_state_write:plan_selection, missing_state_write:down_payment_percent, openai_provider_error",
+      "expected": {
+        "expected_tools": [
+          "credit_plan.resolve"
+        ],
+        "expected_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 5,
+      "status": "failed",
+      "failures": [
+        "openai_provider_error"
+      ],
+      "inbound": "?",
+      "input": "?",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "8531c0fd-aa02-46d9-86a9-478dd777c412",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 24
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_provider_error",
+          "APIConnectionError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": null,
+        "policy_issues": [
+          {
+            "code": "human_response_composer_provider_failed",
+            "message": "Connection error."
+          }
+        ],
+        "latency_ms": 3
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_provider_error",
+        "APIConnectionError",
+        "human_response_composer_provider_failed"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {},
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "token_usage_missing"
+      },
+      "failure_reason": "openai_provider_error",
+      "expected": {
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    }
+  ],
+  "turn_summary": [
+    {
+      "turn_number": 1,
+      "inbound": "hola",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "failures": [
+        "openai_provider_error"
+      ]
+    },
+    {
+      "turn_number": 2,
+      "inbound": "info porfavor",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "failures": [
+        "openai_provider_error"
+      ]
+    },
+    {
+      "turn_number": 3,
+      "inbound": "tengo 2 años",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [
+        "cumple_antiguedad",
+        "employment_seniority"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "failures": [
+        "openai_provider_error"
+      ]
+    },
+    {
+      "turn_number": 4,
+      "inbound": "me pagan por transferencia",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "failures": [
+        "missing_tool:credit_plan.resolve",
+        "missing_state_write:plan_selection",
+        "missing_state_write:down_payment_percent",
+        "openai_provider_error"
+      ]
+    },
+    {
+      "turn_number": 5,
+      "inbound": "?",
+      "final_message": "Necesito que una persona del equipo revise esto para responderte con certeza.",
+      "user_act": "unknown",
+      "pending_slot": "employment_seniority",
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+      "failures": [
+        "openai_provider_error"
+      ]
+    }
+  ],
+  "trace_ids": [
+    "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+    "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+    "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+    "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown",
+    "8531c0fd-aa02-46d9-86a9-478dd777c412:unknown"
+  ],
+  "outbox_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "side_effect_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "coverage_summary": {
+    "scope": "product_first_test_lab",
+    "execution_mode": "runtime_v2_agent_service",
+    "send_mode": "no_send",
+    "openai_api_real": true,
+    "runtime_v2_agent_service": true,
+    "readiness_eligible": true,
+    "max_scenarios": 2,
+    "max_turns_per_scenario": 6,
+    "max_output_tokens": 350,
+    "temperature": 0.2
+  },
+  "token_totals": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0
+  },
+  "db_audit_after": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "readiness_audit": {
+    "status": "failed",
+    "failures": [
+      "test_lab_run_not_passed:REAL_AGENT_TEST_LAB_BLOCKED_BY_OPENAI_API",
+      "seniority_not_requested_first",
+      "credit_plan_resolve_missing_turn_4",
+      "question_mark_does_not_resume_missing_model"
+    ]
+  },
+  "decision": "SMOKE_V3_APPROVAL_BLOCKED_BY_FLOW_ORDER"
+}

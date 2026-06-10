@@ -1,0 +1,87 @@
+{
+  "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+  "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+  "suite_name": "Dinamo Runtime V2 real no-send scenarios",
+  "mode": "publish_readiness",
+  "execution_mode": "runtime_v2_agent_service",
+  "send_mode": "no_send",
+  "global_expected": {
+    "expected_send_decision": "no_send",
+    "internal_text_forbidden": true,
+    "trace_required": true
+  },
+  "scenarios": [
+    {
+      "name": "Negocio ambiguo",
+      "turns": [
+        {"inbound_text": "Hola, quiero informacion del credito"},
+        {"inbound_text": "Tengo negocio"},
+        {"inbound_text": "Vendo comida desde mi casa"},
+        {"inbound_text": "No tengo SAT"},
+        {"inbound_text": "Quiero algo economico para moverme diario"},
+        {"inbound_text": "La Adventure"}
+      ],
+      "expected": {
+        "expected_turns": [
+          {},
+          {
+            "forbidden_state_writes": ["plan_selection", "down_payment_percent"],
+            "final_message_contains": ["SAT"],
+            "final_message_not_contains": [
+              "ya valide tu tipo de ingreso",
+              "Cuanto tiempo llevas trabajando",
+              "Dime que dato quieres revisar."
+            ]
+          },
+          {
+            "forbidden_state_writes": ["plan_selection", "down_payment_percent"],
+            "final_message_not_contains": ["Dime que dato quieres revisar."]
+          },
+          {
+            "expected_tools": ["credit_plan.resolve"],
+            "expected_state_writes": ["plan_selection", "down_payment_percent"],
+            "final_message_not_contains": ["Dime que dato quieres revisar."]
+          },
+          {
+            "final_message_not_contains": ["Dime que dato quieres revisar."]
+          },
+          {
+            "expected_tools": ["catalog.search"],
+            "expected_state_writes": ["product_selection"],
+            "final_message_not_contains": ["Dime que dato quieres revisar."]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Skeleton buro tarjeta",
+      "turns": [
+        {"inbound_text": "Hola, vi una Skeleton, cuanto sale a credito? Estoy en buro"},
+        {"inbound_text": "me pagan por tarjeta"},
+        {"inbound_text": "tengo 2 anos"},
+        {"inbound_text": "que papeles ocupo"}
+      ],
+      "expected": {
+        "expected_turns": [
+          {
+            "expected_tools": ["catalog.search", "faq.lookup"],
+            "expected_state_writes": ["product_selection"]
+          },
+          {
+            "expected_tools": ["credit_plan.resolve"],
+            "expected_state_writes": ["plan_selection", "down_payment_percent"]
+          },
+          {
+            "expected_tools": ["quote.resolve"],
+            "expected_state_writes": ["employment_seniority", "quote_snapshot_id"],
+            "final_message_not_contains": ["Dime que dato quieres revisar."]
+          },
+          {
+            "expected_tools": ["requirements.lookup"],
+            "expected_state_writes": ["requirements_checklist"]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,4204 @@
+{
+  "openai_api_key_present": true,
+  "openai_api_key_length": 164,
+  "send_enabled": false,
+  "actions_enabled": false,
+  "workflow_events_enabled": false,
+  "model_provider": "openai",
+  "model": "gpt-4o-mini",
+  "composer_model": "gpt-4o-mini",
+  "scenario_count": 2,
+  "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+  "agent_version_id": "6d4e3937-3621-4951-b9ab-bdcd05dd1577",
+  "binding_result": {
+    "knowledge_source_count": 5,
+    "knowledge_source_ids": [
+      "c211c61f-f077-5501-970d-9592eda877d1",
+      "042ce44e-6834-59ba-b977-492d4226f49d",
+      "4e27d277-d6e6-5892-aee6-d7aac56ade68",
+      "35b8e008-a6ae-5d61-8c57-7f88f261bdd8",
+      "4e382fcb-8710-5065-97c9-212aeab252b2"
+    ],
+    "tool_binding_count": 7,
+    "field_permission_count": 11
+  },
+  "db_audit_before": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "suite_id": "cdffb424-8ed8-4302-8d38-7717e877eacf",
+  "test_run_id": "fc215ccf-26f2-4b6e-adf1-0b87fd0d376e",
+  "run_status": "passed",
+  "run_decision": "TEST_LAB_PASSED",
+  "scenario_results": [
+    {
+      "scenario_id": "6cce86f6-071f-4937-a5cc-e0317f3f0a4a",
+      "status": "passed",
+      "failures": [],
+      "turn_count": 6
+    },
+    {
+      "scenario_id": "5c9f9087-e59f-4fe1-b9fc-d3c0b78d3b5d",
+      "status": "passed",
+      "failures": [],
+      "turn_count": 6
+    }
+  ],
+  "turn_results": [
+    {
+      "turn_number": 1,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Hola, vi una Skeleton, cuanto sale a credito? Estoy en buro",
+      "input": "Hola, vi una Skeleton, cuanto sale a credito? Estoy en buro",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [
+        "catalog.search",
+        "faq.lookup",
+        "catalog.search"
+      ],
+      "required_tools": [
+        "catalog.search",
+        "faq.lookup",
+        "catalog.search"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "product_selection",
+          "value": {
+            "product_id": "skeleton_400_cc",
+            "sku": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {}
+          },
+          "reason": "catalog.search validated model from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:skeleton_400_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "auto_apply_when_catalog_match",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "product_catalog_id",
+          "value": "skeleton_400_cc",
+          "reason": "catalog.search validated model id from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:skeleton_400_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "product_selection",
+          "value": {
+            "product_id": "skeleton_400_cc",
+            "sku": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {}
+          },
+          "reason": "catalog.search validated model from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:skeleton_400_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "auto_apply_when_catalog_match",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "product_catalog_id",
+          "value": "skeleton_400_cc",
+          "reason": "catalog.search validated model id from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:skeleton_400_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "product_id": "skeleton_400_cc",
+            "sku": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {}
+          },
+          "catalog": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "Skeleton",
+            "source_path": "docs/tenant_sources/dinamo/CatalogoMotos2026_DINAMO.json",
+            "matches": [
+              {
+                "product_id": "skeleton_400_cc",
+                "name": "Skeleton 400 CC",
+                "category": "Naked-Urbana",
+                "score": 1.0
+              }
+            ],
+            "canonical_product_ref": {
+              "product_id": "skeleton_400_cc",
+              "sku": "skeleton_400_cc",
+              "display_name": "Skeleton 400 CC",
+              "catalog_id": "CatalogoMotos2026_DINAMO",
+              "catalog_version_id": null,
+              "evidence": [
+                "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                "catalog:skeleton_400_cc"
+              ],
+              "metadata": {}
+            },
+            "field_updates": [
+              {
+                "key": "product_selection",
+                "value": {
+                  "product_id": "skeleton_400_cc",
+                  "sku": "skeleton_400_cc",
+                  "display_name": "Skeleton 400 CC",
+                  "catalog_id": "CatalogoMotos2026_DINAMO",
+                  "catalog_version_id": null,
+                  "evidence": [
+                    "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                    "catalog:skeleton_400_cc"
+                  ],
+                  "metadata": {}
+                },
+                "reason": "catalog.search validated model from tenant catalog.",
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:skeleton_400_cc"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "product_catalog_id",
+                "value": "skeleton_400_cc",
+                "reason": "catalog.search validated model id from tenant catalog.",
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:skeleton_400_cc"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          },
+          "policy": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "buro",
+            "source_path": "docs/tenant_sources/dinamo/FAQ_DINAMO.json",
+            "matches": [
+              {
+                "question": "¿Se puede hacer el trámite si estoy en buró?",
+                "answer_facts": {
+                  "policy": "Sí, se puede revisar si debes menos de $50,000. La aprobación final depende de validación.",
+                  "details_by_plan": {},
+                  "documents": [],
+                  "url": null,
+                  "address": null
+                },
+                "score": 0.94
+              },
+              {
+                "question": "¿Puedo iniciar el trámite sin tener todo?",
+                "answer_facts": {
+                  "policy": "No, se requiere enviar la documentación completa para proceder con la revisión de buró.",
+                  "details_by_plan": {},
+                  "documents": [],
+                  "url": null,
+                  "address": null
+                },
+                "score": 0.94
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "catalog.search",
+            "status": "succeeded",
+            "data_keys": [
+              "canonical_product_ref",
+              "field_updates",
+              "matches",
+              "query",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          },
+          {
+            "tool_name": "faq.lookup",
+            "status": "succeeded",
+            "data_keys": [
+              "matches",
+              "query",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          },
+          {
+            "tool_name": "catalog.search",
+            "status": "succeeded",
+            "data_keys": [
+              "canonical_product_ref",
+              "field_updates",
+              "matches",
+              "query",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "product_selection",
+              "field": "product_selection",
+              "proposed_value": {
+                "product_id": "skeleton_400_cc",
+                "sku": "skeleton_400_cc",
+                "display_name": "Skeleton 400 CC",
+                "catalog_id": "CatalogoMotos2026_DINAMO",
+                "catalog_version_id": null,
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:skeleton_400_cc"
+                ],
+                "metadata": {}
+              },
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "product_catalog_id",
+              "field": "product_catalog_id",
+              "proposed_value": "skeleton_400_cc",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "product_selection",
+              "field": "product_selection",
+              "proposed_value": {
+                "product_id": "skeleton_400_cc",
+                "sku": "skeleton_400_cc",
+                "display_name": "Skeleton 400 CC",
+                "catalog_id": "CatalogoMotos2026_DINAMO",
+                "catalog_version_id": null,
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:skeleton_400_cc"
+                ],
+                "metadata": {}
+              },
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "product_catalog_id",
+              "field": "product_catalog_id",
+              "proposed_value": "skeleton_400_cc",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 4,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "catalog.search",
+          "faq.lookup"
+        ],
+        "required_tools": [
+          "catalog.search",
+          "faq.lookup",
+          "catalog.search"
+        ],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The response is a friendly request for clarification regarding the user's income type, which is the pending slot.",
+          "used_facts": [
+            "product_selection"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1702
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "product_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "auto_apply_when_catalog_match",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "product_catalog_id",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 2021,
+        "output_tokens": 66,
+        "total_tokens": 2087
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 2021,
+        "output_tokens": 66,
+        "total_tokens": 2087
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "expected_tools": [
+          "catalog.search",
+          "faq.lookup"
+        ],
+        "expected_state_writes": [
+          "product_selection"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 2,
+      "status": "passed",
+      "failures": [],
+      "inbound": "me pagan por tarjeta",
+      "input": "me pagan por tarjeta",
+      "final_message": "Para continuar, ¿podrías decirme cuántos años de experiencia laboral tienes?",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "plan_selection",
+          "value": "10%",
+          "reason": "credit_plan.resolve validated income-to-plan mapping.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "down_payment_percent",
+          "value": 10,
+          "reason": "credit_plan.resolve validated down payment percent.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "skeleton_400_cc",
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_version_id": null
+          },
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "credit_plan": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "nomina_tarjeta",
+            "raw_answer": "me pagan por tarjeta",
+            "income_candidate": "nomina_tarjeta",
+            "pending_slot": "income_type",
+            "last_bot_question": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "plan_id": "nomina_tarjeta_10",
+            "tipo_credito": "Nómina Tarjeta",
+            "plan_credito": "10%",
+            "down_payment_percent": 10,
+            "field_updates": [
+              {
+                "key": "plan_selection",
+                "value": "10%",
+                "reason": "credit_plan.resolve validated income-to-plan mapping.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "down_payment_percent",
+                "value": 10,
+                "reason": "credit_plan.resolve validated down payment percent.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "down_payment_percent",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "pending_slot",
+              "plan_credito",
+              "plan_id",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id",
+              "tipo_credito"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "plan_selection",
+              "field": "plan_selection",
+              "proposed_value": "10%",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "down_payment_percent",
+              "field": "down_payment_percent",
+              "proposed_value": 10,
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": null,
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cuántos años de experiencia laboral tienes?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to provide their employment seniority to proceed with the credit plan.",
+          "used_facts": [
+            "product_selection",
+            "plan_selection",
+            "credit_plan"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2501
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "plan_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "down_payment_percent",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1221,
+        "output_tokens": 67,
+        "total_tokens": 1288
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1221,
+        "output_tokens": 67,
+        "total_tokens": 1288
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "expected_tools": [
+          "credit_plan.resolve"
+        ],
+        "expected_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 3,
+      "status": "passed",
+      "failures": [],
+      "inbound": "tengo 2 anos",
+      "input": "tengo 2 anos",
+      "final_message": "Tu cotización para la Skeleton 400 CC con un plan del 10% ya está lista. El pago inicial es de 8,147 MXN y las cuotas son de 3,236 MXN durante 72 quincenas. Si necesitas más información, aquí estoy para ayudarte.",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [
+        "quote.resolve"
+      ],
+      "required_tools": [
+        "quote.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 24,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "tengo 2 anos"
+          ],
+          "confidence": 0.0,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "quote_snapshot_id",
+          "value": "quote-skeleton_400_cc-plan-10",
+          "reason": "quote.resolve returned validated quote data.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:skeleton_400_cc",
+            "plan:10%"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "quote_snapshot": true,
+            "quote_snapshot_id": "quote-skeleton_400_cc-plan-10",
+            "quote_snapshot_hash": "4e4f51a6b66146bf88d9c09ea422683b7e66828490f80311e9070d3dfb7e8454",
+            "source_tool": "quote.resolve",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": true,
+        "message_goal": "explain_validated_quote",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "skeleton_400_cc",
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_version_id": null
+          },
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 24,
+          "quote": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "quote_snapshot": {
+              "snapshot_id": "quote-skeleton_400_cc-plan-10",
+              "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+              "product": {
+                "product_id": "skeleton_400_cc",
+                "sku": "skeleton_400_cc",
+                "display_name": "Skeleton 400 CC",
+                "catalog_id": "CatalogoMotos2026_DINAMO",
+                "catalog_version_id": null,
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:skeleton_400_cc"
+                ],
+                "metadata": {}
+              },
+              "plan_id": "plan_10",
+              "plan_code": "10%",
+              "plan_name": "10% credito",
+              "currency": "MXN",
+              "pricing": {
+                "cash_price": 77590,
+                "list_price": 83797,
+                "down_payment": 8147,
+                "installment": 3236,
+                "installments": 72,
+                "period_label": "quincenas"
+              },
+              "requirements": {},
+              "source_tool": "quote.resolve",
+              "source_version": "tenant_knowledge_tool_layer_v1",
+              "quote_payload": {},
+              "evidence": [
+                "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                "catalog:skeleton_400_cc",
+                "plan:10%"
+              ],
+              "created_at": "2026-06-08T06:22:08.213026+00:00",
+              "integrity_hash": "4e4f51a6b66146bf88d9c09ea422683b7e66828490f80311e9070d3dfb7e8454"
+            }
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "quote.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "quote_snapshot",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 24,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:tengo 2 anos",
+                "tool_result:quote.resolve"
+              ],
+              "confidence": 0.0
+            },
+            {
+              "target": "contact_field",
+              "key": "quote_snapshot_id",
+              "field": "quote_snapshot_id",
+              "proposed_value": "quote-skeleton_400_cc-plan-10",
+              "decision": "accepted",
+              "reason": "quote_resolver_satisfied_field_policy",
+              "source": "quote.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:quote.resolve"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [
+            {
+              "target": "contact_field",
+              "key": "quote_snapshot_id",
+              "field": "quote_snapshot_id",
+              "decision": "blocked",
+              "source": "tool_result",
+              "writer": "StateWriter",
+              "reason": "field_not_visible",
+              "evidence_refs": [
+                "tool_result:quote.resolve"
+              ]
+            }
+          ],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 1
+        },
+        "next_best_question": null,
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "quote.resolve"
+        ],
+        "required_tools": [
+          "quote.resolve"
+        ],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "explain_validated_quote",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": true,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Tu cotización para la Skeleton 400 CC con un plan del 10% ya está lista. El pago inicial es de 8,147 MXN y las cuotas son de 3,236 MXN durante 72 quincenas. Si necesitas más información, aquí estoy para ayudarte.",
+          "language": "es",
+          "reasoning_summary_safe": "El mensaje resume la cotización validada y proporciona detalles sobre el pago inicial y las cuotas, manteniendo un tono amigable y conciso.",
+          "used_facts": [
+            "product_selection",
+            "plan_selection",
+            "down_payment_percent",
+            "employment_seniority",
+            "quote"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2470
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.0,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "quote_snapshot_id",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "quote_snapshot": true,
+              "quote_snapshot_id": "quote-skeleton_400_cc-plan-10",
+              "quote_snapshot_hash": "4e4f51a6b66146bf88d9c09ea422683b7e66828490f80311e9070d3dfb7e8454",
+              "source_tool": "quote.resolve",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": null,
+        "quote_snapshot_persisted": true
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1415,
+        "output_tokens": 132,
+        "total_tokens": 1547
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1415,
+        "output_tokens": 132,
+        "total_tokens": 1547
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "expected_tools": [
+          "quote.resolve"
+        ],
+        "expected_state_writes": [
+          "employment_seniority",
+          "quote_snapshot_id"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 4,
+      "status": "passed",
+      "failures": [],
+      "inbound": "que papeles ocupo",
+      "input": "que papeles ocupo",
+      "final_message": "Para el crédito de Nómina Tarjeta al 10%, necesitas los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), 2 estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna duda, aquí estoy para ayudarte.",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [
+        "requirements.lookup"
+      ],
+      "required_tools": [
+        "requirements.lookup"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "plan_selection",
+          "value": "10%",
+          "reason": "requirements.lookup validated income-to-plan mapping.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "down_payment_percent",
+          "value": 10,
+          "reason": "requirements.lookup validated down payment percent.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "requirements_checklist",
+          "value": [
+            {
+              "key": "ine_ambos_lados",
+              "label": "INE vigente por ambos lados",
+              "required": true,
+              "detail": "Enviar foto del frente y reverso."
+            },
+            {
+              "key": "comprobante_domicilio",
+              "label": "Comprobante de domicilio",
+              "required": true,
+              "detail": "Debe tener menos de 2 meses."
+            },
+            {
+              "key": "estados_cuenta_recientes",
+              "label": "2 estados de cuenta recientes",
+              "required": true,
+              "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+            },
+            {
+              "key": "nomina_1_mes_dentro_estado_cuenta",
+              "label": "Un mes de nómina dentro del estado de cuenta",
+              "required": true,
+              "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+            }
+          ],
+          "reason": "requirements.lookup returned documents for validated plan.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "requirements",
+        "slot_consumed": false,
+        "message_goal": "explain_validated_requirements",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "skeleton_400_cc",
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_version_id": null
+          },
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 24,
+          "requirements_checklist": [
+            {
+              "key": "ine_ambos_lados",
+              "label": "INE vigente por ambos lados",
+              "required": true,
+              "detail": "Enviar foto del frente y reverso."
+            },
+            {
+              "key": "comprobante_domicilio",
+              "label": "Comprobante de domicilio",
+              "required": true,
+              "detail": "Debe tener menos de 2 meses."
+            },
+            {
+              "key": "estados_cuenta_recientes",
+              "label": "2 estados de cuenta recientes",
+              "required": true,
+              "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+            },
+            {
+              "key": "nomina_1_mes_dentro_estado_cuenta",
+              "label": "Un mes de nómina dentro del estado de cuenta",
+              "required": true,
+              "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+            }
+          ],
+          "requirements": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "10%",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "plan_id": "nomina_tarjeta_10",
+            "tipo_credito": "Nómina Tarjeta",
+            "plan_credito": "10%",
+            "down_payment_percent": 10,
+            "requirements": [
+              "INE vigente por ambos lados",
+              "Comprobante de domicilio",
+              "2 estados de cuenta recientes",
+              "Un mes de nómina dentro del estado de cuenta"
+            ],
+            "documents": [
+              {
+                "key": "ine_ambos_lados",
+                "label": "INE vigente por ambos lados",
+                "required": true,
+                "detail": "Enviar foto del frente y reverso."
+              },
+              {
+                "key": "comprobante_domicilio",
+                "label": "Comprobante de domicilio",
+                "required": true,
+                "detail": "Debe tener menos de 2 meses."
+              },
+              {
+                "key": "estados_cuenta_recientes",
+                "label": "2 estados de cuenta recientes",
+                "required": true,
+                "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+              },
+              {
+                "key": "nomina_1_mes_dentro_estado_cuenta",
+                "label": "Un mes de nómina dentro del estado de cuenta",
+                "required": true,
+                "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+              }
+            ],
+            "field_updates": [
+              {
+                "key": "plan_selection",
+                "value": "10%",
+                "reason": "requirements.lookup validated income-to-plan mapping.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "down_payment_percent",
+                "value": 10,
+                "reason": "requirements.lookup validated down payment percent.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "requirements_checklist",
+                "value": [
+                  {
+                    "key": "ine_ambos_lados",
+                    "label": "INE vigente por ambos lados",
+                    "required": true,
+                    "detail": "Enviar foto del frente y reverso."
+                  },
+                  {
+                    "key": "comprobante_domicilio",
+                    "label": "Comprobante de domicilio",
+                    "required": true,
+                    "detail": "Debe tener menos de 2 meses."
+                  },
+                  {
+                    "key": "estados_cuenta_recientes",
+                    "label": "2 estados de cuenta recientes",
+                    "required": true,
+                    "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+                  },
+                  {
+                    "key": "nomina_1_mes_dentro_estado_cuenta",
+                    "label": "Un mes de nómina dentro del estado de cuenta",
+                    "required": true,
+                    "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+                  }
+                ],
+                "reason": "requirements.lookup returned documents for validated plan.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "requirements.lookup",
+            "status": "succeeded",
+            "data_keys": [
+              "documents",
+              "down_payment_percent",
+              "field_updates",
+              "plan_credito",
+              "plan_id",
+              "query",
+              "requirements",
+              "source_path",
+              "tenant_id",
+              "tipo_credito"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "plan_selection",
+              "field": "plan_selection",
+              "proposed_value": "10%",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "down_payment_percent",
+              "field": "down_payment_percent",
+              "proposed_value": 10,
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "requirements_checklist",
+              "field": "requirements_checklist",
+              "proposed_value": [
+                {
+                  "key": "ine_ambos_lados",
+                  "label": "INE vigente por ambos lados",
+                  "required": true,
+                  "detail": "Enviar foto del frente y reverso."
+                },
+                {
+                  "key": "comprobante_domicilio",
+                  "label": "Comprobante de domicilio",
+                  "required": true,
+                  "detail": "Debe tener menos de 2 meses."
+                },
+                {
+                  "key": "estados_cuenta_recientes",
+                  "label": "2 estados de cuenta recientes",
+                  "required": true,
+                  "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+                },
+                {
+                  "key": "nomina_1_mes_dentro_estado_cuenta",
+                  "label": "Un mes de nómina dentro del estado de cuenta",
+                  "required": true,
+                  "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+                }
+              ],
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 3,
+          "blocked_count": 0
+        },
+        "next_best_question": "requirements",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "requirements.lookup"
+        ],
+        "required_tools": [
+          "requirements.lookup"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "explain_validated_requirements",
+      "user_act": "question",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para el crédito de Nómina Tarjeta al 10%, necesitas los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), 2 estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna duda, aquí estoy para ayudarte.",
+          "language": "es",
+          "reasoning_summary_safe": "El mensaje resume los requisitos necesarios para el crédito solicitado, manteniendo un tono amigable y claro.",
+          "used_facts": [
+            "product_selection",
+            "plan_selection",
+            "requirements_checklist"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 3329
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "plan_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "down_payment_percent",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "requirements_checklist",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "requirements",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 2060,
+        "output_tokens": 116,
+        "total_tokens": 2176
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 2060,
+        "output_tokens": 116,
+        "total_tokens": 2176
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "expected_tools": [
+          "requirements.lookup"
+        ],
+        "expected_state_writes": [
+          "requirements_checklist"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 5,
+      "status": "passed",
+      "failures": [],
+      "inbound": "te mando INE al rato",
+      "input": "te mando INE al rato",
+      "final_message": "Para continuar, ¿podrías confirmar si tienes todos los documentos requeridos, como el INE vigente por ambos lados y el comprobante de domicilio?",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "unknown",
+        "intent": "needs_human_review",
+        "pending_slot": "requirements",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "skeleton_400_cc",
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_version_id": null
+          },
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 24,
+          "requirements_checklist": [
+            {
+              "key": "ine_ambos_lados",
+              "label": "INE vigente por ambos lados",
+              "detail": "Enviar foto del frente y reverso.",
+              "required": true
+            },
+            {
+              "key": "comprobante_domicilio",
+              "label": "Comprobante de domicilio",
+              "detail": "Debe tener menos de 2 meses.",
+              "required": true
+            },
+            {
+              "key": "estados_cuenta_recientes",
+              "label": "2 estados de cuenta recientes",
+              "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte.",
+              "required": true
+            },
+            {
+              "key": "nomina_1_mes_dentro_estado_cuenta",
+              "label": "Un mes de nómina dentro del estado de cuenta",
+              "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden.",
+              "required": true
+            }
+          ]
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": null,
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "semantic_interpreter_invalid_output",
+          "ValidationError"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "unknown",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías confirmar si tienes todos los documentos requeridos, como el INE vigente por ambos lados y el comprobante de domicilio?",
+          "language": "es",
+          "reasoning_summary_safe": "The response asks a clarifying question about the required documents to proceed with the user's request.",
+          "used_facts": [
+            "requirements_checklist"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2064
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "semantic_interpreter_invalid_output",
+        "ValidationError"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "requirements",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 926,
+        "output_tokens": 77,
+        "total_tokens": 1003
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 926,
+        "output_tokens": 77,
+        "total_tokens": 1003
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "forbidden_state_writes": [
+          "requirements_complete",
+          "Doc_Completos"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 6,
+      "status": "passed",
+      "failures": [],
+      "inbound": "?",
+      "input": "?",
+      "final_message": "Para el crédito de la tarjeta de nómina, necesitarás los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), dos estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna pregunta sobre estos requisitos, ¡estoy aquí para ayudarte!",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "tools_required": [
+        "requirements.lookup"
+      ],
+      "required_tools": [
+        "requirements.lookup"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "plan_selection",
+          "value": "10%",
+          "reason": "requirements.lookup validated income-to-plan mapping.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "down_payment_percent",
+          "value": 10,
+          "reason": "requirements.lookup validated down payment percent.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "requirements_checklist",
+          "value": [
+            {
+              "key": "ine_ambos_lados",
+              "label": "INE vigente por ambos lados",
+              "required": true,
+              "detail": "Enviar foto del frente y reverso."
+            },
+            {
+              "key": "comprobante_domicilio",
+              "label": "Comprobante de domicilio",
+              "required": true,
+              "detail": "Debe tener menos de 2 meses."
+            },
+            {
+              "key": "estados_cuenta_recientes",
+              "label": "2 estados de cuenta recientes",
+              "required": true,
+              "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+            },
+            {
+              "key": "nomina_1_mes_dentro_estado_cuenta",
+              "label": "Un mes de nómina dentro del estado de cuenta",
+              "required": true,
+              "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+            }
+          ],
+          "reason": "requirements.lookup returned documents for validated plan.",
+          "evidence": [
+            "requirements:nomina_tarjeta_10"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "requirements.lookup",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "f032f2e0-6de5-4dc9-a291-454178ef481a",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "requirements",
+        "slot_consumed": false,
+        "message_goal": "explain_validated_requirements",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "skeleton_400_cc",
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:skeleton_400_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "skeleton_400_cc",
+            "display_name": "Skeleton 400 CC",
+            "catalog_version_id": null
+          },
+          "plan_selection": "10%",
+          "down_payment_percent": 10,
+          "employment_seniority": 24,
+          "requirements_checklist": [
+            {
+              "key": "ine_ambos_lados",
+              "label": "INE vigente por ambos lados",
+              "required": true,
+              "detail": "Enviar foto del frente y reverso."
+            },
+            {
+              "key": "comprobante_domicilio",
+              "label": "Comprobante de domicilio",
+              "required": true,
+              "detail": "Debe tener menos de 2 meses."
+            },
+            {
+              "key": "estados_cuenta_recientes",
+              "label": "2 estados de cuenta recientes",
+              "required": true,
+              "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+            },
+            {
+              "key": "nomina_1_mes_dentro_estado_cuenta",
+              "label": "Un mes de nómina dentro del estado de cuenta",
+              "required": true,
+              "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+            }
+          ],
+          "requirements": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "10%",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "plan_id": "nomina_tarjeta_10",
+            "tipo_credito": "Nómina Tarjeta",
+            "plan_credito": "10%",
+            "down_payment_percent": 10,
+            "requirements": [
+              "INE vigente por ambos lados",
+              "Comprobante de domicilio",
+              "2 estados de cuenta recientes",
+              "Un mes de nómina dentro del estado de cuenta"
+            ],
+            "documents": [
+              {
+                "key": "ine_ambos_lados",
+                "label": "INE vigente por ambos lados",
+                "required": true,
+                "detail": "Enviar foto del frente y reverso."
+              },
+              {
+                "key": "comprobante_domicilio",
+                "label": "Comprobante de domicilio",
+                "required": true,
+                "detail": "Debe tener menos de 2 meses."
+              },
+              {
+                "key": "estados_cuenta_recientes",
+                "label": "2 estados de cuenta recientes",
+                "required": true,
+                "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+              },
+              {
+                "key": "nomina_1_mes_dentro_estado_cuenta",
+                "label": "Un mes de nómina dentro del estado de cuenta",
+                "required": true,
+                "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+              }
+            ],
+            "field_updates": [
+              {
+                "key": "plan_selection",
+                "value": "10%",
+                "reason": "requirements.lookup validated income-to-plan mapping.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "down_payment_percent",
+                "value": 10,
+                "reason": "requirements.lookup validated down payment percent.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "requirements_checklist",
+                "value": [
+                  {
+                    "key": "ine_ambos_lados",
+                    "label": "INE vigente por ambos lados",
+                    "required": true,
+                    "detail": "Enviar foto del frente y reverso."
+                  },
+                  {
+                    "key": "comprobante_domicilio",
+                    "label": "Comprobante de domicilio",
+                    "required": true,
+                    "detail": "Debe tener menos de 2 meses."
+                  },
+                  {
+                    "key": "estados_cuenta_recientes",
+                    "label": "2 estados de cuenta recientes",
+                    "required": true,
+                    "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+                  },
+                  {
+                    "key": "nomina_1_mes_dentro_estado_cuenta",
+                    "label": "Un mes de nómina dentro del estado de cuenta",
+                    "required": true,
+                    "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+                  }
+                ],
+                "reason": "requirements.lookup returned documents for validated plan.",
+                "evidence": [
+                  "requirements:nomina_tarjeta_10"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "requirements.lookup",
+            "status": "succeeded",
+            "data_keys": [
+              "documents",
+              "down_payment_percent",
+              "field_updates",
+              "plan_credito",
+              "plan_id",
+              "query",
+              "requirements",
+              "source_path",
+              "tenant_id",
+              "tipo_credito"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "plan_selection",
+              "field": "plan_selection",
+              "proposed_value": "10%",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "down_payment_percent",
+              "field": "down_payment_percent",
+              "proposed_value": 10,
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "requirements_checklist",
+              "field": "requirements_checklist",
+              "proposed_value": [
+                {
+                  "key": "ine_ambos_lados",
+                  "label": "INE vigente por ambos lados",
+                  "required": true,
+                  "detail": "Enviar foto del frente y reverso."
+                },
+                {
+                  "key": "comprobante_domicilio",
+                  "label": "Comprobante de domicilio",
+                  "required": true,
+                  "detail": "Debe tener menos de 2 meses."
+                },
+                {
+                  "key": "estados_cuenta_recientes",
+                  "label": "2 estados de cuenta recientes",
+                  "required": true,
+                  "detail": "Enviar los 2 estados de cuenta más recientes para revisar la fecha de corte."
+                },
+                {
+                  "key": "nomina_1_mes_dentro_estado_cuenta",
+                  "label": "Un mes de nómina dentro del estado de cuenta",
+                  "required": true,
+                  "detail": "Primero deben enviar el estado de cuenta para revisar la fecha de corte y confirmar cuáles nóminas corresponden."
+                }
+              ],
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "requirements.lookup",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:requirements.lookup"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 3,
+          "blocked_count": 0
+        },
+        "next_best_question": "requirements",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "requirements.lookup"
+        ],
+        "required_tools": [
+          "requirements.lookup"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "explain_validated_requirements",
+      "user_act": "question",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para el crédito de la tarjeta de nómina, necesitarás los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), dos estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna pregunta sobre estos requisitos, ¡estoy aquí para ayudarte!",
+          "language": "es",
+          "reasoning_summary_safe": "El mensaje resume los requisitos necesarios para el crédito de la tarjeta de nómina, manteniendo un tono amigable y claro.",
+          "used_facts": [
+            "INE vigente por ambos lados",
+            "Comprobante de domicilio",
+            "2 estados de cuenta recientes",
+            "Un mes de nómina dentro del estado de cuenta"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 4196
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "plan_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "down_payment_percent",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "requirements_checklist",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "requirements.lookup",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "requirements",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 2060,
+        "output_tokens": 143,
+        "total_tokens": 2203
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 2060,
+        "output_tokens": 143,
+        "total_tokens": 2203
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Critical credit document followup",
+        "forbidden_state_writes": [
+          "requirements_complete",
+          "Doc_Completos"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 1,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Hola, quiero informacion del credito",
+      "input": "Hola, quiero informacion del credito",
+      "final_message": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "greeting",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "greet_and_resume_without_consuming_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "greet_and_resume_without_consuming_slot",
+      "user_act": "greeting",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The response acknowledges the greeting and gently prompts the user for the next required information without consuming the pending slot.",
+          "used_facts": [],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2130
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 615,
+        "output_tokens": 72,
+        "total_tokens": 687
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 615,
+        "output_tokens": 72,
+        "total_tokens": 687
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "forbidden_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 2,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Tengo negocio",
+      "input": "Tengo negocio",
+      "final_message": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "credit_plan": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "negocio_sat",
+            "raw_answer": "Tengo negocio",
+            "income_candidate": "negocio_sat",
+            "pending_slot": "business_tax_status",
+            "last_bot_question": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "needs_clarification": true,
+            "clarification": {
+              "code": "income_business_tax_status_required",
+              "pending_slot": "business_tax_status",
+              "source": "tenant_income_resolution_policy"
+            },
+            "field_updates": []
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "clarification",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "needs_clarification",
+              "pending_slot",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The response asks a clarifying question regarding the user's business tax status, which is necessary to proceed with the credit plan.",
+          "used_facts": [
+            "Tengo negocio",
+            "¿podrías decirme cómo recibes tus ingresos?",
+            "si tienes SAT/RIF o si seria sin comprobantes"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2365
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 866,
+        "output_tokens": 95,
+        "total_tokens": 961
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 866,
+        "output_tokens": 95,
+        "total_tokens": 961
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "expected_tools": [
+          "credit_plan.resolve"
+        ],
+        "forbidden_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 3,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Vendo comida desde mi casa",
+      "input": "Vendo comida desde mi casa",
+      "final_message": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": true,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "credit_plan": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "negocio_sat",
+            "raw_answer": "Vendo comida desde mi casa",
+            "income_candidate": "negocio_sat",
+            "pending_slot": "business_tax_status",
+            "last_bot_question": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "needs_clarification": true,
+            "clarification": {
+              "code": "income_business_tax_status_required",
+              "pending_slot": "business_tax_status",
+              "source": "tenant_income_resolution_policy"
+            },
+            "field_updates": []
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "clarification",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "needs_clarification",
+              "pending_slot",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": true,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to clarify their business tax status to proceed with the credit plan.",
+          "used_facts": [
+            "business_tax_status",
+            "negocio_sat",
+            "last_bot_question"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 1618
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": null,
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 866,
+        "output_tokens": 71,
+        "total_tokens": 937
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 866,
+        "output_tokens": 71,
+        "total_tokens": 937
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "forbidden_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 4,
+      "status": "passed",
+      "failures": [],
+      "inbound": "No tengo SAT",
+      "input": "No tengo SAT",
+      "final_message": "Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "plan_selection",
+          "value": "20%",
+          "reason": "credit_plan.resolve validated income-to-plan mapping.",
+          "evidence": [
+            "requirements:sin_comprobantes_20"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "down_payment_percent",
+          "value": 20,
+          "reason": "credit_plan.resolve validated down payment percent.",
+          "evidence": [
+            "requirements:sin_comprobantes_20"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "credit_plan.resolve",
+            "write_policy": "auto_apply_when_valid_plan",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "plan_selection": "20%",
+          "down_payment_percent": 20,
+          "credit_plan": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "sin_comprobantes",
+            "raw_answer": "No tengo SAT",
+            "income_candidate": "sin_comprobantes",
+            "pending_slot": null,
+            "last_bot_question": null,
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "plan_id": "sin_comprobantes_20",
+            "tipo_credito": "Sin Comprobantes",
+            "plan_credito": "20%",
+            "down_payment_percent": 20,
+            "field_updates": [
+              {
+                "key": "plan_selection",
+                "value": "20%",
+                "reason": "credit_plan.resolve validated income-to-plan mapping.",
+                "evidence": [
+                  "requirements:sin_comprobantes_20"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "down_payment_percent",
+                "value": 20,
+                "reason": "credit_plan.resolve validated down payment percent.",
+                "evidence": [
+                  "requirements:sin_comprobantes_20"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "down_payment_percent",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "pending_slot",
+              "plan_credito",
+              "plan_id",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id",
+              "tipo_credito"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "plan_selection",
+              "field": "plan_selection",
+              "proposed_value": "20%",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "down_payment_percent",
+              "field": "down_payment_percent",
+              "proposed_value": 20,
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "credit_plan.resolve",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:credit_plan.resolve"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to provide their employment seniority, so I asked a clarifying question about their work duration.",
+          "used_facts": [
+            "plan_selection: 20%",
+            "down_payment_percent: 20"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2024
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "plan_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "down_payment_percent",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "credit_plan.resolve",
+              "write_policy": "auto_apply_when_valid_plan",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "plan",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1113,
+        "output_tokens": 75,
+        "total_tokens": 1188
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1113,
+        "output_tokens": 75,
+        "total_tokens": 1188
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "expected_tools": [
+          "credit_plan.resolve"
+        ],
+        "expected_state_writes": [
+          "plan_selection",
+          "down_payment_percent"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 5,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Quiero algo economico para moverme diario",
+      "input": "Quiero algo economico para moverme diario",
+      "final_message": "¡Hola! Para poder ayudarte mejor, ¿cuánto tiempo llevas trabajando en tu empleo actual?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "plan_selection": "20%",
+          "down_payment_percent": 20
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Para poder ayudarte mejor, ¿cuánto tiempo llevas trabajando en tu empleo actual?",
+          "language": "es",
+          "reasoning_summary_safe": "The response acknowledges the user's question and asks for the necessary information regarding their employment duration to proceed with the pending slot.",
+          "used_facts": [
+            "plan_selection: 20%",
+            "down_payment_percent: 20"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2438
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 626,
+        "output_tokens": 81,
+        "total_tokens": 707
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 626,
+        "output_tokens": 81,
+        "total_tokens": 707
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 6,
+      "status": "passed",
+      "failures": [],
+      "inbound": "La Adventure",
+      "input": "La Adventure",
+      "final_message": "¡Hola! Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "tools_required": [
+        "catalog.search"
+      ],
+      "required_tools": [
+        "catalog.search"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "product_selection",
+          "value": {
+            "product_id": "adventure_elite_150_cc",
+            "sku": "adventure_elite_150_cc",
+            "display_name": "Adventure Elite 150 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:adventure_elite_150_cc"
+            ],
+            "metadata": {}
+          },
+          "reason": "catalog.search validated model from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:adventure_elite_150_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "auto_apply_when_catalog_match",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "product_catalog_id",
+          "value": "adventure_elite_150_cc",
+          "reason": "catalog.search validated model id from tenant catalog.",
+          "evidence": [
+            "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+            "catalog:adventure_elite_150_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+        "agent_id": "d447fffe-ab1e-4861-8385-3b26d3b4aebc",
+        "conversation_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "product_id": "adventure_elite_150_cc",
+            "sku": "adventure_elite_150_cc",
+            "display_name": "Adventure Elite 150 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+              "catalog:adventure_elite_150_cc"
+            ],
+            "metadata": {}
+          },
+          "plan_selection": "20%",
+          "down_payment_percent": 20,
+          "catalog": {
+            "tenant_id": "5528e854-f446-46e8-bac0-bac28a8492fe",
+            "query": "Adventure Elite 150 CC",
+            "source_path": "docs/tenant_sources/dinamo/CatalogoMotos2026_DINAMO.json",
+            "matches": [
+              {
+                "product_id": "adventure_elite_150_cc",
+                "name": "Adventure Elite 150 CC",
+                "category": "Motoneta",
+                "score": 1.0
+              }
+            ],
+            "canonical_product_ref": {
+              "product_id": "adventure_elite_150_cc",
+              "sku": "adventure_elite_150_cc",
+              "display_name": "Adventure Elite 150 CC",
+              "catalog_id": "CatalogoMotos2026_DINAMO",
+              "catalog_version_id": null,
+              "evidence": [
+                "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                "catalog:adventure_elite_150_cc"
+              ],
+              "metadata": {}
+            },
+            "field_updates": [
+              {
+                "key": "product_selection",
+                "value": {
+                  "product_id": "adventure_elite_150_cc",
+                  "sku": "adventure_elite_150_cc",
+                  "display_name": "Adventure Elite 150 CC",
+                  "catalog_id": "CatalogoMotos2026_DINAMO",
+                  "catalog_version_id": null,
+                  "evidence": [
+                    "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                    "catalog:adventure_elite_150_cc"
+                  ],
+                  "metadata": {}
+                },
+                "reason": "catalog.search validated model from tenant catalog.",
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:adventure_elite_150_cc"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "product_catalog_id",
+                "value": "adventure_elite_150_cc",
+                "reason": "catalog.search validated model id from tenant catalog.",
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:adventure_elite_150_cc"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "catalog.search",
+            "status": "succeeded",
+            "data_keys": [
+              "canonical_product_ref",
+              "field_updates",
+              "matches",
+              "query",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "product_selection",
+              "field": "product_selection",
+              "proposed_value": {
+                "product_id": "adventure_elite_150_cc",
+                "sku": "adventure_elite_150_cc",
+                "display_name": "Adventure Elite 150 CC",
+                "catalog_id": "CatalogoMotos2026_DINAMO",
+                "catalog_version_id": null,
+                "evidence": [
+                  "tenant:5528e854-f446-46e8-bac0-bac28a8492fe",
+                  "catalog:adventure_elite_150_cc"
+                ],
+                "metadata": {}
+              },
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "product_catalog_id",
+              "field": "product_catalog_id",
+              "proposed_value": "adventure_elite_150_cc",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje"
+        ],
+        "required_sources": [
+          "catalog.search"
+        ],
+        "required_tools": [
+          "catalog.search"
+        ],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "amigable",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+          "language": "es",
+          "reasoning_summary_safe": "The user is inquiring about their seniority, which is a pending slot. A clarifying question about their work duration is appropriate to gather the needed information.",
+          "used_facts": [
+            "product_selection",
+            "plan_selection"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2907
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "product_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "auto_apply_when_catalog_match",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "product_catalog_id",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1528,
+        "output_tokens": 84,
+        "total_tokens": 1612
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1528,
+        "output_tokens": 84,
+        "total_tokens": 1612
+      },
+      "failure_reason": null,
+      "expected": {
+        "_scenario_name": "Ambiguous business and model selection",
+        "expected_tools": [
+          "catalog.search"
+        ],
+        "expected_state_writes": [
+          "product_selection"
+        ],
+        "final_message_not_contains": [
+          "Si se puede revisar; para darte el plan correcto",
+          "Sí se puede revisar; para darte el plan correcto",
+          "Tomo tu mensaje",
+          "reviso el contexto",
+          "siguiente paso con el contexto actual",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "Para cotizarte bien, dime que modelo quieres",
+          "Necesito consultar los requisitos vigentes"
+        ],
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    }
+  ],
+  "turn_summary": [
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 1,
+      "inbound": "Hola, vi una Skeleton, cuanto sale a credito? Estoy en buro",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "faq.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "product_catalog_id",
+        "product_selection"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 2021,
+        "output_tokens": 66,
+        "total_tokens": 2087
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 2,
+      "inbound": "me pagan por tarjeta",
+      "final_message": "Para continuar, ¿podrías decirme cuántos años de experiencia laboral tienes?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "down_payment_percent",
+        "plan_selection"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 1221,
+        "output_tokens": 67,
+        "total_tokens": 1288
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 3,
+      "inbound": "tengo 2 anos",
+      "final_message": "Tu cotización para la Skeleton 400 CC con un plan del 10% ya está lista. El pago inicial es de 8,147 MXN y las cuotas son de 3,236 MXN durante 72 quincenas. Si necesitas más información, aquí estoy para ayudarte.",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": true,
+      "message_goal": "explain_validated_quote",
+      "tools": [
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "employment_seniority",
+        "quote_snapshot_id"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 1415,
+        "output_tokens": 132,
+        "total_tokens": 1547
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 4,
+      "inbound": "que papeles ocupo",
+      "final_message": "Para el crédito de Nómina Tarjeta al 10%, necesitas los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), 2 estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna duda, aquí estoy para ayudarte.",
+      "user_act": "question",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "message_goal": "explain_validated_requirements",
+      "tools": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "down_payment_percent",
+        "plan_selection",
+        "requirements_checklist"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 2060,
+        "output_tokens": 116,
+        "total_tokens": 2176
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 5,
+      "inbound": "te mando INE al rato",
+      "final_message": "Para continuar, ¿podrías confirmar si tienes todos los documentos requeridos, como el INE vigente por ambos lados y el comprobante de domicilio?",
+      "user_act": "unknown",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 926,
+        "output_tokens": 77,
+        "total_tokens": 1003
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Critical credit document followup",
+      "turn_number": 6,
+      "inbound": "?",
+      "final_message": "Para el crédito de la tarjeta de nómina, necesitarás los siguientes documentos: INE vigente por ambos lados, comprobante de domicilio (menos de 2 meses), dos estados de cuenta recientes y un mes de nómina dentro del estado de cuenta. Si tienes alguna pregunta sobre estos requisitos, ¡estoy aquí para ayudarte!",
+      "user_act": "question",
+      "pending_slot": "requirements",
+      "slot_consumed": false,
+      "message_goal": "explain_validated_requirements",
+      "tools": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "down_payment_percent",
+        "plan_selection",
+        "requirements_checklist"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+      "token_usage": {
+        "input_tokens": 2060,
+        "output_tokens": 143,
+        "total_tokens": 2203
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 1,
+      "inbound": "Hola, quiero informacion del credito",
+      "final_message": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "user_act": "greeting",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "message_goal": "greet_and_resume_without_consuming_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 615,
+        "output_tokens": 72,
+        "total_tokens": 687
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 2,
+      "inbound": "Tengo negocio",
+      "final_message": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 866,
+        "output_tokens": 95,
+        "total_tokens": 961
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 3,
+      "inbound": "Vendo comida desde mi casa",
+      "final_message": "Para continuar, ¿tienes tu registro en el SAT/RIF o sería sin comprobantes?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": true,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 866,
+        "output_tokens": 71,
+        "total_tokens": 937
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 4,
+      "inbound": "No tengo SAT",
+      "final_message": "Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "down_payment_percent",
+        "plan_selection"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 1113,
+        "output_tokens": 75,
+        "total_tokens": 1188
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 5,
+      "inbound": "Quiero algo economico para moverme diario",
+      "final_message": "¡Hola! Para poder ayudarte mejor, ¿cuánto tiempo llevas trabajando en tu empleo actual?",
+      "user_act": "question",
+      "pending_slot": "seniority",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [],
+      "state_writes": [],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 626,
+        "output_tokens": 81,
+        "total_tokens": 707
+      },
+      "failures": []
+    },
+    {
+      "scenario": "Ambiguous business and model selection",
+      "turn_number": 6,
+      "inbound": "La Adventure",
+      "final_message": "¡Hola! Para continuar, ¿podrías decirme cuánto tiempo llevas trabajando?",
+      "user_act": "question",
+      "pending_slot": "seniority",
+      "slot_consumed": false,
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "tools": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        "product_catalog_id",
+        "product_selection"
+      ],
+      "send_decision": "no_send",
+      "trace_id": "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+      "token_usage": {
+        "input_tokens": 1528,
+        "output_tokens": 84,
+        "total_tokens": 1612
+      },
+      "failures": []
+    }
+  ],
+  "trace_ids": [
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "f032f2e0-6de5-4dc9-a291-454178ef481a:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown",
+    "e1d915f3-2697-4bb1-b0af-2647d1594c15:unknown"
+  ],
+  "outbox_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "side_effect_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "coverage_summary": {
+    "scope": "product_first_test_lab",
+    "execution_mode": "runtime_v2_agent_service",
+    "send_mode": "no_send",
+    "openai_api_real": true,
+    "runtime_v2_agent_service": true,
+    "readiness_eligible": true,
+    "max_scenarios": 2,
+    "max_turns_per_scenario": 6,
+    "max_output_tokens": 350,
+    "temperature": 0.2
+  },
+  "token_totals": {
+    "input_tokens": 15317,
+    "output_tokens": 1079,
+    "total_tokens": 16396
+  },
+  "db_audit_after": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "readiness_audit": {
+    "status": "passed",
+    "failures": [],
+    "checked": [
+      "run passed",
+      "send/actions/workflow flags false",
+      "outbox and side effects zero",
+      "no generic visible copy",
+      "human composer clean",
+      "validated response plan present",
+      "future document promise did not mark docs complete",
+      "punctuation turn handled without internal copy"
+    ]
+  },
+  "decision": "READY_FOR_CONTROLLED_SINGLE_CONTACT_SMOKE_APPROVAL_V2"
+}

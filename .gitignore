@@ -55,3 +55,6 @@ core/uploads/
 
 # Logs
 *.log
+
+# Vendored spec-kit source copy (external tool)
+spec-kit-main/

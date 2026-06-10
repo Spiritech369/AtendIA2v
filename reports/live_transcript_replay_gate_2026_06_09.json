@@ -1,0 +1,3125 @@
+{
+  "send_enabled": false,
+  "actions_enabled": false,
+  "workflow_events_enabled": false,
+  "openai_key_present": true,
+  "scenario_turns": 18,
+  "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+  "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+  "agent_version_id": "ae37c6a6-b07a-420d-8bd2-cc14d9e1c1f6",
+  "binding_result": {
+    "knowledge_source_count": 5,
+    "knowledge_source_ids": [
+      "4d6bc8b7-7f35-5892-8eca-9722f351dc20",
+      "53eaf979-15a6-58ae-907a-c1c990702446",
+      "9810c15b-43b7-566e-93e1-5dc873f316ce",
+      "3d8b4ebe-a6e0-5886-8fbd-58313f5b2b77",
+      "6250db63-6ade-546d-896f-cc6a13a792cc"
+    ],
+    "tool_binding_count": 7,
+    "field_permission_count": 11
+  },
+  "db_audit_before": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "suite_id": "5046f823-44c4-4182-b925-5a53c5c09e67",
+  "test_run_id": "231be8b6-9314-4ea4-8355-695c96826111",
+  "run_status": "passed",
+  "run_decision": "TEST_LAB_PASSED",
+  "scenario_results": [
+    {
+      "scenario_id": "e9480f22-ec95-4846-954c-be076c3aae0e",
+      "status": "passed",
+      "failures": [],
+      "turn_count": 18
+    }
+  ],
+  "turn_results": [
+    {
+      "turn_number": 1,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Hola",
+      "input": "Hola",
+      "final_message": "¡Hola! Para continuar, ¿cuánto tiempo llevas trabajando?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "greeting",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "greeting",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Para continuar, ¿cuánto tiempo llevas trabajando?",
+          "language": "es",
+          "reasoning_summary_safe": "The user greeted, and I need to ask about their employment seniority to proceed.",
+          "used_facts": [],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2389
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 714,
+        "output_tokens": 59,
+        "total_tokens": 773
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 714,
+        "output_tokens": 59,
+        "total_tokens": 773
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 2,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Busco info",
+      "input": "Busco info",
+      "final_message": "¿Cuánto tiempo llevas trabajando en tu empleo actual?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "employment_seniority",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {},
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "cuanto tiempo llevas trabajando",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "employment_seniority",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cuánto tiempo llevas trabajando en tu empleo actual?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending slot regarding employment seniority, and the next best question is to ask how long they have been working.",
+          "used_facts": [],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2918
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "employment_seniority",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 713,
+        "output_tokens": 66,
+        "total_tokens": 779
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 713,
+        "output_tokens": 66,
+        "total_tokens": 779
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 3,
+      "status": "passed",
+      "failures": [],
+      "inbound": "15 meses",
+      "input": "15 meses",
+      "final_message": "¿Cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 15,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "15 meses"
+          ],
+          "confidence": 0.0,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "cumple_antiguedad",
+          "value": true,
+          "reason": "employment_seniority validated against minimum 6 months.",
+          "evidence": [
+            "15 meses"
+          ],
+          "confidence": 0.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "system_derived": true,
+            "derived_from_field": "employment_seniority",
+            "minimum_months": 6,
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 15
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 15,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:15 meses"
+              ],
+              "confidence": 0.0
+            },
+            {
+              "target": "contact_field",
+              "key": "cumple_antiguedad",
+              "field": "cumple_antiguedad",
+              "decision": "accepted",
+              "source": "system",
+              "writer": "StateWriter",
+              "reason": "employment_seniority_eligibility_derived",
+              "evidence_refs": [
+                "15 meses"
+              ],
+              "confidence": 0.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to clarify their income type, so I asked a direct question about how they receive their income.",
+          "used_facts": [
+            "employment_seniority: 15"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2667
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.0,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "cumple_antiguedad",
+            "source": "action",
+            "confidence": 0.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "system_derived": true,
+              "derived_from_field": "employment_seniority",
+              "minimum_months": 6,
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 886,
+        "output_tokens": 65,
+        "total_tokens": 951
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 886,
+        "output_tokens": 65,
+        "total_tokens": 951
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 4,
+      "status": "passed",
+      "failures": [],
+      "inbound": "hola",
+      "input": "hola",
+      "final_message": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "greeting",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "greet_and_resume_without_consuming_slot",
+        "validated_facts": {
+          "employment_seniority": 15
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "greet_and_resume_without_consuming_slot",
+      "user_act": "greeting",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user greeted, and I acknowledged it while prompting for the pending income type slot without consuming it.",
+          "used_facts": [
+            "employment_seniority: 15"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2084
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 718,
+        "output_tokens": 79,
+        "total_tokens": 797
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 718,
+        "output_tokens": 79,
+        "total_tokens": 797
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 5,
+      "status": "passed",
+      "failures": [],
+      "inbound": "que ocupo_",
+      "input": "que ocupo_",
+      "final_message": "¿Cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 15
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending slot for income type, and the next best question is to clarify how they receive their income.",
+          "used_facts": [
+            "employment_seniority: 15"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2003
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 718,
+        "output_tokens": 67,
+        "total_tokens": 785
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 718,
+        "output_tokens": 67,
+        "total_tokens": 785
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 6,
+      "status": "passed",
+      "failures": [],
+      "inbound": "22 años",
+      "input": "22 años",
+      "final_message": "¿Cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 264,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "22 años"
+          ],
+          "confidence": 0.9,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "cumple_antiguedad",
+          "value": true,
+          "reason": "employment_seniority validated against minimum 6 months.",
+          "evidence": [
+            "22 años"
+          ],
+          "confidence": 0.9,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "system_derived": true,
+            "derived_from_field": "employment_seniority",
+            "minimum_months": 6,
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 264
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 264,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:22 años"
+              ],
+              "confidence": 0.9
+            },
+            {
+              "target": "contact_field",
+              "key": "cumple_antiguedad",
+              "field": "cumple_antiguedad",
+              "decision": "accepted",
+              "source": "system",
+              "writer": "StateWriter",
+              "reason": "employment_seniority_eligibility_derived",
+              "evidence_refs": [
+                "22 años"
+              ],
+              "confidence": 0.9
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to clarify their income type, so I asked a direct question about how they receive their income.",
+          "used_facts": [
+            "employment_seniority: 264"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 1853
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.9,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "cumple_antiguedad",
+            "source": "action",
+            "confidence": 0.9,
+            "metadata": {
+              "state_writer": "declarative",
+              "system_derived": true,
+              "derived_from_field": "employment_seniority",
+              "minimum_months": 6,
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 882,
+        "output_tokens": 61,
+        "total_tokens": 943
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 882,
+        "output_tokens": 61,
+        "total_tokens": 943
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 7,
+      "status": "passed",
+      "failures": [],
+      "inbound": "hola",
+      "input": "hola",
+      "final_message": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "greeting",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "greet_and_resume_without_consuming_slot",
+        "validated_facts": {
+          "employment_seniority": 264
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "greet_and_resume_without_consuming_slot",
+      "user_act": "greeting",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¡Hola! Espero que estés bien. Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The response acknowledges the greeting and smoothly transitions to the next question about income type, which is pending.",
+          "used_facts": [
+            "employment_seniority: 264"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2440
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 718,
+        "output_tokens": 79,
+        "total_tokens": 797
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 718,
+        "output_tokens": 79,
+        "total_tokens": 797
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 8,
+      "status": "passed",
+      "failures": [],
+      "inbound": "ya te dije no?",
+      "input": "ya te dije no?",
+      "final_message": "Entiendo tu frustración. Aún necesitamos saber cómo recibes tus ingresos para avanzar. ¿Podrías decirme eso?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "frustration",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "acknowledge_confusion_and_explain_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 264
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "acknowledge_confusion_and_explain_pending_slot",
+      "user_act": "frustration",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Entiendo tu frustración. Aún necesitamos saber cómo recibes tus ingresos para avanzar. ¿Podrías decirme eso?",
+          "language": "es",
+          "reasoning_summary_safe": "The user is frustrated due to a pending question about income type. The response acknowledges this frustration and prompts for the necessary information to proceed.",
+          "used_facts": [
+            "employment_seniority: 264"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2450
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 721,
+        "output_tokens": 89,
+        "total_tokens": 810
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 721,
+        "output_tokens": 89,
+        "total_tokens": 810
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 9,
+      "status": "passed",
+      "failures": [],
+      "inbound": "tengo 10 meses",
+      "input": "tengo 10 meses",
+      "final_message": "¿Cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [
+        {
+          "field_key": "employment_seniority",
+          "value": 10,
+          "reason": "ChatGPT semantic interpretation proposed this field.",
+          "evidence": [
+            "tengo 10 meses"
+          ],
+          "confidence": 0.0,
+          "source": "customer_message",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "source": "user_message",
+            "semantic_interpreter": true,
+            "raw_field_key": "employment_seniority",
+            "state_writer": "declarative",
+            "advisor_proposed": true,
+            "write_policy": "auto_apply_when_explicit",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "cumple_antiguedad",
+          "value": true,
+          "reason": "employment_seniority validated against minimum 6 months.",
+          "evidence": [
+            "tengo 10 meses"
+          ],
+          "confidence": 0.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "system_derived": true,
+            "derived_from_field": "employment_seniority",
+            "minimum_months": 6,
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "employment_seniority",
+              "field": "employment_seniority",
+              "proposed_value": 10,
+              "decision": "accepted",
+              "reason": "field_policy_auto_apply_when_explicit_accepted",
+              "source": "user_message",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "user_message:tengo 10 meses"
+              ],
+              "confidence": 0.0
+            },
+            {
+              "target": "contact_field",
+              "key": "cumple_antiguedad",
+              "field": "cumple_antiguedad",
+              "decision": "accepted",
+              "source": "system",
+              "writer": "StateWriter",
+              "reason": "employment_seniority_eligibility_derived",
+              "evidence_refs": [
+                "tengo 10 meses"
+              ],
+              "confidence": 0.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has provided their employment seniority, and the next step is to clarify how they receive their income.",
+          "used_facts": [
+            "employment_seniority: 10"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1716
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "employment_seniority",
+            "source": "customer_message",
+            "confidence": 0.0,
+            "metadata": {
+              "source": "user_message",
+              "semantic_interpreter": true,
+              "raw_field_key": "employment_seniority",
+              "state_writer": "declarative",
+              "advisor_proposed": true,
+              "write_policy": "auto_apply_when_explicit",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "cumple_antiguedad",
+            "source": "action",
+            "confidence": 0.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "system_derived": true,
+              "derived_from_field": "employment_seniority",
+              "minimum_months": 6,
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 891,
+        "output_tokens": 65,
+        "total_tokens": 956
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 891,
+        "output_tokens": 65,
+        "total_tokens": 956
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 10,
+      "status": "passed",
+      "failures": [],
+      "inbound": "metro",
+      "input": "metro",
+      "final_message": "Para continuar, ¿cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [
+        "catalog.search"
+      ],
+      "required_tools": [
+        "catalog.search"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [
+        {
+          "field_key": "product_selection",
+          "value": {
+            "product_id": "metro_125_cc",
+            "sku": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {}
+          },
+          "reason": "catalog.search validated model from tenant catalog.",
+          "evidence": [
+            "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+            "catalog:metro_125_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "auto_apply_when_catalog_match",
+            "writer": "StateWriter"
+          }
+        },
+        {
+          "field_key": "product_catalog_id",
+          "value": "metro_125_cc",
+          "reason": "catalog.search validated model id from tenant catalog.",
+          "evidence": [
+            "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+            "catalog:metro_125_cc"
+          ],
+          "confidence": 1.0,
+          "source": "action",
+          "evidence_message_id": null,
+          "evidence_attachment_id": null,
+          "trace_id": null,
+          "metadata": {
+            "state_writer": "declarative",
+            "tool_result": true,
+            "source_tool": "catalog.search",
+            "write_policy": "tool_only",
+            "writer": "StateWriter"
+          }
+        }
+      ],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "product_id": "metro_125_cc",
+            "sku": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "catalog_version_id": null,
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {}
+          },
+          "employment_seniority": 10,
+          "catalog": {
+            "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+            "query": "Metro 125 CC",
+            "source_path": "docs/tenant_sources/dinamo/CatalogoMotos2026_DINAMO.json",
+            "matches": [
+              {
+                "product_id": "metro_125_cc",
+                "name": "Metro 125 CC",
+                "category": "Motoneta",
+                "score": 1.0
+              }
+            ],
+            "canonical_product_ref": {
+              "product_id": "metro_125_cc",
+              "sku": "metro_125_cc",
+              "display_name": "Metro 125 CC",
+              "catalog_id": "CatalogoMotos2026_DINAMO",
+              "catalog_version_id": null,
+              "evidence": [
+                "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+                "catalog:metro_125_cc"
+              ],
+              "metadata": {}
+            },
+            "field_updates": [
+              {
+                "key": "product_selection",
+                "value": {
+                  "product_id": "metro_125_cc",
+                  "sku": "metro_125_cc",
+                  "display_name": "Metro 125 CC",
+                  "catalog_id": "CatalogoMotos2026_DINAMO",
+                  "catalog_version_id": null,
+                  "evidence": [
+                    "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+                    "catalog:metro_125_cc"
+                  ],
+                  "metadata": {}
+                },
+                "reason": "catalog.search validated model from tenant catalog.",
+                "evidence": [
+                  "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+                  "catalog:metro_125_cc"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "key": "product_catalog_id",
+                "value": "metro_125_cc",
+                "reason": "catalog.search validated model id from tenant catalog.",
+                "evidence": [
+                  "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+                  "catalog:metro_125_cc"
+                ],
+                "confidence": 1.0
+              }
+            ]
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "catalog.search",
+            "status": "succeeded",
+            "data_keys": [
+              "canonical_product_ref",
+              "field_updates",
+              "matches",
+              "query",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [
+            {
+              "target": "contact_field",
+              "key": "product_selection",
+              "field": "product_selection",
+              "proposed_value": {
+                "product_id": "metro_125_cc",
+                "sku": "metro_125_cc",
+                "display_name": "Metro 125 CC",
+                "catalog_id": "CatalogoMotos2026_DINAMO",
+                "catalog_version_id": null,
+                "evidence": [
+                  "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+                  "catalog:metro_125_cc"
+                ],
+                "metadata": {}
+              },
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            },
+            {
+              "target": "contact_field",
+              "key": "product_catalog_id",
+              "field": "product_catalog_id",
+              "proposed_value": "metro_125_cc",
+              "decision": "accepted",
+              "reason": "tool_result_satisfied_field_policy",
+              "source": "catalog.search",
+              "writer": "StateWriter",
+              "evidence_refs": [
+                "tool_result:catalog.search"
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 2,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [
+          "catalog.search"
+        ],
+        "required_tools": [
+          "catalog.search"
+        ],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to clarify their income type to proceed with the inquiry about the Metro 125 CC.",
+          "used_facts": [
+            "product_selection"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1798
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [
+          {
+            "field_key": "product_selection",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "auto_apply_when_catalog_match",
+              "writer": "StateWriter"
+            }
+          },
+          {
+            "field_key": "product_catalog_id",
+            "source": "action",
+            "confidence": 1.0,
+            "metadata": {
+              "state_writer": "declarative",
+              "tool_result": true,
+              "source_tool": "catalog.search",
+              "write_policy": "tool_only",
+              "writer": "StateWriter"
+            }
+          }
+        ],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1573,
+        "output_tokens": 61,
+        "total_tokens": 1634
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1573,
+        "output_tokens": 61,
+        "total_tokens": 1634
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 11,
+      "status": "passed",
+      "failures": [],
+      "inbound": "si quiero saber",
+      "input": "si quiero saber",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending question about their income type, and asking how they receive their income will help clarify that.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1901
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 816,
+        "output_tokens": 74,
+        "total_tokens": 890
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 816,
+        "output_tokens": 74,
+        "total_tokens": 890
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 12,
+      "status": "passed",
+      "failures": [],
+      "inbound": "que ocupo",
+      "input": "que ocupo",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending question regarding their income type, which is necessary for the next steps in the process. Asking how they receive their income will help clarify this.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1883
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 816,
+        "output_tokens": 84,
+        "total_tokens": 900
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 816,
+        "output_tokens": 84,
+        "total_tokens": 900
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 13,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Entonces",
+      "input": "Entonces",
+      "final_message": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "income_type",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "como recibes tus ingresos",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "income_type",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+          "language": "es",
+          "reasoning_summary_safe": "The response asks the user for clarification on their income type, which is the next best question to proceed with the conversation.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2041
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "income_type",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 816,
+        "output_tokens": 75,
+        "total_tokens": 891
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 816,
+        "output_tokens": 75,
+        "total_tokens": 891
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 14,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Soy comerciante",
+      "input": "Soy comerciante",
+      "final_message": "Para continuar, ¿tienes SAT/RIF o sería sin comprobantes?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [
+        "credit_plan.resolve"
+      ],
+      "required_tools": [
+        "credit_plan.resolve"
+      ],
+      "tools_executed": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        },
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded"
+        }
+      ],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "answer_to_pending_slot",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10,
+          "credit_plan": {
+            "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+            "query": "negocio_sat",
+            "raw_answer": "Soy comerciante",
+            "income_candidate": "negocio_sat",
+            "pending_slot": "business_tax_status",
+            "last_bot_question": "Para continuar, ¿podrías decirme cómo recibes tus ingresos?",
+            "source_path": "docs/tenant_sources/dinamo/Requisitos_Credito_Dinamo.json",
+            "needs_clarification": true,
+            "clarification": {
+              "code": "income_business_tax_status_required",
+              "pending_slot": "business_tax_status",
+              "source": "tenant_income_resolution_policy"
+            },
+            "field_updates": []
+          }
+        },
+        "tool_results_summary": [
+          {
+            "tool_name": "credit_plan.resolve",
+            "status": "succeeded",
+            "data_keys": [
+              "clarification",
+              "field_updates",
+              "income_candidate",
+              "last_bot_question",
+              "needs_clarification",
+              "pending_slot",
+              "query",
+              "raw_answer",
+              "source_path",
+              "tenant_id"
+            ],
+            "error": null
+          }
+        ],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [
+          "credit_plan.resolve"
+        ],
+        "required_tools": [
+          "credit_plan.resolve"
+        ],
+        "risk_flags": [],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "answer_to_pending_slot",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "Para continuar, ¿tienes SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs to clarify their business tax status to proceed with the credit plan.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority",
+            "credit_plan"
+          ],
+          "risk_flags": []
+        },
+        "policy_issues": [],
+        "latency_ms": 2535
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 1063,
+        "output_tokens": 66,
+        "total_tokens": 1129
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 1063,
+        "output_tokens": 66,
+        "total_tokens": 1129
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 15,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Esta muy caro",
+      "input": "Esta muy caro",
+      "final_message": "¿Tienes un SAT/RIF o sería sin comprobantes?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "objection",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "objection",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Tienes un SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The response directly addresses the pending slot by asking the clarifying question about the user's business tax status, which is necessary for proceeding.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 1814
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 824,
+        "output_tokens": 75,
+        "total_tokens": 899
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 824,
+        "output_tokens": 75,
+        "total_tokens": 899
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 16,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Que ocupas",
+      "input": "Que ocupas",
+      "final_message": "¿Tienes tu número de SAT/RIF o sería sin comprobantes?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Tienes tu número de SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The user has a pending question regarding their business tax status, specifically whether they have a SAT/RIF number or if they will be proceeding without documentation. This question is necessary to clarify their tax status for the financing process.",
+          "used_facts": [
+            "product_selection.sku: metro_125_cc",
+            "employment_seniority: 10"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2494
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 823,
+        "output_tokens": 105,
+        "total_tokens": 928
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 823,
+        "output_tokens": 105,
+        "total_tokens": 928
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 17,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Dime",
+      "input": "Dime",
+      "final_message": "¿Tienes un número de SAT/RIF o sería sin comprobantes?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Tienes un número de SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The response asks a clarifying question regarding the user's business tax status, which is the pending slot.",
+          "used_facts": [
+            "product_selection",
+            "employment_seniority"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2072
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 823,
+        "output_tokens": 71,
+        "total_tokens": 894
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 823,
+        "output_tokens": 71,
+        "total_tokens": 894
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    },
+    {
+      "turn_number": 18,
+      "status": "passed",
+      "failures": [],
+      "inbound": "Eres un robot?",
+      "input": "Eres un robot?",
+      "final_message": "si tienes SAT/RIF o si seria sin comprobantes?",
+      "trace_id": "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+      "tools_required": [],
+      "required_tools": [],
+      "tools_executed": [],
+      "tools_skipped": [],
+      "tools_failed": [],
+      "tool_results": [],
+      "state_writes": [],
+      "policy_result": {
+        "status": "passed"
+      },
+      "response_plan": {
+        "tenant_id": "6ad78236-1fc9-467a-858d-90d248d57ee5",
+        "agent_id": "c169deec-226d-55b7-bd07-270f339e75a6",
+        "conversation_id": "55fd5ba2-0886-4753-80ff-7763ae336f76",
+        "user_act": "question",
+        "intent": null,
+        "pending_slot": "business_tax_status",
+        "slot_consumed": false,
+        "message_goal": "ask_one_clarifying_question_for_pending_slot",
+        "validated_facts": {
+          "product_selection": {
+            "sku": "metro_125_cc",
+            "evidence": [
+              "tenant:6ad78236-1fc9-467a-858d-90d248d57ee5",
+              "catalog:metro_125_cc"
+            ],
+            "metadata": {},
+            "catalog_id": "CatalogoMotos2026_DINAMO",
+            "product_id": "metro_125_cc",
+            "display_name": "Metro 125 CC",
+            "catalog_version_id": null
+          },
+          "employment_seniority": 10
+        },
+        "tool_results_summary": [],
+        "state_writes_summary": {
+          "accepted": [],
+          "blocked": [],
+          "needs_review": [],
+          "accepted_count": 0,
+          "blocked_count": 0
+        },
+        "next_best_question": "si tienes SAT/RIF o si seria sin comprobantes",
+        "clarification_question": null,
+        "forbidden_phrases": [
+          "Si se puede revisar",
+          "Sí se puede revisar",
+          "Dime que dato quieres revisar",
+          "Dime qué dato quieres revisar",
+          "reviso el contexto",
+          "te doy continuidad",
+          "siguiente paso con el contexto actual",
+          "Tomo tu mensaje",
+          "Si necesitas más información",
+          "Si necesitas mas informacion",
+          "estoy aquí para ayudarte",
+          "estoy aqui para ayudarte",
+          "aquí estoy",
+          "aqui estoy",
+          "en qué puedo ayudarte hoy",
+          "en que puedo ayudarte hoy",
+          "tu solicitud está siendo revisada",
+          "tu solicitud esta siendo revisada",
+          "te responderán pronto",
+          "te responderan pronto"
+        ],
+        "required_sources": [],
+        "required_tools": [],
+        "risk_flags": [
+          "low_confidence"
+        ],
+        "style_constraints": {
+          "persona": "asesor",
+          "tone": "WhatsApp directo",
+          "max_sentences": 2
+        },
+        "max_response_sentences": 2,
+        "can_send_visible": true,
+        "failure_reason": null
+      },
+      "message_goal": "ask_one_clarifying_question_for_pending_slot",
+      "user_act": "question",
+      "pending_slot": "business_tax_status",
+      "slot_consumed": false,
+      "human_response_composer": {
+        "candidate": {
+          "final_message_candidate": "¿Tienes tu número de SAT/RIF o sería sin comprobantes?",
+          "language": "es",
+          "reasoning_summary_safe": "The user needs clarification on their business tax status, specifically whether they have a SAT/RIF number or if they will be providing without documentation. This question is directly related to the pending slot.",
+          "used_facts": [
+            "product_selection.sku: metro_125_cc",
+            "employment_seniority: 10"
+          ],
+          "risk_flags": [
+            "low_confidence"
+          ]
+        },
+        "policy_issues": [],
+        "latency_ms": 2104
+      },
+      "forbidden_phrase_check": {
+        "status": "passed",
+        "found": []
+      },
+      "risk_flags": [
+        "low_confidence",
+        "mandatory_tool_missing",
+        "mandatory_tool_missing:requirements.lookup",
+        "policy_validator_blocked",
+        "generic_progress_copy"
+      ],
+      "send_decision": "no_send",
+      "send_status": "no_send",
+      "send_mode": "no_send",
+      "errors": [],
+      "state_persistence": {
+        "persisted": true,
+        "field_updates_applied": [],
+        "pending_slot": "business_tax_status",
+        "quote_snapshot_persisted": false
+      },
+      "execution_mode": "runtime_v2_agent_service",
+      "token_usage": {
+        "input_tokens": 823,
+        "output_tokens": 99,
+        "total_tokens": 922
+      },
+      "estimated_cost": {
+        "amount_usd": null,
+        "status": "cost_rate_not_configured",
+        "input_tokens": 823,
+        "output_tokens": 99,
+        "total_tokens": 922
+      },
+      "failure_reason": null,
+      "expected": {
+        "expected_send_decision": "no_send",
+        "trace_required": true,
+        "internal_text_forbidden": true
+      }
+    }
+  ],
+  "trace_ids": [
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown",
+    "55fd5ba2-0886-4753-80ff-7763ae336f76:unknown"
+  ],
+  "outbox_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "side_effect_audit_result": {
+    "count": 0,
+    "status": "pass"
+  },
+  "db_audit_after": {
+    "outbound_outbox_pending_retry": 0,
+    "business_event_ledger_side_effects_allowed": 0
+  },
+  "gate_audit": {
+    "status": "passed",
+    "failures": []
+  },
+  "decision": "LIVE_TRANSCRIPT_REPLAY_GATE_PASSED_READY_FOR_APPROVAL_PACKET"
+}
