@@ -386,3 +386,28 @@ Evidence: `reports/respond_style_phase_11_multiround_testlab_resolver_2026_06_09
 Next: Phase 12 — HTTP+DB end-to-end Test Lab direct in Docker, resolver
 preview wired into inbound (log-only), legacy customer-copy hard-block
 test battery from the kill map.
+
+## Phase 12 — Docker E2E, Inbound Preview, Legacy Copy Hard Block (2026-06-09)
+
+Status: `PHASE_12_DOCKER_E2E_AND_LEGACY_COPY_HARD_BLOCK_READY`
+
+- 12A: real-container E2E PASSED — the respond-style-direct Test Lab
+  endpoint ran inside `atendia_backend` against real Postgres with real
+  OpenAI; AgentTestRun evidence persisted (mode no_send, status passed);
+  outbox row delta 0; CSRF middleware exercised.
+- 12B: `routing_preview.py` wired into `_run_inbound_pipeline` as a 9-line
+  log-only block (fail-safe, swallows all errors). Per-deployment opt-in
+  flag: `metadata_json.respond_style_enabled`. Real previews captured in
+  Docker: all no_send, live_routing_active=false.
+- 12C: hard-block battery `test_product_agent_legacy_copy_hard_block.py` —
+  transitive import-graph proof that the direct route cannot load any kill
+  map copy source, plus output-structure guarantees (no fallback copy on
+  blocked turns, handoff/workflow proposals carry no copy, no plan
+  artifacts). Kill map amended with the missing ConversationProgressGuard
+  row.
+
+Evidence: `reports/respond_style_phase_12_docker_e2e_hard_block_2026_06_09.md`.
+
+Next: Phase 13 — Publish Control gates on the hard-block battery, resolver
+flip behind per-deployment opt-in in shadow, failed V2/V3 transcript replay
+through the direct route, live-candidate parity gate.

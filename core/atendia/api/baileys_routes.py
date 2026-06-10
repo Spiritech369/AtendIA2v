@@ -600,6 +600,15 @@ async def _run_inbound_pipeline(
     #    are returned so the caller can enqueue them after commit.
     started_executions = await evaluate_event(session, event_row.id)
 
+    # 2b. Respond-Style routing preview (Phase 12B): log-only observation of
+    #     what route each Product Agent deployment WOULD take. It never
+    #     routes, never sends, and swallows every failure.
+    from atendia.product_agents.routing_preview import log_routing_preview_safely
+
+    await log_routing_preview_safely(
+        session, tenant_id=tenant_id, conversation_id=conversation_id
+    )
+
     # 3. Live notification (best-effort).
     try:
         redis = _Redis.from_url(settings.redis_url)

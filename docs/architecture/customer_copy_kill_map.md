@@ -80,3 +80,21 @@ This marker is documentary evidence only. It does not prove live readiness and
 does not authorize deletion, send, smoke, canary, action side effects, workflow
 side effects, or production traffic.
 
+
+## Amendment 2026-06-09 (Phase 12)
+
+Added source missed by the original map:
+
+| Source | File / module | Function / class | Live/Test route | Can reach customer? | Current risk | Future decision | Required blocking test |
+|---|---|---|---|---|---|---|---|
+| ConversationProgressGuard | `core/atendia/agent_runtime/conversation_progress.py` | `_progress_fallback` variants | Runtime V2 semantic + structured | Yes — REWRITES with ~18 canned variants | Replaces repetitive copy instead of forcing retry/no-send | `BLOCK_FOR_PRODUCT_AGENT` | `progress_guard_never_rewrites_product_agent_copy` |
+
+Hard-block battery implemented:
+`core/tests/agent_runtime/test_product_agent_legacy_copy_hard_block.py`
+proves by transitive import graph (fresh interpreter) that the published
+Product Agent direct route cannot load ConversationRunner, composers
+(HumanResponseComposer / StructuredRuntimeComposer / legacy prompts),
+ValidatedResponsePlan, ConversationProgressGuard, QuoteSafetyGuard,
+MandatoryToolGuard, SafeFallbackAgentProvider, SendAdapter, AgentService,
+outbox, or the workflow engine — plus output-structure tests for the
+handoff/workflow/fallback/plan-artifact rows above.

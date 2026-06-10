@@ -1,0 +1,45 @@
+{
+  "decision": "PHASE_12A_DOCKER_E2E_TEST_LAB_DIRECT_PASSED",
+  "mode": "no_send",
+  "checks": {
+    "http_status": 201,
+    "run_persisted": true,
+    "runs_for_suite": 1,
+    "run_mode": "no_send",
+    "run_status": "passed",
+    "run_decision": "RESPOND_STYLE_DIRECT_NO_SEND_READY",
+    "execution_mode": "respond_style_product_agent_direct",
+    "turns": [
+      {
+        "inbound": "hola",
+        "send_decision": "no_send",
+        "blocked_reason": null,
+        "final_message": "¡Hola! ¿En qué puedo ayudarte hoy?",
+        "tools": []
+      },
+      {
+        "inbound": "me interesa la opcion estandar, que necesito?",
+        "send_decision": "no_send",
+        "blocked_reason": null,
+        "final_message": "Para la opción estándar, necesitas: \n1. Identificación válida \n2. Prueba de dirección.",
+        "tools": [
+          {
+            "status": "succeeded",
+            "tool_name": "requirements.lookup"
+          }
+        ]
+      }
+    ],
+    "all_turns_no_send": true,
+    "outbox_audit": {
+      "status": "clean",
+      "outbound_outbox_writes": 0
+    },
+    "outbox_rows_before": 54,
+    "outbox_rows_after": 54,
+    "outbox_delta": 0,
+    "outbox_pending_or_retry": 0,
+    "routing_previews": [],
+    "routing_previews_all_no_send": true
+  }
+}
