@@ -11,6 +11,7 @@ from atendia.agent_runtime.respond_style_turn_contract import (
     AgentTurnInput,
     AgentTurnValidationResult,
     FinalTurnDecision,
+    LLMFieldUpdateProposal,
     LLMToolCallProposal,
     ValidationErrorItem,
 )
@@ -99,18 +100,28 @@ class RespondStyleToolLoop:
                 tool_rounds=0,
                 tool_results=[],
                 blocked_reason=None,
+                provisional_field_keys=[],
             )
+
+        # Field values the LLM extracted in this same turn are facts for the
+        # tool round (validated proposals only). They are provisional context
+        # — nothing is persisted here; real writes remain a later, separately
+        # validated execution layer.
+        provisional_fields = _accepted_field_writes(first_decision)
+        context_for_tools = _context_with_provisional_fields(context, provisional_fields)
 
         tool_results: list[ToolExecutionResult] = []
         for tool_call in tool_calls:
-            result = await self._execute_fact_tool(tool_call=tool_call, context=context)
+            result = await self._execute_fact_tool(
+                tool_call=tool_call, context=context_for_tools
+            )
             tool_results.append(result)
 
         required_failure = _required_tool_failure(tool_results)
         if required_failure is not None:
             return _blocked_tool_decision(required_failure, tool_results)
 
-        context_with_tools = _context_with_tool_results(context, tool_results)
+        context_with_tools = _context_with_tool_results(context_for_tools, tool_results)
         final_decision = await self._provider.generate(
             turn_input=turn_input,
             context=context_with_tools,
@@ -118,11 +129,13 @@ class RespondStyleToolLoop:
         pending_required_tool = _pending_required_tool_request(final_decision)
         if pending_required_tool is not None:
             return _blocked_pending_tool_decision(pending_required_tool, tool_results)
+        final_decision = _with_merged_field_writes(final_decision, provisional_fields)
         return _with_loop_trace(
             _force_no_send(final_decision),
             tool_rounds=1,
             tool_results=tool_results,
             blocked_reason=None,
+            provisional_field_keys=[item.field_key for item in provisional_fields],
         )
 
     async def _execute_fact_tool(
@@ -153,6 +166,60 @@ def _accepted_tool_requests(decision: FinalTurnDecision) -> list[LLMToolCallProp
     if validation is None or validation.status != "valid":
         return []
     return list(validation.accepted_tool_requests)
+
+
+def _accepted_field_writes(decision: FinalTurnDecision) -> list[LLMFieldUpdateProposal]:
+    validation = decision.validation
+    if validation is None or validation.status != "valid":
+        return []
+    return list(decision.accepted_field_writes)
+
+
+def _context_with_provisional_fields(
+    context: AgentContextPackage,
+    proposals: list[LLMFieldUpdateProposal],
+) -> AgentContextPackage:
+    if not proposals:
+        return context
+    identity = dict(context.agent_identity)
+    contact_state = dict(identity.get("contact_state") or {})
+    provisional_keys: list[str] = []
+    for proposal in proposals:
+        contact_state[proposal.field_key] = proposal.value
+        provisional_keys.append(proposal.field_key)
+    identity["contact_state"] = contact_state
+    identity["provisional_field_keys"] = provisional_keys
+    missing = identity.get("missing_fields")
+    if isinstance(missing, list):
+        identity["missing_fields"] = [
+            key for key in missing if key not in provisional_keys
+        ]
+    return context.model_copy(update={"agent_identity": identity})
+
+
+def _with_merged_field_writes(
+    decision: FinalTurnDecision,
+    provisional_fields: list[LLMFieldUpdateProposal],
+) -> FinalTurnDecision:
+    """Carry turn-1 field proposals into the final decision so they are not
+    lost when the final response does not repeat them. Final-turn proposals
+    win on key collisions."""
+    if not provisional_fields:
+        return decision
+    merged: dict[str, LLMFieldUpdateProposal] = {
+        item.field_key: item for item in provisional_fields
+    }
+    for item in decision.accepted_field_writes:
+        merged[item.field_key] = item
+    merged_list = list(merged.values())
+    validation = decision.validation
+    if validation is not None and validation.status == "valid":
+        validation = validation.model_copy(
+            update={"accepted_field_writes": merged_list}
+        )
+    return decision.model_copy(
+        update={"accepted_field_writes": merged_list, "validation": validation}
+    )
 
 
 def _tool_is_bound(tool_name: str, context: AgentContextPackage) -> bool:
@@ -277,6 +344,7 @@ def _with_loop_trace(
     tool_rounds: int,
     tool_results: list[ToolExecutionResult],
     blocked_reason: str | None,
+    provisional_field_keys: list[str],
 ) -> FinalTurnDecision:
     return decision.model_copy(
         update={
@@ -287,6 +355,7 @@ def _with_loop_trace(
                     "mode": "no_send",
                     "tool_rounds": tool_rounds,
                     "blocked": blocked_reason,
+                    "provisional_field_keys": provisional_field_keys,
                     "tool_results": [item.model_dump(mode="json") for item in tool_results],
                     "side_effects": {
                         "delivery": False,

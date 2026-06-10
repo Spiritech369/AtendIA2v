@@ -247,6 +247,9 @@ def _agent_identity(snapshot: RespondStyleContextSnapshot) -> JsonDict:
         "conversation_stage": snapshot.conversation_stage,
         "contact_state": known_fields,
         "missing_fields": missing_fields,
+        # Declarative contract for the LLM: fields are captured when the
+        # customer provides them, never collected as a questionnaire.
+        "field_capture_policy": "opportunistic_never_agenda",
     }
 
 

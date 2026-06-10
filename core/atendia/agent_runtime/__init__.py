@@ -110,6 +110,12 @@ _LAZY_EXPORTS = {
     "published_config_from_version_payload": (
         "atendia.agent_runtime.respond_style_product_agent_config_adapter"
     ),
+    "InMemoryEvidenceSink": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "RespondStyleTestLabDirect": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "TestLabEvidenceSink": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "TestLabScenario": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "TestLabScenarioResult": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "TestLabTurnEvidence": "atendia.agent_runtime.respond_style_test_lab_direct",
     "LiveSimulatedChannel": "atendia.agent_runtime.respond_style_live_simulated_channel",
     "SimulatedChannelSummary": (
         "atendia.agent_runtime.respond_style_live_simulated_channel"

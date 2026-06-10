@@ -340,3 +340,24 @@ Status: `PHASE_9_5_LIVE_SIMULATED_CHANNEL_ANALYSIS_READY`
   satisfiable tools.
 
 Evidence: `reports/live_simulated_channel_no_send_2026_06_09.md`.
+
+## Phase 10 — F1/F2 Fixes + Test Lab Direct (2026-06-09)
+
+Status: `PHASE_10_RESPOND_STYLE_SIMULATED_LIVE_FIXES_AND_TESTLAB_API_READY`
+
+- F1: tool loop injects the turn's VALIDATED field proposals as provisional
+  contact state for the same turn's tool round (and merges them into the
+  final decision). No persistence — provisional context only. Chaotic
+  compound case: live simulated channel now 10/10 turns, 0 blocked.
+- F2: prompt + builder declare fields as opportunistic capture
+  (`field_capture_policy: opportunistic_never_agenda`), never an agenda;
+  satisfiable tools take priority over field collection.
+- Test Lab Direct: `respond_style_test_lab_direct.py` runs scenarios over
+  the SAME direct path and emits TestLabScenarioResult evidence through an
+  injected TestLabEvidenceSink (in-memory default; DB/API adapter = Phase
+  11). Legacy product_agents/test_lab.py intentionally untouched.
+- Carried-forward pre-live requirement (re-confirmed by chaotic Test Lab
+  run blocking on `tool_round_limit_reached`): configurable multi-round
+  tool loop with budget.
+
+Evidence: `reports/respond_style_phase_10_fixes_and_test_lab_direct_2026_06_09.md`.

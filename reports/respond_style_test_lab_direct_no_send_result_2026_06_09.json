@@ -1,0 +1,361 @@
+{
+  "decision": "PHASE_10_RESPOND_STYLE_SIMULATED_LIVE_FIXES_AND_TESTLAB_API_READY",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "evidence_saved": 3,
+  "results": [
+    {
+      "run_id": "test-lab-direct-3d4662860f764844ade3d214f21afe8b",
+      "scenario_name": "greeting_info",
+      "runtime_path": "respond_style_product_agent_direct",
+      "turns": [
+        {
+          "turn_number": 1,
+          "inbound_text": "hola",
+          "final_message": "¡Hola! ¿En qué puedo ayudarte hoy?",
+          "send_decision": "no_send",
+          "simulated_outbound": true,
+          "blocked_reason": null,
+          "validation_result": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "provisional_field_keys": [],
+          "tools": [],
+          "tool_results": [],
+          "field_update_proposals": [],
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "trace": {
+            "respond_style_product_agent_runtime": {
+              "mode": "no_send",
+              "runtime_path": "respond_style_no_send_direct",
+              "agent_version_id": "v1",
+              "deployment_id": "live-simulated-no-send"
+            },
+            "respond_style_validator": {
+              "status": "valid",
+              "turn_kind": "final_response"
+            },
+            "respond_style_llm_provider": {
+              "mode": "no_send"
+            },
+            "respond_style_tool_loop": {
+              "mode": "no_send",
+              "tool_rounds": 0,
+              "blocked": null,
+              "provisional_field_keys": [],
+              "tool_results": [],
+              "side_effects": {
+                "delivery": false,
+                "workflows": false,
+                "actions": false
+              }
+            }
+          }
+        },
+        {
+          "turn_number": 2,
+          "inbound_text": "que opciones tienen?",
+          "final_message": "Ofrecemos una opción estándar y una opción premium. ¿Te gustaría saber más sobre alguna de estas opciones en particular?",
+          "send_decision": "no_send",
+          "simulated_outbound": true,
+          "blocked_reason": null,
+          "validation_result": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "provisional_field_keys": [],
+          "tools": [],
+          "tool_results": [],
+          "field_update_proposals": [],
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "trace": {
+            "respond_style_product_agent_runtime": {
+              "mode": "no_send",
+              "runtime_path": "respond_style_no_send_direct",
+              "agent_version_id": "v1",
+              "deployment_id": "live-simulated-no-send"
+            },
+            "respond_style_validator": {
+              "status": "valid",
+              "turn_kind": "final_response"
+            },
+            "respond_style_llm_provider": {
+              "mode": "no_send"
+            },
+            "respond_style_tool_loop": {
+              "mode": "no_send",
+              "tool_rounds": 0,
+              "blocked": null,
+              "provisional_field_keys": [],
+              "tool_results": [],
+              "side_effects": {
+                "delivery": false,
+                "workflows": false,
+                "actions": false
+              }
+            }
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "¡Hola! ¿En qué puedo ayudarte hoy?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "que opciones tienen?",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Ofrecemos una opción estándar y una opción premium. ¿Te gustaría saber más sobre alguna de estas opciones en particular?",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "outbound_outbox_writes": 0,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "run_id": "test-lab-direct-032b73399730479f84a7a27caf4d0f7f",
+      "scenario_name": "chaotic_compound",
+      "runtime_path": "respond_style_product_agent_direct",
+      "turns": [
+        {
+          "turn_number": 1,
+          "inbound_text": "quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta",
+          "final_message": null,
+          "send_decision": "no_send",
+          "simulated_outbound": false,
+          "blocked_reason": "tool_round_limit_reached",
+          "validation_result": {
+            "status": "blocked",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [
+              {
+                "code": "tool_round_limit_reached",
+                "message": "Required tool request remained after the allowed no-send tool round.",
+                "path": "tool_requests",
+                "retryable": false,
+                "metadata": {
+                  "tool_name": "requirements.lookup"
+                }
+              }
+            ],
+            "send_decision": "no_send",
+            "blocked_reason": "tool_round_limit_reached"
+          },
+          "provisional_field_keys": [],
+          "tools": [
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded"
+            }
+          ],
+          "tool_results": [
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded",
+              "facts": {
+                "selected_option": "opcion estandar",
+                "price": 120,
+                "currency": "USD",
+                "billing": "monthly"
+              },
+              "citations": [
+                "quote.resolve-source"
+              ],
+              "source_refs": [
+                "quote.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "field_update_proposals": [],
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "trace": {
+            "respond_style_product_agent_runtime": {
+              "mode": "no_send",
+              "runtime_path": "respond_style_no_send_direct",
+              "agent_version_id": "v1",
+              "deployment_id": "live-simulated-no-send"
+            },
+            "respond_style_tool_loop": {
+              "mode": "no_send",
+              "tool_rounds": 1,
+              "blocked": "tool_round_limit_reached",
+              "pending_tool_name": "requirements.lookup",
+              "tool_results": [
+                {
+                  "tool_name": "quote.resolve",
+                  "status": "succeeded",
+                  "facts": {
+                    "selected_option": "opcion estandar",
+                    "price": 120,
+                    "currency": "USD",
+                    "billing": "monthly"
+                  },
+                  "citations": [
+                    "quote.resolve-source"
+                  ],
+                  "source_refs": [
+                    "quote.resolve"
+                  ],
+                  "error_code": null,
+                  "is_required": true,
+                  "can_support_claims": true
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "outbound_outbox_writes": 0,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "run_id": "test-lab-direct-9ecbc07280e8459bb9da2fd43805b393",
+      "scenario_name": "handoff",
+      "runtime_path": "respond_style_product_agent_direct",
+      "turns": [
+        {
+          "turn_number": 1,
+          "inbound_text": "quiero hablar con una persona real por favor",
+          "final_message": null,
+          "send_decision": "no_send",
+          "simulated_outbound": false,
+          "blocked_reason": null,
+          "validation_result": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "provisional_field_keys": [],
+          "tools": [],
+          "tool_results": [],
+          "field_update_proposals": [],
+          "workflow_event_proposals": [],
+          "handoff_proposal": {
+            "needed": true,
+            "reason": "El cliente desea hablar con una persona real.",
+            "target": "support",
+            "priority": "normal"
+          },
+          "trace": {
+            "respond_style_product_agent_runtime": {
+              "mode": "no_send",
+              "runtime_path": "respond_style_no_send_direct",
+              "agent_version_id": "v1",
+              "deployment_id": "live-simulated-no-send"
+            },
+            "respond_style_validator": {
+              "status": "valid",
+              "turn_kind": "handoff_request"
+            },
+            "respond_style_llm_provider": {
+              "mode": "no_send"
+            },
+            "respond_style_tool_loop": {
+              "mode": "no_send",
+              "tool_rounds": 0,
+              "blocked": null,
+              "provisional_field_keys": [],
+              "tool_results": [],
+              "side_effects": {
+                "delivery": false,
+                "workflows": false,
+                "actions": false
+              }
+            }
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "quiero hablar con una persona real por favor",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "outbound_outbox_writes": 0,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ]
+}
