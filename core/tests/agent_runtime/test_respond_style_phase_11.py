@@ -595,3 +595,110 @@ async def test_duplicate_tools_within_one_round_execute_once() -> None:
 
     assert executor.calls == ["requirements.lookup"]
     assert decision.final_message == "done"
+
+
+@pytest.mark.asyncio
+async def test_f4_silent_tool_request_escape_blocks_with_reason() -> None:
+    """A turn must never end silently: a tool_request escaping the loop as
+    the final decision blocks with no_final_response_after_tools."""
+    req_call = LLMToolCallProposal(tool_name="requirements.lookup", reason="needed")
+    provider = _FakeTurnProvider([
+        _decision(None, tool_requests=[req_call]),
+        # Model keeps re-requesting the satisfied tool...
+        _decision(None, tool_requests=[req_call]),
+        # ...even after the nudge.
+        _decision(None, tool_requests=[req_call]),
+    ])
+    executor = _SequencedExecutor({
+        "requirements.lookup": _ok_result("requirements.lookup", {"r": 1}),
+    })
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=executor,
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    assert decision.final_message is None
+    assert decision.validation is not None
+    assert decision.validation.blocked_reason == "no_final_response_after_tools"
+
+
+@pytest.mark.asyncio
+async def test_f5_missing_precondition_retries_into_natural_question() -> None:
+    """A required tool skipped on a missing precondition retries the model
+    once so it asks the customer instead of going silent."""
+    req_call = LLMToolCallProposal(tool_name="requirements.lookup", reason="needed")
+
+    class _SkippingExecutor:
+        def execute_tool(self, tool_call, context):
+            return ToolExecutionResult(
+                tool_name=tool_call.tool_name,
+                status="skipped",
+                error_code="missing_precondition:income_type",
+                is_required=True,
+                can_support_claims=False,
+            )
+
+    provider = _FakeTurnProvider([
+        _decision(None, tool_requests=[req_call]),
+        _decision("Para darte la lista exacta, dime como recibes tus ingresos."),
+    ])
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=_SkippingExecutor(),
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    assert decision.final_message == (
+        "Para darte la lista exacta, dime como recibes tus ingresos."
+    )
+    assert decision.validation is not None
+    assert decision.validation.status == "valid"
+    # The retry feedback reached the model.
+    retry_context = provider.contexts[1]
+    assert any(
+        "could not run" in str(item) for item in retry_context.validator_feedback
+    )
+
+
+@pytest.mark.asyncio
+async def test_f8_blocked_decisions_carry_validated_field_writes() -> None:
+    req_call = LLMToolCallProposal(tool_name="requirements.lookup", reason="needed")
+    field = LLMFieldUpdateProposal(
+        field_key="selected_option",
+        value="standard",
+        evidence=["customer said standard"],
+        confidence=0.9,
+        reason="stated",
+    )
+
+    class _AlwaysSkippingExecutor:
+        def execute_tool(self, tool_call, context):
+            return ToolExecutionResult(
+                tool_name=tool_call.tool_name,
+                status="skipped",
+                error_code="missing_precondition:income_type",
+                is_required=True,
+                can_support_claims=False,
+            )
+
+    provider = _FakeTurnProvider([
+        _decision(None, tool_requests=[req_call], field_writes=[field]),
+        # Retry also insists on the tool -> hard block, but the validated
+        # field proposal must survive into the blocked decision.
+        _decision(None, tool_requests=[req_call]),
+    ])
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=_AlwaysSkippingExecutor(),
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    assert decision.validation is not None
+    assert decision.validation.status == "blocked"
+    assert [item.field_key for item in decision.accepted_field_writes] == [
+        "selected_option"
+    ]

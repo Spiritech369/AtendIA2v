@@ -94,3 +94,65 @@ zero leaks, zero legacy copy, zero side effects across 71 adversarial
 turns. The conversation half is not yet WhatsApp-worthy: 21% of turns are
 silence and repetition breaks the human feel. The simulator did exactly
 its job: these defects were caught for free instead of on a real customer.
+
+---
+
+# Round 2 — after F4-F9 fixes (2026-06-10)
+
+Fixes applied: F4 (silent-valid escape now blocks with
+`no_final_response_after_tools`), F5 (missing-precondition skip retries
+once into a natural question), F6/F7/F9 (prompt: corrections win, answer
+direct questions about the assistant, never repeat verbatim, never re-ask
+known values), F8 (validated field proposals survive blocked turns).
+Suite: 176 passing (3 new tests), ruff clean. Same 10 conversations re-run.
+
+## Delta
+
+| Metric | Round 1 | Round 2 |
+|---|---|---|
+| Turns answered | 56/71 (79%) | **63/71 (89%)** |
+| Silent with NO reason (bug) | 4 | **0** |
+| Blocked (structured reason) | 11 | 8 |
+| Average human score | 2.7/5 | **3.0/5** |
+
+Conversation scores R1→R2: c01 2.5→4.0 (full flow, exact enganche from
+quote.resolve), c02 3.0→3.5 (compound ask now gets a natural question —
+F5 working), c03 2.5→2.5, c04 3.0→3.5 (income finally captured from
+"vendo comida"), c05 2.5→3.0 (SAT captured, all turns answered), c06
+3.0→2.5 (same paragraph 3×), c07 2.0→2.5 (everything answered BUT "eres
+robot?" still deflected), c08 2.0→2.0 (income correction still ignored),
+c09 2.5→2.0 (catalog dead-end 3×), c10 4.0→4.0.
+
+## Gate: still `MANUAL_SIMULATOR_HUMAN_REVIEW_FAILED` (3.0 < 4.2)
+
+Remaining defects, in order of damage:
+
+- **F10 — catalog dead-end (5 of 8 blocks):** after `catalog.search`
+  succeeds, gpt-4o-mini keeps emitting tool_request instead of writing the
+  options, exhausting the nudge → `no_final_response_after_tools`
+  (conv09 ×3, conv03, conv06). The structural cause is the known provider
+  weakness: the whole context rides as one JSON blob in a single user
+  message, so loop feedback gets drowned. Fix prescription: render the
+  context as structured prompt sections with the transcript as real chat
+  messages (the provider upgrade already flagged in the original
+  architecture review), and/or strip tool proposals on the final forced
+  attempt.
+- **F11 — answers the wrong sub-question:** "cuánto tendría que dar" →
+  document list; "qué ocupo" → price repeat (c01, c04, c10). Prompt
+  ordering pressure; likely improves with structured prompting.
+- **F12 — "eres robot?" still deflected** despite the new prompt line and
+  the KB honesty snippet (c07). Same root as F10: instructions buried.
+- **F13 — income correction still loses** ("realmente por transferencia
+  sin recibos" → keeps nómina, c08).
+- Repetition pressure persists when the customer stalls (c02, c06).
+
+## Conclusion
+
+The structural/runtime half is now clean: zero unexplained silences, zero
+invented facts, zero leaks, zero side effects, natural asks on missing
+preconditions, corrections of state captured with evidence. What remains
+is conversation quality bounded by the provider's prompt rendering and the
+small model. Next iteration is F10 (structured prompt rendering in
+RespondStyleLLMTurnProvider) — a contained provider change, not new
+architecture — then re-run this same battery. No AgentService, no smoke
+until this gate passes.

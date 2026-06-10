@@ -118,6 +118,7 @@ class RespondStyleToolLoop:
         total_tool_calls = 0
 
         nudged_after_duplicate_requests = False
+        precondition_retry_done = False
         while rounds_executed < self._config.max_tool_rounds:
             tool_calls = _accepted_tool_requests(decision)
             if not tool_calls:
@@ -173,8 +174,31 @@ class RespondStyleToolLoop:
             required_failure = _required_tool_failure(round_results)
             all_tool_results.extend(round_results)
             if required_failure is not None:
+                if (
+                    required_failure.status == "skipped"
+                    and (required_failure.error_code or "").startswith("missing_")
+                    and not precondition_retry_done
+                ):
+                    # F5: a required tool could not run because a precondition
+                    # is unknown. Instead of going silent, ask the model ONCE
+                    # to request the missing detail from the customer.
+                    precondition_retry_done = True
+                    decision = await self._provider.generate(
+                        turn_input=turn_input,
+                        context=_context_with_loop_feedback(
+                            current_context,
+                            f"The tool {required_failure.tool_name} could not run "
+                            f"({required_failure.error_code}). Do not request it "
+                            "again yet: write a final_response that naturally asks "
+                            "the customer for the missing detail.",
+                        ),
+                    )
+                    continue
                 return _blocked_tool_decision(
-                    required_failure, all_tool_results, tool_rounds=rounds_executed + 1
+                    required_failure,
+                    all_tool_results,
+                    tool_rounds=rounds_executed + 1,
+                    field_writes=list(provisional_by_key.values()),
                 )
 
             rounds_executed += 1
@@ -186,7 +210,12 @@ class RespondStyleToolLoop:
             )
             decision = await self._provider.generate(
                 turn_input=turn_input,
-                context=current_context,
+                context=_context_with_loop_feedback(
+                    current_context,
+                    "Tool results are now present in context. If no further tool "
+                    "is genuinely required, write the final_response now from "
+                    "those results.",
+                ),
             )
 
         pending_required_tool = _pending_required_tool_request(
@@ -194,11 +223,32 @@ class RespondStyleToolLoop:
         )
         if pending_required_tool is not None:
             return _blocked_pending_tool_decision(
-                pending_required_tool, all_tool_results, tool_rounds=rounds_executed
+                pending_required_tool,
+                all_tool_results,
+                tool_rounds=rounds_executed,
+                field_writes=list(provisional_by_key.values()),
             )
         decision = _with_merged_field_writes(
             decision, list(provisional_by_key.values())
         )
+        if (
+            decision.final_message is None
+            and decision.accepted_handoff is None
+            and decision.validation is not None
+            and decision.validation.status == "valid"
+        ):
+            # F4: a tool_request escaped the loop as the final decision. A
+            # turn must never end silently without a structured reason.
+            return _blocked_loop_decision(
+                code="no_final_response_after_tools",
+                message=(
+                    "The model did not produce a final_response after the tool "
+                    "rounds; visible send remains blocked."
+                ),
+                tool_rounds=rounds_executed,
+                tool_results=all_tool_results,
+                field_writes=list(provisional_by_key.values()),
+            )
         return _with_loop_trace(
             _force_no_send(decision),
             tool_rounds=rounds_executed,
@@ -388,6 +438,7 @@ def _blocked_pending_tool_decision(
     tool_results: list[ToolExecutionResult],
     *,
     tool_rounds: int,
+    field_writes: list[LLMFieldUpdateProposal] | None = None,
 ) -> FinalTurnDecision:
     code = "tool_round_limit_reached"
     error = ValidationErrorItem(
@@ -407,6 +458,7 @@ def _blocked_pending_tool_decision(
         final_message=None,
         send_decision="no_send",
         validation=validation,
+        accepted_field_writes=list(field_writes or []),
         trace_metadata={
             "respond_style_tool_loop": {
                 "mode": "no_send",
@@ -425,6 +477,7 @@ def _blocked_loop_decision(
     message: str,
     tool_rounds: int,
     tool_results: list[ToolExecutionResult],
+    field_writes: list[LLMFieldUpdateProposal] | None = None,
 ) -> FinalTurnDecision:
     error = ValidationErrorItem(
         code=code,
@@ -442,6 +495,7 @@ def _blocked_loop_decision(
         final_message=None,
         send_decision="no_send",
         validation=validation,
+        accepted_field_writes=list(field_writes or []),
         trace_metadata={
             "respond_style_tool_loop": {
                 "mode": "no_send",
@@ -458,6 +512,7 @@ def _blocked_tool_decision(
     tool_results: list[ToolExecutionResult],
     *,
     tool_rounds: int,
+    field_writes: list[LLMFieldUpdateProposal] | None = None,
 ) -> FinalTurnDecision:
     code = "required_tool_not_succeeded"
     if result.status == "failed" and result.error_code:
@@ -481,6 +536,7 @@ def _blocked_tool_decision(
         final_message=None,
         send_decision="no_send",
         validation=validation,
+        accepted_field_writes=list(field_writes or []),
         trace_metadata={
             "respond_style_tool_loop": {
                 "mode": "no_send",

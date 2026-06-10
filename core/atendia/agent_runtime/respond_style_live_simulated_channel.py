@@ -162,6 +162,14 @@ class LiveSimulatedChannel:
             and result.blocked_reason is None
         )
         simulated_writes: JsonDict = {}
+        # Validated field proposals update the simulated state even when the
+        # turn blocks: the extraction was accepted by the validator, and
+        # losing it would make the customer repeat themselves next turn.
+        for proposal in result.field_update_proposals:
+            field_key = proposal.get("field_key")
+            if field_key:
+                self._field_values[str(field_key)] = proposal.get("value")
+                simulated_writes[str(field_key)] = proposal.get("value")
         if deliverable:
             self._messages.append(
                 TranscriptMessage(
@@ -170,11 +178,6 @@ class LiveSimulatedChannel:
                     message_id=f"sim-out-{turn_number}",
                 )
             )
-            for proposal in result.field_update_proposals:
-                field_key = proposal.get("field_key")
-                if field_key:
-                    self._field_values[str(field_key)] = proposal.get("value")
-                    simulated_writes[str(field_key)] = proposal.get("value")
         return SimulatedTurnRecord(
             turn_number=turn_number,
             inbound_text=inbound_text,
