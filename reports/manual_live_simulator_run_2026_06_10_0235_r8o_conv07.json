@@ -1,0 +1,792 @@
+{
+  "decision_context": "MANUAL_LIVE_SIMULATOR_NO_SEND",
+  "run_label": "2026_06_10_0235_r8o_conv07",
+  "agent": {
+    "tenant_id": "manual-review-tenant",
+    "agent_id": "moto-credit-agent",
+    "agent_version_id": "v1"
+  },
+  "mode": "no_send",
+  "turns": [
+    {
+      "turn_number": 1,
+      "inbound_text": "hola",
+      "final_message_candidate": "¡Hola! Soy tu asesor de motos a crédito. ¿En qué puedo ayudarte hoy?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 0,
+          "validator_retries_total": 0,
+          "backoff_wait_ms_total": 0
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 2,
+      "inbound_text": "qué ocupo",
+      "final_message_candidate": "Para un crédito de moto, generalmente necesitas una identificación oficial vigente, un comprobante de domicilio reciente y alguna forma de demostrar tus ingresos. La lista exacta de documentos depende de cómo recibes tus ingresos y del plan específico.\n\n¿Podrías contarme cómo recibes tus ingresos para darte más detalles?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 1,
+          "validator_retries_total": 0,
+          "backoff_wait_ms_total": 1000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 3,
+      "inbound_text": "ya te dije que quiero crédito no?",
+      "final_message_candidate": null,
+      "simulated_outbound": false,
+      "send_decision": "no_send",
+      "blocked_reason": "claim_missing_source_ref,claim_missing_source_ref",
+      "validation_result": {
+        "status": "blocked",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [
+          {
+            "code": "claim_missing_source_ref",
+            "message": "claim requires source_refs",
+            "path": "claims[0].source_refs",
+            "retryable": true,
+            "metadata": {}
+          },
+          {
+            "code": "claim_missing_source_ref",
+            "message": "claim requires source_refs",
+            "path": "claims[1].source_refs",
+            "retryable": true,
+            "metadata": {}
+          }
+        ],
+        "send_decision": "no_send",
+        "blocked_reason": "claim_missing_source_ref,claim_missing_source_ref"
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "blocked"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 3,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 6000,
+          "blocked_raw_output": "{\"turn_kind\":\"final_response\",\"final_message\":\"Sí, claro. Para avanzar con el crédito, necesito saber cómo recibes tus ingresos. Esto me ayudará a darte la lista exacta de documentos necesarios y el plan adecuado para ti. ¿Podrías compartir esa información?\",\"tool_requests\":[],\"field_write_proposals\":[],\"action_proposals\":[],\"workflow_event_proposals\":[],\"handoff_proposal\":null,\"claims\":[{\"text\":\"Para avanzar con el crédito, necesito saber cómo recibes tus ingresos.\",\"basis\":\"agent_policy\",\"source_refs\":[]},{\"text\":\"Esto me ayudará a darte la lista exacta de documentos necesarios y el plan adecuado para ti.\",\"basis\":\"agent_policy\",\"source_refs\":[]}],\"confidence\":0.95,\"needs_retry_reason\":null}"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 4,
+      "inbound_text": "tengo 15 meses",
+      "final_message_candidate": "Perfecto, con 15 meses de antigüedad laboral ya cumples con uno de los requisitos. Ahora, para darte información más precisa sobre el crédito, ¿cómo recibes tus ingresos? Puede ser por nómina, transferencia, en efectivo o si tienes un negocio propio.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "employment_seniority",
+            "value": "15 meses",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 1.0,
+            "reason": "El cliente mencionó su antigüedad laboral."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "skipped",
+          "facts": {},
+          "citations": [],
+          "source_refs": [],
+          "error_code": "missing_precondition:income_type",
+          "is_required": true,
+          "can_support_claims": false
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "employment_seniority",
+          "value": "15 meses",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 1.0,
+          "reason": "El cliente mencionó su antigüedad laboral."
+        }
+      ],
+      "simulated_field_writes": {
+        "employment_seniority": "15 meses"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 7,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 11000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [
+            "employment_seniority"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "skipped",
+              "facts": {},
+              "citations": [],
+              "source_refs": [],
+              "error_code": "missing_precondition:income_type",
+              "is_required": true,
+              "can_support_claims": false
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 5,
+      "inbound_text": "me pagan por fuera",
+      "final_message_candidate": "Gracias por aclararlo. Para un crédito de moto, necesitarás:\n\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi tienes alguna otra pregunta o necesitas más ayuda, aquí estoy para apoyarte. 😊",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "income_type",
+            "value": "efectivo o por fuera de nómina, transferencia o negocio propio.",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente indicó que recibe sus pagos por fuera de nómina."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded",
+          "facts": {
+            "requirements": [
+              "identificacion oficial vigente",
+              "comprobante de domicilio reciente",
+              "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+            ],
+            "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio."
+          },
+          "citations": [
+            "requirements.lookup-dry-source"
+          ],
+          "source_refs": [
+            "requirements.lookup"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "income_type",
+          "value": "efectivo o por fuera de nómina, transferencia o negocio propio.",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente indicó que recibe sus pagos por fuera de nómina."
+        }
+      ],
+      "simulated_field_writes": {
+        "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio."
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 9,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 14000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [
+            "income_type"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded",
+              "facts": {
+                "requirements": [
+                  "identificacion oficial vigente",
+                  "comprobante de domicilio reciente",
+                  "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+                ],
+                "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio."
+              },
+              "citations": [
+                "requirements.lookup-dry-source"
+              ],
+              "source_refs": [
+                "requirements.lookup"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 6,
+      "inbound_text": "entonces qué sigue",
+      "final_message_candidate": "Con tus 15 meses de antigüedad laboral y recibiendo ingresos por fuera de nómina, puedes acceder al plan semanal estándar. Este plan requiere un enganche del 30% y los pagos son semanales.\n\nSi tienes un negocio propio y estás dado de alta en el SAT, podrías calificar para un enganche del 20%.\n\n¿Te gustaría saber el precio de alguna moto en particular o necesitas más información sobre el proceso?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded",
+          "facts": {
+            "plan": "plan semanal estandar",
+            "down_payment_percent": 30,
+            "payment_frequency": "semanal",
+            "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+            "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio.",
+            "employment_seniority": "15 meses"
+          },
+          "citations": [
+            "credit_plan.resolve-dry-source"
+          ],
+          "source_refs": [
+            "credit_plan.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 13,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 20000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "succeeded",
+              "facts": {
+                "plan": "plan semanal estandar",
+                "down_payment_percent": 30,
+                "payment_frequency": "semanal",
+                "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+                "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio.",
+                "employment_seniority": "15 meses"
+              },
+              "citations": [
+                "credit_plan.resolve-dry-source"
+              ],
+              "source_refs": [
+                "credit_plan.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 7,
+      "inbound_text": "eres robot?",
+      "final_message_candidate": "Soy un asistente digital aquí para ayudarte con información sobre motos a crédito. Si prefieres hablar con un asesor humano, puedo conectarte con alguien del equipo de ventas. ¿Te gustaría que lo haga?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 13,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 20000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "role": "customer",
+      "text": "hola",
+      "timestamp": null,
+      "message_id": "in-1",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "¡Hola! Soy tu asesor de motos a crédito. ¿En qué puedo ayudarte hoy?",
+      "timestamp": null,
+      "message_id": "sim-out-1",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "qué ocupo",
+      "timestamp": null,
+      "message_id": "in-2",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Para un crédito de moto, generalmente necesitas una identificación oficial vigente, un comprobante de domicilio reciente y alguna forma de demostrar tus ingresos. La lista exacta de documentos depende de cómo recibes tus ingresos y del plan específico.\n\n¿Podrías contarme cómo recibes tus ingresos para darte más detalles?",
+      "timestamp": null,
+      "message_id": "sim-out-2",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "ya te dije que quiero crédito no?",
+      "timestamp": null,
+      "message_id": "in-3",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "tengo 15 meses",
+      "timestamp": null,
+      "message_id": "in-4",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Perfecto, con 15 meses de antigüedad laboral ya cumples con uno de los requisitos. Ahora, para darte información más precisa sobre el crédito, ¿cómo recibes tus ingresos? Puede ser por nómina, transferencia, en efectivo o si tienes un negocio propio.",
+      "timestamp": null,
+      "message_id": "sim-out-4",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "me pagan por fuera",
+      "timestamp": null,
+      "message_id": "in-5",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Gracias por aclararlo. Para un crédito de moto, necesitarás:\n\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi tienes alguna otra pregunta o necesitas más ayuda, aquí estoy para apoyarte. 😊",
+      "timestamp": null,
+      "message_id": "sim-out-5",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "entonces qué sigue",
+      "timestamp": null,
+      "message_id": "in-6",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Con tus 15 meses de antigüedad laboral y recibiendo ingresos por fuera de nómina, puedes acceder al plan semanal estándar. Este plan requiere un enganche del 30% y los pagos son semanales.\n\nSi tienes un negocio propio y estás dado de alta en el SAT, podrías calificar para un enganche del 20%.\n\n¿Te gustaría saber el precio de alguna moto en particular o necesitas más información sobre el proceso?",
+      "timestamp": null,
+      "message_id": "sim-out-6",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "eres robot?",
+      "timestamp": null,
+      "message_id": "in-7",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Soy un asistente digital aquí para ayudarte con información sobre motos a crédito. Si prefieres hablar con un asesor humano, puedo conectarte con alguien del equipo de ventas. ¿Te gustaría que lo haga?",
+      "timestamp": null,
+      "message_id": "sim-out-7",
+      "attachments": []
+    }
+  ],
+  "simulated_fields_final": {
+    "employment_seniority": "15 meses",
+    "income_type": "efectivo o por fuera de nómina, transferencia o negocio propio."
+  },
+  "failures": [
+    {
+      "turn": 3,
+      "inbound": "ya te dije que quiero crédito no?",
+      "no_send_reason": "claim_missing_source_ref,claim_missing_source_ref"
+    }
+  ],
+  "summary": {
+    "conversation_id": "manual-sim-0",
+    "turns": 7,
+    "simulated_outbound_count": 6,
+    "blocked_turns": 1,
+    "outbound_outbox_writes": 0,
+    "side_effects": {
+      "delivery": false,
+      "workflows": false,
+      "actions": false,
+      "field_writes": false
+    }
+  }
+}

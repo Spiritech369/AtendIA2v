@@ -289,3 +289,74 @@ def test_f19_hard_policies_not_relaxed() -> None:
     assert decision.send_decision == "no_send"
     codes = {item.code for item in decision.validation.blocked_items}
     assert "missing_quote_tool" in codes
+
+
+# --- F21/F22/F23 -------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_f21_validator_retry_recovers_from_invalid_json() -> None:
+    """A parse failure on the validator-retry call gets ONE corrective
+    attempt instead of failing closed."""
+    price_violation = json.dumps(
+        {
+            "turn_kind": "final_response",
+            "final_message": "The price is $10,000.",
+            "tool_requests": [],
+            "field_write_proposals": [],
+            "action_proposals": [],
+            "workflow_event_proposals": [],
+            "handoff_proposal": None,
+            "claims": [],
+            "confidence": 0.8,
+            "needs_retry_reason": None,
+        }
+    )
+    provider, completions = _provider(
+        [],
+        [price_violation, "truncated{not-json", _ok_output()],
+    )
+
+    decision = await provider.generate(
+        turn_input=_turn_input(), context=AgentContextPackage()
+    )
+
+    assert decision.final_message == "Hola, te ayudo con gusto."
+    assert decision.validation is not None
+    assert decision.validation.status == "valid"
+    assert completions.calls == 3
+
+
+def test_f22_prompt_forbids_product_identity_fabrication() -> None:
+    prompt = respond_style_system_prompt()
+    assert "Never add a brand, engine size, year, or spec" in prompt
+
+
+@pytest.mark.asyncio
+async def test_f23_blocked_decisions_carry_raw_output_excerpt() -> None:
+    leak = json.dumps(
+        {
+            "turn_kind": "final_response",
+            "final_message": "I checked the trace and the workflow.",
+            "tool_requests": [],
+            "field_write_proposals": [],
+            "action_proposals": [],
+            "workflow_event_proposals": [],
+            "handoff_proposal": None,
+            "claims": [],
+            "confidence": 0.8,
+            "needs_retry_reason": None,
+        }
+    )
+    provider, _ = _provider([], [leak, leak])
+
+    decision = await provider.generate(
+        turn_input=_turn_input(), context=AgentContextPackage()
+    )
+
+    assert decision.validation is not None
+    assert decision.validation.status == "blocked"
+    raw = decision.trace_metadata["respond_style_llm_provider"].get(
+        "blocked_raw_output"
+    )
+    assert raw is not None and "trace" in raw

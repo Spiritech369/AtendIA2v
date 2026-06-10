@@ -26,7 +26,7 @@ class RespondStyleLLMClient(Protocol):
 class RespondStyleLLMTurnProviderConfig:
     model: str = "gpt-4o-mini"
     temperature: float = 0.2
-    max_output_tokens: int = 900
+    max_output_tokens: int = 1400
     max_llm_retries: int = 1
     # F18: transient API errors (429/timeouts/5xx) retry with exponential
     # backoff + jitter, honoring Retry-After. Schema/validation errors are
@@ -132,7 +132,9 @@ class RespondStyleLLMTurnProvider:
             )
             self.last_messages = retry_messages
             try:
-                retry_output = await self._complete_structured_turn(retry_messages)
+                retry_output = await self._complete_structured_turn_with_parse_recovery(
+                    retry_messages
+                )
             except TransientAPIBudgetExhaustedError as exc:
                 return self._finalize(
                     blocked_provider_decision(exc.reason_code, exc.last_error)
@@ -163,6 +165,12 @@ class RespondStyleLLMTurnProvider:
                 "backoff_wait_ms_total": self.total_backoff_wait_ms,
             }
         )
+        if (
+            decision.validation is not None
+            and decision.validation.status == "blocked"
+            and self.last_raw_output
+        ):
+            provider_meta["blocked_raw_output"] = self.last_raw_output[:1200]
         meta["respond_style_llm_provider"] = provider_meta
         return decision.model_copy(update={"trace_metadata": meta})
 
@@ -201,7 +209,9 @@ class RespondStyleLLMTurnProvider:
         )
         self.last_messages = retry_messages
         try:
-            retry_output = await self._complete_structured_turn(retry_messages)
+            retry_output = await self._complete_structured_turn_with_parse_recovery(
+                retry_messages
+            )
         except TransientAPIBudgetExhaustedError as retry_exc:
             return blocked_provider_decision(retry_exc.reason_code, retry_exc.last_error)
         except Exception as retry_exc:
@@ -214,6 +224,29 @@ class RespondStyleLLMTurnProvider:
             context=retry_context,
             attempt_number=2,
         )
+
+    async def _complete_structured_turn_with_parse_recovery(
+        self,
+        messages: list[dict[str, str]],
+    ) -> LLMAgentTurnOutput:
+        """F21: one corrective attempt when the model returns invalid JSON
+        (e.g. truncation under load). Raises on the second failure."""
+        try:
+            return await self._complete_structured_turn(messages)
+        except ValueError:
+            self.retry_count += 1
+            corrective = [
+                *messages,
+                {
+                    "role": "system",
+                    "content": (
+                        "Your previous output was not valid JSON for the required "
+                        "schema. Return ONLY a complete, valid JSON object. Keep "
+                        "final_message short."
+                    ),
+                },
+            ]
+            return await self._complete_structured_turn(corrective)
 
     async def _complete_structured_turn(
         self,
@@ -554,6 +587,9 @@ def respond_style_system_prompt() -> str:
             "immediate next step, and ask for at most one detail at a time.",
             "If a workflow applies, propose a workflow event using an allowed binding.",
             "Do not invent prices, requirements, approval, availability, or policy.",
+            "Describe products using ONLY attributes present in catalog or tool",
+            "facts. Never add a brand, engine size, year, or spec that is not in",
+            "those facts.",
             "Every factual claim you state must carry source_refs in one of these",
             "exact forms: tool:<tool_name> (a succeeded tool_result from this turn),",
             "kb:<source_id> (a knowledge snippet shown to you),",
