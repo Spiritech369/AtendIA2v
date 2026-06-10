@@ -559,3 +559,42 @@ class _FakeCompletions:
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content=output))]
         )
+
+
+@pytest.mark.asyncio
+async def test_tool_request_turn_without_message_flows_to_final_response() -> None:
+    """Amended contract: turn 1 may be tool-only (no customer copy at all)."""
+    tool_call = _tool_call("requirements.lookup")
+    tool_only = FinalTurnDecision(
+        final_message=None,
+        send_decision="no_send",
+        validation=AgentTurnValidationResult(
+            status="valid",
+            accepted_tool_requests=[tool_call],
+            send_decision="no_send",
+        ),
+    )
+    provider = _FakeTurnProvider([
+        tool_only,
+        _valid_decision("You need an ID and proof of address.", []),
+    ])
+    executor = _FakeToolExecutor([
+        ToolExecutionResult(
+            tool_name="requirements.lookup",
+            status="succeeded",
+            facts={"requirements": ["ID", "proof of address"]},
+            citations=["requirements-source"],
+            source_refs=["requirements.lookup"],
+            is_required=True,
+            can_support_claims=True,
+        )
+    ])
+
+    decision = await RespondStyleToolLoop(provider=provider, executor=executor).run(
+        turn_input=_turn_input("what do I need?"),
+        context=_context(tool_schemas=[{"name": "requirements.lookup", "enabled": True}]),
+    )
+
+    assert decision.send_decision == "no_send"
+    assert decision.final_message == "You need an ID and proof of address."
+    assert executor.calls[0].tool_name == "requirements.lookup"

@@ -153,3 +153,86 @@ def test_contract_has_no_tenant_or_vertical_hardcode() -> None:
         re.search(rf"\b{re.escape(term)}\b", lowered)
         for term in forbidden_terms
     )
+
+
+def test_tool_request_turn_allows_null_final_message() -> None:
+    from atendia.agent_runtime import LLMToolCallProposal
+
+    output = LLMAgentTurnOutput(
+        turn_kind="tool_request",
+        final_message=None,
+        tool_requests=[
+            LLMToolCallProposal(
+                tool_name="requirements.lookup",
+                reason="Customer asked for the exact list.",
+            )
+        ],
+        confidence=0.8,
+    )
+
+    assert output.final_message is None
+    assert output.turn_kind == "tool_request"
+
+
+def test_tool_request_turn_rejects_customer_copy() -> None:
+    import pytest
+    from atendia.agent_runtime import LLMToolCallProposal
+
+    with pytest.raises(ValueError):
+        LLMAgentTurnOutput(
+            turn_kind="tool_request",
+            final_message="Let me check the documents you need.",
+            tool_requests=[
+                LLMToolCallProposal(
+                    tool_name="requirements.lookup",
+                    reason="Customer asked for the exact list.",
+                )
+            ],
+            confidence=0.8,
+        )
+
+
+def test_tool_request_turn_requires_at_least_one_tool() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        LLMAgentTurnOutput(
+            turn_kind="tool_request",
+            final_message=None,
+            confidence=0.8,
+        )
+
+
+def test_handoff_request_turn_requires_needed_proposal() -> None:
+    import pytest
+    from atendia.agent_runtime import LLMHandoffProposal
+
+    with pytest.raises(ValueError):
+        LLMAgentTurnOutput(
+            turn_kind="handoff_request",
+            final_message=None,
+            confidence=0.8,
+        )
+
+    output = LLMAgentTurnOutput(
+        turn_kind="handoff_request",
+        final_message=None,
+        handoff_proposal=LLMHandoffProposal(
+            needed=True,
+            reason="Human review is required.",
+            target="specialist",
+        ),
+        confidence=0.8,
+    )
+    assert output.turn_kind == "handoff_request"
+
+
+def test_final_response_still_requires_final_message() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        LLMAgentTurnOutput(
+            turn_kind="final_response",
+            final_message="   ",
+            confidence=0.8,
+        )

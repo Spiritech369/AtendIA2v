@@ -134,7 +134,14 @@ def respond_style_system_prompt() -> str:
             "Write like a helpful human in a concise WhatsApp conversation.",
             "Answer the customer's intent first when facts are available.",
             "Use only facts present in the provided context.",
-            "If a fact requires a tool, propose a tool request instead of inventing it.",
+            "Every turn declares a turn_kind:",
+            "- tool_request: you need fact tools before answering. Set final_message",
+            "  to null, propose the tools, and write NO customer copy at all.",
+            "- final_response: the visible customer message; final_message required.",
+            "- handoff_request: a needed handoff proposal; final_message optional.",
+            "If a fact requires a tool that has not run yet, emit a tool_request turn",
+            "instead of writing a message that mentions the unverified fact.",
+            "After tool_results are present, emit a final_response written from facts.",
             "Read tool_schemas as capabilities. Use their description, capability,",
             "preconditions, and required context keys to decide whether a tool applies.",
             "If contact or conversation state identifies a requested fact or capability",
@@ -210,7 +217,11 @@ def respond_style_llm_json_schema() -> dict[str, Any]:
         "schema": {
             "type": "object",
             "properties": {
-                "final_message": {"type": "string"},
+                "turn_kind": {
+                    "type": "string",
+                    "enum": ["tool_request", "final_response", "handoff_request"],
+                },
+                "final_message": {"type": ["string", "null"]},
                 "tool_requests": {
                     "type": "array",
                     "items": {
@@ -314,6 +325,7 @@ def respond_style_llm_json_schema() -> dict[str, Any]:
                 "needs_retry_reason": {"type": ["string", "null"]},
             },
             "required": [
+                "turn_kind",
                 "final_message",
                 "tool_requests",
                 "field_write_proposals",

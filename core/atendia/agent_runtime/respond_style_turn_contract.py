@@ -16,6 +16,7 @@ RuntimeMode = Literal[
 SendMode = Literal["no_send", "live_candidate", "live_limited"]
 ValidationStatus = Literal["valid", "invalid_retryable", "blocked"]
 FinalSendDecision = Literal["no_send", "send", "handoff"]
+TurnKind = Literal["tool_request", "final_response", "handoff_request"]
 
 
 def _not_blank(value: str, *, field_name: str) -> str:
@@ -80,6 +81,7 @@ class AgentContextPackage(BaseModel):
     workflow_trigger_schemas: list[JsonDict] = Field(default_factory=list)
     handoff_policy: JsonDict = Field(default_factory=dict)
     send_policy: JsonDict = Field(default_factory=dict)
+    hard_policies: list[JsonDict] = Field(default_factory=list)
     validator_feedback: list[JsonDict] = Field(default_factory=list)
 
 
@@ -174,11 +176,20 @@ class LLMClaim(BaseModel):
 
 
 class LLMAgentTurnOutput(BaseModel):
-    """LLM-authored turn proposal before AtendIA validation."""
+    """LLM-authored turn proposal before AtendIA validation.
+
+    Turn kinds:
+    - ``tool_request``: the LLM needs fact tools before answering. It must
+      propose at least one tool and must NOT contain customer copy.
+    - ``final_response``: visible customer copy; ``final_message`` required.
+    - ``handoff_request``: requires a needed handoff proposal; an optional
+      visible message may accompany it and is validated as customer copy.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    final_message: str
+    turn_kind: TurnKind = "final_response"
+    final_message: str | None = None
     tool_requests: list[LLMToolCallProposal] = Field(default_factory=list)
     field_write_proposals: list[LLMFieldUpdateProposal] = Field(default_factory=list)
     action_proposals: list[LLMActionProposal] = Field(default_factory=list)
@@ -188,10 +199,22 @@ class LLMAgentTurnOutput(BaseModel):
     confidence: float = Field(ge=0, le=1)
     needs_retry_reason: str | None = None
 
-    @field_validator("final_message")
-    @classmethod
-    def require_final_message(cls, value: str) -> str:
-        return _not_blank(value, field_name="final_message")
+    @model_validator(mode="after")
+    def validate_turn_kind_shape(self) -> Self:
+        message = (self.final_message or "").strip()
+        if self.turn_kind == "tool_request":
+            if message:
+                raise ValueError("tool_request turns must not contain customer copy")
+            if not self.tool_requests:
+                raise ValueError("tool_request turns require at least one tool request")
+            self.final_message = None
+        elif self.turn_kind == "handoff_request":
+            if self.handoff_proposal is None or not self.handoff_proposal.needed:
+                raise ValueError("handoff_request turns require a needed handoff proposal")
+            self.final_message = message or None
+        else:
+            self.final_message = _not_blank(message, field_name="final_message")
+        return self
 
 
 class ValidationErrorItem(BaseModel):
@@ -311,6 +334,7 @@ __all__ = [
     "LLMHandoffProposal",
     "LLMToolCallProposal",
     "LLMWorkflowEventProposal",
+    "TurnKind",
     "ValidationErrorItem",
 ]
 

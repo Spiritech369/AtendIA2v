@@ -285,3 +285,158 @@ def _codes(decision) -> set[str]:
     assert decision.validation is not None
     return {item.code for item in decision.validation.blocked_items}
 
+
+
+def test_validator_does_not_fact_gate_tool_request_turns() -> None:
+    from atendia.agent_runtime import LLMToolCallProposal
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            turn_kind="tool_request",
+            final_message=None,
+            tool_requests=[
+                LLMToolCallProposal(
+                    tool_name="requirements.lookup",
+                    reason="Customer asked which documents are required.",
+                )
+            ],
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            tool_schemas=[{"tool_name": "requirements.lookup", "enabled": True}],
+        ),
+    )
+
+    assert decision.validation is not None
+    assert decision.validation.status == "valid"
+    assert decision.send_decision == "no_send"
+    assert len(decision.validation.accepted_tool_requests) == 1
+
+
+def test_validator_blocks_unbound_tool_in_tool_request_turn() -> None:
+    from atendia.agent_runtime import LLMToolCallProposal
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            turn_kind="tool_request",
+            final_message=None,
+            tool_requests=[
+                LLMToolCallProposal(
+                    tool_name="requirements.lookup",
+                    reason="Customer asked which documents are required.",
+                )
+            ],
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            tool_schemas=[{"tool_name": "quote.resolve", "enabled": True}],
+        ),
+    )
+
+    assert "tool_not_bound" in _codes(decision)
+
+
+def test_validator_catches_spanish_price_phrasing() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Te sale en 85 mil pesos a la semana.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+    )
+
+    assert "missing_quote_tool" in _codes(decision)
+
+
+def test_validator_catches_spanish_requirements_word() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Los requisitos son identificacion y comprobante de domicilio.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+    )
+
+    assert "missing_requirements_tool" in _codes(decision)
+
+
+def test_validator_allows_price_supported_by_knowledge_source_claim() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="La limpieza dental cuesta 800 pesos.",
+            claims=[
+                LLMClaim(
+                    text="La limpieza dental cuesta 800 pesos.",
+                    basis="knowledge_source",
+                    source_refs=["kb-price-list"],
+                )
+            ],
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            knowledge_bindings=[{"source_id": "kb-price-list"}],
+        ),
+    )
+
+    assert decision.send_decision == "send"
+
+
+def test_validator_allows_benign_document_mention() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Recibi tus documentos, gracias. En cuanto los revisemos te confirmo.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+    )
+
+    assert decision.send_decision == "send"
+
+
+def test_tenant_hard_policies_replace_defaults() -> None:
+    context = AgentContextPackage(
+        hard_policies=[
+            {
+                "policy_id": "warranty_support",
+                "description": "warranty claims require the warranty tool",
+                "trigger_patterns": [r"\bgarant[ií]a\b"],
+                "requires_any": ["tool:warranty.lookup"],
+            }
+        ],
+    )
+
+    blocked = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="La garantia cubre un anio completo.",
+            confidence=0.8,
+        ),
+        context=context,
+    )
+    assert "hard_policy_unsupported:warranty_support" in _codes(blocked)
+
+    # Defaults no longer apply when tenant policies are present:
+    price_ok = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="El costo es de 500 pesos.",
+            confidence=0.8,
+        ),
+        context=context,
+    )
+    assert price_ok.send_decision == "send"
+
+
+def test_malformed_tenant_hard_policy_fails_closed() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Hola, claro que te ayudo.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            hard_policies=[{"policy_id": "broken", "trigger_patterns": "not-a-list"}],
+        ),
+    )
+
+    assert decision.send_decision == "no_send"
+    assert decision.validation is not None
+    assert decision.validation.status == "blocked"
+    assert "hard_policy_malformed" in _codes(decision)
