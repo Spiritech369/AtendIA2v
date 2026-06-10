@@ -702,3 +702,97 @@ async def test_f8_blocked_decisions_carry_validated_field_writes() -> None:
     assert [item.field_key for item in decision.accepted_field_writes] == [
         "selected_option"
     ]
+
+
+@pytest.mark.asyncio
+async def test_f14_message_with_unrun_tool_proposals_keeps_message() -> None:
+    """If the F5 retry produces a natural question but the model also
+    re-proposed the tool, the message survives and the proposals are
+    dropped instead of hard-blocking the turn."""
+    quote_call = LLMToolCallProposal(tool_name="quote.resolve", reason="needed")
+
+    class _SkippingExecutor:
+        def execute_tool(self, tool_call, context):
+            return ToolExecutionResult(
+                tool_name=tool_call.tool_name,
+                status="skipped",
+                error_code="missing_precondition:selected_option",
+                is_required=True,
+                can_support_claims=False,
+            )
+
+    provider = _FakeTurnProvider([
+        _decision(None, tool_requests=[quote_call]),
+        # Retry: natural question BUT the model insists on the tool too.
+        _decision("Que modelo te interesa?", tool_requests=[quote_call]),
+    ])
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=_SkippingExecutor(),
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    assert decision.final_message == "Que modelo te interesa?"
+    assert decision.validation is not None
+    assert decision.validation.status == "valid"
+    assert decision.validation.accepted_tool_requests == []
+    loop_trace = decision.trace_metadata["respond_style_tool_loop"]
+    assert loop_trace["dropped_tool_requests"] == ["quote.resolve"]
+
+
+@pytest.mark.asyncio
+async def test_f15_silent_handoff_gets_visible_ack_nudge() -> None:
+    from atendia.agent_runtime import LLMHandoffProposal
+
+    handoff = LLMHandoffProposal(needed=True, reason="customer asked", target="sales")
+    silent_handoff = FinalTurnDecision(
+        final_message=None,
+        send_decision="no_send",
+        validation=AgentTurnValidationResult(status="valid", send_decision="no_send"),
+        accepted_handoff=handoff,
+    )
+    provider = _FakeTurnProvider([
+        silent_handoff,
+        _decision("Te conecto con una persona del equipo."),
+    ])
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=_SequencedExecutor({}),
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    assert decision.final_message == "Te conecto con una persona del equipo."
+    # The handoff from the original decision is preserved.
+    assert decision.accepted_handoff is not None
+    assert decision.accepted_handoff.target == "sales"
+    # The nudge feedback reached the model.
+    assert any(
+        "handoff proposal was accepted" in str(item)
+        for item in provider.contexts[1].validator_feedback
+    )
+
+
+@pytest.mark.asyncio
+async def test_f15_handoff_stays_silent_if_nudge_fails() -> None:
+    from atendia.agent_runtime import LLMHandoffProposal
+
+    handoff = LLMHandoffProposal(needed=True, reason="customer asked", target="sales")
+    silent_handoff = FinalTurnDecision(
+        final_message=None,
+        send_decision="no_send",
+        validation=AgentTurnValidationResult(status="valid", send_decision="no_send"),
+        accepted_handoff=handoff,
+    )
+    provider = _FakeTurnProvider([silent_handoff, silent_handoff])
+
+    decision = await RespondStyleToolLoop(
+        provider=provider,
+        executor=_SequencedExecutor({}),
+        config=RespondStyleToolLoopConfig(max_tool_rounds=3),
+    ).run(turn_input=_turn_input(), context=_context())
+
+    # Still a valid silent handoff — never replaced by synthetic copy.
+    assert decision.final_message is None
+    assert decision.accepted_handoff is not None

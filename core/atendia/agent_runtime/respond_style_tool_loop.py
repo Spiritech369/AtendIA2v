@@ -188,12 +188,15 @@ class RespondStyleToolLoop:
                         context=_context_with_loop_feedback(
                             current_context,
                             f"The tool {required_failure.tool_name} could not run "
-                            f"({required_failure.error_code}). Do not request it "
-                            "again yet: write a final_response that naturally asks "
-                            "the customer for the missing detail.",
+                            f"({required_failure.error_code}). Do NOT include any "
+                            "tool_requests in your reply: write a final_response "
+                            "that naturally asks the customer for the missing "
+                            "detail.",
                         ),
                     )
-                    continue
+                    # F14: no more tool execution this turn — the reply is
+                    # either the natural question or it fails closed below.
+                    break
                 return _blocked_tool_decision(
                     required_failure,
                     all_tool_results,
@@ -218,16 +221,61 @@ class RespondStyleToolLoop:
                 ),
             )
 
+        # F15: a valid handoff without a visible message leaves the customer
+        # in silence at the exact moment they asked for a human. Nudge once
+        # for a short LLM-authored ack; keep the handoff either way.
+        if (
+            decision.final_message is None
+            and decision.accepted_handoff is not None
+            and decision.validation is not None
+            and decision.validation.status == "valid"
+        ):
+            handoff = decision.accepted_handoff
+            acked = await self._provider.generate(
+                turn_input=turn_input,
+                context=_context_with_loop_feedback(
+                    current_context,
+                    "Your handoff proposal was accepted. Write a short, warm "
+                    "final_response telling the customer you are connecting "
+                    "them with a teammate, and keep the handoff proposal.",
+                ),
+            )
+            if (
+                acked.final_message is not None
+                and acked.validation is not None
+                and acked.validation.status == "valid"
+            ):
+                if acked.accepted_handoff is None:
+                    acked = acked.model_copy(update={"accepted_handoff": handoff})
+                decision = acked
+
+        dropped_tool_requests: list[str] = []
         pending_required_tool = _pending_required_tool_request(
             decision, satisfied=all_tool_results
         )
         if pending_required_tool is not None:
-            return _blocked_pending_tool_decision(
-                pending_required_tool,
-                all_tool_results,
-                tool_rounds=rounds_executed,
-                field_writes=list(provisional_by_key.values()),
-            )
+            if decision.final_message is None:
+                return _blocked_pending_tool_decision(
+                    pending_required_tool,
+                    all_tool_results,
+                    tool_rounds=rounds_executed,
+                    field_writes=list(provisional_by_key.values()),
+                )
+            # F14: the model wrote a visible reply AND still proposed tools
+            # that did not run. Keep the message (fact claims stay gated by
+            # the hard policies) and drop the un-run proposals — the tool
+            # can run on the next turn once its preconditions are known.
+            dropped_tool_requests = [
+                tool_call.tool_name for tool_call in _accepted_tool_requests(decision)
+            ]
+            if decision.validation is not None:
+                decision = decision.model_copy(
+                    update={
+                        "validation": decision.validation.model_copy(
+                            update={"accepted_tool_requests": []}
+                        )
+                    }
+                )
         decision = _with_merged_field_writes(
             decision, list(provisional_by_key.values())
         )
@@ -255,6 +303,7 @@ class RespondStyleToolLoop:
             tool_results=all_tool_results,
             blocked_reason=None,
             provisional_field_keys=list(provisional_by_key.keys()),
+            dropped_tool_requests=dropped_tool_requests,
         )
 
     def _budget_block(
@@ -562,6 +611,7 @@ def _with_loop_trace(
     tool_results: list[ToolExecutionResult],
     blocked_reason: str | None,
     provisional_field_keys: list[str],
+    dropped_tool_requests: list[str] | None = None,
 ) -> FinalTurnDecision:
     return decision.model_copy(
         update={
@@ -573,6 +623,7 @@ def _with_loop_trace(
                     "tool_rounds": tool_rounds,
                     "blocked": blocked_reason,
                     "provisional_field_keys": provisional_field_keys,
+                    "dropped_tool_requests": dropped_tool_requests or [],
                     "tool_results": [item.model_dump(mode="json") for item in tool_results],
                     "side_effects": {
                         "delivery": False,

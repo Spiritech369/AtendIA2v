@@ -217,3 +217,64 @@ F10 delivered exactly what it targeted: catalog dead-ends 5→0, robot
 honesty fixed, corrections win, grounded model disambiguation by color.
 Remaining work is three contained loop/prompt adjustments (F14-F16), then
 another battery run. Still NO AgentService and NO smoke until >= 4.2.
+
+---
+
+# Round 4 — after F14/F15/F16 (2026-06-10)
+
+F14: a visible reply with un-run required tool proposals now KEEPS the
+message and drops the proposals (trace records `dropped_tool_requests`);
+the F5 retry no longer re-executes tools. F15: a valid-but-silent handoff
+gets ONE nudge for an LLM-authored visible ack (never synthetic copy; if
+the nudge fails the silent handoff stands). F16: workflow binding names
+rendered as exact-values-only; handoff instructions clarified
+(handoff_proposal, not workflow events, with a visible message).
+Suite: 179 passing (3 new tests; 1 legacy test updated to the amended
+F14 semantics), ruff clean.
+
+## Delta
+
+| Metric | R1 | R2 | R3 | R4 |
+|---|---|---|---|---|
+| Turns answered | 56/71 | 63/71 | 63/71 | **65/71** |
+| Silent handoffs | — | — | 1 | **0** |
+| Average human score | 2.7 | 3.0 | 3.65 | **3.95** |
+
+Highlights: conv02's chaotic FIRST message now gets a full useful answer
+(papeles + natural asks — F14 showcase, was silence in R1-R3); conv04
+"cuánto tendría que dar" now asks for the model naturally (4.5); conv07
+frustrated flow is now complete including honest robot answer + handoff
+offer (4.5); conv08 corrections perfect (4.5); conv10 handoff now has a
+warm visible ack ("Claro, te conectaré con un asesor humano...").
+
+Scores: c01 4.5, c02 3.5, c03 3.5, c04 4.5, c05 3.5, c06 3.0, c07 4.5,
+c08 4.5, c09 3.5, c10 4.0 → **3.95**.
+
+## Gate: still short — 3.95 < 4.2
+
+Safety intact: 0 invented facts, 0 leaks, 0 outbox, 0 side effects.
+6 remaining silences, with two roots:
+
+- **(a) model insists tool-only after the F5 retry** (conv03 "pero dime
+  los papeles primero", conv06 "cuánto me queda", conv09 "qué opciones
+  hay"): correct fail-closed, but gpt-4o-mini ignores the explicit "do NOT
+  include tool_requests" feedback under pressure.
+- **(b) hard-policy blocks on benign mentions** (conv05 t2, conv06 t8):
+  the model writes "requisitos"/price-adjacent words without the
+  supporting tool in that turn.
+- **F17 (trivial):** conv10 handoff target invalid once
+  (`handoff_target_not_allowed`) — render handoff targets as
+  exact-values-only like binding names.
+
+## Recommendation
+
+The structural machinery is done — every remaining failure is the small
+model ignoring explicit instructions under pressure. Two moves left,
+in order of leverage:
+
+1. **Run round 5 with a stronger model** (config change only:
+   `RespondStyleLLMTurnProviderConfig(model="gpt-4o")` — the provider is
+   already model-configurable). Expected to clear both remaining roots.
+2. F17 exact handoff targets (one render line).
+
+Still NO AgentService and NO smoke until >= 4.2.

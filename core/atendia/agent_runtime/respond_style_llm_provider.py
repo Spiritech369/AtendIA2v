@@ -255,19 +255,24 @@ def _render_capabilities_section(context: AgentContextPackage) -> str:
         lines.append(line)
     if context.workflow_trigger_schemas:
         lines.append("")
-        lines.append("## Workflow events you may propose")
+        lines.append(
+            "## Workflow events you may propose "
+            "(use ONLY these exact binding_name values; never invent one)"
+        )
         for schema in context.workflow_trigger_schemas:
             if isinstance(schema, dict):
                 lines.append(
-                    f"- {schema.get('binding_name')}: {schema.get('event_name')}"
+                    f"- binding_name={schema.get('binding_name')} "
+                    f"event_name={schema.get('event_name')}"
                 )
     handoff = context.handoff_policy
     if handoff.get("enabled"):
         targets = ", ".join(str(t) for t in handoff.get("targets") or []) or "team"
         lines.append("")
         lines.append(
-            f"## Handoff: available to {targets}. Propose it whenever the "
-            "customer asks for a human."
+            f"## Handoff: available to {targets}. When the customer asks for a "
+            "human, use handoff_proposal (NOT a workflow event) and include a "
+            "short visible message telling them you are connecting them."
         )
     return "\n".join(lines)
 

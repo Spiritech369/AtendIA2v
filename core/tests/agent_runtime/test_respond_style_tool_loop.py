@@ -214,10 +214,15 @@ async def test_required_tool_request_after_tool_round_blocks() -> None:
         ),
     )
 
-    assert decision.final_message is None
+    # F14 (round-4 amendment): a visible reply with un-run required tool
+    # proposals keeps the message; the proposals are dropped instead of
+    # silencing the customer. Fact claims remain gated by hard policies.
+    assert decision.final_message == "I need another lookup."
     assert decision.validation is not None
-    assert decision.validation.status == "blocked"
-    assert decision.validation.blocked_reason == "tool_round_limit_reached"
+    assert decision.validation.status == "valid"
+    assert decision.validation.accepted_tool_requests == []
+    loop_trace = decision.trace_metadata["respond_style_tool_loop"]
+    assert loop_trace["dropped_tool_requests"] == ["quote.resolve"]
 
 
 @pytest.mark.asyncio
