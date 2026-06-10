@@ -1,0 +1,75 @@
+{
+  "decision": "RESPOND_STYLE_CONTRACT_VALIDATOR_AMENDED_VERIFIED_NO_SEND",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "model_scenario_amended_flow_verified": true,
+  "all_scenarios_no_send": true,
+  "results": [
+    {
+      "turn1_kind": "tool_request",
+      "turn1_is_tool_request": true,
+      "turn1_has_no_visible_message": true,
+      "turn1_tool_requests": [
+        "requirements.lookup"
+      ],
+      "tool_executed": [
+        "requirements.lookup"
+      ],
+      "tool_result_returned_to_turn2": true,
+      "turn2_kind": "final_response",
+      "turn2_is_final_response": true,
+      "final_validation_status": "valid",
+      "final_message": "For the metro option, you'll need the following requirements: valid identification, proof of address, and recent proof of income when applicable.",
+      "send_decision": "no_send",
+      "llm_turns_total": 2,
+      "scenario": "model",
+      "inbound_text": "metro"
+    },
+    {
+      "turn1_kind": "tool_request",
+      "turn1_is_tool_request": true,
+      "turn1_has_no_visible_message": true,
+      "turn1_tool_requests": [
+        "requirements.lookup"
+      ],
+      "tool_executed": [
+        "requirements.lookup"
+      ],
+      "tool_result_returned_to_turn2": true,
+      "turn2_kind": "final_response",
+      "turn2_is_final_response": true,
+      "final_validation_status": "valid",
+      "final_message": "Para la opción estándar, necesitas: \n1. Identificación válida \n2. Comprobante de domicilio \n3. Comprobante de ingresos reciente, si aplica.",
+      "send_decision": "no_send",
+      "llm_turns_total": 2,
+      "scenario": "requirements_generic",
+      "inbound_text": "que ocupo"
+    },
+    {
+      "turn1_kind": "tool_request",
+      "turn1_is_tool_request": true,
+      "turn1_has_no_visible_message": true,
+      "turn1_tool_requests": [
+        "quote.resolve"
+      ],
+      "tool_executed": [
+        "quote.resolve"
+      ],
+      "tool_result_returned_to_turn2": true,
+      "turn2_kind": "final_response",
+      "turn2_is_final_response": true,
+      "final_validation_status": "valid",
+      "final_message": "El costo de la opción estándar es de 120 USD.",
+      "send_decision": "no_send",
+      "llm_turns_total": 2,
+      "scenario": "price_direct",
+      "inbound_text": "cuanto cuesta"
+    }
+  ],
+  "side_effects": {
+    "outbox": false,
+    "workflows": false,
+    "actions": false,
+    "delivery": false
+  }
+}
