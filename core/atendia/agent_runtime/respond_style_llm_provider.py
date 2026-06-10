@@ -170,16 +170,190 @@ def build_respond_style_messages(
     context: AgentContextPackage,
     retry_instruction: AgentTurnRetryInstruction | None = None,
 ) -> list[dict[str, str]]:
-    payload = {
-        "turn_input": turn_input.model_dump(mode="json"),
-        "agent_context": context.model_dump(mode="json"),
-    }
-    if retry_instruction is not None:
-        payload["validator_feedback"] = retry_instruction.model_dump(mode="json")
-    return [
-        {"role": "system", "content": respond_style_system_prompt()},
-        {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)},
+    """Structured prompt rendering (F10).
+
+    Instead of one JSON blob, the model receives: a system message with the
+    platform contract + the tenant's agent configuration + capabilities, the
+    recent transcript as REAL chat turns, a system message with the current
+    dynamic context (state, knowledge, tool results, feedback), and the
+    inbound text as the final user message.
+    """
+    system_content = "\n".join(
+        [
+            respond_style_system_prompt(),
+            "",
+            _render_agent_section(context),
+            _render_capabilities_section(context),
+            _render_fields_section(context),
+        ]
+    )
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
+    messages.extend(_transcript_messages(turn_input))
+    dynamic = _render_dynamic_context(
+        turn_input=turn_input,
+        context=context,
+        retry_instruction=retry_instruction,
+    )
+    if dynamic:
+        messages.append({"role": "system", "content": dynamic})
+    messages.append({"role": "user", "content": turn_input.inbound_text})
+    return messages
+
+
+def _transcript_messages(turn_input: AgentTurnInput) -> list[dict[str, str]]:
+    rendered: list[dict[str, str]] = []
+    for item in turn_input.recent_messages:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        role = str(item.get("role") or "")
+        if role == "customer":
+            rendered.append({"role": "user", "content": text})
+        elif role == "assistant":
+            rendered.append({"role": "assistant", "content": text})
+    return rendered
+
+
+def _render_agent_section(context: AgentContextPackage) -> str:
+    identity = context.agent_identity
+    lines = ["## Agent configuration"]
+    for label, key in (
+        ("Name", "name"),
+        ("Persona", "persona"),
+        ("Language", "language"),
+        ("Tone", "tone"),
+    ):
+        value = identity.get(key)
+        if value:
+            lines.append(f"{label}: {value}")
+    if context.instructions:
+        lines.append(f"Instructions: {context.instructions}")
+    goals = identity.get("goals") or []
+    if goals:
+        lines.append("Goals: " + "; ".join(str(item) for item in goals))
+    do_not_do = identity.get("do_not_do") or []
+    if do_not_do:
+        lines.append("Never do: " + "; ".join(str(item) for item in do_not_do))
+    return "\n".join(lines)
+
+
+def _render_capabilities_section(context: AgentContextPackage) -> str:
+    lines = ["", "## Tools (capabilities — facts only, never customer copy)"]
+    if not context.tool_schemas:
+        lines.append("(none configured)")
+    for schema in context.tool_schemas:
+        if not isinstance(schema, dict):
+            continue
+        name = schema.get("tool_name") or schema.get("name")
+        description = schema.get("description") or ""
+        preconditions = schema.get("preconditions") or []
+        line = f"- {name}: {description}"
+        if preconditions:
+            line += f" (preconditions: {', '.join(str(p) for p in preconditions)})"
+        lines.append(line)
+    if context.workflow_trigger_schemas:
+        lines.append("")
+        lines.append("## Workflow events you may propose")
+        for schema in context.workflow_trigger_schemas:
+            if isinstance(schema, dict):
+                lines.append(
+                    f"- {schema.get('binding_name')}: {schema.get('event_name')}"
+                )
+    handoff = context.handoff_policy
+    if handoff.get("enabled"):
+        targets = ", ".join(str(t) for t in handoff.get("targets") or []) or "team"
+        lines.append("")
+        lines.append(
+            f"## Handoff: available to {targets}. Propose it whenever the "
+            "customer asks for a human."
+        )
+    return "\n".join(lines)
+
+
+def _render_fields_section(context: AgentContextPackage) -> str:
+    if not context.field_policies:
+        return ""
+    lines = [
+        "",
+        "## Contact fields (opportunistic capture only — never an agenda)",
     ]
+    for policy in context.field_policies:
+        if not isinstance(policy, dict):
+            continue
+        key = policy.get("field_key")
+        label = policy.get("label") or key
+        writable = "writable" if policy.get("writable", True) else "read-only"
+        lines.append(f"- {key} ({label}, {writable})")
+    return "\n".join(lines)
+
+
+def _render_dynamic_context(
+    *,
+    turn_input: AgentTurnInput,
+    context: AgentContextPackage,
+    retry_instruction: AgentTurnRetryInstruction | None,
+) -> str:
+    sections: list[str] = []
+    identity = context.agent_identity
+    known = identity.get("contact_state") or {}
+    if known:
+        sections.append(
+            "## Known contact values (do NOT ask for these again)\n"
+            + "\n".join(f"- {key}: {value}" for key, value in known.items())
+        )
+    missing = identity.get("missing_fields") or []
+    if missing:
+        sections.append(
+            "## Not yet known (capture opportunistically, never as a form): "
+            + ", ".join(str(item) for item in missing)
+        )
+    if context.retrieved_context:
+        kb_lines = ["## Knowledge (citable with source_id)"]
+        for snippet in context.retrieved_context:
+            if isinstance(snippet, dict):
+                kb_lines.append(
+                    f"- [{snippet.get('source_id')}] {snippet.get('excerpt')}"
+                )
+        sections.append("\n".join(kb_lines))
+    if context.tool_results:
+        tool_lines = [
+            "## Tool results from THIS turn (verified facts — write your "
+            "final_response from these; do not request these tools again)"
+        ]
+        for result in context.tool_results:
+            if isinstance(result, dict):
+                tool_lines.append(
+                    f"- {result.get('tool_name')} [{result.get('status')}]: "
+                    + json.dumps(result.get("facts") or {}, ensure_ascii=False)
+                )
+        sections.append("\n".join(tool_lines))
+    feedback_items = list(context.validator_feedback)
+    if retry_instruction is not None:
+        feedback_items.append(
+            {
+                "feedback_for_llm": retry_instruction.feedback_for_llm,
+                "errors": [
+                    item.model_dump(mode="json")
+                    for item in retry_instruction.error_items
+                ],
+            }
+        )
+    if feedback_items:
+        feedback_lines = ["## IMPORTANT FEEDBACK — follow this before anything else"]
+        for item in feedback_items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("feedback_for_llm"):
+                feedback_lines.append(f"- {item['feedback_for_llm']}")
+            for error in item.get("errors") or []:
+                if isinstance(error, dict) and error.get("code"):
+                    feedback_lines.append(
+                        f"  (error {error['code']}: {error.get('message', '')})"
+                    )
+        sections.append("\n".join(feedback_lines))
+    return "\n\n".join(sections)
 
 
 def respond_style_system_prompt() -> str:

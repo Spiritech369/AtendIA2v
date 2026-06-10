@@ -104,7 +104,9 @@ async def test_price_without_quote_tool_result_stays_no_send_after_provider_retr
     assert decision.send_decision == "no_send"
     assert decision.validation is not None
     assert decision.validation.status == "valid"
-    assert "missing_quote_tool" in provider.last_messages[-1]["content"]
+    assert "missing_quote_tool" in " ".join(
+        m["content"] for m in provider.last_messages
+    )
     assert executor.calls == []
 
 
@@ -126,7 +128,9 @@ async def test_requirements_without_requirements_tool_result_stays_no_send_after
     assert decision.send_decision == "no_send"
     assert decision.validation is not None
     assert decision.validation.status == "valid"
-    assert "missing_requirements_tool" in provider.last_messages[-1]["content"]
+    assert "missing_requirements_tool" in " ".join(
+        m["content"] for m in provider.last_messages
+    )
     assert executor.calls == []
 
 

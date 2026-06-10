@@ -68,7 +68,7 @@ async def test_provider_price_without_quote_produces_retry_instruction() -> None
     assert decision.send_decision == "no_send"
     assert decision.validation is not None
     assert decision.validation.status == "valid"
-    retry_payload = provider.last_messages[-1]["content"]
+    retry_payload = " ".join(m["content"] for m in provider.last_messages)
     assert "missing_quote_tool" in retry_payload
 
 
@@ -88,7 +88,9 @@ async def test_provider_requirements_without_tool_produces_retry_instruction() -
 
     assert decision.validation is not None
     assert decision.validation.status == "valid"
-    assert "missing_requirements_tool" in provider.last_messages[-1]["content"]
+    assert "missing_requirements_tool" in " ".join(
+        m["content"] for m in provider.last_messages
+    )
 
 
 @pytest.mark.asyncio

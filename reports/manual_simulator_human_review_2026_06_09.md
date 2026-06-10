@@ -156,3 +156,64 @@ small model. Next iteration is F10 (structured prompt rendering in
 RespondStyleLLMTurnProvider) — a contained provider change, not new
 architecture — then re-run this same battery. No AgentService, no smoke
 until this gate passes.
+
+---
+
+# Round 3 — after F10 structured prompt rendering (2026-06-10)
+
+F10 applied: `build_respond_style_messages` now renders a structured system
+prompt (platform contract + agent config + capabilities + field policy
+sections), the transcript as REAL chat turns, a dynamic-context system
+message (known values "do NOT ask again", missing fields, KB with source
+ids, THIS-turn tool results, prominent feedback with error codes), and the
+inbound as the final user message — replacing the single JSON blob.
+Suite: 176 passing, ruff clean. Same 10 conversations re-run.
+
+## Delta
+
+| Metric | R1 | R2 | R3 |
+|---|---|---|---|
+| Turns answered | 56/71 | 63/71 | **63/71** |
+| Catalog dead-ends (F10) | — | 5 | **0** |
+| Average human score | 2.7 | 3.0 | **3.65** |
+
+Scores R2→R3: c01 4.0→**4.5** (every question gets the RIGHT answer:
+papeles→requirements, enganche→exact quote; DNM2.5 grounded in catalog
+colors), c02 3.5→3.0, c03 2.5→3.5, c04 3.5→3.5, c05 3.0→3.5 (SAT→20%
+correctly, Metro captured, exact quote), c06 2.5→3.5 ("cuánto me queda"
+now ASKS for the model naturally), c07 2.5→**3.5** ("eres robot?" →
+"Sí, soy un asistente digital... ¿te paso con un asesor humano?" — F12
+FIXED), c08 2.0→**4.0** (BOTH corrections now win, including
+"realmente por transferencia" — F13 FIXED), c09 2.0→**4.5** ("la roja del
+anuncio" matched against catalog colors offering both red models — F10
+showcase), c10 4.0→3.0 (regression at the handoff moment, see F15/F16).
+
+## Gate: still short — 3.65 < 4.2 (but the trend is 2.7 → 3.0 → 3.65)
+
+Safety intact in round 3: 0 invented facts, 0 leaks, 0 outbox, 0 side
+effects; hard policies blocked 4 unsupported claims correctly.
+
+Remaining defects (narrow, specific):
+
+- **F14:** when a required tool skips on missing_precondition, the F5
+  retry fires but the model sometimes RE-proposes the same tool →
+  hard block (conv02 t2, conv04 t7). Fix: on the F5 retry, ignore/strip
+  new tool proposals — force a final_response that asks for the missing
+  detail.
+- **F15:** `handoff_request` turns may carry no visible message (valid by
+  contract) → the customer asking "me puedes pasar con alguien?" gets
+  structured handoff but SILENCE (conv10 t8). Fix: when handoff is
+  accepted without a message, nudge once for a short visible ack
+  (config declares customer_message_authored_by_llm).
+- **F16:** model proposed a workflow event with an invented binding name →
+  retryable block consumed the turn (conv10 t7). Binding names are now
+  rendered; reinforce "only these exact binding names".
+- Handoff offered as deflection 3× in conv02 instead of helping with
+  catalog options; occasional verbatim repeat (conv05 final turn).
+
+## Conclusion
+
+F10 delivered exactly what it targeted: catalog dead-ends 5→0, robot
+honesty fixed, corrections win, grounded model disambiguation by color.
+Remaining work is three contained loop/prompt adjustments (F14-F16), then
+another battery run. Still NO AgentService and NO smoke until >= 4.2.
