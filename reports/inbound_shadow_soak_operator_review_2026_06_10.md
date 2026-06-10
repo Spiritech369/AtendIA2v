@@ -4,7 +4,7 @@ Date: 2026-06-10
 Decision: `PHASE_16_INBOUND_SHADOW_SOAK_AND_OPERATOR_REVIEW_READY`
 Harness: `tools/run_inbound_shadow_soak_2026_06_10.py` →
 `reports/inbound_shadow_soak_result_2026_06_10.json`
-Suite: 215 tests passing, ruff clean.
+Suite: 213 tests passing, ruff clean.
 
 ## What Phase 16 changed
 

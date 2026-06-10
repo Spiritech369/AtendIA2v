@@ -518,7 +518,7 @@ Status: `PHASE_16_INBOUND_SHADOW_SOAK_AND_OPERATOR_REVIEW_READY`
   delta 0, 4 shadow-field rows persisted. Operator review produced; main
   watch-item: copy/state divergence on corrections (state right, words
   stale) — prompt iteration item for the real soak.
-- Suite 215 tests, ruff clean.
+- Suite 213 tests, ruff clean.
 
 Path to controlled smoke: flip the two flags on the pilot deployment for
 a real-traffic shadow window, review with the Phase 16 format, then the
