@@ -400,6 +400,15 @@ def _claim_errors(
     for index, claim in enumerate(claims):
         if claim.basis in {"tool_result", "knowledge_source", "agent_policy"}:
             if not claim.source_refs:
+                # F24: an agent_policy claim with no refs is treated as a
+                # procedural self-statement (questions, next steps, process)
+                # and is ignored rather than blocking a customer-safe
+                # message. Factual safety is unaffected: tool_result and
+                # knowledge_source claims keep strict refs, and the hard
+                # policies still scan message AND claim text for
+                # price/requirements support regardless of declarations.
+                if claim.basis == "agent_policy":
+                    continue
                 errors.append(
                     _error(
                         "claim_missing_source_ref",

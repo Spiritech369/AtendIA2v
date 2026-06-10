@@ -98,8 +98,12 @@
     },
     {
       "policy_id": "requirements_require_support",
-      "description": "listas de requisitos/papeles requieren tool o fuente citada",
-      "trigger_patterns": ["\\b(?:requisitos?|papeles)\\b"],
+      "description": "listas o aserciones de requisitos/papeles requieren tool o fuente citada; mencionar la palabra sin listar no dispara",
+      "trigger_patterns": [
+        "\\b(?:requisitos?|papeles|documentos?)\\b[^.?!]*\\b(?:son|incluyen)\\b",
+        "(?:requisitos?|papeles|documentos?)\\s*:",
+        "\\b(?:identificaci[oó]n oficial|comprobante de domicilio|comprobante de ingresos|estados? de cuenta|recibos? de n[oó]mina)\\b"
+      ],
       "requires_any": ["tool:requirements.lookup", "basis:knowledge_source"]
     }
   ],

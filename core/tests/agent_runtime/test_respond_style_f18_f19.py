@@ -360,3 +360,97 @@ async def test_f23_blocked_decisions_carry_raw_output_excerpt() -> None:
         "blocked_raw_output"
     )
     assert raw is not None and "trace" in raw
+
+
+# --- F24 ---------------------------------------------------------------------
+
+
+def test_f24_procedural_agent_policy_claims_without_refs_do_not_block() -> None:
+    """Exact regression of the r8o c07-t3 false positive: a good procedural
+    message blocked because its process statements were declared as
+    agent_policy claims with empty refs."""
+    output = LLMAgentTurnOutput(
+        final_message=(
+            "Sí, claro. Para avanzar con el crédito, necesito saber cómo "
+            "recibes tus ingresos. ¿Podrías compartir esa información?"
+        ),
+        claims=[
+            LLMClaim(
+                text="Para avanzar con el crédito, necesito saber cómo recibes tus ingresos.",
+                basis="agent_policy",
+                source_refs=[],
+            ),
+            LLMClaim(
+                text="Esto me ayudará a darte la lista exacta de documentos.",
+                basis="agent_policy",
+                source_refs=[],
+            ),
+        ],
+        confidence=0.8,
+    )
+
+    decision = RespondStyleTurnValidator().validate(
+        output=output, context=AgentContextPackage()
+    )
+
+    assert decision.send_decision == "send"
+    assert decision.validation is not None
+    assert decision.validation.status == "valid"
+
+
+def test_f24_agent_policy_claims_with_refs_still_validated() -> None:
+    decision = RespondStyleTurnValidator().validate(
+        output=_output_with_claim(
+            "Our policy applies here.", "agent_policy", ["kb:made-up-source"]
+        ),
+        context=_context_with_sources(),
+    )
+    assert decision.send_decision == "no_send"
+    codes = {item.code for item in decision.validation.blocked_items}
+    assert "claim_source_ref_not_available" in codes
+
+
+def test_f24_does_not_relax_price_requirements_or_leak_blocks() -> None:
+    validator = RespondStyleTurnValidator()
+
+    price = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="El precio es de 32,500 pesos.",
+            claims=[
+                LLMClaim(text="precio 32,500 pesos", basis="agent_policy", source_refs=[])
+            ],
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+        attempt_number=2,
+    )
+    assert price.send_decision == "no_send"
+    assert "missing_quote_tool" in price.validation.blocked_reason
+
+    requirements = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="Los requisitos son INE y comprobante.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+        attempt_number=2,
+    )
+    assert requirements.send_decision == "no_send"
+    assert "missing_requirements_tool" in requirements.validation.blocked_reason
+
+    leak = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="I checked the trace and the workflow.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(),
+        attempt_number=2,
+    )
+    assert leak.send_decision == "no_send"
+    assert "internal_text_visible" in leak.validation.blocked_reason
+
+
+def test_f24_prompt_scopes_claims_to_factual_assertions() -> None:
+    prompt = respond_style_system_prompt()
+    assert "Do not create claims for questions, procedural guidance" in prompt
+    assert "factual assertions requiring support" in prompt

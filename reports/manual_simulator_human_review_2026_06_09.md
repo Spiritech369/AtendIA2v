@@ -387,3 +387,31 @@ carried forward as preconditions to AgentService integration:
    never dead air (already designed; must be in the AgentService phase).
 
 Next phase unlocked: AgentService integration no-send.
+
+---
+
+# F24 — Claims scope fix (2026-06-10)
+
+Status: `RESPOND_STYLE_CLAIMS_SCOPE_FIX_READY`
+
+- Prompt: claims are ONLY for factual assertions requiring support — never
+  for questions, procedural guidance, transitions, acknowledgements, or
+  next-step prompts.
+- Validator: an `agent_policy` claim with EMPTY source_refs is treated as a
+  procedural self-statement and ignored (never blocks a customer-safe
+  message). agent_policy claims WITH refs are still ref-validated;
+  tool_result/knowledge_source claims unchanged; hard policies unchanged
+  (price/requirements/leak blocks verified intact by test).
+- Tenant config refinement surfaced by the F23-diagnosed regression run:
+  the requirements hard-policy trigger fired on META-references ("para
+  verificar los requisitos exactos necesito...") blocking two GOOD
+  messages. Trigger refined to assertion shapes only (requisitos+son/:,
+  concrete document names); verified: meta-reference passes, unsupported
+  concrete list still blocks, KB-cited general list passes.
+- Unit replay of the exact r8o false-positive output now validates `send`.
+- Real-model regression (gpt-4o): conv07 **7/7 zero blocks** — including
+  the exact formerly-blocked turn, now delivered verbatim-equivalent
+  ("Sí, claro. Para avanzar con el crédito, ¿me puedes contar cómo recibes
+  tus ingresos?...") — and conv03 6/6 zero blocks.
+- Suite: 198 tests passing, ruff clean. No outbox, no side effects, no
+  live.
