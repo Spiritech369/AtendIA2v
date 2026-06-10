@@ -435,3 +435,28 @@ Evidence: `reports/respond_style_phase_13_publish_shadow_parity_2026_06_09.md`.
 Path to live from here: shadow-soak on a pilot deployment, human review of
 shadow candidates, then controlled live-candidate smoke gated by parity +
 publish gates + rollback packet.
+
+## Manual Live Simulator (2026-06-09)
+
+Status: `MANUAL_LIVE_SIMULATOR_READY`
+
+- `core/atendia/agent_runtime/respond_style_manual_simulator.py`:
+  command-driven operator harness over LiveSimulatedChannel /
+  ProductAgentRuntime (direct route). Commands: /exit /trace /state /save
+  /reset. Per-turn display: inbound, simulated final message, send
+  decision, tools + results, field proposals, simulated state, workflow
+  proposals, handoff, validator result, no_send reason. /save writes
+  reports/manual_live_simulator_run_<label>.{json,md} via an injected
+  writer (in-memory in tests).
+- Runner `tools/run_manual_live_simulator_2026_06_09.py`: interactive
+  terminal chat or `--script "msg||/cmd||..."`; three generic tenant
+  configs (sales/scheduling/support) or `--config <json>` with a
+  ProductAgentPublishedConfig; real OpenAI provider + DryFacts executor,
+  3-round budgeted loop; auto-saves evidence on /exit.
+- Verified with real OpenAI scripted run: greeting, requirements via tool
+  with quoted-evidence field capture, price via quote.resolve using the
+  simulated selected_option, /state and /trace live, reports saved with
+  outbox=0 and side_effects=0.
+- 7 unit tests (multi-turn transcript, in-memory state, blocked turns show
+  structured reason without fallback copy, all commands, legacy-import and
+  vertical-hardcode audits for module + runner). Suite total: 173.

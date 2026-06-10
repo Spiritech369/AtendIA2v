@@ -126,6 +126,9 @@ _LAZY_EXPORTS = {
     "TestLabScenario": "atendia.agent_runtime.respond_style_test_lab_direct",
     "TestLabScenarioResult": "atendia.agent_runtime.respond_style_test_lab_direct",
     "TestLabTurnEvidence": "atendia.agent_runtime.respond_style_test_lab_direct",
+    "COMMANDS_HELP": "atendia.agent_runtime.respond_style_manual_simulator",
+    "ManualLiveSimulator": "atendia.agent_runtime.respond_style_manual_simulator",
+    "SimulatorOutput": "atendia.agent_runtime.respond_style_manual_simulator",
     "LiveSimulatedChannel": "atendia.agent_runtime.respond_style_live_simulated_channel",
     "SimulatedChannelSummary": (
         "atendia.agent_runtime.respond_style_live_simulated_channel"
@@ -188,6 +191,7 @@ _LAZY_EXPORTS = {
 
 __all__ = [
     "AGENT_WORKFLOW_EVENT_TYPES",
+    "COMMANDS_HELP",
     "ActionDefinition",
     "ActionRegistry",
     "ActionRequest",
@@ -244,6 +248,7 @@ __all__ = [
     "MandatoryToolApplyResult",
     "MandatoryToolEvaluation",
     "MandatoryToolGuard",
+    "ManualLiveSimulator",
     "MockAgentProvider",
     "MockSemanticInterpreterProvider",
     "NoopToolLayer",
@@ -287,6 +292,7 @@ __all__ = [
     "ShadowComparison",
     "ShadowRunResult",
     "SimulatedTurnRecord",
+    "SimulatorOutput",
     "StateWriteResult",
     "StructuredRuntimeComposer",
     "TenantDomainContract",

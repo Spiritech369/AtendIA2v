@@ -1,0 +1,379 @@
+{
+  "decision_context": "MANUAL_LIVE_SIMULATOR_NO_SEND",
+  "run_label": "2026_06_09_2318",
+  "agent": {
+    "tenant_id": "generic-sales-tenant",
+    "agent_id": "generic-sales-agent",
+    "agent_version_id": "v1"
+  },
+  "mode": "no_send",
+  "turns": [
+    {
+      "turn_number": 1,
+      "inbound_text": "hola",
+      "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 2,
+      "inbound_text": "me interesa la opcion estandar, que necesito?",
+      "final_message_candidate": "Para la opción estándar, necesitas: \n- identificación válida \n- comprobante de domicilio \n- comprobante de ingresos reciente, si aplica.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "selected_option",
+            "value": "estándar",
+            "evidence": [
+              "El cliente dijo: 'me interesa la opcion estandar'"
+            ],
+            "confidence": 1.0,
+            "reason": "El cliente ha expresado interés en la opción estándar."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded",
+          "facts": {
+            "requirements": [
+              "valid identification",
+              "proof of address",
+              "recent proof of income when applicable"
+            ],
+            "selected_option": "estándar"
+          },
+          "citations": [
+            "requirements.lookup-dry-source"
+          ],
+          "source_refs": [
+            "requirements.lookup"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "selected_option",
+          "value": "estándar",
+          "evidence": [
+            "El cliente dijo: 'me interesa la opcion estandar'"
+          ],
+          "confidence": 1.0,
+          "reason": "El cliente ha expresado interés en la opción estándar."
+        }
+      ],
+      "simulated_field_writes": {
+        "selected_option": "estándar"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [
+            "selected_option"
+          ],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded",
+              "facts": {
+                "requirements": [
+                  "valid identification",
+                  "proof of address",
+                  "recent proof of income when applicable"
+                ],
+                "selected_option": "estándar"
+              },
+              "citations": [
+                "requirements.lookup-dry-source"
+              ],
+              "source_refs": [
+                "requirements.lookup"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 3,
+      "inbound_text": "cuanto cuesta?",
+      "final_message_candidate": "La opción estándar cuesta $120 al mes.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded",
+          "facts": {
+            "price": 120,
+            "currency": "USD",
+            "billing": "monthly",
+            "selected_option": "estándar"
+          },
+          "citations": [
+            "quote.resolve-dry-source"
+          ],
+          "source_refs": [
+            "quote.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "tool_results": [
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded",
+              "facts": {
+                "price": 120,
+                "currency": "USD",
+                "billing": "monthly",
+                "selected_option": "estándar"
+              },
+              "citations": [
+                "quote.resolve-dry-source"
+              ],
+              "source_refs": [
+                "quote.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "role": "customer",
+      "text": "hola",
+      "timestamp": null,
+      "message_id": "in-1",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "¡Hola! ¿En qué puedo ayudarte hoy?",
+      "timestamp": null,
+      "message_id": "sim-out-1",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "me interesa la opcion estandar, que necesito?",
+      "timestamp": null,
+      "message_id": "in-2",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Para la opción estándar, necesitas: \n- identificación válida \n- comprobante de domicilio \n- comprobante de ingresos reciente, si aplica.",
+      "timestamp": null,
+      "message_id": "sim-out-2",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "cuanto cuesta?",
+      "timestamp": null,
+      "message_id": "in-3",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "La opción estándar cuesta $120 al mes.",
+      "timestamp": null,
+      "message_id": "sim-out-3",
+      "attachments": []
+    }
+  ],
+  "simulated_fields_final": {
+    "selected_option": "estándar"
+  },
+  "failures": [],
+  "summary": {
+    "conversation_id": "manual-sim-0",
+    "turns": 3,
+    "simulated_outbound_count": 3,
+    "blocked_turns": 0,
+    "outbound_outbox_writes": 0,
+    "side_effects": {
+      "delivery": false,
+      "workflows": false,
+      "actions": false,
+      "field_writes": false
+    }
+  }
+}
