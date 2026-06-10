@@ -62,6 +62,7 @@ services:
       ATENDIA_V2_BAILEYS_INTERNAL_TOKEN: ${BAILEYS_INTERNAL_TOKEN:-dev-only-baileys-token-change-me}
     volumes:
       - ./core:/app        # hot-reload: cambios en código se reflejan al instante
+      - ./docs/tenant_sources:/app/docs/tenant_sources:ro
       - /app/.venv         # el .venv del contenedor no es sobreescrito por el volumen
     depends_on:
       postgres-v2:
@@ -88,6 +89,7 @@ services:
       ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
     volumes:
       - ./core:/app
+      - ./docs/tenant_sources:/app/docs/tenant_sources:ro
       - /app/.venv
     depends_on:
       postgres-v2:
@@ -109,6 +111,7 @@ services:
       ATENDIA_V2_REDIS_URL: redis://redis-v2:6379/0
     volumes:
       - ./core:/app
+      - ./docs/tenant_sources:/app/docs/tenant_sources:ro
       - /app/.venv
     depends_on:
       postgres-v2:

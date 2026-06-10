@@ -12,6 +12,7 @@ from atendia.agent_runtime import (
 )
 from atendia.agent_runtime.canonical import CanonicalProductReference
 from atendia.agent_runtime.schemas import (
+    ActiveAgentContext,
     ConversationMemoryContext,
     TenantRuntimeConfigContext,
     TurnContext,
@@ -39,6 +40,7 @@ def _context(
     inbound_text: str = "Me interesa ese dato",
     memory: ConversationMemoryContext | None = None,
     safe_mode: bool = False,
+    active_agent: ActiveAgentContext | None = None,
 ) -> TurnContext:
     if raw is None:
         config = TenantRuntimeConfigContext(safe_mode=safe_mode)
@@ -54,6 +56,7 @@ def _context(
         inbound_text=inbound_text,
         tenant_config=config,
         memory=memory or ConversationMemoryContext(),
+        active_agent=active_agent,
     )
 
 
@@ -91,10 +94,15 @@ def _change(
 
 
 def _tool(name: str, *, tenant_id: str, data: dict | None = None) -> ToolExecutionResult:
+    structured_data = dict(data or {})
+    if name == "catalog.search" and not structured_data:
+        structured_data = {
+            "items": [{"tenant_id": tenant_id, "name": "R4 250 CC", "product_id": "prod-r4"}]
+        }
     return ToolExecutionResult(
         tool_name=name,
         status="succeeded",
-        data={"tenant_id": tenant_id, **(data or {})},
+        data={"tenant_id": tenant_id, **structured_data},
     )
 
 
@@ -135,6 +143,45 @@ def test_tool_only_rejects_model_write() -> None:
     assert result.field_updates == []
     assert result.blocked[0]["field"] == "quote_snapshot_id"
     assert result.blocked[0]["reason"] == "field_is_tool_only"
+
+
+def test_tenant_contract_fields_are_visible_even_when_active_agent_has_legacy_fields() -> None:
+    raw = _fixture("dinamo_motos_nl_shadow.json")
+    for field in raw["fields"]:
+        if field["key"] == "employment_seniority":
+            field["domain_role"] = "employment_seniority"
+        if field["key"] == "eligibility_seniority":
+            field["domain_role"] = "employment_seniority_eligibility"
+            field["aliases"] = [
+                *field.get("aliases", []),
+                "employment_seniority_eligibility",
+            ]
+    context = _context(
+        raw,
+        inbound_text="15 meses",
+        active_agent=ActiveAgentContext(
+            id=raw["agent_id"],
+            visible_contact_field_keys=["Moto", "Plan_Credito"],
+        ),
+    )
+
+    result = DeterministicStateWriter().build_updates(
+        context=context,
+        decision=_decision(
+            _change(
+                "employment_seniority",
+                15,
+                evidence=["15 meses"],
+                metadata={"source": "user_message"},
+            )
+        ),
+        tool_results=[],
+    )
+
+    values = {update.field_key: update.value for update in result.field_updates}
+    assert values["employment_seniority"] == 15
+    assert values["eligibility_seniority"] is True
+    assert not any(item["reason"] == "field_not_visible" for item in result.blocked)
 
 
 def test_blocked_from_model_rejects_model_write() -> None:

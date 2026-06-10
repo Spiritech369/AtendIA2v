@@ -51,6 +51,8 @@ def evaluate_prepared_send_policy(
         reasons.append("tenant_outbox_disabled")
     if not _truthy(runtime_config.get("single_contact_smoke_enabled")):
         reasons.append("single_contact_smoke_disabled")
+    if _truthy(runtime_config.get("tenant_domain_contract_safe_mode")):
+        reasons.append("tenant_domain_contract_safe_mode")
 
     send_scope = _text(runtime_config.get("send_scope")) or None
     if send_scope != "approved_contact_only":

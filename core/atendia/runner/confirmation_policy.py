@@ -57,10 +57,10 @@ _NEGATIVE: frozenset[str] = frozenset({"no", "nada", "nel", "nop"})
 _AFFIRMATIVE_DEICTIC_TERMS: frozenset[str] = frozenset(
     {"esa", "ese", "eso", "esta", "este", "misma", "mismo", "aquella", "aquel"}
 )
-_AFFIRMATIVE_RAW: frozenset[str] = frozenset({"sÃ­"})
+_AFFIRMATIVE_RAW: frozenset[str] = frozenset({"s\u00ed"})
 _LEGACY_PENDING_CONFIRMATION_BRANCHES: dict[str, dict[str, dict[str, Any]]] = {
     "is_nomina_tarjeta": {
-        "yes": {"tipo_credito": "NÃ³mina Tarjeta", "plan_credito": "10%"},
+        "yes": {"tipo_credito": "N\u00f3mina Tarjeta", "plan_credito": "10%"},
     },
     "is_negocio_sat": {
         "no": {"tipo_credito": "Sin Comprobantes", "plan_credito": "20%"},

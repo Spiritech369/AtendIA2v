@@ -366,7 +366,12 @@ def find_price_mentions(message: str | None) -> list[PriceMention]:
     if _has_price_context(text):
         for match in _MONTH_RE.finditer(text):
             value = _amount_to_int(match.group("number"))
-            if value is not None and 1 <= value <= 120:
+            if (
+                value is not None
+                and 1 <= value <= 120
+                and not _looks_like_seniority_months(text, match.start())
+                and not _looks_like_document_validity_months(text, match.start())
+            ):
                 add(match, "term_months")
     return sorted(mentions, key=lambda mention: mention.start)
 
@@ -711,6 +716,37 @@ def _looks_like_false_positive_number(text: str, start: int, end: int) -> bool:
     if before.endswith("+"):
         return True
     return False
+
+
+def _looks_like_seniority_months(text: str, start: int) -> bool:
+    window = _fold(text[max(0, start - 48) : start])
+    return any(
+        token in window
+        for token in (
+            "antiguedad",
+            "laboral",
+            "trabajando",
+            "trabajo",
+            "empleo",
+        )
+    )
+
+
+def _looks_like_document_validity_months(text: str, start: int) -> bool:
+    window = _fold(text[max(0, start - 72) : start])
+    return any(
+        token in window
+        for token in (
+            "comprobante",
+            "domicilio",
+            "vigencia",
+            "vigente",
+            "menos de",
+            "no tenga mas de",
+            "reciente",
+            "recientes",
+        )
+    )
 
 
 def _amount_to_int(value: Any) -> int | None:

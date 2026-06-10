@@ -45,10 +45,16 @@ class _FakeChoice:
 
 
 class _FakeResponse:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, usage=None) -> None:
         self.choices = [_FakeChoice(content)]
         self.model = "gpt-test"
-        self.usage = None
+        self.usage = usage
+
+
+class _FakeUsage:
+    prompt_tokens = 11
+    completion_tokens = 7
+    total_tokens = 18
 
 
 class _FakeCompletions:
@@ -61,6 +67,8 @@ class _FakeCompletions:
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
+        if isinstance(response, tuple):
+            return _FakeResponse(response[0], response[1])
         return _FakeResponse(response)
 
 
@@ -142,6 +150,29 @@ async def test_openai_provider_accepts_valid_json_without_repair():
     assert len(client.chat.completions.calls) == 1
     assert client.chat.completions.calls[0]["response_format"]["type"] == "json_schema"
     assert output.trace_metadata["provider"] == "openai"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_records_usage_and_low_cost_limits():
+    client = _FakeClient([(_valid_json(final_message="JSON valido."), _FakeUsage())])
+    provider = OpenAIAgentProvider(
+        api_key="sk-test",
+        client=client,
+        temperature=0.2,
+        max_output_tokens=350,
+    )
+
+    output = await provider.generate(_context())
+
+    call = client.chat.completions.calls[0]
+    assert call["temperature"] == 0.2
+    assert call["max_tokens"] == 350
+    assert output.trace_metadata["model_usage"] == {
+        "input_tokens": 11,
+        "output_tokens": 7,
+        "total_tokens": 18,
+        "phase": "generate",
+    }
 
 
 @pytest.mark.asyncio

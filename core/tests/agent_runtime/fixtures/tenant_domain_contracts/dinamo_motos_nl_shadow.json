@@ -87,7 +87,7 @@
       "aliases": ["CREDITO", "PLAN", "PLAN_CREDITO"],
       "write_policy": "auto_apply_when_valid_plan",
       "owner": "StateWriter",
-      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "allowed_sources": ["user_message", "credit_plan.resolve", "requirements.lookup"],
       "evidence_required": true,
       "invalidates_roles": ["quote"]
     },
@@ -99,7 +99,7 @@
       "aliases": ["enganche", "enganche_porcentaje"],
       "write_policy": "auto_apply_when_valid_plan",
       "owner": "StateWriter",
-      "allowed_sources": ["user_message", "credit_plan.resolve"],
+      "allowed_sources": ["user_message", "credit_plan.resolve", "requirements.lookup"],
       "evidence_required": true,
       "invalidates_roles": ["quote"]
     },
@@ -144,10 +144,10 @@
       "label": "Checklist documentos",
       "type": "json",
       "domain_role": "document",
-      "aliases": ["requisitos", "checklist"],
+      "aliases": ["requisitos", "checklist", "Docs_Checklist"],
       "write_policy": "tool_only",
       "owner": "StateWriter",
-      "allowed_sources": ["requirements.lookup"],
+      "allowed_sources": ["requirements.lookup", "expediente.evaluate"],
       "evidence_required": true
     },
     {
@@ -169,9 +169,9 @@
       "aliases": ["Doc_Completos", "docs_complete"],
       "write_policy": "system_derived",
       "owner": "StateWriter",
-      "allowed_sources": ["requirements.lookup", "document.check", "system"],
+      "allowed_sources": ["expediente.evaluate"],
       "evidence_required": true,
-      "required_tools": ["requirements.lookup", "document.check"]
+      "required_tools": ["expediente.evaluate"]
     },
     {
       "key": "bureau_mentioned",
@@ -261,6 +261,11 @@
       "aliases": ["document", "documentos", "vision.document_check"]
     },
     {
+      "tool_id": "expediente.evaluate",
+      "topic": "document_completeness",
+      "aliases": ["expediente", "documentos_completos", "requirements.evaluate"]
+    },
+    {
       "tool_id": "handoff.create",
       "topic": "handoff_or_action",
       "aliases": ["handoff", "human_review"]
@@ -271,6 +276,34 @@
       "aliases": ["followup", "seguimiento"]
     }
   ],
+  "flow_policy": {
+    "seniority_before_income": true,
+    "seniority_slot": "employment_seniority",
+    "income_slot": "income_type",
+    "seniority_minimum_months": 6,
+    "business_activity_ambiguous_slot": "business_tax_status",
+    "business_activity_clarification": "Va, si tienes negocio. Para darte el plan correcto dime si estas dado de alta en SAT/RIF o si lo manejas sin comprobantes."
+  },
+  "income_resolution_policy": {
+    "ambiguous_signals": [
+      "tengo negocio",
+      "vendo comida",
+      "vendo comida desde mi casa"
+    ],
+    "ambiguous_pending_slot": "business_tax_status",
+    "resolution_rules": [
+      {
+        "candidate": "negocio_sat",
+        "plan_id": "negocio_sat_15",
+        "evidence_any": ["tengo sat", "estoy dado de alta en sat"]
+      },
+      {
+        "candidate": "sin_comprobantes",
+        "plan_id": "sin_comprobantes_20",
+        "evidence_any": ["no tengo sat", "sin comprobantes"]
+      }
+    ]
+  },
   "pipeline": {
     "id": "dinamo_vehicle_credit_shadow",
     "stages": [

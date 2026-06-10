@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from atendia.agent_runtime.action_registry import (
@@ -32,6 +33,63 @@ APPROVAL_PROMISES = (
 )
 
 
+GENERIC_PROGRESS_COPY = (
+    "reviso el contexto",
+    "contexto actual",
+    "tomando en cuenta el contexto",
+    "reviso el siguiente paso",
+    "te doy continuidad",
+    "ya estoy tomando en cuenta",
+    "tomo tu mensaje",
+    "dime que dato quieres revisar",
+    "dime quÃ© dato quieres revisar",
+    "he actualizado tu antig",
+    "si necesitas mas informacion",
+    "si necesitas mÃ¡s informaciÃ³n",
+    "si tienes otra consulta",
+    "aqui estoy",
+    "aquÃ­ estoy",
+    "hola, Â¿en quÃ© puedo ayudarte hoy?",
+    "hola, ¿en qué puedo ayudarte hoy?",
+    "solicitud esta siendo revisada",
+    "solicitud estÃ¡ siendo revisada",
+    "solicitud está siendo revisada",
+    "te responderan pronto",
+    "te responderÃ¡n pronto",
+    "te responderán pronto",
+    "necesito consultar los requisitos vigentes",
+    "necesito que una persona del equipo revise esto",
+    "persona del equipo revise esto",
+)
+
+INTERNAL_VISIBLE_COPY = (
+    "json",
+    "trace",
+    "tool",
+    "herramienta",
+    "prompt",
+    "workflow",
+    "outbox",
+    "field_not_visible",
+    "statewriter",
+    "state writer",
+    "campo no est",
+    "no puedo registrar",
+    "pending_slot",
+    "internal",
+    "runtime",
+    "error tecnico",
+    "error tÃ©cnico",
+    "error técnico",
+)
+
+PRICE_PATTERN = re.compile(r"(?:\$|\b\d+[,.]?\d*\s*(?:pesos|mxn|quincenas?|semanas?))", re.I)
+REQUIREMENTS_PATTERN = re.compile(
+    r"(?:ine|comprobante de domicilio|recibos?|estado de cuenta|papeles)",
+    re.I,
+)
+
+
 @dataclass(frozen=True)
 class PolicyIssue:
     code: str
@@ -42,6 +100,54 @@ class PolicyValidationError(ValueError):
     def __init__(self, issues: list[PolicyIssue]) -> None:
         self.issues = issues
         super().__init__("; ".join(f"{issue.code}: {issue.message}" for issue in issues))
+
+
+def _validated_response_plan_issues(output: TurnOutput, final_text: str) -> list[PolicyIssue]:
+    trace = output.trace_metadata if isinstance(output.trace_metadata, dict) else {}
+    plan = trace.get("validated_response_plan")
+    if not isinstance(plan, dict):
+        return []
+    facts = plan.get("validated_facts") if isinstance(plan.get("validated_facts"), dict) else {}
+    issues: list[PolicyIssue] = []
+    if PRICE_PATTERN.search(final_text) and "quote" not in facts:
+        issues.append(
+            PolicyIssue(
+                "unsupported_price_fact",
+                "Visible price/payment copy requires quote facts.",
+            )
+        )
+    if REQUIREMENTS_PATTERN.search(final_text) and not _has_requirements_facts(facts):
+        issues.append(
+            PolicyIssue(
+                "unsupported_requirements_fact",
+                "Visible requirements copy requires requirements facts.",
+            )
+        )
+    pending_slot = str(plan.get("pending_slot") or "")
+    slot_consumed = bool(plan.get("slot_consumed"))
+    user_act = str(plan.get("user_act") or "")
+    folded = final_text.casefold()
+    if (
+        pending_slot in {"income_type", "plan", "plan_credito"}
+        and not slot_consumed
+        and user_act != "answer_to_pending_slot"
+        and any(
+            token in folded
+            for token in (
+                "ya validÃ© tu tipo de ingreso",
+                "ya valide tu tipo de ingreso",
+                "ya tengo tu tipo de ingreso",
+                "plan validado",
+            )
+        )
+    ):
+        issues.append(
+            PolicyIssue(
+                "slot_consumed_by_copy",
+                "final_message claims a pending slot was consumed.",
+            )
+        )
+    return issues
 
 
 class PolicyValidator:
@@ -88,6 +194,21 @@ class PolicyValidator:
                     "final_message must not promise credit approval.",
                 )
             )
+        if any(phrase in folded_final for phrase in GENERIC_PROGRESS_COPY):
+            issues.append(
+                PolicyIssue(
+                    "generic_progress_copy",
+                    "final_message must not use generic progress copy.",
+                )
+            )
+        if any(token in folded_final for token in INTERNAL_VISIBLE_COPY):
+            issues.append(
+                PolicyIssue(
+                    "internal_text_visible",
+                    "final_message must not expose internal runtime text.",
+                )
+            )
+        issues.extend(_validated_response_plan_issues(output, final_text))
 
         if not 0 <= float(output.confidence) <= 1:
             issues.append(
@@ -207,3 +328,7 @@ class PolicyValidator:
                 )
             )
         return issues
+
+
+def _has_requirements_facts(facts: dict[str, object]) -> bool:
+    return any(key in facts for key in ("requirements", "requirements_checklist"))

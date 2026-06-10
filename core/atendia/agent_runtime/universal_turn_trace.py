@@ -124,6 +124,8 @@ def build_universal_turn_trace(
         "workflow_results": _list_of_dicts(raw_trace.get("workflow_results")),
         "guards": guards,
         "provider": _provider_view(raw_trace),
+        "validated_response_plan": _dict(raw_trace.get("validated_response_plan")),
+        "human_response_composer": _dict(raw_trace.get("human_response_composer")),
         "final_output": {
             "final_message": output.final_message,
             "source": VISIBLE_TEXT_AUTHORITY,

@@ -12,6 +12,7 @@ the runner uses so we don't drift between sites — every escalation
 goes through this function or it's a bug.
 """
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -25,7 +26,7 @@ from atendia.state_machine.derived import funnel_stage
 def build_handoff_summary(
     *,
     reason: HandoffReason,
-    extracted: ExtractedFields,
+    extracted: ExtractedFields | dict[str, Any],
     last_inbound_text: str,
     suggested_next_action: str,
     docs_per_plan: dict[str, list[str]] | None = None,
@@ -39,6 +40,7 @@ def build_handoff_summary(
     Empty dict is fine — docs_recibidos / docs_pendientes will both be empty.
     """
     del document_requirements_field
+    extracted = _coerce_extracted_fields(extracted)
     docs_per_plan = docs_per_plan if docs_per_plan is not None else document_requirements or {}
     docs_received: list[str] = []
     docs_pending: list[str] = []
@@ -75,6 +77,27 @@ def build_handoff_summary(
         funnel_stage=funnel_stage(extracted),
         cita_dia=extracted.cita_dia,
     )
+
+
+def _coerce_extracted_fields(extracted: ExtractedFields | dict[str, Any]) -> ExtractedFields:
+    if isinstance(extracted, ExtractedFields):
+        return extracted
+    if not isinstance(extracted, dict):
+        return ExtractedFields()
+
+    payload: dict[str, Any] = {}
+    known_fields = set(ExtractedFields.model_fields)
+    for key, value in extracted.items():
+        if key not in known_fields:
+            continue
+        if isinstance(value, dict) and "value" in value:
+            payload[key] = value.get("value")
+        else:
+            payload[key] = value
+    try:
+        return ExtractedFields.model_validate(payload)
+    except Exception:
+        return ExtractedFields()
 
 
 async def persist_handoff(

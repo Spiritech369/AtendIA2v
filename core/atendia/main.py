@@ -70,6 +70,7 @@ from atendia.api.onboarding_routes import router as onboarding_router
 from atendia.api.pipeline_routes import router as pipeline_router
 from atendia.api.product_config_routes import router as product_config_router
 from atendia.api.product_config_routes import tenant_capabilities_router
+from atendia.api.product_agents_routes import router as product_agents_router
 from atendia.api.reports_routes import router as reports_router
 from atendia.api.runner_routes import router as runner_router
 from atendia.api.tenants_routes import router as tenants_router
@@ -167,6 +168,11 @@ app.include_router(
 app.include_router(turn_traces_router, prefix="/api/v1/turn-traces", tags=["turn-traces"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(
+    product_agents_router,
+    prefix="/api/v1/product-agents",
+    tags=["product-agents"],
+)
 app.include_router(
     agent_runtime_v2_router,
     prefix="/api/v1/agent-runtime-v2",

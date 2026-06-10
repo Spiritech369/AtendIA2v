@@ -79,6 +79,33 @@ def test_requirements_without_requirements_lookup_are_blocked() -> None:
     assert requirements_decision["blocking_scopes"] == ["final_message", "workflow_event"]
 
 
+def test_requirements_copy_with_validated_checklist_is_not_rewritten() -> None:
+    message = "Va, cuando mandes tu INE que sea frente y reverso, completa y legible."
+    result = MandatoryToolGuard().apply(
+        context=_context(),
+        decision=_decision(),
+        tool_results=[],
+        output=TurnOutput(
+            final_message=message,
+            confidence=0.9,
+            trace_metadata={
+                "validated_response_plan": {
+                    "validated_facts": {"requirements_checklist": ["INE"]}
+                }
+            },
+        ),
+    )
+
+    assert result.output.final_message == message
+    requirements_decision = next(
+        item
+        for item in result.output.trace_metadata["mandatory_tool_decisions"]
+        if item["tool_id"] == "requirements.lookup"
+    )
+    assert requirements_decision["status"] == "missing"
+    assert result.action == "recorded"
+
+
 def test_sensitive_policy_without_faq_or_policy_lookup_is_blocked() -> None:
     output = _apply_without_tools("Aunque estes en buro, si te podemos aprobar.")
 

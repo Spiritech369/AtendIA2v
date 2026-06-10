@@ -39,19 +39,6 @@ _DOCUMENT_INTENT_RE = re.compile(
     r"\b(?:documentos?|requisitos?|papeles?|que necesito|qu[eé] ocupo)\b",
     re.IGNORECASE,
 )
-_PLAN_ALIASES = {
-    "cash": "cash",
-    "contado": "cash",
-    "efectivo": "cash",
-    "nomina tarjeta": "Nomina Tarjeta",
-    "nómina tarjeta": "Nomina Tarjeta",
-    "tarjeta": "Nomina Tarjeta",
-    "nomina recibos": "Nomina Recibos",
-    "nómina recibos": "Nomina Recibos",
-    "sin comprobantes": "Sin Comprobantes",
-    "por fuera": "Sin Comprobantes",
-}
-
 
 @dataclass(frozen=True)
 class AdvisorBrainContractResult:
@@ -185,19 +172,17 @@ def advisor_brain_contract_system_rules() -> str:
             "",
             "Reglas para productos:",
             "- Producto canonico significa objeto con product_id, sku y display_name.",
-            '- Alias como "Adventure", "R4", "U5", "Comando" debe resolverse con '
-            "catalog.lookup si aun no esta canonico.",
+            '- Alias o nombres cortos de producto deben resolverse con catalog.lookup '
+            "si aun no estan canonicos.",
             '- Selecciones ordinales como "la primera", "esa", "la de arriba" solo '
             "son validas si existe last_options en contexto.",
             "",
             "Reglas para planes:",
-            '- "contado", "efectivo", "cash" => plan_code "cash"',
-            '- "sin comprobantes", "me pagan por fuera", "sin recibos" => plan_code '
-            '"Sin Comprobantes"',
-            '- "nomina", "me depositan en tarjeta", "recibos de nomina" => plan_code '
-            '"Nomina Tarjeta", si ese plan existe en catalogo',
-            "- Si el plan no esta claro, puedes pedir aclaracion o elegir plan por "
-            "politica del negocio solo si esta configurada.",
+            "- No traduzcas frases de ingreso a plan_code en AdvisorBrain.",
+            "- El plan, porcentaje o enganche debe venir de una herramienta "
+            "tenant-aware o de estado ya validado.",
+            "- Si el plan no esta validado, solicita la herramienta configurada "
+            "para resolverlo o pide una aclaracion.",
             "",
             "Reglas de progreso conversacional:",
             "- No pongas en missing_facts datos ya conocidos.",
@@ -218,9 +203,9 @@ def advisor_brain_contract_system_rules() -> str:
             "",
             "Ejemplos:",
             "",
-            'Cliente: "Quiero la R4, cuanto seria?"',
+            'Cliente: "Quiero el modelo corto que mencione, cuanto seria?"',
             "Respuesta esperada:",
-            "- catalog.lookup si R4 no esta canonico",
+            "- catalog.lookup si el producto no esta canonico",
             "- quote.resolve solo despues de tener canonical_product_ref",
             "- response_plan sin precios",
             "",
@@ -231,21 +216,21 @@ def advisor_brain_contract_system_rules() -> str:
             "- no precio",
             "",
             'Cliente: "La primera"',
-            "Contexto: last_options[0] = Adventure Elite 150 CC",
+            "Contexto: last_options[0] = producto canonico del catalogo tenant",
             "Respuesta esperada:",
             "- proposed_state_changes Producto = canonical_product_ref de last_options[0]",
             "- no precio si el cliente no pidio precio",
             "",
             'Cliente: "Cotizamela"',
-            "Contexto: Producto canonico Adventure Elite 150 CC",
+            "Contexto: Producto canonico validado por catalog.lookup",
             "Respuesta esperada:",
             "- quote.resolve con ese producto",
             "- no texto de precio en response_plan",
             "",
-            'Cliente: "Ahora mejor la R4"',
-            "Contexto: Ultima_Cotizacion = Adventure Elite 150 CC",
+            'Cliente: "Ahora mejor el otro modelo"',
+            "Contexto: Ultima_Cotizacion = producto canonico anterior",
             "Respuesta esperada:",
-            "- catalog.lookup R4",
+            "- catalog.lookup para el nuevo producto",
             "- invalidar uso de cotizacion anterior para precio",
             "- no reutilizar precio anterior",
         ]
@@ -428,9 +413,11 @@ def _normalize_quote_tool(
         violations.append({"code": "quote_resolve_without_canonical_product"})
         return None
     payload["product"] = product.model_dump(mode="json")
-    payload["plan_code"] = (
-        _normalize_plan_code(payload.get("plan_code")) or _current_plan(context) or "cash"
-    )
+    plan_code = _normalize_plan_code(payload.get("plan_code")) or _current_plan(context)
+    if plan_code is None:
+        violations.append({"code": "quote_resolve_without_validated_plan"})
+        return None
+    payload["plan_code"] = plan_code
     return tool.model_copy(update={"payload": payload})
 
 
@@ -575,7 +562,7 @@ def _normalize_plan_code(value: Any) -> str | None:
     text = str(value).strip()
     if not text:
         return None
-    return _PLAN_ALIASES.get(text.casefold(), text)
+    return text
 
 
 def _alias_from_customer_message(context: TurnContext) -> str | None:

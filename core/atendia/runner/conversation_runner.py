@@ -13,9 +13,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from atendia.config import get_settings
-from atendia.agent_runtime.context_builder import ContextBuilder
-from atendia.agent_runtime.runtime import AgentRuntime
-from atendia.agent_runtime.schemas import TurnInput
+from atendia.agent_runtime.agent_service import AgentService
 from atendia.agent_runtime.send_policy import (
     evaluate_prepared_send_policy,
     legacy_visible_output_allowed,
@@ -25,6 +23,7 @@ from atendia.agent_runtime.send_policy import (
 from atendia.credit_plan_invariants import build_credit_plan_menu, enforce_credit_plan_invariants
 from atendia.contracts.event import EventType
 from atendia.contracts.flow_mode import FlowMode
+from atendia.contracts.handoff_summary import HandoffReason
 from atendia.contracts.message import Message
 from atendia.contracts.nlu_result import Intent, NLUResult, Sentiment
 from atendia.contracts.tone import Tone
@@ -93,6 +92,7 @@ from atendia.runner.dinamo_agent_runtime import (
     select_dinamo_runtime,
 )
 from atendia.runner.flow_router import AlwaysTrigger, FlowModeRule, _normalize_for_router
+from atendia.runner.handoff_helper import build_handoff_summary, persist_handoff
 from atendia.runner.nlu_protocol import NLUProvider, UsageMetadata
 from atendia.runner.outbound_dispatcher import COMPOSED_ACTIONS, enqueue_messages
 from atendia.runner.response_contract import (
@@ -3889,6 +3889,7 @@ async def _persist_agent_runtime_v2_prepared_turn(
     total_cost_usd: Decimal,
     pending_confirmation: str | None,
     bot_paused: bool,
+    to_phone_e164: str | None = None,
 ) -> TurnTrace:
     runtime_config = _agent_runtime_v2_config(tenant_config)
     contact_id, phone_e164 = await _runtime_v2_contact_scope(
@@ -3896,23 +3897,26 @@ async def _persist_agent_runtime_v2_prepared_turn(
         conversation_id=conversation_id,
     )
     output = None
+    service_result = None
     errors: list[dict[str, Any]] = []
     try:
-        output = await AgentRuntime(context_builder=ContextBuilder(session)).run_turn(
-            TurnInput(
-                tenant_id=str(tenant_id),
-                conversation_id=str(conversation_id),
-                inbound_text=inbound.text,
-                turn_number=turn_number,
-                metadata={
-                    "agent_id": _runtime_v2_agent_id(runtime_config),
-                    "message_id": str(getattr(inbound, "id", "") or ""),
-                    "turn_number": turn_number,
-                    "runtime_v2_prepared_send_path": True,
-                    "send_execution_mode": "dry_run_prepared",
-                },
-            )
+        service_result = await AgentService(session=session).handle_turn(
+            tenant_id=str(tenant_id),
+            conversation_id=str(conversation_id),
+            inbound_text=inbound.text,
+            turn_number=turn_number,
+            mode="live_candidate",
+            metadata={
+                "agent_id": _runtime_v2_agent_id(runtime_config),
+                "message_id": str(getattr(inbound, "id", "") or ""),
+                "turn_number": turn_number,
+                "runtime_v2_prepared_send_path": True,
+                "send_execution_mode": "live_candidate",
+            },
+            to_phone_e164=to_phone_e164,
         )
+        output = service_result.output
+        errors.extend(service_result.errors)
     except Exception as exc:
         errors.append(
             {
@@ -3925,37 +3929,41 @@ async def _persist_agent_runtime_v2_prepared_turn(
 
     trace_metadata = dict(output.trace_metadata) if output is not None else {}
     provider_fallback = provider_fallback_detected_from_trace(trace_metadata)
-    settings = get_settings()
-    send_decision = evaluate_prepared_send_policy(
-        runtime_config=runtime_config,
-        global_send_enabled=(
-            bool(settings.agent_runtime_v2_enabled)
-            and bool(settings.agent_runtime_v2_send_enabled)
-        ),
-        contact_id=str(contact_id) if contact_id is not None else None,
-        phone_e164=phone_e164,
-        provider_fallback_detected=provider_fallback,
-    )
-    if not send_decision.allowed:
-        errors.append(
-            {
-                "where": "agent_runtime_v2_send_policy",
-                "code": "send_blocked_by_policy",
-                "reason": send_decision.reason,
-                "reasons": list(send_decision.reasons),
-            }
-        )
-
     universal_trace = trace_metadata.get("universal_turn_trace")
     if not isinstance(universal_trace, dict):
         universal_trace = None
     final_message = output.final_message if output is not None else ""
     runtime_v2_failed_closed = output is None
-    delivery_status = _runtime_v2_delivery_status(
-        runtime_v2_failed_closed=runtime_v2_failed_closed,
-        provider_fallback=provider_fallback,
-        send_decision=send_decision.model_dump(mode="json"),
-    )
+    send_result = service_result.send if service_result is not None else None
+    if send_result is None:
+        send_runtime_config = dict(runtime_config)
+        if _runtime_v2_contract_safe_mode(trace_metadata):
+            send_runtime_config["tenant_domain_contract_safe_mode"] = True
+        settings = get_settings()
+        send_decision = evaluate_prepared_send_policy(
+            runtime_config=send_runtime_config,
+            global_send_enabled=(
+                bool(settings.agent_runtime_v2_enabled)
+                and bool(settings.agent_runtime_v2_send_enabled)
+            ),
+            contact_id=str(contact_id) if contact_id is not None else None,
+            phone_e164=phone_e164,
+            provider_fallback_detected=provider_fallback,
+        )
+        delivery_status = _runtime_v2_delivery_status(
+            runtime_v2_failed_closed=runtime_v2_failed_closed,
+            provider_fallback=provider_fallback,
+            send_decision=send_decision.model_dump(mode="json"),
+        )
+        outbox_write_attempted = False
+        outbox_ids: list[str] = []
+        outbound_messages = None
+    else:
+        send_decision = send_result.send_decision
+        delivery_status = send_result.delivery_status
+        outbox_write_attempted = send_result.outbox_write_attempted
+        outbox_ids = list(send_result.outbox_ids)
+        outbound_messages = list(send_result.outbound_messages or []) or None
     legacy_block_trace = legacy_visible_output_block_trace()
     state_before = {
         "current_stage": current_stage,
@@ -3985,7 +3993,8 @@ async def _persist_agent_runtime_v2_prepared_turn(
         "visible_copy_written": False,
         "manual_recovery_visible_blocked": True,
         "whatsapp_send_attempted": False,
-        "outbox_write_attempted": False,
+        "outbox_write_attempted": outbox_write_attempted,
+        "outbox_ids": outbox_ids,
         "send_blocked_by_policy": not send_decision.allowed,
         "send_decision": send_decision.model_dump(mode="json"),
         "turn_output": _jsonable(output.model_dump(mode="json")) if output is not None else None,
@@ -4016,6 +4025,7 @@ async def _persist_agent_runtime_v2_prepared_turn(
                 "customer_visible_message_sent": False,
                 "send_status": delivery_status["send_status"],
                 "reason": delivery_status["reason"],
+                "outbox_write_attempted": outbox_write_attempted,
             },
             "send_policy": send_decision.model_dump(mode="json"),
         },
@@ -4042,7 +4052,7 @@ async def _persist_agent_runtime_v2_prepared_turn(
             if output is not None
             else None
         ),
-        outbound_messages=None,
+        outbound_messages=outbound_messages,
         total_latency_ms=int((time.perf_counter() - started) * 1000),
         total_cost_usd=Decimal("0"),
         tool_cost_usd=Decimal("0"),
@@ -4112,6 +4122,31 @@ def _runtime_v2_delivery_status(
         "reason": "prepared_send_allowed_by_single_contact_policy",
         "internal_event": "runtime_v2_prepared_send_preview",
     }
+
+
+def _runtime_v2_contract_safe_mode(trace_metadata: dict[str, Any]) -> bool:
+    contract = trace_metadata.get("tenant_domain_contract")
+    if isinstance(contract, dict) and contract.get("safe_mode") is True:
+        return True
+    universal = trace_metadata.get("universal_turn_trace")
+    if not isinstance(universal, dict):
+        return False
+    audit = universal.get("audit")
+    audit_contract = (
+        audit.get("tenant_domain_contract") if isinstance(audit, dict) else None
+    )
+    if isinstance(audit_contract, dict) and audit_contract.get("safe_mode") is True:
+        return True
+    input_payload = universal.get("input")
+    input_metadata = (
+        input_payload.get("metadata") if isinstance(input_payload, dict) else None
+    )
+    input_contract = (
+        input_metadata.get("tenant_domain_contract")
+        if isinstance(input_metadata, dict)
+        else None
+    )
+    return isinstance(input_contract, dict) and input_contract.get("safe_mode") is True
 
 
 async def _runtime_v2_contact_scope(
@@ -4243,6 +4278,7 @@ class ConversationRunner:
                 total_cost_usd=total_cost_usd or Decimal("0"),
                 pending_confirmation=pending_confirmation,
                 bot_paused=bool(bot_paused),
+                to_phone_e164=to_phone_e164,
             )
 
         policy_config = None
@@ -6357,12 +6393,6 @@ class ConversationRunner:
             pass
         elif not inside_24h and decision.action in COMPOSED_ACTIONS:
             # Outside 24h: no compose, no enqueue. Create handoff for visibility.
-            from atendia.contracts.handoff_summary import HandoffReason
-            from atendia.runner.handoff_helper import (
-                build_handoff_summary,
-                persist_handoff,
-            )
-
             await persist_handoff(
                 session=self._session,
                 conversation_id=conversation_id,
@@ -6639,6 +6669,53 @@ class ConversationRunner:
             # Phase 3c.2 — write back any binary slot the composer raised.
             # The next turn's confirmation policy will read this
             # if the user replies sí/no.
+            if (
+                composer_input is not None
+                and composer_output is not None
+                and composer_validation is None
+            ):
+                from atendia.runner.composer_validator import validate_composer_output
+
+                raw_composer_validation = validate_composer_output(
+                    input=composer_input,
+                    output=composer_output,
+                )
+                if not raw_composer_validation.policy_passed:
+                    composer_validation = raw_composer_validation
+                    composer_outbox_allowed = False
+                    composer_guard_applied = True
+                    composer_guard_reason = "composer_validator_blocked_output"
+                    trace_errors.append(
+                        {
+                            "where": "composer_validator",
+                            "reason": "policy_failed",
+                            "issues": [
+                                issue.model_dump(mode="json")
+                                for issue in raw_composer_validation.issues
+                            ],
+                        }
+                    )
+                    if raw_composer_validation.needs_handoff:
+                        await persist_handoff(
+                            session=self._session,
+                            conversation_id=conversation_id,
+                            tenant_id=tenant_id,
+                            summary=build_handoff_summary(
+                                reason=HandoffReason.POLICY_NOT_MET,
+                                extracted=merged_extracted,
+                                last_inbound_text=inbound.text,
+                                suggested_next_action=(
+                                    "Revisar respuesta bloqueada por validator antes de contactar."
+                                ),
+                                document_requirements=pipeline.document_requirements,
+                                document_requirements_field=getattr(
+                                    pipeline,
+                                    "document_requirements_field",
+                                    None,
+                                ),
+                            ),
+                        )
+
             response_frame_requires_current_answer_guard = bool(
                 composer_input is not None
                 and composer_input.response_frame is not None
@@ -6709,7 +6786,11 @@ class ConversationRunner:
                     composer_mode = "guarded"
                     composer_output_source = "guarded"
 
-            if composer_input is not None and composer_output is not None:
+            if (
+                composer_input is not None
+                and composer_output is not None
+                and composer_validation is None
+            ):
                 from atendia.runner.composer_validator import validate_composer_output
 
                 composer_validation = validate_composer_output(
@@ -6731,12 +6812,6 @@ class ConversationRunner:
                         }
                     )
                     if composer_validation.needs_handoff:
-                        from atendia.contracts.handoff_summary import HandoffReason
-                        from atendia.runner.handoff_helper import (
-                            build_handoff_summary,
-                            persist_handoff,
-                        )
-
                         await persist_handoff(
                             session=self._session,
                             conversation_id=conversation_id,
@@ -7534,7 +7609,7 @@ class ConversationRunner:
                 fallback_preserved_response_frame = True
                 fallback_generated_customer_visible = True
 
-        if composer_output is not None:
+        if composer_output is not None and composer_outbox_allowed:
             finalized_response = finalize_agent_visible_response(
                 AgentFinalResponseRequest(
                     user_message=inbound.text,
@@ -7553,7 +7628,6 @@ class ConversationRunner:
                     allow_document_resume=True,
                 )
             )
-            agent_final = finalized_response.final_response
             composer_output = finalized_response.composer_output
             agent_final_response_trace = finalized_response.trace
             if finalized_response.final_response.rewrote:
@@ -7572,7 +7646,7 @@ class ConversationRunner:
         duplicate_outbound_override_applied = False
         outbound_policy_final_decision = "not_evaluated"
         outbound_suppressed_final_reason: str | None = None
-        if composer_output is not None:
+        if composer_output is not None and composer_outbox_allowed:
             outbound_policy_result = await evaluate_outbound_policy(
                 self._session,
                 conversation_id=conversation_id,
@@ -7711,6 +7785,7 @@ class ConversationRunner:
         if (
             duplicate_outbound_override_attempted
             and not duplicate_outbound_override_applied
+            and composer_outbox_allowed
             and outbound_policy_result is not None
             and not outbound_policy_result.allowed
             and outbound_policy_result.reason == "duplicate_outbound"
@@ -8617,12 +8692,6 @@ class ConversationRunner:
                 suggested_handoff = None
 
         if suggested_handoff:
-            from atendia.contracts.handoff_summary import HandoffReason
-            from atendia.runner.handoff_helper import (
-                build_handoff_summary,
-                persist_handoff,
-            )
-
             reason = HandoffReason(suggested_handoff)
             summary = build_handoff_summary(
                 reason=reason,
@@ -8716,12 +8785,6 @@ class ConversationRunner:
         )
         if stage is None or not getattr(stage, "pause_bot_on_enter", False):
             return False
-
-        from atendia.contracts.handoff_summary import HandoffReason
-        from atendia.runner.handoff_helper import (
-            build_handoff_summary,
-            persist_handoff,
-        )
 
         # Resolve the reason: prefer stage-level override; fall back to
         # the generic STAGE_TRIGGERED_HANDOFF when the operator didn't

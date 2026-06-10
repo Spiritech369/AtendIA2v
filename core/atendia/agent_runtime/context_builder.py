@@ -48,7 +48,7 @@ class ContextBuilder:
         self,
         session: AsyncSession | None = None,
         *,
-        history_limit: int = 12,
+        history_limit: int = 20,
         knowledge_provider: KnowledgeContextProvider | None = None,
     ) -> None:
         self._session = session
@@ -102,11 +102,16 @@ class ContextBuilder:
         active_agent = await self._load_agent(
             conversation.get("assigned_agent_id") or turn_input.metadata.get("agent_id")
         )
+        active_agent = _active_agent_with_product_agent_fields(active_agent, turn_input.metadata)
         contact_fields = await self._load_contact_fields(
             turn_input.tenant_id,
             visible_keys=active_agent.visible_contact_field_keys if active_agent else None,
         )
         runtime_v2_config = await self._load_agent_runtime_v2_config(turn_input.tenant_id)
+        runtime_v2_config = _runtime_config_with_product_agent_overlay(
+            runtime_v2_config,
+            turn_input.metadata,
+        )
         default_voice = await self._load_tenant_default_voice(turn_input.tenant_id)
         tenant_config = _tenant_config_from_runtime_config(
             runtime_v2_config,
@@ -441,6 +446,7 @@ def _memory_from_state_and_metadata(
     metadata: dict[str, Any],
 ) -> ConversationMemoryContext:
     extracted_data = _dict(state.get("extracted_data"))
+    runtime_memory = _dict(extracted_data.get("_runtime_v2"))
     memory = _memory_from_metadata(metadata)
     salient_facts = {
         **_salient_facts_from_extracted_data(extracted_data),
@@ -448,6 +454,8 @@ def _memory_from_state_and_metadata(
     }
     last_quote = (
         memory.last_quote_snapshot
+        or _field_value(extracted_data, "quote_snapshot")
+        or _field_value(extracted_data, "quote_snapshot_id")
         or _field_value(extracted_data, "Ultima_Cotizacion")
         or _field_value(extracted_data, "last_quote")
     )
@@ -464,8 +472,11 @@ def _memory_from_state_and_metadata(
             "documents": documents,
             "metadata": {
                 **memory.metadata,
+                **_dict(runtime_memory.get("memory_metadata")),
                 "source": "conversation_state",
                 "last_intent_signal": _maybe_str(state.get("last_intent")),
+                "pending_slot": runtime_memory.get("pending_slot"),
+                "question_slot": runtime_memory.get("question_slot"),
             },
         }
     )
@@ -515,6 +526,17 @@ def _tenant_config_from_runtime_config(
     default_voice: dict[str, Any] | None = None,
 ) -> TenantRuntimeConfigContext:
     tenant_config = _dict(runtime_config.get("tenant_config"))
+    contract_raw = (
+        tenant_config.get("tenant_domain_contract")
+        or tenant_config.get("domain_contract")
+        or runtime_config.get("tenant_domain_contract")
+        or runtime_config.get("domain_contract")
+    )
+    structured_sources = _structured_knowledge_sources(
+        tenant_config=tenant_config,
+        runtime_config=runtime_config,
+        contract_raw=contract_raw,
+    )
     config = TenantRuntimeConfigContext(
         ruleset=_dict(
             tenant_config.get("ruleset")
@@ -533,19 +555,15 @@ def _tenant_config_from_runtime_config(
             for item in (
                 tenant_config.get("knowledge_sources")
                 or runtime_config.get("knowledge_sources")
+                or structured_sources.get("knowledge_sources")
                 or []
             )
         ],
         metadata={
             **_dict(tenant_config.get("metadata")),
+            **_dict(structured_sources.get("metadata")),
             "source": "agent_runtime_v2_config",
         },
-    )
-    contract_raw = (
-        tenant_config.get("tenant_domain_contract")
-        or tenant_config.get("domain_contract")
-        or runtime_config.get("tenant_domain_contract")
-        or runtime_config.get("domain_contract")
     )
     result = load_tenant_domain_contract(
         contract_raw,
@@ -553,6 +571,103 @@ def _tenant_config_from_runtime_config(
         agent_id=agent_id,
     )
     return apply_tenant_domain_contract(config, result)
+
+
+def _runtime_config_with_product_agent_overlay(
+    runtime_config: dict[str, Any],
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    if (
+        metadata.get("product_agent_runtime_adapter") is not True
+        or metadata.get("send_mode") != "no_send"
+    ):
+        return runtime_config
+    contract_raw = metadata.get("tenant_domain_contract") or metadata.get("domain_contract")
+    if not isinstance(contract_raw, dict) or not contract_raw:
+        return runtime_config
+    tenant_config = _dict(runtime_config.get("tenant_config"))
+    has_runtime_contract = any(
+        isinstance(value, dict) and bool(value)
+        for value in (
+            runtime_config.get("tenant_domain_contract"),
+            runtime_config.get("domain_contract"),
+            tenant_config.get("tenant_domain_contract"),
+            tenant_config.get("domain_contract"),
+        )
+    )
+    if has_runtime_contract:
+        return runtime_config
+    return {
+        **runtime_config,
+        "tenant_domain_contract": dict(contract_raw),
+        "metadata": {
+            **_dict(runtime_config.get("metadata")),
+            "product_agent_runtime_contract_overlay": True,
+        },
+    }
+
+
+def _active_agent_with_product_agent_fields(
+    active_agent: ActiveAgentContext | None,
+    metadata: dict[str, Any],
+) -> ActiveAgentContext | None:
+    if active_agent is None or metadata.get("product_agent_runtime_adapter") is not True:
+        return active_agent
+    visible = [
+        str(item)
+        for item in metadata.get("product_agent_visible_contact_field_keys") or []
+        if str(item).strip()
+    ]
+    if not visible:
+        return active_agent
+    return active_agent.model_copy(update={"visible_contact_field_keys": visible})
+
+
+def _structured_knowledge_sources(
+    *,
+    tenant_config: dict[str, Any],
+    runtime_config: dict[str, Any],
+    contract_raw: Any,
+) -> dict[str, Any]:
+    metadata = {
+        **_dict(tenant_config.get("metadata")),
+        **_dict(runtime_config.get("metadata")),
+    }
+    knowledge_os = _dict(metadata.get("knowledge_os"))
+    sources = _dict(knowledge_os.get("sources"))
+    knowledge_sources = list(
+        tenant_config.get("knowledge_sources")
+        or runtime_config.get("knowledge_sources")
+        or []
+    )
+    contract = _dict(contract_raw)
+    contract_metadata = _dict(contract.get("metadata"))
+    contract_knowledge_os = _dict(
+        contract.get("knowledge_os") or contract_metadata.get("knowledge_os")
+    )
+    contract_sources = _dict(contract_knowledge_os.get("sources"))
+    if contract_sources:
+        sources = {**contract_sources, **sources}
+    contract_knowledge_sources = contract.get("knowledge_sources")
+    if isinstance(contract_knowledge_sources, list):
+        knowledge_sources = [*contract_knowledge_sources, *knowledge_sources]
+    if sources:
+        metadata["knowledge_os"] = {
+            **knowledge_os,
+            "sources": sources,
+            "mode": knowledge_os.get("mode") or "tenant_structured_sources",
+        }
+    if not knowledge_sources and sources:
+        for value in sources.values():
+            path = value.get("path") if isinstance(value, dict) else value
+            if isinstance(path, str):
+                knowledge_sources.append(path)
+    return {
+        "knowledge_sources": [
+            str(item) for item in knowledge_sources if str(item).strip()
+        ],
+        "metadata": metadata,
+    }
 
 
 def _salient_facts_from_extracted_data(extracted_data: dict[str, Any]) -> dict[str, Any]:

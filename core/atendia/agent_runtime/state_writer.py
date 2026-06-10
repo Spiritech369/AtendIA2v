@@ -137,6 +137,21 @@ class DeterministicStateWriter:
                         update = outcome["update"]
                         field_updates.append(update)
                         accepted.append(outcome["decision"])
+                        derived_updates = _derived_updates_for_declarative_change(
+                            context=context,
+                            update=update,
+                            field_metadata=field_metadata,
+                            allowed_fields=allowed_fields,
+                        )
+                        field_updates.extend(
+                            derived_update for derived_update, _ in derived_updates
+                        )
+                        accepted.extend(
+                            derived_decision for _, derived_decision in derived_updates
+                        )
+                        decisions.extend(
+                            derived_decision for _, derived_decision in derived_updates
+                        )
                         invalidations = _quote_invalidations_for_declarative_change(
                             context=context,
                             changed_field=update.field_key,
@@ -451,6 +466,22 @@ class DeterministicStateWriter:
             )
             return {"status": "blocked", "update": None, "decision": decision}
 
+        if (
+            policy == "auto_apply_when_catalog_match"
+            and str(metadata.get("domain_role") or "") == "selection"
+            and coerce_canonical_product_ref(change.value) is None
+            and not _catalog_tool_validates_selection(context, tool_results, change.value)
+        ):
+            decision = _decision_payload(
+                change,
+                decision="blocked",
+                reason="catalog_tool_result_must_write_canonical_selection",
+                source=source,
+                evidence_refs=evidence_refs,
+                confidence=confidence,
+            )
+            return {"status": "blocked", "update": None, "decision": decision}
+
         value, update_metadata = _value_for_declarative_update(change.value, metadata)
         update = FieldUpdate(
             field_key=key,
@@ -706,6 +737,8 @@ def _has_valid_plan_evidence(
         return True
     if _has_trusted_tool(context, tool_results, "plan.resolve"):
         return True
+    if _has_trusted_tool(context, tool_results, "requirements.lookup"):
+        return True
     allowed_values = {
         str(item).casefold()
         for item in (
@@ -721,6 +754,41 @@ def _has_valid_plan_evidence(
         and value in allowed_values
         and _is_explicit_user_evidence(context, change)
     )
+
+
+def _catalog_tool_validates_selection(
+    context: TurnContext,
+    tool_results: list[Any],
+    value: Any,
+) -> bool:
+    expected = _field_token(value)
+    if not expected:
+        return False
+    for result in tool_results:
+        if not _trusted_tool_result(context, result, "catalog.search"):
+            continue
+        data = getattr(result, "data", None)
+        if isinstance(result, dict):
+            data = result.get("data")
+        if not isinstance(data, dict):
+            continue
+        ref = coerce_canonical_product_ref(data.get("canonical_product_ref"))
+        if ref is not None and _field_token(ref.display_name) == expected:
+            return True
+        for collection_key in ("items", "matches", "category_matches"):
+            for item in _list(data.get(collection_key)):
+                if not isinstance(item, dict):
+                    continue
+                names = [
+                    item.get("display_name"),
+                    item.get("name"),
+                    item.get("modelo"),
+                    item.get("modelo_moto"),
+                    item.get("sku"),
+                ]
+                if any(_field_token(name) == expected for name in names):
+                    return True
+    return False
 
 
 def _has_attachment_or_human_evidence(
@@ -898,6 +966,63 @@ def _field_updates_from_tool_results(
             }
             updates.append((update, decision))
     return updates
+
+
+def _derived_updates_for_declarative_change(
+    *,
+    context: TurnContext,
+    update: FieldUpdate,
+    field_metadata: dict[str, dict[str, Any]],
+    allowed_fields: set[str],
+) -> list[tuple[FieldUpdate, dict[str, Any]]]:
+    source_metadata = field_metadata.get(update.field_key, {})
+    if not _is_employment_seniority_field(update.field_key, source_metadata):
+        return []
+    months = _int(update.value)
+    if months is None:
+        return []
+    out: list[tuple[FieldUpdate, dict[str, Any]]] = []
+    for key, metadata in field_metadata.items():
+        if allowed_fields and key not in allowed_fields:
+            continue
+        if not _is_employment_seniority_eligibility_field(key, metadata):
+            continue
+        minimum = _minimum_months(context, metadata, source_metadata)
+        value = months >= minimum
+        derived = FieldUpdate(
+            field_key=key,
+            value=value,
+            reason=(
+                f"{update.field_key} validated against minimum {minimum} months."
+            ),
+            evidence=list(update.evidence) or [context.inbound_text],
+            confidence=update.confidence,
+            source="action",
+            metadata={
+                "state_writer": "declarative",
+                "system_derived": True,
+                "derived_from_field": update.field_key,
+                "minimum_months": minimum,
+                "writer": "StateWriter",
+            },
+        )
+        out.append(
+            (
+                derived,
+                {
+                    "target": "contact_field",
+                    "key": key,
+                    "field": key,
+                    "decision": "accepted",
+                    "source": "system",
+                    "writer": "StateWriter",
+                    "reason": "employment_seniority_eligibility_derived",
+                    "evidence_refs": list(derived.evidence),
+                    "confidence": derived.confidence,
+                },
+            )
+        )
+    return out
 
 
 def _quote_field_updates_from_tool(
@@ -1090,6 +1215,48 @@ def _current_field_value(context: TurnContext, key: str) -> Any:
     return context.customer.attrs.get(key)
 
 
+def _is_employment_seniority_field(key: str, metadata: dict[str, Any]) -> bool:
+    role = _field_token(metadata.get("domain_role"))
+    token = _field_token(key)
+    aliases = {_field_token(alias) for alias in _list(metadata.get("aliases"))}
+    return (
+        role in {"employmentseniority", "workseniority"}
+        or token in {"employmentseniority", "employmentsenioritymonths", "workseniority"}
+        or bool(aliases & {"employmentseniority", "employmentsenioritymonths", "workseniority"})
+    )
+
+
+def _is_employment_seniority_eligibility_field(
+    key: str,
+    metadata: dict[str, Any],
+) -> bool:
+    role = _field_token(metadata.get("domain_role"))
+    token = _field_token(key)
+    aliases = {_field_token(alias) for alias in _list(metadata.get("aliases"))}
+    return (
+        role == "employmentseniorityeligibility"
+        or token in {"employmentseniorityeligibility", "seniorityeligibility"}
+        or bool(aliases & {"employmentseniorityeligibility", "seniorityeligibility"})
+    )
+
+
+def _minimum_months(
+    context: TurnContext,
+    target_metadata: dict[str, Any],
+    source_metadata: dict[str, Any],
+) -> int:
+    for source in (
+        _dict(target_metadata.get("validation")),
+        _dict(source_metadata.get("validation")),
+        _dict(_dict(context.tenant_config.tenant_domain_contract).get("flow_policy")),
+    ):
+        value = source.get("minimum_months") or source.get("seniority_minimum_months")
+        months = _int(value)
+        if months is not None:
+            return months
+    return 1
+
+
 def _invalidation_decision(update: FieldUpdate, *, changed_field: str) -> dict[str, Any]:
     return {
         "field": update.field_key,
@@ -1126,9 +1293,10 @@ def _decision_payload(
 
 
 def _visible_fields(context: TurnContext) -> set[str]:
+    contract_fields = set(_field_metadata(context))
     if context.active_agent and context.active_agent.visible_contact_field_keys is not None:
-        return set(context.active_agent.visible_contact_field_keys)
-    return {field.key for field in context.contact_fields}
+        return set(context.active_agent.visible_contact_field_keys) | contract_fields
+    return {field.key for field in context.contact_fields} | contract_fields
 
 
 def _configured_single_field(context: TurnContext, name: str) -> str | None:
@@ -1171,6 +1339,22 @@ def _dict(value: Any) -> dict[str, Any]:
 
 def _list(value: Any) -> list[Any]:
     return list(value) if isinstance(value, list) else []
+
+
+def _int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
 
 
 def _field_token(value: Any) -> str:

@@ -180,6 +180,36 @@ def test_cotizamela_adds_canonical_product_from_state_to_quote_tool() -> None:
     assert "advisor_contract_violation" in normalized.risk_flags
 
 
+def test_quote_resolve_without_plan_is_blocked_instead_of_defaulting_to_cash() -> None:
+    product = _product("prod-r4", "R4-250", "R4 250 CC")
+    decision = _decision(tools=[_tool("quote.resolve", {})])
+
+    normalized = _normalize(_context("Cotizamela", product=product), decision)
+
+    assert normalized.required_tools == []
+    assert "advisor_contract_violation" in normalized.risk_flags
+    assert "quote_resolve_without_validated_plan" in {
+        item["code"] for item in normalized.metadata["advisor_contract"]["violations"]
+    }
+
+
+def test_contract_does_not_map_income_words_to_plan_code() -> None:
+    product = _product("prod-r4", "R4-250", "R4 250 CC")
+    decision = _decision(
+        tools=[
+            _tool(
+                "quote.resolve",
+                {"product": product.model_dump(mode="json"), "plan_code": "tarjeta"},
+            )
+        ]
+    )
+
+    normalized = _normalize(_context("Cotizame, me pagan por tarjeta", product=product), decision)
+
+    assert normalized.required_tools[0].payload["plan_code"] == "tarjeta"
+    assert normalized.required_tools[0].payload["plan_code"] != "Nomina Tarjeta"
+
+
 def test_documents_question_drops_quote_and_keeps_requirements_resolve() -> None:
     product = _product()
     decision = _decision(

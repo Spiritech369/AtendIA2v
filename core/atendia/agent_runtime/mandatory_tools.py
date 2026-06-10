@@ -19,7 +19,7 @@ GuardAction = Literal["recorded", "rewritten"]
 
 _REQUIREMENTS_RE = (
     r"\b(?:requisit(?:o|os)|document(?:o|os)|papeleria|papeles|ine|"
-    r"comprobante(?:s)?|identificacion|domicilio|ingresos?)\b"
+    r"comprobante(?:s)?|identificacion|domicilio)\b"
 )
 _POLICY_RE = (
     r"\b(?:politica|restriccion(?:es)?|aprobacion|aprobar|aprueba|aprobado|"
@@ -213,6 +213,14 @@ class MandatoryToolGuard:
                 and blocker.tool_id == "quote.resolve"
                 and "final_message" in blocker.blocking_scopes
             )
+            and not (
+                blocker.tool_id == "requirements.lookup"
+                and _credit_plan_needs_clarification(tool_results or [])
+            )
+            and not (
+                blocker.tool_id == "requirements.lookup"
+                and _has_validated_requirements_facts(output)
+            )
         ]
         trace = {
             **output.trace_metadata,
@@ -359,6 +367,17 @@ def _rule_matches(
     decision: AdvisorBrainDecision,
     output: TurnOutput | None,
 ) -> bool:
+    has_matching_state_change = any(
+        _state_change_matches(rule, change) for change in decision.proposed_state_changes
+    )
+    if (
+        rule.topic in {"requirements", "document_status"}
+        and _is_document_future_promise(decision)
+        and not has_matching_state_change
+    ):
+        return False
+    if _is_clarification_only_turn(decision):
+        return False
     final_message = output.final_message if output is not None else ""
     if rule.uses_price_signal and (
         visible_quote_signal(final_message)
@@ -370,6 +389,34 @@ def _rule_matches(
     if _pattern_matches(rule.response_plan_pattern, decision.response_plan):
         return True
     return any(_state_change_matches(rule, change) for change in decision.proposed_state_changes)
+
+
+def _is_clarification_only_turn(decision: AdvisorBrainDecision) -> bool:
+    return bool(decision.should_ask_question or decision.missing_facts) and not (
+        decision.required_tools or decision.proposed_state_changes
+    )
+
+
+def _is_document_future_promise(decision: AdvisorBrainDecision) -> bool:
+    text = " ".join(
+        [
+            str(decision.customer_goal or ""),
+            str(decision.understanding or ""),
+            str(decision.response_plan or ""),
+            str(decision.metadata.get("income") or ""),
+        ]
+    ).casefold()
+    return any(
+        token in text
+        for token in (
+            "document_future_promise",
+            "will_send_document",
+            "promesa_documento",
+            "send_document_later",
+            "mandar ine despues",
+            "mandar ine después",
+        )
+    )
 
 
 def _state_change_matches(rule: ToolRequirementRule, change: AdvisorBrainStateChange) -> bool:
@@ -466,6 +513,26 @@ def _invalid_tool_results(
                 }
             )
     return invalid
+
+
+def _credit_plan_needs_clarification(tool_results: list[ToolExecutionResult]) -> bool:
+    return any(
+        result.tool_name == "credit_plan.resolve"
+        and result.status == "succeeded"
+        and bool(_dict(result.data).get("needs_clarification"))
+        for result in tool_results
+    )
+
+
+def _has_validated_requirements_facts(output: TurnOutput) -> bool:
+    trace = output.trace_metadata if isinstance(output.trace_metadata, dict) else {}
+    plan = trace.get("validated_response_plan")
+    if not isinstance(plan, dict):
+        return False
+    facts = plan.get("validated_facts")
+    if not isinstance(facts, dict):
+        return False
+    return "requirements" in facts or "requirements_checklist" in facts
 
 
 def _tenant_ids_in_value(value: Any) -> list[str]:

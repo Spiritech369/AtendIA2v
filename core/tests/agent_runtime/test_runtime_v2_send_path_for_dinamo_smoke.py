@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -11,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from atendia.agent_runtime.advisor_pipeline import AdvisorFirstAgentProvider
+from atendia.agent_runtime.agent_service import AgentService
 from atendia.agent_runtime.context_builder import ContextBuilder
 from atendia.agent_runtime.schemas import (
     AdvisorBrainDecision,
@@ -20,6 +22,7 @@ from atendia.agent_runtime.schemas import (
     TurnOutput,
 )
 from atendia.agent_runtime.send_policy import (
+    PreparedSendDecision,
     evaluate_prepared_send_policy,
     provider_fallback_detected_from_trace,
 )
@@ -116,7 +119,7 @@ async def test_runtime_v2_runner_path_generates_trace_and_blocks_send_when_disab
 
 @pytest.mark.integration_db
 @pytest.mark.asyncio
-async def test_runtime_v2_contact_approved_reaches_prepared_send_only(
+async def test_runtime_v2_contact_approved_stages_single_contact_outbox(
     db_session,
     monkeypatch,
 ):
@@ -166,9 +169,192 @@ async def test_runtime_v2_contact_approved_reaches_prepared_send_only(
     assert trace.state_after["send_status"] == "prepared"
     assert trace.state_after["send_decision"]["allowed"] is True
     assert trace.state_after["send_decision"]["dry_run"] is True
-    assert trace.outbound_messages is None
+    assert trace.outbound_messages == [trace.composer_output["final_message"]]
     assert trace.state_after["whatsapp_send_attempted"] is False
-    assert trace.state_after["outbox_write_attempted"] is False
+    assert trace.state_after["outbox_write_attempted"] is True
+    assert trace.state_after["send_decision"]["outbox_write_attempted"] is True
+    assert await _outbox_count(db_session) == 1
+    payload = (
+        await db_session.execute(text("SELECT payload FROM outbound_outbox LIMIT 1"))
+    ).scalar_one()
+    assert payload["to_phone_e164"] == "+5215555550037"
+    assert payload["text"] == trace.composer_output["final_message"]
+    assert payload["metadata"]["source"] == "agent_runtime_v2"
+    assert payload["metadata"]["runtime_path"] == "agent_runtime_v2"
+
+
+@pytest.mark.integration_db
+@pytest.mark.asyncio
+async def test_agent_service_fails_closed_when_required_tool_is_not_succeeded(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_ENABLED", "true")
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_SEND_ENABLED", "true")
+    get_settings.cache_clear()
+    contact_id, conversation_id = await _seed_dinamo_runtime_conversation(
+        db_session,
+        runtime_overrides={
+            "send_enabled": True,
+            "outbox_enabled": True,
+            "single_contact_smoke_enabled": True,
+            "send_scope": "approved_contact_only",
+            "allowed_contact_ids": [],
+            "allowed_test_phones": ["+5215555550037"],
+        },
+    )
+    await _approve_contact(db_session, contact_id)
+
+    result = await AgentService(
+        session=db_session,
+        provider=_StaticProvider(
+            TurnOutput(
+                final_message="Si se puede revisar; dime como recibes tus ingresos.",
+                confidence=0.92,
+                trace_metadata={
+                    "advisor_brain": {
+                        "required_tools": [
+                            {"name": "catalog.search", "required": True}
+                        ]
+                    },
+                    "tool_results": [
+                        {
+                            "tool_name": "catalog.search",
+                            "status": "skipped",
+                            "data": {},
+                            "error": "catalog source and explicit query required",
+                            "trace_metadata": {},
+                        }
+                    ],
+                },
+            )
+        ),
+    ).handle_turn(
+        tenant_id=str(DINAMO_TENANT_ID),
+        conversation_id=str(conversation_id),
+        inbound_text="Hola, vi una Skeleton, cuanto sale a credito?",
+        turn_number=1,
+        mode="live_candidate",
+    )
+    await db_session.commit()
+
+    assert result.output is not None
+    assert result.send.delivery_status["send_status"] == "no_send"
+    assert result.send.delivery_status["reason"] == "runtime_v2_failed_closed"
+    assert result.state_persistence == {}
+    assert await _outbox_count(db_session) == 0
+    assert any(
+        error["code"] == "required_tool_not_succeeded_blocks_send"
+        for error in result.errors
+    )
+
+
+@pytest.mark.integration_db
+@pytest.mark.asyncio
+async def test_agent_service_fails_closed_when_policy_validation_fails(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_ENABLED", "true")
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_SEND_ENABLED", "true")
+    get_settings.cache_clear()
+    contact_id, conversation_id = await _seed_dinamo_runtime_conversation(
+        db_session,
+        runtime_overrides={
+            "send_enabled": True,
+            "outbox_enabled": True,
+            "single_contact_smoke_enabled": True,
+            "send_scope": "approved_contact_only",
+            "allowed_contact_ids": [],
+            "allowed_test_phones": ["+5215555550037"],
+        },
+    )
+    await _approve_contact(db_session, contact_id)
+
+    result = await AgentService(
+        session=db_session,
+        provider=_StaticProvider(
+            TurnOutput(
+                final_message="Tomo tu mensaje y reviso el siguiente paso con el contexto actual.",
+                confidence=0.3,
+                trace_metadata={},
+            )
+        ),
+    ).handle_turn(
+        tenant_id=str(DINAMO_TENANT_ID),
+        conversation_id=str(conversation_id),
+        inbound_text="?",
+        turn_number=2,
+        mode="live_candidate",
+    )
+    await db_session.commit()
+
+    assert result.output is not None
+    assert result.send.delivery_status["send_status"] == "no_send"
+    assert result.send.delivery_status["reason"] == "runtime_v2_failed_closed"
+    assert result.state_persistence == {}
+    assert await _outbox_count(db_session) == 0
+    assert any(
+        error["code"] == "runtime_v2_turn_failed"
+        and error["exception"] == "PolicyValidationError"
+        for error in result.errors
+    )
+
+
+@pytest.mark.integration_db
+@pytest.mark.asyncio
+async def test_runtime_v2_missing_tenant_contract_blocks_single_contact_outbox(
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_ENABLED", "true")
+    monkeypatch.setenv("ATENDIA_V2_AGENT_RUNTIME_V2_SEND_ENABLED", "true")
+    get_settings.cache_clear()
+    contact_id, conversation_id = await _seed_dinamo_runtime_conversation(
+        db_session,
+        runtime_overrides={
+            "send_enabled": True,
+            "outbox_enabled": True,
+            "single_contact_smoke_enabled": True,
+            "send_scope": "approved_contact_only",
+            "allowed_contact_ids": [],
+            "allowed_test_phones": ["+5215555550037"],
+            "tenant_domain_contract": None,
+        },
+    )
+    await db_session.execute(
+        text(
+            """UPDATE tenants
+            SET config = jsonb_set(
+                config,
+                '{agent_runtime_v2,allowed_contact_ids}',
+                CAST(:allowed AS jsonb),
+                true
+            )
+            WHERE id = :tenant_id"""
+        ),
+        {"tenant_id": DINAMO_TENANT_ID, "allowed": json.dumps([str(contact_id)])},
+    )
+    await db_session.commit()
+    composer = _RecordingComposer()
+
+    trace = await ConversationRunner(db_session, _UnusedNLU(), composer).run_turn(
+        conversation_id=conversation_id,
+        tenant_id=DINAMO_TENANT_ID,
+        inbound=_inbound(
+            conversation_id,
+            "Hola, vi una Skeleton, cuanto sale a credito? Estoy en buro.",
+        ),
+        turn_number=1,
+    )
+    await db_session.commit()
+
+    assert composer.call_count == 0
+    assert trace.state_after["send_decision"]["allowed"] is False
+    assert "tenant_domain_contract_safe_mode" in trace.state_after["send_decision"]["reasons"]
+    assert trace.state_after["send_status"] == "blocked_by_policy"
+    assert trace.state_after["customer_visible_message_sent"] is False
+    assert trace.outbound_messages is None
     assert await _outbox_count(db_session) == 0
 
 
@@ -193,15 +379,15 @@ async def test_runtime_v2_runtime_failure_fails_closed_without_legacy_visible_fa
     )
     composer = _RecordingComposer()
 
-    class _FailingRuntime:
+    class _FailingAgentService:
         def __init__(self, *args, **kwargs) -> None:
             pass
 
-        async def run_turn(self, turn_input):
-            del turn_input
+        async def handle_turn(self, **kwargs):
+            del kwargs
             raise RuntimeError("runtime v2 unavailable")
 
-    monkeypatch.setattr(conversation_runner_module, "AgentRuntime", _FailingRuntime)
+    monkeypatch.setattr(conversation_runner_module, "AgentService", _FailingAgentService)
 
     trace = await ConversationRunner(db_session, _UnusedNLU(), composer).run_turn(
         conversation_id=conversation_id,
@@ -261,13 +447,13 @@ async def test_runtime_v2_provider_fallback_is_no_send_without_intermitencia_tex
     )
     await db_session.commit()
 
-    class _ProviderFallbackRuntime:
+    class _ProviderFallbackAgentService:
         def __init__(self, *args, **kwargs) -> None:
             pass
 
-        async def run_turn(self, turn_input):
-            del turn_input
-            return TurnOutput(
+        async def handle_turn(self, **kwargs):
+            del kwargs
+            output = TurnOutput(
                 final_message="Recibi tu mensaje con intermitencia.",
                 confidence=0.0,
                 needs_human=True,
@@ -276,8 +462,39 @@ async def test_runtime_v2_provider_fallback_is_no_send_without_intermitencia_tex
                     "human_review_notes": ["advisor_brain_provider_error"],
                 },
             )
+            decision = PreparedSendDecision(
+                status="blocked",
+                allowed=False,
+                reason="provider_fallback_blocks_visible_send",
+                reasons=["provider_fallback_blocks_visible_send"],
+                contact_id=str(contact_id),
+                phone_e164="+5215555550037",
+                send_scope="approved_contact_only",
+                allowed_contact_ids=[str(contact_id)],
+                allowed_test_phones=["+5215555550037"],
+                provider_fallback_blocked=True,
+            )
+            return SimpleNamespace(
+                output=output,
+                errors=[],
+                send=SimpleNamespace(
+                    send_decision=decision,
+                    delivery_status={
+                        "send_status": "no_send",
+                        "reason": "provider_fallback_blocks_visible_send",
+                        "internal_event": "provider_failure_needs_review",
+                    },
+                    outbox_write_attempted=False,
+                    outbox_ids=[],
+                    outbound_messages=None,
+                ),
+            )
 
-    monkeypatch.setattr(conversation_runner_module, "AgentRuntime", _ProviderFallbackRuntime)
+    monkeypatch.setattr(
+        conversation_runner_module,
+        "AgentService",
+        _ProviderFallbackAgentService,
+    )
     composer = _RecordingComposer()
 
     trace = await ConversationRunner(db_session, _UnusedNLU(), composer).run_turn(
@@ -443,7 +660,7 @@ def test_provider_fallback_blocks_visible_send_policy() -> None:
 async def test_provider_error_turn_output_is_internal_only_and_needs_human() -> None:
     raw_contract = _dinamo_contract()
     config = apply_tenant_domain_contract(
-        TenantRuntimeConfigContext(),
+        _dinamo_tenant_runtime_config(),
         load_tenant_domain_contract(
             raw_contract,
             tenant_id=str(DINAMO_TENANT_ID),
@@ -521,20 +738,35 @@ class _FailingAdvisorBrain:
         raise RuntimeError("provider unavailable")
 
 
+class _StaticProvider:
+    def __init__(self, output: TurnOutput) -> None:
+        self._output = output
+
+    async def generate(self, context: TurnContext) -> TurnOutput:
+        del context
+        return self._output
+
+
 async def _seed_dinamo_runtime_conversation(
     session: AsyncSession,
     *,
     runtime_overrides: dict,
 ) -> tuple[UUID, UUID]:
     raw_contract = _dinamo_contract()
+    base_overrides = dict(runtime_overrides)
+    contract_value = base_overrides.pop("tenant_domain_contract", raw_contract)
     runtime_config = _runtime_config(
         tenant_domain_contract=raw_contract,
         agent_id=str(DINAMO_AGENT_ID),
         allowed_agent_ids=[str(DINAMO_AGENT_ID)],
         actions_enabled=False,
         workflow_side_effects_enabled=False,
-        **runtime_overrides,
+        **base_overrides,
     )
+    if contract_value is None:
+        runtime_config.pop("tenant_domain_contract", None)
+    else:
+        runtime_config["tenant_domain_contract"] = contract_value
     await session.execute(
         text(
             """INSERT INTO tenants (id, name, config)
@@ -574,6 +806,23 @@ async def _seed_dinamo_runtime_conversation(
     return contact_id, conversation_id
 
 
+async def _approve_contact(session: AsyncSession, contact_id: UUID) -> None:
+    await session.execute(
+        text(
+            """UPDATE tenants
+            SET config = jsonb_set(
+                config,
+                '{agent_runtime_v2,allowed_contact_ids}',
+                CAST(:allowed AS jsonb),
+                true
+            )
+            WHERE id = :tenant_id"""
+        ),
+        {"tenant_id": DINAMO_TENANT_ID, "allowed": json.dumps([str(contact_id)])},
+    )
+    await session.commit()
+
+
 def _runtime_config(**overrides) -> dict:
     return {
         "runtime_v2_enabled": True,
@@ -583,6 +832,7 @@ def _runtime_config(**overrides) -> dict:
         "actions_enabled": False,
         "workflow_side_effects_enabled": False,
         "single_contact_smoke_enabled": False,
+        "tenant_config": _dinamo_tenant_runtime_config().model_dump(mode="json"),
         **overrides,
     }
 
@@ -590,6 +840,27 @@ def _runtime_config(**overrides) -> dict:
 def _dinamo_contract() -> dict:
     return json.loads(
         (FIXTURE_DIR / "dinamo_motos_nl_shadow.json").read_text(encoding="utf-8")
+    )
+
+
+def _dinamo_tenant_runtime_config() -> TenantRuntimeConfigContext:
+    sources = [
+        "docs/CatalogoMotos2026_DINAMO.json",
+        "docs/Requisitos_Credito_Dinamo.json",
+        "docs/FAQ_DINAMO.json",
+    ]
+    return TenantRuntimeConfigContext(
+        knowledge_sources=sources,
+        metadata={
+            "knowledge_os": {
+                "sources": {
+                    "catalog": {"path": sources[0]},
+                    "requirements": {"path": sources[1]},
+                    "faq": {"path": sources[2]},
+                },
+                "mode": "tenant_structured_sources",
+            }
+        },
     )
 
 

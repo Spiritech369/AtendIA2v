@@ -8,13 +8,14 @@ def test_legacy_nomina_tarjeta_confirmation_resolves_yes() -> None:
         extracted_jsonb={},
     )
 
+    expected = "N\u00f3mina Tarjeta"
     assert result is not None
     assert result.answer == "yes"
     assert result.updates == {
-        "tipo_credito": "NÃ³mina Tarjeta",
+        "tipo_credito": expected,
         "plan_credito": "10%",
     }
-    assert result.extracted_data["tipo_credito"]["value"] == "NÃ³mina Tarjeta"
+    assert result.extracted_data["tipo_credito"]["value"] == expected
 
 
 def test_legacy_negocio_sat_confirmation_resolves_no() -> None:

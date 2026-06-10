@@ -6,6 +6,7 @@ import json
 import re
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -61,6 +62,12 @@ _SAFE_CITATION_METADATA_KEYS = {
 }
 _EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
 _PHONE_RE = re.compile(r"(?<!\d)(?:\+?\d[\d\s().-]{7,}\d)(?!\d)")
+
+
+@dataclass(frozen=True)
+class ModelCompletion:
+    text: str
+    usage: dict[str, int]
 
 
 class AgentModelProvider(Protocol):
@@ -144,6 +151,8 @@ class OpenAIAgentProvider:
         retry_jitter_ms: int = 250,
         circuit_failure_threshold: int = 5,
         circuit_cooldown_s: float = 30.0,
+        temperature: float = 0,
+        max_output_tokens: int | None = None,
         client: Any | None = None,
     ) -> None:
         if client is None:
@@ -152,12 +161,16 @@ class OpenAIAgentProvider:
             client = AsyncOpenAI(api_key=api_key, max_retries=0, timeout=timeout_s)
         self._client = client
         self._model = model
+        self._temperature = temperature
+        self._max_output_tokens = max_output_tokens
         delays = tuple(retry_delays_ms)
         self._reliability_config = ProviderReliabilityConfig(
             max_retries=len(delays) if max_retries is None else max_retries,
             timeout_s=timeout_s,
             base_delay_ms=(
-                int(delays[0]) if retry_base_delay_ms is None and delays else retry_base_delay_ms or 0
+                int(delays[0])
+                if retry_base_delay_ms is None and delays
+                else retry_base_delay_ms or 0
             ),
             max_delay_ms=retry_max_delay_ms,
             jitter_ms=retry_jitter_ms,
@@ -226,17 +239,25 @@ class OpenAIAgentProvider:
         json_schema: dict[str, Any],
     ) -> TurnOutput:
         del context
-        raw_text = await self._complete_json(messages, json_schema)
-        if not raw_text.strip():
+        completion = await self._complete_json(messages, json_schema)
+        if not completion.text.strip():
             raise ProviderEmptyResponseError("empty agent provider response")
         try:
-            return parse_turn_output_json(raw_text, lenient=True)
-        except json.JSONDecodeError as exc:
+            return _attach_model_usage(
+                parse_turn_output_json(completion.text, lenient=True),
+                usage=completion.usage,
+                phase="generate",
+            )
+        except json.JSONDecodeError:
             try:
-                repaired = await self._repair_json(raw_text, json_schema)
-                if not repaired.strip():
+                repaired = await self._repair_json(completion.text, json_schema)
+                if not repaired.text.strip():
                     raise ProviderEmptyResponseError("empty repaired agent provider response")
-                return parse_turn_output_json(repaired, lenient=True)
+                return _attach_model_usage(
+                    parse_turn_output_json(repaired.text, lenient=True),
+                    usage=_merge_usage(completion.usage, repaired.usage),
+                    phase="repair",
+                )
             except json.JSONDecodeError as repair_exc:
                 raise ProviderMalformedJSONError("malformed agent provider JSON") from repair_exc
             except _MODEL_PARSE_ERRORS as repair_exc:
@@ -252,19 +273,27 @@ class OpenAIAgentProvider:
         self,
         messages: list[dict[str, str]],
         json_schema: dict[str, Any],
-    ) -> str:
+    ) -> ModelCompletion:
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "response_format": {"type": "json_schema", "json_schema": json_schema},
+            "temperature": self._temperature,
+        }
+        if self._max_output_tokens is not None:
+            payload["max_tokens"] = self._max_output_tokens
         response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-            model=self._model,
-            messages=messages,
-            response_format={"type": "json_schema", "json_schema": json_schema},
-            temperature=0,
+            **payload,
         )
-        return response.choices[0].message.content or ""
+        return ModelCompletion(
+            text=response.choices[0].message.content or "",
+            usage=_response_usage(response),
+        )
 
-    async def _repair_json(self, raw_text: str, json_schema: dict[str, Any]) -> str:
-        response = await self._client.chat.completions.create(  # type: ignore[call-overload]
-            model=self._model,
-            messages=[
+    async def _repair_json(self, raw_text: str, json_schema: dict[str, Any]) -> ModelCompletion:
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": [
                 {
                     "role": "system",
                     "content": (
@@ -274,16 +303,68 @@ class OpenAIAgentProvider:
                 },
                 {"role": "user", "content": raw_text},
             ],
-            response_format={"type": "json_schema", "json_schema": json_schema},
-            temperature=0,
+            "response_format": {"type": "json_schema", "json_schema": json_schema},
+            "temperature": self._temperature,
+        }
+        if self._max_output_tokens is not None:
+            payload["max_tokens"] = self._max_output_tokens
+        response = await self._client.chat.completions.create(  # type: ignore[call-overload]
+            **payload,
         )
-        return response.choices[0].message.content or ""
+        return ModelCompletion(
+            text=response.choices[0].message.content or "",
+            usage=_response_usage(response),
+        )
+
+
+def _attach_model_usage(output: TurnOutput, *, usage: dict[str, int], phase: str) -> TurnOutput:
+    if not usage:
+        return output
+    trace = dict(output.trace_metadata)
+    trace["model_usage"] = {
+        **usage,
+        "phase": phase,
+    }
+    return output.model_copy(update={"trace_metadata": trace})
+
+
+def _response_usage(response: Any) -> dict[str, int]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {}
+    return {
+        key: int(value)
+        for key, value in {
+            "input_tokens": _usage_value(usage, "prompt_tokens", "input_tokens"),
+            "output_tokens": _usage_value(usage, "completion_tokens", "output_tokens"),
+            "total_tokens": _usage_value(usage, "total_tokens"),
+        }.items()
+        if value is not None
+    }
+
+
+def _usage_value(usage: Any, *keys: str) -> int | None:
+    for key in keys:
+        if isinstance(usage, dict):
+            value = usage.get(key)
+        else:
+            value = getattr(usage, key, None)
+        if value is not None:
+            return int(value)
+    return None
+
+
+def _merge_usage(first: dict[str, int], second: dict[str, int]) -> dict[str, int]:
+    keys = set(first) | set(second)
+    return {key: int(first.get(key, 0)) + int(second.get(key, 0)) for key in keys}
 
 
 def build_agent_turn_provider(
     settings: Settings | None = None,
     *,
     model_provider_allowed: bool | None = None,
+    temperature: float | None = None,
+    max_output_tokens: int | None = None,
 ) -> Any:
     resolved = settings or get_settings()
     if (
@@ -306,6 +387,8 @@ def build_agent_turn_provider(
             retry_jitter_ms=resolved.agent_runtime_v2_model_retry_jitter_ms,
             circuit_failure_threshold=resolved.agent_runtime_v2_provider_circuit_failure_threshold,
             circuit_cooldown_s=resolved.agent_runtime_v2_provider_circuit_cooldown_s,
+            temperature=0 if temperature is None else temperature,
+            max_output_tokens=max_output_tokens,
         )
     return SafeFallbackAgentProvider(reason="unsupported_agent_model_provider")
 

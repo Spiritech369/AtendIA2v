@@ -311,6 +311,31 @@ def _document_tool(
     )
 
 
+def _expediente_tool(*, complete: bool, missing: list[str]) -> ToolExecutionResult:
+    return _tool(
+        "expediente.evaluate",
+        {
+            "contract": "Expedientes",
+            "requirements_complete": complete,
+            "missing_documents": missing,
+            "field_updates": [
+                {
+                    "key": "requirements_missing",
+                    "value": missing,
+                    "reason": "expediente.evaluate computed missing requirements.",
+                    "evidence": ["tool_result:expediente.evaluate"],
+                },
+                {
+                    "key": "requirements_complete",
+                    "value": complete,
+                    "reason": "expediente.evaluate computed checklist completeness.",
+                    "evidence": ["tool_result:expediente.evaluate"],
+                },
+            ],
+        },
+    )
+
+
 def _handoff_tool(reason: str) -> ToolExecutionResult:
     return _tool(
         "handoff.create",
@@ -518,6 +543,7 @@ def test_dinamo_shadow_contract_loads_real_tenant_proposal() -> None:
         "requirements.lookup",
         "faq.lookup",
         "document.check",
+        "expediente.evaluate",
         "handoff.create",
         "followup.schedule",
     }
@@ -783,7 +809,7 @@ def test_dinamo_shadow_six_turn_e2e_produces_dry_run_universal_trace() -> None:
             next_best_action="check_document_partial",
             response_plan="Validar adjunto con document.check.",
             latest_customer_act="document_attachment",
-            required_tools=["requirements.lookup", "document.check"],
+            required_tools=["requirements.lookup", "document.check", "expediente.evaluate"],
             changes=[_lifecycle("papeleria_recibida", evidence=["document.check"])],
         ),
         tool_results=[
@@ -794,6 +820,7 @@ def test_dinamo_shadow_six_turn_e2e_produces_dry_run_universal_trace() -> None:
                 missing=["comprobante_domicilio"],
                 received=["ine"],
             ),
+            _expediente_tool(complete=False, missing=["comprobante_domicilio"]),
         ],
         final_message=(
             "Recibi un archivo y document.check lo marco parcial; falta completar "
@@ -828,8 +855,13 @@ def test_dinamo_shadow_six_turn_e2e_produces_dry_run_universal_trace() -> None:
             response_plan="Solicitar revision humana dry-run sin prometer resultado.",
             latest_customer_act="document_attachment_complete",
             needs_human=True,
-            required_tools=["requirements.lookup", "document.check", "handoff.create"],
-            changes=[_lifecycle("en_revision_humana", evidence=["document.check"])],
+            required_tools=[
+                "requirements.lookup",
+                "document.check",
+                "expediente.evaluate",
+                "handoff.create",
+            ],
+            changes=[_lifecycle("en_revision_humana", evidence=["expediente.evaluate"])],
             metadata={"handoff_reason": "requirements_complete_needs_human_review"},
         ),
         tool_results=[
@@ -840,6 +872,7 @@ def test_dinamo_shadow_six_turn_e2e_produces_dry_run_universal_trace() -> None:
                 missing=[],
                 received=["ine", "comprobante_domicilio"],
             ),
+            _expediente_tool(complete=True, missing=[]),
             _handoff_tool("requirements_complete_needs_human_review"),
         ],
         final_message=(

@@ -60,3 +60,19 @@ def test_policy_flags_approval_promise() -> None:
     codes = _codes(TurnOutput(final_message="Seguro te aprueban el credito.", confidence=0.8))
 
     assert "approval_promise" in codes
+
+
+def test_policy_allows_requirements_copy_from_validated_checklist_state() -> None:
+    codes = _codes(
+        TurnOutput(
+            final_message="Va, cuando mandes tu INE que sea completa y legible.",
+            confidence=0.8,
+            trace_metadata={
+                "validated_response_plan": {
+                    "validated_facts": {"requirements_checklist": ["INE"]}
+                }
+            },
+        )
+    )
+
+    assert "unsupported_requirements_fact" not in codes

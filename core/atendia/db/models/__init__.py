@@ -53,6 +53,20 @@ from atendia.db.models.message_attachment import MessageAttachmentRow
 from atendia.db.models.notification import Notification
 from atendia.db.models.onboarding import OnboardingState
 from atendia.db.models.outbound_outbox import OutboundOutbox
+from atendia.db.models.product_agent import (
+    AgentActionBinding,
+    AgentDeployment,
+    AgentFieldPermission,
+    AgentKnowledgeSourceBinding,
+    AgentPublishEvent,
+    AgentPublishRequest,
+    AgentTestRun,
+    AgentTestScenario,
+    AgentTestSuite,
+    AgentToolBinding,
+    AgentVersion,
+    AgentWorkflowBinding,
+)
 from atendia.db.models.tenant import Tenant, TenantUser
 from atendia.db.models.tenant_baileys_config import TenantBaileysConfig
 from atendia.db.models.tenant_config import (
@@ -87,7 +101,19 @@ __all__ = [
     "Advisor",
     "AdvisorPool",
     "Agent",
+    "AgentActionBinding",
+    "AgentDeployment",
+    "AgentFieldPermission",
+    "AgentKnowledgeSourceBinding",
+    "AgentPublishEvent",
+    "AgentPublishRequest",
     "AgentReadinessEvalResult",
+    "AgentTestRun",
+    "AgentTestScenario",
+    "AgentTestSuite",
+    "AgentToolBinding",
+    "AgentVersion",
+    "AgentWorkflowBinding",
     "Appointment",
     "BusinessEventLedgerRow",
     "BusinessHoursRule",

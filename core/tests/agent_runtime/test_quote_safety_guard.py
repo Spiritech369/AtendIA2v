@@ -182,6 +182,22 @@ def test_detects_finance_amounts_and_installment_count() -> None:
     assert [mention.value for mention in mentions] == [8390, 3333, 72]
 
 
+def test_does_not_detect_labor_seniority_months_as_quote_term() -> None:
+    mentions = find_price_mentions(
+        "Con tu antiguedad laboral de 24 meses, enganche $8,390 y pagos $3,333."
+    )
+
+    assert [mention.value for mention in mentions] == [8390, 3333]
+
+
+def test_does_not_detect_document_validity_months_as_quote_term() -> None:
+    mentions = find_price_mentions(
+        "Con pago inicial del 10%, manda comprobante de domicilio menor a 2 meses."
+    )
+
+    assert mentions == []
+
+
 def test_does_not_detect_phone_like_value_as_price() -> None:
     assert visible_quote_signal("+52999836cc71874") is False
 

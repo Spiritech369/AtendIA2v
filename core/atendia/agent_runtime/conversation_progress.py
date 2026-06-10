@@ -384,7 +384,7 @@ def _progress_fallback(
                     "Va, el siguiente paso es confirmar documentos "
                     "o revisar si quieres otra opcion."
                 ),
-                "Va, te doy continuidad con el siguiente paso disponible.",
+                "Va, dime si quieres revisar documentos, modelo u otra opcion.",
                 "Va, seguimos con el avance sin volver a listar lo mismo.",
             ],
             prior_messages,
@@ -419,9 +419,9 @@ def _progress_fallback(
         )
     return _first_new(
         [
-            "Tomo tu mensaje y reviso el siguiente paso con el contexto actual.",
-            "Te doy continuidad con lo que ya tenemos en la conversacion.",
-            "Listo, sigo desde el contexto actual y cuido no duplicar informacion.",
+            "Para ayudarte bien dime si quieres revisar modelo, plan o documentos.",
+            "Va, dime que dato quieres revisar y lo vemos con cuidado.",
+            "Listo, dime que parte quieres revisar primero.",
         ],
         prior_messages,
     )
