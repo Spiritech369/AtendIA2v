@@ -460,3 +460,24 @@ Status: `MANUAL_LIVE_SIMULATOR_READY`
 - 7 unit tests (multi-turn transcript, in-memory state, blocked turns show
   structured reason without fallback copy, all commands, legacy-import and
   vertical-hardcode audits for module + runner). Suite total: 173.
+
+## Phase 14 — AgentService × Respond-Style Direct (2026-06-10)
+
+Status: `PHASE_14_AGENT_SERVICE_RESPOND_STYLE_NO_SEND_READY`
+
+AgentService.handle_turn now routes opted-in Product Agent deployments
+(resolver preview product_agent_direct) through ProductAgentRuntime in
+mandatory no-send via `product_agents/agent_service_bridge.py`. Opted-in
+turns never fall back to legacy; every failure is fail-closed with a
+structured reason (live mode, missing version, publish-gate blockers,
+provider unconfigured, bridge errors). Non-opted-in tenants keep the
+previous Runtime V2 path byte-identical. Full evidence rides
+TurnOutput.trace_metadata.respond_style_agent_service with
+legacy_path_used=false; SendAdapterResult is blocked-by-construction.
+
+E2E PASSED in Docker (real DB + OpenAI): V2/V3 failed transcripts through
+the REAL AgentService — 8/9 answered, 0 leaks, outbox delta 0, all direct
+route. Suite 206 tests, ruff clean.
+
+Next phase: validated field-proposal persistence for the direct route,
+live no_send->handoff policy, multi-deployment resolution.

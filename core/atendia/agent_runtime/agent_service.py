@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from atendia.agent_runtime.agent_config import action_registry_for_agent
 from atendia.agent_runtime.advisor_pipeline import AdvisorFirstAgentProvider
+from atendia.agent_runtime.agent_config import action_registry_for_agent
 from atendia.agent_runtime.context_builder import ContextBuilder
 from atendia.agent_runtime.policy_validator import PolicyValidator
 from atendia.agent_runtime.runtime_state_persistence import persist_runtime_v2_turn_state
@@ -63,6 +63,29 @@ class AgentService:
         metadata: dict[str, Any] | None = None,
         to_phone_e164: str | None = None,
     ) -> AgentServiceResult:
+        # Phase 14: Respond-Style direct route for opted-in Product Agents
+        # (mandatory no-send). Tenants without an opted-in deployment keep
+        # the previous Runtime V2 path completely untouched.
+        from atendia.product_agents.agent_service_bridge import (
+            maybe_handle_respond_style_turn,
+        )
+
+        respond_style = await maybe_handle_respond_style_turn(
+            self._session,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            inbound_text=inbound_text,
+            mode=str(mode),
+        )
+        if respond_style is not None:
+            return _respond_style_agent_service_result(
+                respond_style,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                inbound_text=inbound_text,
+                mode=mode,
+            )
+
         metadata = {**(metadata or {}), "agent_service_mode": mode}
         context = await self._context_builder.build(
             TurnInput(
@@ -153,6 +176,119 @@ class AgentService:
             send=send,
             errors=errors,
         )
+
+
+def _respond_style_agent_service_result(
+    outcome: Any,
+    *,
+    tenant_id: str,
+    conversation_id: str,
+    inbound_text: str,
+    mode: SendMode,
+) -> AgentServiceResult:
+    """Maps a Respond-Style bridge outcome into the AgentServiceResult shape
+    consumed by existing callers. Always no-send: the send decision is
+    blocked by construction and no outbox write is ever attempted."""
+    from atendia.agent_runtime.send_policy import PreparedSendDecision
+
+    result = outcome.result
+    blocked_reason = outcome.blocked_reason or (
+        result.blocked_reason if result is not None else None
+    )
+    runtime_trace = dict(result.trace) if result is not None else {}
+    provider_trace = runtime_trace.get("respond_style_llm_provider") or {}
+    loop_trace = runtime_trace.get("respond_style_tool_loop") or {}
+    trace_metadata: dict[str, Any] = {
+        "respond_style_agent_service": {
+            "route": "respond_style_agent_service_no_send",
+            "legacy_path_used": False,
+            "send_decision": "no_send",
+            "deployment_id": outcome.deployment_id,
+            "agent_version_id": outcome.agent_version_id,
+            "blocked_reason": blocked_reason,
+            "publish_gate_blockers": outcome.blockers,
+            "context_summary": {
+                "tenant_id": tenant_id,
+                "conversation_id": conversation_id,
+                "inbound_text": inbound_text[:200],
+            },
+            "tool_rounds": loop_trace.get("tool_rounds"),
+            "tool_results": loop_trace.get("tool_results"),
+            "dropped_tool_requests": loop_trace.get("dropped_tool_requests"),
+            "retry_backoff": {
+                "transient_retries_total": provider_trace.get(
+                    "transient_retries_total"
+                ),
+                "validator_retries_total": provider_trace.get(
+                    "validator_retries_total"
+                ),
+                "backoff_wait_ms_total": provider_trace.get("backoff_wait_ms_total"),
+            },
+            "validator": (result.validation_result if result is not None else {}),
+            "final_message_candidate": (
+                result.final_message if result is not None else None
+            ),
+            "field_update_proposals": (
+                result.field_update_proposals if result is not None else []
+            ),
+            "workflow_event_proposals": (
+                result.workflow_event_proposals if result is not None else []
+            ),
+            "action_proposals": (
+                result.action_proposals if result is not None else []
+            ),
+            "handoff_proposal": (
+                result.handoff_proposal if result is not None else None
+            ),
+            "side_effects": (
+                result.side_effects
+                if result is not None
+                else {
+                    "delivery": False,
+                    "workflows": False,
+                    "actions": False,
+                    "field_writes": False,
+                }
+            ),
+        },
+        **runtime_trace,
+    }
+    output = TurnOutput(
+        final_message=(result.final_message or "") if result is not None else "",
+        trace_metadata=trace_metadata,
+    )
+    errors: list[dict[str, Any]] = []
+    if blocked_reason:
+        errors.append(
+            {
+                "where": "respond_style_agent_service",
+                "code": blocked_reason,
+                "blockers": outcome.blockers,
+            }
+        )
+    send = SendAdapterResult(
+        mode=mode,
+        send_decision=PreparedSendDecision(
+            status="blocked",
+            allowed=False,
+            dry_run=True,
+            reason="respond_style_agent_service_no_send_only",
+            reasons=[blocked_reason] if blocked_reason else [],
+        ),
+        delivery_status={"status": "not_attempted"},
+        outbox_write_attempted=False,
+    )
+    return AgentServiceResult(
+        context=TurnContext(
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            inbound_text=inbound_text,
+            metadata={"runtime_path": "respond_style_agent_service_no_send"},
+        ),
+        output=output,
+        send=send,
+        errors=errors,
+    )
 
 
 async def _load_agent_runtime_v2_config(

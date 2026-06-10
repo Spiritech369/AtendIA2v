@@ -1,0 +1,141 @@
+{
+  "decision": "PHASE_14_AGENT_SERVICE_REPLAY_PASSED",
+  "mode": "no_send",
+  "checks": {
+    "turns": 9,
+    "answered": 8,
+    "all_direct_route": true,
+    "legacy_path_used_false": true,
+    "all_send_blocked": true,
+    "no_outbox_attempts": true,
+    "outbox_delta": 0,
+    "outbox_pending_or_retry": 0,
+    "internal_leaks": 0,
+    "no_silent_without_reason": true
+  },
+  "results": [
+    {
+      "replay": "v2_incident",
+      "inbound": "Hola",
+      "candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "replay": "v2_incident",
+      "inbound": "Info porfavor",
+      "candidate": "En general, se requiere identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas. ¿Puedes decirme qué tipo de ingreso recibes?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "replay": "v2_incident",
+      "inbound": "Me pagan por transferencia",
+      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual. ¿Puedes decirme tu antigüedad laboral?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": [
+        {
+          "tool_name": "eligibility_plan.resolve",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "replay": "v2_incident",
+      "inbound": "?",
+      "candidate": "¿En qué puedo ayudarte hoy? Si necesitas información sobre requisitos o algún otro tema, por favor dime.",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "hola",
+      "candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "info porfavor",
+      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual y qué tipo de ingreso recibes. ¿Puedes proporcionarme esos detalles?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "15 meses",
+      "candidate": null,
+      "blocked_reason": "tool_round_limit_reached",
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": [
+        {
+          "tool_name": "eligibility_plan.resolve",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "me pagan por transferencia",
+      "candidate": "Entiendo que te pagan por transferencia. Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual. ¿Puedes decirme tu antigüedad laboral?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": [
+        {
+          "tool_name": "eligibility_plan.resolve",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "?",
+      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual y qué tipo de ingreso recibes. ¿Puedes proporcionarme esos detalles?",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": []
+    }
+  ]
+}
