@@ -239,6 +239,7 @@ class RespondStyleTurnValidator:
                 )
             errors.extend(_claim_errors(output.claims, context))
             errors.extend(self._hard_policy_errors(output, context))
+            errors.extend(_stale_corrected_value_errors(output, context))
 
         errors.extend(_field_write_errors(output, context))
         errors.extend(_workflow_errors(output, context))
@@ -427,6 +428,70 @@ def _claim_errors(
                     )
                 )
     return errors
+
+
+def _stale_corrected_value_errors(
+    output: LLMAgentTurnOutput,
+    context: AgentContextPackage,
+) -> list[ValidationErrorItem]:
+    """Phase 17: the final_message must not restate a value the customer
+    corrected away. Generic comparison of the corrected-away previous value
+    vs the current canonical value; retryable so the provider repairs with
+    feedback before failing closed."""
+    message = output.final_message or ""
+    if not message:
+        return []
+    identity = context.agent_identity or {}
+    corrected = identity.get("corrected_fields") or {}
+    current_state = identity.get("contact_state") or {}
+    if not isinstance(corrected, dict) or not corrected:
+        return []
+    lowered = message.casefold()
+    errors: list[ValidationErrorItem] = []
+    for field_key, previous_value in corrected.items():
+        current_value = (
+            current_state.get(field_key) if isinstance(current_state, dict) else None
+        )
+        previous_token = _value_token(previous_value)
+        current_token = _value_token(current_value)
+        if not previous_token or previous_token == current_token:
+            continue
+        if not _token_in_text(previous_token, lowered):
+            continue
+        if current_token and _token_in_text(current_token, lowered):
+            continue
+        errors.append(
+            _error(
+                "stale_corrected_value_in_message",
+                (
+                    f"final_message restates the corrected-away value "
+                    f"'{previous_token}' for {field_key}; the current value is "
+                    f"'{current_token}'. Use the CURRENT contact state."
+                ),
+                path="final_message",
+            )
+        )
+    return errors
+
+
+def _value_token(value: object) -> str:
+    if value is None:
+        return ""
+    token = str(value).strip().casefold()
+    match = re.search(r"\d+(?:\.\d+)?", token)
+    if match:
+        return match.group(0)
+    return token
+
+
+def _token_in_text(token: str, lowered_text: str) -> bool:
+    if not token:
+        return False
+    if re.fullmatch(r"\d+(?:\.\d+)?", token):
+        pattern = rf"(?<![\w.]){re.escape(token)}(?![\w])(?!\.\d)"
+    else:
+        pattern = rf"(?<!\w){re.escape(token)}(?!\w)"
+    return re.search(pattern, lowered_text) is not None
 
 
 def _available_source_refs(context: AgentContextPackage) -> set[str]:

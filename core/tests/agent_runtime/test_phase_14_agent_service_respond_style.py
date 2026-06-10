@@ -93,7 +93,7 @@ def _patch_bridge(monkeypatch, *, deployment, version, blockers=None, decisions=
         return []
 
     async def fake_load_shadow(session, *, conversation_id):
-        return {}
+        return {}, {}
 
     async def fake_save_shadow(session, *, tenant_id, conversation_id, application):
         return None
@@ -101,7 +101,7 @@ def _patch_bridge(monkeypatch, *, deployment, version, blockers=None, decisions=
     monkeypatch.setattr(bridge, "_resolve_opted_in_deployment", fake_resolve)
     monkeypatch.setattr(bridge, "respond_style_publish_blockers", fake_blockers)
     monkeypatch.setattr(bridge, "_recent_transcript", fake_transcript)
-    monkeypatch.setattr(bridge, "_load_shadow_fields", fake_load_shadow)
+    monkeypatch.setattr(bridge, "_load_shadow_state", fake_load_shadow)
     monkeypatch.setattr(bridge, "_save_shadow_fields", fake_save_shadow)
     monkeypatch.setattr(
         bridge, "get_settings", lambda: SimpleNamespace(openai_api_key="test-key")
@@ -453,7 +453,7 @@ async def test_15a_shadow_fields_survive_between_turns(monkeypatch) -> None:
     store: dict = {}
 
     async def fake_load(session, *, conversation_id):
-        return dict(store)
+        return dict(store), {}
 
     async def fake_save(session, *, tenant_id, conversation_id, application):
         store.clear()
@@ -489,7 +489,7 @@ async def test_15a_shadow_fields_survive_between_turns(monkeypatch) -> None:
     session = _patch_bridge(
         monkeypatch, deployment=deployment, version=version, decisions=decisions
     )
-    monkeypatch.setattr(bridge, "_load_shadow_fields", fake_load)
+    monkeypatch.setattr(bridge, "_load_shadow_state", fake_load)
     monkeypatch.setattr(bridge, "_save_shadow_fields", fake_save)
     monkeypatch.setattr(bridge, "_StaticSources", _SpyStatic)
     service = _agent_service(session)
@@ -736,3 +736,148 @@ async def test_16_inbound_shadow_routes_through_agent_service(monkeypatch) -> No
     assert summaries[0]["field_state"] == {"shadow_only": True}
     assert summaries[0]["no_send_followup"] == {"action": "none"}
     assert summaries[0]["outbox_write_attempted"] is False
+
+
+# --- Phase 17 ----------------------------------------------------------------
+
+
+def _context_with_correction(field_key, current, previous) -> AgentContextPackage:
+    return AgentContextPackage(
+        agent_identity={
+            "contact_state": {field_key: current},
+            "corrected_fields": {field_key: previous},
+        }
+    )
+
+
+def test_17_stale_numeric_correction_blocks_and_is_retryable() -> None:
+    from atendia.agent_runtime import LLMAgentTurnOutput, RespondStyleTurnValidator
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Con 15 meses de antigüedad laboral calificas.",
+            confidence=0.8,
+        ),
+        context=_context_with_correction("employment_seniority", 10, "15 meses"),
+    )
+    assert decision.send_decision == "no_send"
+    assert decision.retry_instruction is not None
+    codes = {item.code for item in decision.retry_instruction.error_items}
+    assert "stale_corrected_value_in_message" in codes
+
+
+def test_17_current_value_in_message_passes() -> None:
+    from atendia.agent_runtime import LLMAgentTurnOutput, RespondStyleTurnValidator
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Con 10 meses de antigüedad laboral seguimos.",
+            confidence=0.8,
+        ),
+        context=_context_with_correction("employment_seniority", 10, "15 meses"),
+    )
+    assert decision.send_decision == "send"
+
+
+def test_17_string_corrections_income_and_product() -> None:
+    from atendia.agent_runtime import LLMAgentTurnOutput, RespondStyleTurnValidator
+
+    validator = RespondStyleTurnValidator()
+    stale_income = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="Como recibes tus ingresos por banco, seguimos.",
+            confidence=0.8,
+        ),
+        context=_context_with_correction("income_type", "efectivo", "banco"),
+    )
+    assert stale_income.send_decision == "no_send"
+
+    stale_product = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="Perfecto, avanzamos con la opcion alfa.",
+            confidence=0.8,
+        ),
+        context=_context_with_correction("selected_option", "beta", "alfa"),
+    )
+    assert stale_product.send_decision == "no_send"
+
+    fixed = validator.validate(
+        output=LLMAgentTurnOutput(
+            final_message="Perfecto, avanzamos con la opcion beta.",
+            confidence=0.8,
+        ),
+        context=_context_with_correction("selected_option", "beta", "alfa"),
+    )
+    assert fixed.send_decision == "send"
+
+
+def test_17_prompt_and_context_mark_state_canonical() -> None:
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        build_respond_style_messages,
+        respond_style_system_prompt,
+    )
+
+    prompt = respond_style_system_prompt()
+    assert "single source of truth" in prompt
+    assert "transcript is HISTORY" in prompt
+
+    from atendia.agent_runtime import AgentTurnInput
+
+    turn_input = AgentTurnInput(
+        tenant_id="t",
+        deployment_id="d",
+        agent_id="a",
+        agent_version_id="v",
+        runtime_mode="test_lab_no_send",
+        send_mode="no_send",
+        channel="test",
+        conversation_id="c",
+        inbound_text="hola",
+    )
+    messages = build_respond_style_messages(
+        turn_input=turn_input,
+        context=_context_with_correction("employment_seniority", 10, "15 meses"),
+    )
+    rendered = " ".join(m["content"] for m in messages)
+    assert "CURRENT contact state (canonical" in rendered
+    assert "CORRECTED by the customer" in rendered
+    assert "'15 meses'" in rendered
+
+
+def test_17_bridge_extracts_corrections_from_audit() -> None:
+    from atendia.product_agents.agent_service_bridge import (
+        _corrected_fields_from_audit,
+    )
+
+    audit = [
+        {
+            "field_key": "employment_seniority",
+            "status": "accepted",
+            "reason": "corrected_previous_value",
+            "previous_value": "15 meses",
+            "new_value": 10,
+        },
+        {
+            "field_key": "income_type",
+            "status": "accepted",
+            "reason": "new_value_captured",
+            "previous_value": None,
+            "new_value": "efectivo",
+        },
+        {
+            "field_key": "stale_irrelevant",
+            "status": "accepted",
+            "reason": "corrected_previous_value",
+            "previous_value": "x",
+            "new_value": "x",
+        },
+    ]
+    corrected = _corrected_fields_from_audit(
+        audit,
+        current_values={
+            "employment_seniority": 10,
+            "income_type": "efectivo",
+            "stale_irrelevant": "x",
+        },
+    )
+    assert corrected == {"employment_seniority": "15 meses"}

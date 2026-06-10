@@ -105,6 +105,8 @@ class RespondStyleContextSnapshot(BaseModel):
     inbound_attachments: list[JsonDict] = Field(default_factory=list)
     recent_messages: list[TranscriptMessage] = Field(default_factory=list)
     contact_fields: list[ContactFieldState] = Field(default_factory=list)
+    # Phase 17: corrected-away previous values, keyed by field_key.
+    corrected_fields: JsonDict = Field(default_factory=dict)
     conversation_stage: str | None = None
     agent_name: str = ""
     agent_persona: str = ""
@@ -246,6 +248,7 @@ def _agent_identity(snapshot: RespondStyleContextSnapshot) -> JsonDict:
         "escalation_rules": list(snapshot.escalation_rules),
         "conversation_stage": snapshot.conversation_stage,
         "contact_state": known_fields,
+        "corrected_fields": dict(snapshot.corrected_fields),
         "missing_fields": missing_fields,
         # Declarative contract for the LLM: fields are captured when the
         # customer provides them, never collected as a questionnaire.

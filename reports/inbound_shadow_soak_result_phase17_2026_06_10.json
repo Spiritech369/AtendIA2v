@@ -1,0 +1,910 @@
+{
+  "decision": "PHASE_16_SOAK_HARNESS_PASSED",
+  "mode": "no_send",
+  "checks": {
+    "conversations": 4,
+    "turns": 12,
+    "answered": 12,
+    "all_no_send": true,
+    "legacy_path_used_false": true,
+    "all_route_agent_service": true,
+    "no_outbox_attempts": true,
+    "no_silent_without_reason": true,
+    "internal_attention_items": [],
+    "outbox_delta": 0,
+    "outbox_pending_or_retry": 0,
+    "shadow_field_rows": 6
+  },
+  "conversations": [
+    {
+      "conversation": "flujo_normal",
+      "turns": [
+        {
+          "inbound": "hola",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "tengo 15 meses trabajando",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "He registrado que tienes 15 meses trabajando. ¿Cómo recibes tus ingresos? Esto me ayudará a verificar los requisitos para ti.",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {
+              "employment_seniority": 15
+            },
+            "accepted": 1,
+            "rejected": 0,
+            "audit": [
+              {
+                "field_key": "employment_seniority",
+                "status": "accepted",
+                "reason": "new_value_captured",
+                "previous_value": null,
+                "new_value": 15,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "source": "llm_field_proposal",
+                "shadow_only": true
+              }
+            ]
+          },
+          "field_update_proposals": [
+            {
+              "field_key": "employment_seniority",
+              "value": 15,
+              "evidence": [
+                "transcript:latest_customer_message"
+              ],
+              "confidence": 0.9,
+              "reason": "El cliente mencionó su antigüedad laboral."
+            }
+          ],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [
+              {
+                "field_key": "employment_seniority",
+                "value": 15,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "confidence": 0.9,
+                "reason": "El cliente mencionó su antigüedad laboral."
+              }
+            ],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "me pagan por transferencia",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Con 15 meses de antigüedad laboral y recibiendo ingresos por transferencia, puedes acceder al plan semanal estándar. Se requiere un pago inicial del 30%.",
+          "tools": [
+            {
+              "tool_name": "eligibility_plan.resolve",
+              "status": "succeeded"
+            }
+          ],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {
+              "employment_seniority": 15
+            },
+            "new_values": {
+              "employment_seniority": 15,
+              "income_type": "transferencia"
+            },
+            "accepted": 1,
+            "rejected": 0,
+            "audit": [
+              {
+                "field_key": "income_type",
+                "status": "accepted",
+                "reason": "new_value_captured",
+                "previous_value": null,
+                "new_value": "transferencia",
+                "evidence": [
+                  "transcript:me pagan por transferencia"
+                ],
+                "source": "llm_field_proposal",
+                "shadow_only": true
+              }
+            ]
+          },
+          "field_update_proposals": [
+            {
+              "field_key": "income_type",
+              "value": "transferencia",
+              "evidence": [
+                "transcript:me pagan por transferencia"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente mencionó que recibe su pago por transferencia."
+            }
+          ],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [
+              {
+                "field_key": "income_type",
+                "value": "transferencia",
+                "evidence": [
+                  "transcript:me pagan por transferencia"
+                ],
+                "confidence": 1.0,
+                "reason": "El cliente mencionó que recibe su pago por transferencia."
+              }
+            ],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "qué ocupo",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Para acceder al plan, necesitas: \n1. Identificación oficial vigente. \n2. Comprobante de domicilio reciente. \n3. Comprobante de ingresos de los últimos 3 meses.",
+          "tools": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded"
+            }
+          ],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {
+              "income_type": "transferencia",
+              "employment_seniority": 15
+            },
+            "new_values": {
+              "income_type": "transferencia",
+              "employment_seniority": 15
+            },
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "¡Hola! ¿En qué puedo ayudarte hoy?"
+        },
+        {
+          "role": "customer",
+          "text": "tengo 15 meses trabajando"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "He registrado que tienes 15 meses trabajando. ¿Cómo recibes tus ingresos? Esto me ayudará a verificar los requisitos para ti."
+        },
+        {
+          "role": "customer",
+          "text": "me pagan por transferencia"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Con 15 meses de antigüedad laboral y recibiendo ingresos por transferencia, puedes acceder al plan semanal estándar. Se requiere un pago inicial del 30%."
+        },
+        {
+          "role": "customer",
+          "text": "qué ocupo"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Para acceder al plan, necesitas: \n1. Identificación oficial vigente. \n2. Comprobante de domicilio reciente. \n3. Comprobante de ingresos de los últimos 3 meses."
+        }
+      ]
+    },
+    {
+      "conversation": "requisitos_primero",
+      "turns": [
+        {
+          "inbound": "hola",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "qué ocupo",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Para obtener información específica sobre lo que necesitas, generalmente se pide identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas. ¿Te gustaría que te ayude a verificar los requisitos según tu situación?",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "dame los papeles primero",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Para darte la lista exacta de papeles que necesitas, primero necesito saber qué tipo de ingresos tienes. ¿Podrías decirme cómo recibes tus ingresos?",
+          "tools": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "skipped"
+            }
+          ],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "¡Hola! ¿En qué puedo ayudarte hoy?"
+        },
+        {
+          "role": "customer",
+          "text": "qué ocupo"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Para obtener información específica sobre lo que necesitas, generalmente se pide identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas. ¿Te gustaría que te ayude a verificar los requisitos según tu situación?"
+        },
+        {
+          "role": "customer",
+          "text": "dame los papeles primero"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Para darte la lista exacta de papeles que necesitas, primero necesito saber qué tipo de ingresos tienes. ¿Podrías decirme cómo recibes tus ingresos?"
+        }
+      ]
+    },
+    {
+      "conversation": "correccion",
+      "turns": [
+        {
+          "inbound": "tengo 15 meses",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Gracias por compartir que tienes 15 meses de antigüedad laboral. ¿Cómo recibes tus ingresos? Esto me ayudará a verificar los requisitos específicos para ti.",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {
+              "employment_seniority": 15
+            },
+            "accepted": 1,
+            "rejected": 0,
+            "audit": [
+              {
+                "field_key": "employment_seniority",
+                "status": "accepted",
+                "reason": "new_value_captured",
+                "previous_value": null,
+                "new_value": 15,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "source": "llm_field_proposal",
+                "shadow_only": true
+              }
+            ]
+          },
+          "field_update_proposals": [
+            {
+              "field_key": "employment_seniority",
+              "value": 15,
+              "evidence": [
+                "transcript:latest_customer_message"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente mencionó tener 15 meses de antigüedad laboral."
+            }
+          ],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [
+              {
+                "field_key": "employment_seniority",
+                "value": 15,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "confidence": 1.0,
+                "reason": "El cliente mencionó tener 15 meses de antigüedad laboral."
+              }
+            ],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "no, perdón, son 10 meses",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Gracias por la aclaración, ahora tengo que actualizar tu antigüedad laboral a 10 meses. ¿Cómo recibes tus ingresos?",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {
+              "employment_seniority": 15
+            },
+            "new_values": {
+              "employment_seniority": 10
+            },
+            "accepted": 1,
+            "rejected": 0,
+            "audit": [
+              {
+                "field_key": "employment_seniority",
+                "status": "accepted",
+                "reason": "corrected_previous_value",
+                "previous_value": 15,
+                "new_value": 10,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "source": "llm_field_proposal",
+                "shadow_only": true
+              }
+            ]
+          },
+          "field_update_proposals": [
+            {
+              "field_key": "employment_seniority",
+              "value": 10,
+              "evidence": [
+                "transcript:latest_customer_message"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente corrigió su antigüedad laboral."
+            }
+          ],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [
+              {
+                "field_key": "employment_seniority",
+                "value": 10,
+                "evidence": [
+                  "transcript:latest_customer_message"
+                ],
+                "confidence": 1.0,
+                "reason": "El cliente corrigió su antigüedad laboral."
+              }
+            ],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "me pagan por nómina",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Para ingresos por nómina, necesitarás presentar los siguientes documentos:\n1. Identificación oficial vigente.\n2. Comprobante de domicilio reciente.\n3. Comprobante de ingresos de los últimos 3 meses.",
+          "tools": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded"
+            }
+          ],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {
+              "employment_seniority": 10
+            },
+            "new_values": {
+              "employment_seniority": 10,
+              "income_type": "nómina"
+            },
+            "accepted": 1,
+            "rejected": 0,
+            "audit": [
+              {
+                "field_key": "income_type",
+                "status": "accepted",
+                "reason": "new_value_captured",
+                "previous_value": null,
+                "new_value": "nómina",
+                "evidence": [
+                  "El cliente dijo: 'me pagan por nómina'"
+                ],
+                "source": "llm_field_proposal",
+                "shadow_only": true
+              }
+            ]
+          },
+          "field_update_proposals": [
+            {
+              "field_key": "income_type",
+              "value": "nómina",
+              "evidence": [
+                "El cliente dijo: 'me pagan por nómina'"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente proporcionó su tipo de ingreso."
+            }
+          ],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [
+              {
+                "field_key": "income_type",
+                "value": "nómina",
+                "evidence": [
+                  "El cliente dijo: 'me pagan por nómina'"
+                ],
+                "confidence": 1.0,
+                "reason": "El cliente proporcionó su tipo de ingreso."
+              }
+            ],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "tengo 15 meses"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Gracias por compartir que tienes 15 meses de antigüedad laboral. ¿Cómo recibes tus ingresos? Esto me ayudará a verificar los requisitos específicos para ti."
+        },
+        {
+          "role": "customer",
+          "text": "no, perdón, son 10 meses"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Gracias por la aclaración, ahora tengo que actualizar tu antigüedad laboral a 10 meses. ¿Cómo recibes tus ingresos?"
+        },
+        {
+          "role": "customer",
+          "text": "me pagan por nómina"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Para ingresos por nómina, necesitarás presentar los siguientes documentos:\n1. Identificación oficial vigente.\n2. Comprobante de domicilio reciente.\n3. Comprobante de ingresos de los últimos 3 meses."
+        }
+      ]
+    },
+    {
+      "conversation": "humano",
+      "turns": [
+        {
+          "inbound": "hola",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy?",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": null,
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        },
+        {
+          "inbound": "prefiero que me atienda una persona",
+          "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+          "agent_version_id": "a7bdde5e-2e33-41f0-bd66-3aea3c3bfb62",
+          "route": "respond_style_agent_service_no_send",
+          "legacy_path_used": false,
+          "send_decision": "no_send",
+          "send_allowed": false,
+          "outbox_write_attempted": false,
+          "blocked_reason": null,
+          "final_message_candidate": "Voy a conectar contigo un asesor humano para que te ayude mejor.",
+          "tools": [],
+          "field_state": {
+            "shadow_only": true,
+            "previous_values": {},
+            "new_values": {},
+            "accepted": 0,
+            "rejected": 0,
+            "audit": []
+          },
+          "field_update_proposals": [],
+          "handoff_proposal": {
+            "needed": true,
+            "reason": "El cliente prefiere atención humana.",
+            "target": "ventas",
+            "priority": "normal"
+          },
+          "no_send_followup": {
+            "action": "none",
+            "notify_operator": false,
+            "executed": false
+          },
+          "validator": {
+            "status": "valid",
+            "retryable": false,
+            "feedback_for_llm": null,
+            "accepted_tool_requests": [],
+            "accepted_field_writes": [],
+            "accepted_actions": [],
+            "accepted_workflow_events": [],
+            "blocked_items": [],
+            "send_decision": "no_send",
+            "blocked_reason": null
+          },
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false,
+            "field_writes": false
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "¡Hola! ¿En qué puedo ayudarte hoy?"
+        },
+        {
+          "role": "customer",
+          "text": "prefiero que me atienda una persona"
+        },
+        {
+          "role": "assistant_shadow",
+          "text": "Voy a conectar contigo un asesor humano para que te ayude mejor."
+        }
+      ]
+    }
+  ]
+}

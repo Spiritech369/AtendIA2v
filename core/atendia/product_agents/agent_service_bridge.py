@@ -172,9 +172,13 @@ async def _handle_opted_in_turn(
 
     config = _config_from_version(version)
     transcript = await _recent_transcript(session, conversation_id=conversation_id)
-    shadow_values = await _load_shadow_fields(session, conversation_id=conversation_id)
+    shadow_values, corrected_fields = await _load_shadow_state(
+        session, conversation_id=conversation_id
+    )
     state = ConversationStateSnapshot(
-        recent_messages=transcript, field_values=shadow_values
+        recent_messages=transcript,
+        field_values=shadow_values,
+        corrected_fields=corrected_fields,
     )
     runtime = ProductAgentRuntime(
         snapshot_adapter=_StaticSources(config, state),
@@ -250,10 +254,47 @@ def derive_no_send_followup(
 
 
 async def _load_shadow_fields(session: Any, *, conversation_id: str) -> dict[str, Any]:
+    values, _ = await _load_shadow_state(session, conversation_id=conversation_id)
+    return values
+
+
+async def _load_shadow_state(
+    session: Any, *, conversation_id: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Returns (current_values, corrected_fields). corrected_fields maps a
+    field_key to its corrected-away PREVIOUS value (Phase 17: lets the
+    context mark current state as canonical over older transcript text)."""
     row = await session.get(RespondStyleShadowFields, UUID(str(conversation_id)))
     if row is None or not isinstance(row.field_values, dict):
-        return {}
-    return dict(row.field_values)
+        return {}, {}
+    values = dict(row.field_values)
+    return values, _corrected_fields_from_audit(
+        list(row.audit_log or []), current_values=values
+    )
+
+
+def _corrected_fields_from_audit(
+    audit_log: list[Any],
+    *,
+    current_values: dict[str, Any],
+) -> dict[str, Any]:
+    corrected: dict[str, Any] = {}
+    for entry in audit_log:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("status") != "accepted":
+            continue
+        if entry.get("reason") != "corrected_previous_value":
+            continue
+        field_key = entry.get("field_key")
+        previous = entry.get("previous_value")
+        if not field_key or previous is None:
+            continue
+        # Only corrections still relevant: the current value differs from
+        # the corrected-away one.
+        if str(current_values.get(field_key)) != str(previous):
+            corrected[str(field_key)] = previous
+    return corrected
 
 
 async def _save_shadow_fields(

@@ -484,11 +484,22 @@ def _render_dynamic_context(
     sections: list[str] = []
     identity = context.agent_identity
     known = identity.get("contact_state") or {}
+    corrected = identity.get("corrected_fields") or {}
     if known:
-        sections.append(
-            "## Known contact values (do NOT ask for these again)\n"
-            + "\n".join(f"- {key}: {value}" for key, value in known.items())
-        )
+        known_lines = [
+            "## CURRENT contact state (canonical — overrides anything older in "
+            "the transcript; do NOT ask for these again)"
+        ]
+        for key, value in known.items():
+            if key in corrected:
+                known_lines.append(
+                    f"- {key}: {value} (CORRECTED by the customer — replaces the "
+                    f"older value '{corrected[key]}' still visible in the "
+                    "transcript; never restate the old value)"
+                )
+            else:
+                known_lines.append(f"- {key}: {value}")
+        sections.append("\n".join(known_lines))
     missing = identity.get("missing_fields") or []
     if missing:
         sections.append(
@@ -602,6 +613,10 @@ def respond_style_system_prompt() -> str:
             "for factual assertions requiring support.",
             "If the customer corrects a previously given value, the correction wins:",
             "propose the corrected value and never restate the old one.",
+            "The CURRENT contact state is the single source of truth. The",
+            "transcript is HISTORY: when an older transcript message conflicts",
+            "with a current contact value, always use the current value and",
+            "never repeat the outdated one.",
             "Never ask for a value the customer already provided in this conversation.",
             "Answer direct questions about you (for example whether you are a bot)",
             "first and honestly, using the configured knowledge, then continue.",

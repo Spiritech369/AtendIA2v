@@ -523,3 +523,30 @@ Status: `PHASE_16_INBOUND_SHADOW_SOAK_AND_OPERATOR_REVIEW_READY`
 Path to controlled smoke: flip the two flags on the pilot deployment for
 a real-traffic shadow window, review with the Phase 16 format, then the
 smoke decision gated by parity + publish gates + rollback packet.
+
+## Phase 17 — State Truth Over Transcript (2026-06-10)
+
+Status: `PHASE_17_STATE_TRUTH_OVER_TRANSCRIPT_READY`
+
+Fixes the soak-detected copy/state divergence (state corrected 15->10,
+final copy restated the stale 15):
+
+- Context contract: ConversationStateSnapshot/RespondStyleContextSnapshot
+  carry `corrected_fields` (field_key -> corrected-away previous value);
+  builder surfaces it in agent_identity.
+- Prompt: known fields render as "CURRENT contact state (canonical —
+  overrides anything older in the transcript)"; corrected fields carry an
+  explicit "replaces the older value 'X' still visible in the transcript"
+  note; system rule "current state is the single source of truth, the
+  transcript is HISTORY".
+- Validator backstop (generic, no vertical hardcode):
+  `stale_corrected_value_in_message` — retryable error when the
+  final_message contains the corrected-away token without the current one;
+  numeric and string tokens with safe boundaries (decimals protected).
+- Bridge: extracts still-relevant corrections from the shadow audit_log
+  (`corrected_previous_value` entries whose previous differs from current)
+  and feeds them into the snapshot each turn.
+- Soak re-run (Docker, real DB+OpenAI): correction conversation now acks
+  the update explicitly and never restates the stale value — scenario
+  score 4.5 (>=4.2). 12/12 answered, outbox delta 0, legacy false.
+  Suite 218 tests, ruff clean.

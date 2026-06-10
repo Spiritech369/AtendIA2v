@@ -57,6 +57,10 @@ class ConversationStateSnapshot(BaseModel):
 
     recent_messages: list[TranscriptMessage] = Field(default_factory=list)
     field_values: JsonDict = Field(default_factory=dict)
+    # Phase 17: fields whose value was corrected by the customer, mapped to
+    # the corrected-away PREVIOUS value. Lets the context mark the current
+    # value as canonical over older transcript mentions.
+    corrected_fields: JsonDict = Field(default_factory=dict)
     conversation_stage: str | None = None
 
 
@@ -112,6 +116,7 @@ class ProductAgentConfigSnapshotAdapter:
             inbound_attachments=list(runtime_input.attachments),
             recent_messages=list(state.recent_messages),
             contact_fields=_merge_field_state(config.field_definitions, state.field_values),
+            corrected_fields=dict(state.corrected_fields),
             conversation_stage=state.conversation_stage,
             agent_name=config.agent_name,
             agent_persona=config.persona,
