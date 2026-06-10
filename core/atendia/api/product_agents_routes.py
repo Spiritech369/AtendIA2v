@@ -10,7 +10,7 @@ from atendia.api._auth_helpers import AuthUser
 from atendia.api._deps import current_tenant_id, current_user, require_tenant_admin
 from atendia.db.models.product_agent import AgentDeployment, AgentVersion
 from atendia.db.session import get_db_session
-from atendia.product_agents import service, test_lab
+from atendia.product_agents import service, test_lab, test_lab_direct_adapter
 from atendia.product_agents.schemas import (
     ActionBindingCreate,
     AgentActionBindingCreate,
@@ -660,6 +660,36 @@ async def run_agent_test_suite(
             mode=payload.mode,
             execution_mode=payload.execution_mode,
             review_required=payload.review_required,
+            created_by_user_id=user.user_id,
+        )
+    except service.ProductAgentError as exc:
+        raise _http_error(exc) from exc
+    await session.commit()
+    await session.refresh(run)
+    return run
+
+
+@router.post(
+    "/test-suites/{suite_id}/runs/respond-style-direct",
+    response_model=AgentTestRunRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def run_agent_test_suite_respond_style_direct(
+    suite_id: UUID,
+    tenant_id: UUID = Depends(current_tenant_id),
+    user: AuthUser = Depends(require_tenant_admin),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Runs the suite over the Respond-Style direct ProductAgentRuntime path.
+
+    Always no-send: simulated delivery only, no outbox, no workflow/action
+    side effects. Evidence is stored as an AgentTestRun (mode='no_send').
+    """
+    try:
+        run = await test_lab_direct_adapter.run_direct_test_suite(
+            session,
+            tenant_id=tenant_id,
+            suite_id=suite_id,
             created_by_user_id=user.user_id,
         )
     except service.ProductAgentError as exc:

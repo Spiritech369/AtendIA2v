@@ -1,0 +1,121 @@
+{
+  "decision": "PHASE_11_RESPOND_STYLE_MULTIRound_TESTLAB_RESOLVER_NO_SEND_READY",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "compound_used_multiple_rounds": true,
+  "rounds_used": [
+    3,
+    2
+  ],
+  "scenarios": [
+    {
+      "scenario": "chaotic_compound",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta",
+          "final_message": "Para la opción estándar de trabajo por tu cuenta, necesitas: \n- Identificación válida \n- Comprobante de domicilio \n- Comprobante de ingresos reciente (cuando sea aplicable).\n\nEl costo es de 120 USD mensuales.",
+          "blocked_reason": null,
+          "tool_rounds": 3,
+          "tools": [
+            {
+              "tool_name": "catalog.search",
+              "status": "succeeded"
+            },
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded"
+            },
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded"
+            }
+          ],
+          "provisional_field_keys": [
+            "selected_option",
+            "work_type"
+          ],
+          "send_decision": "no_send"
+        }
+      ]
+    },
+    {
+      "scenario": "sequential_two_step_price",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "cuanto cuesta la opcion mas economica que tengan?",
+          "final_message": "La opción más económica cuesta 120 USD al mes.",
+          "blocked_reason": null,
+          "tool_rounds": 2,
+          "tools": [
+            {
+              "tool_name": "catalog.search",
+              "status": "succeeded"
+            },
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded"
+            }
+          ],
+          "provisional_field_keys": [],
+          "send_decision": "no_send"
+        }
+      ]
+    }
+  ],
+  "resolver_previews": [
+    {
+      "route_preview": "product_agent_direct",
+      "reason": "published_product_agent_with_respond_style_enabled",
+      "no_send_only": true,
+      "send_decision": "no_send",
+      "live_routing_active": false,
+      "live_blocked_reasons": [
+        "phase_11_is_no_send_only",
+        "send_not_enabled",
+        "outbox_not_enabled",
+        "live_send_not_enabled"
+      ],
+      "deployment_id": "dep-published",
+      "agent_id": "agent-1",
+      "active_version_id": "v1"
+    },
+    {
+      "route_preview": "legacy_runner",
+      "reason": "direct_route_requirements_not_met:publish_state_not_published",
+      "no_send_only": true,
+      "send_decision": "no_send",
+      "live_routing_active": false,
+      "live_blocked_reasons": [
+        "phase_11_is_no_send_only",
+        "send_not_enabled",
+        "outbox_not_enabled",
+        "live_send_not_enabled"
+      ],
+      "deployment_id": "dep-draft",
+      "agent_id": "agent-2",
+      "active_version_id": "v1"
+    },
+    {
+      "route_preview": "product_agent_direct",
+      "reason": "published_product_agent_with_respond_style_enabled",
+      "no_send_only": true,
+      "send_decision": "no_send",
+      "live_routing_active": false,
+      "live_blocked_reasons": [
+        "phase_11_is_no_send_only"
+      ],
+      "deployment_id": "dep-live-flags",
+      "agent_id": "agent-3",
+      "active_version_id": "v1"
+    }
+  ],
+  "side_effects": {
+    "outbox": false,
+    "workflows": false,
+    "actions": false,
+    "delivery": false,
+    "db_writes": false
+  }
+}

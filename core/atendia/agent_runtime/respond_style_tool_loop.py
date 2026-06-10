@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from inspect import isawaitable
+from time import monotonic
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -64,15 +65,26 @@ class RespondStyleTurnProvider(Protocol):
 
 @dataclass(frozen=True)
 class RespondStyleToolLoopConfig:
+    """Budgeted multi-round tool loop configuration.
+
+    ``max_tool_rounds``: LLM->tools->LLM cycles allowed (1 keeps the
+    original single-round behavior; compound asks typically need 2-3).
+    ``max_total_tool_calls``: hard cap on executed tool calls across all
+    rounds. ``max_elapsed_seconds``: optional wall-clock budget checked
+    before each round.
+    """
+
     max_tool_rounds: int = 1
+    max_total_tool_calls: int = 8
+    max_elapsed_seconds: float | None = None
 
 
 class RespondStyleToolLoop:
     """No-live Respond-Style tool loop.
 
-    It executes at most one dry/fact-only tool round and never sends,
+    It executes budgeted dry/fact-only tool rounds and never sends,
     persists, runs actions, emits workflow side effects, or touches legacy
-    composition paths.
+    composition paths. Exhausted budgets fail closed.
     """
 
     def __init__(
@@ -92,51 +104,124 @@ class RespondStyleToolLoop:
         turn_input: AgentTurnInput,
         context: AgentContextPackage,
     ) -> FinalTurnDecision:
-        first_decision = await self._provider.generate(turn_input=turn_input, context=context)
-        tool_calls = _accepted_tool_requests(first_decision)
-        if not tool_calls or self._config.max_tool_rounds < 1:
-            return _with_loop_trace(
-                _force_no_send(first_decision),
-                tool_rounds=0,
-                tool_results=[],
-                blocked_reason=None,
-                provisional_field_keys=[],
+        started = monotonic()
+        decision = await self._provider.generate(turn_input=turn_input, context=context)
+
+        # Field values the LLM extracts in any round are facts for tool
+        # preconditions (validated proposals only). They are provisional
+        # context — nothing is persisted here; real writes remain a later,
+        # separately validated execution layer.
+        provisional_by_key: dict[str, LLMFieldUpdateProposal] = {}
+        all_tool_results: list[ToolExecutionResult] = []
+        current_context = context
+        rounds_executed = 0
+        total_tool_calls = 0
+
+        nudged_after_duplicate_requests = False
+        while rounds_executed < self._config.max_tool_rounds:
+            tool_calls = _accepted_tool_requests(decision)
+            if not tool_calls:
+                break
+            # Never re-execute a tool that already succeeded: reuse its
+            # result. If the model only re-requested succeeded tools, nudge
+            # it once with structured feedback to write from tool_results.
+            tool_calls = _deduplicate_tool_calls(tool_calls, all_tool_results)
+            if not tool_calls:
+                if nudged_after_duplicate_requests:
+                    break
+                nudged_after_duplicate_requests = True
+                decision = await self._provider.generate(
+                    turn_input=turn_input,
+                    context=_context_with_loop_feedback(
+                        current_context,
+                        "All requested tools already have succeeded tool_results "
+                        "in context. Do not request them again; write the "
+                        "final_response from those results.",
+                    ),
+                )
+                continue
+            budget_block = self._budget_block(
+                started=started,
+                total_tool_calls=total_tool_calls,
+                requested=len(tool_calls),
+            )
+            if budget_block is not None:
+                return _blocked_loop_decision(
+                    code=budget_block,
+                    message="Tool budget exhausted; visible send remains blocked.",
+                    tool_rounds=rounds_executed,
+                    tool_results=all_tool_results,
+                )
+
+            for proposal in _accepted_field_writes(decision):
+                provisional_by_key[proposal.field_key] = proposal
+            current_context = _context_with_provisional_fields(
+                context, list(provisional_by_key.values())
+            )
+            current_context = _context_with_tool_results(
+                current_context, all_tool_results
             )
 
-        # Field values the LLM extracted in this same turn are facts for the
-        # tool round (validated proposals only). They are provisional context
-        # — nothing is persisted here; real writes remain a later, separately
-        # validated execution layer.
-        provisional_fields = _accepted_field_writes(first_decision)
-        context_for_tools = _context_with_provisional_fields(context, provisional_fields)
+            round_results: list[ToolExecutionResult] = []
+            for tool_call in tool_calls:
+                result = await self._execute_fact_tool(
+                    tool_call=tool_call, context=current_context
+                )
+                round_results.append(result)
+                total_tool_calls += 1
 
-        tool_results: list[ToolExecutionResult] = []
-        for tool_call in tool_calls:
-            result = await self._execute_fact_tool(
-                tool_call=tool_call, context=context_for_tools
+            required_failure = _required_tool_failure(round_results)
+            all_tool_results.extend(round_results)
+            if required_failure is not None:
+                return _blocked_tool_decision(
+                    required_failure, all_tool_results, tool_rounds=rounds_executed + 1
+                )
+
+            rounds_executed += 1
+            current_context = _context_with_tool_results(
+                _context_with_provisional_fields(
+                    context, list(provisional_by_key.values())
+                ),
+                all_tool_results,
             )
-            tool_results.append(result)
+            decision = await self._provider.generate(
+                turn_input=turn_input,
+                context=current_context,
+            )
 
-        required_failure = _required_tool_failure(tool_results)
-        if required_failure is not None:
-            return _blocked_tool_decision(required_failure, tool_results)
-
-        context_with_tools = _context_with_tool_results(context_for_tools, tool_results)
-        final_decision = await self._provider.generate(
-            turn_input=turn_input,
-            context=context_with_tools,
+        pending_required_tool = _pending_required_tool_request(
+            decision, satisfied=all_tool_results
         )
-        pending_required_tool = _pending_required_tool_request(final_decision)
         if pending_required_tool is not None:
-            return _blocked_pending_tool_decision(pending_required_tool, tool_results)
-        final_decision = _with_merged_field_writes(final_decision, provisional_fields)
-        return _with_loop_trace(
-            _force_no_send(final_decision),
-            tool_rounds=1,
-            tool_results=tool_results,
-            blocked_reason=None,
-            provisional_field_keys=[item.field_key for item in provisional_fields],
+            return _blocked_pending_tool_decision(
+                pending_required_tool, all_tool_results, tool_rounds=rounds_executed
+            )
+        decision = _with_merged_field_writes(
+            decision, list(provisional_by_key.values())
         )
+        return _with_loop_trace(
+            _force_no_send(decision),
+            tool_rounds=rounds_executed,
+            tool_results=all_tool_results,
+            blocked_reason=None,
+            provisional_field_keys=list(provisional_by_key.keys()),
+        )
+
+    def _budget_block(
+        self,
+        *,
+        started: float,
+        total_tool_calls: int,
+        requested: int,
+    ) -> str | None:
+        if total_tool_calls + requested > self._config.max_total_tool_calls:
+            return "tool_call_budget_exceeded"
+        if (
+            self._config.max_elapsed_seconds is not None
+            and monotonic() - started > self._config.max_elapsed_seconds
+        ):
+            return "tool_time_budget_exceeded"
+        return None
 
     async def _execute_fact_tool(
         self,
@@ -253,21 +338,61 @@ def _required_tool_failure(
 
 def _pending_required_tool_request(
     decision: FinalTurnDecision,
+    *,
+    satisfied: list[ToolExecutionResult] | None = None,
 ) -> LLMToolCallProposal | None:
+    succeeded = {
+        result.tool_name for result in satisfied or [] if result.status == "succeeded"
+    }
     for tool_call in _accepted_tool_requests(decision):
-        if tool_call.required:
+        if tool_call.required and tool_call.tool_name not in succeeded:
             return tool_call
     return None
+
+
+def _deduplicate_tool_calls(
+    tool_calls: list[LLMToolCallProposal],
+    prior_results: list[ToolExecutionResult],
+) -> list[LLMToolCallProposal]:
+    succeeded = {
+        result.tool_name
+        for result in prior_results
+        if result.status == "succeeded"
+    }
+    seen_this_round: set[str] = set()
+    deduplicated: list[LLMToolCallProposal] = []
+    for tool_call in tool_calls:
+        if tool_call.tool_name in succeeded or tool_call.tool_name in seen_this_round:
+            continue
+        seen_this_round.add(tool_call.tool_name)
+        deduplicated.append(tool_call)
+    return deduplicated
+
+
+def _context_with_loop_feedback(
+    context: AgentContextPackage,
+    feedback: str,
+) -> AgentContextPackage:
+    return context.model_copy(
+        update={
+            "validator_feedback": [
+                *context.validator_feedback,
+                {"feedback_for_llm": feedback, "errors": []},
+            ]
+        }
+    )
 
 
 def _blocked_pending_tool_decision(
     tool_call: LLMToolCallProposal,
     tool_results: list[ToolExecutionResult],
+    *,
+    tool_rounds: int,
 ) -> FinalTurnDecision:
     code = "tool_round_limit_reached"
     error = ValidationErrorItem(
         code=code,
-        message="Required tool request remained after the allowed no-send tool round.",
+        message="Required tool request remained after the allowed no-send tool rounds.",
         path="tool_requests",
         retryable=False,
         metadata={"tool_name": tool_call.tool_name},
@@ -285,9 +410,43 @@ def _blocked_pending_tool_decision(
         trace_metadata={
             "respond_style_tool_loop": {
                 "mode": "no_send",
-                "tool_rounds": 1,
+                "tool_rounds": tool_rounds,
                 "blocked": code,
                 "pending_tool_name": tool_call.tool_name,
+                "tool_results": [item.model_dump(mode="json") for item in tool_results],
+            }
+        },
+    )
+
+
+def _blocked_loop_decision(
+    *,
+    code: str,
+    message: str,
+    tool_rounds: int,
+    tool_results: list[ToolExecutionResult],
+) -> FinalTurnDecision:
+    error = ValidationErrorItem(
+        code=code,
+        message=message,
+        path="tool_requests",
+        retryable=False,
+    )
+    validation = AgentTurnValidationResult(
+        status="blocked",
+        blocked_items=[error],
+        send_decision="no_send",
+        blocked_reason=code,
+    )
+    return FinalTurnDecision(
+        final_message=None,
+        send_decision="no_send",
+        validation=validation,
+        trace_metadata={
+            "respond_style_tool_loop": {
+                "mode": "no_send",
+                "tool_rounds": tool_rounds,
+                "blocked": code,
                 "tool_results": [item.model_dump(mode="json") for item in tool_results],
             }
         },
@@ -297,6 +456,8 @@ def _blocked_pending_tool_decision(
 def _blocked_tool_decision(
     result: ToolExecutionResult,
     tool_results: list[ToolExecutionResult],
+    *,
+    tool_rounds: int,
 ) -> FinalTurnDecision:
     code = "required_tool_not_succeeded"
     if result.status == "failed" and result.error_code:
@@ -323,7 +484,7 @@ def _blocked_tool_decision(
         trace_metadata={
             "respond_style_tool_loop": {
                 "mode": "no_send",
-                "tool_rounds": 1,
+                "tool_rounds": tool_rounds,
                 "blocked": code,
                 "tool_results": [item.model_dump(mode="json") for item in tool_results],
             }

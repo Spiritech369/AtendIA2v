@@ -361,3 +361,28 @@ Status: `PHASE_10_RESPOND_STYLE_SIMULATED_LIVE_FIXES_AND_TESTLAB_API_READY`
   tool loop with budget.
 
 Evidence: `reports/respond_style_phase_10_fixes_and_test_lab_direct_2026_06_09.md`.
+
+## Phase 11 — Multi-Round Loop, Test Lab DB/API, Deployment Resolver (2026-06-09)
+
+Status: `PHASE_11_RESPOND_STYLE_MULTIRound_TESTLAB_RESOLVER_NO_SEND_READY`
+
+- 11A: tool loop is multi-round with budgets (`max_tool_rounds` default 1,
+  `max_total_tool_calls`, `max_elapsed_seconds`; exhaustion fails closed).
+  Succeeded tools are never re-executed (dedupe + one structured nudge to
+  write from existing tool_results). Real OpenAI: chaotic compound resolved
+  in 3 rounds; sequential option_id dependency in 2 rounds.
+- 11B: `test_lab_direct_adapter.run_direct_test_suite` + route
+  `POST /test-suites/{suite_id}/runs/respond-style-direct` store direct-path
+  evidence as AgentTestRun rows (mode no_send, clean outbox/side-effect
+  audits, JSONB evidence; no migration). `DryFactsToolExecutor` is the
+  generic config-driven fact executor (bindings declare dry_facts +
+  preconditions). Legacy test_lab.py untouched.
+- 11C: `RespondStyleDeploymentResolver` previews product_agent_direct vs
+  legacy_runner per deployment; resolution model is schema-locked to
+  no_send/no live routing; live flags only surface as blocked reasons.
+
+Evidence: `reports/respond_style_phase_11_multiround_testlab_resolver_2026_06_09.md`.
+
+Next: Phase 12 — HTTP+DB end-to-end Test Lab direct in Docker, resolver
+preview wired into inbound (log-only), legacy customer-copy hard-block
+test battery from the kill map.
