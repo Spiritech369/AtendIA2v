@@ -1,0 +1,34 @@
+{
+  "decision": "PHASE_13B_INBOUND_SHADOW_DOCKER_PASSED",
+  "mode": "no_send",
+  "shadow_summaries": [
+    {
+      "deployment_id": "51c2c516-9222-4acd-9ef8-6a1c044626c5",
+      "agent_version_id": "729f2ab7-b3ce-401e-ad86-b44934d70dcd",
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "final_message_candidate": "Para la opción estándar, necesito que me confirmes que es la opción que deseas. Una vez que lo confirmes, puedo decirte qué necesitas.",
+      "tools": [],
+      "field_update_proposals": [
+        {
+          "field_key": "selected_option",
+          "value": "estándar",
+          "evidence": [
+            "\"me interesa la opcion estandar\""
+          ],
+          "confidence": 1.0,
+          "reason": "El cliente ha expresado interés en la opción estándar."
+        }
+      ],
+      "handoff_proposal": null,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ],
+  "outbox_delta": 0,
+  "outbox_pending_or_retry": 0
+}

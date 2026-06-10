@@ -76,10 +76,13 @@ class LiveSimulatedChannel:
         tool_loop: RespondStyleToolLoop,
         conversation_id: str,
         contact_id: str | None = None,
+        send_policy_label: str = "no_send",
     ) -> None:
         self._config = config
         self._conversation_id = conversation_id
         self._contact_id = contact_id or "simulated-contact"
+        # Label only: every turn remains no_send regardless of this value.
+        self._send_policy_label = send_policy_label
         self._messages: list[TranscriptMessage] = []
         self._field_values: JsonDict = {}
         self._records: list[SimulatedTurnRecord] = []
@@ -189,6 +192,7 @@ class LiveSimulatedChannel:
             retry_instruction=result.retry_instruction,
             send_policy={
                 "send_mode": "no_send",
+                "send_policy_label": self._send_policy_label,
                 "delivery": "simulated",
                 "outbound_outbox_writes": 0,
             },

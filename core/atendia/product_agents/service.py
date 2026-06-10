@@ -826,6 +826,18 @@ async def evaluate_publish_request(
         readiness=readiness,
         latest_run=latest_run,
     )
+    # Respond-Style gates (Phase 13A): additive blockers for deployments
+    # that opted into the direct route. Never removes existing blockers.
+    from atendia.product_agents.publish_gates import respond_style_publish_blockers
+
+    blockers.extend(
+        await respond_style_publish_blockers(
+            session,
+            tenant_id=tenant_id,
+            version_id=version.id,
+            deployment=deployment,
+        )
+    )
     publish_request.blockers = blockers
     publish_request.test_run_ids = [str(latest_run.id)] if latest_run is not None else []
     publish_request.readiness_snapshot = {

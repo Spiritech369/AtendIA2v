@@ -78,9 +78,12 @@ class RespondStyleDeploymentResolver:
         )
 
 
+PUBLISHED_STATES: tuple[str, ...] = ("published", "published_no_send")
+
+
 def _direct_route_blockers(deployment: DeploymentView) -> list[str]:
     blockers: list[str] = []
-    if deployment.publish_state != "published":
+    if deployment.publish_state not in PUBLISHED_STATES:
         blockers.append("publish_state_not_published")
     if not deployment.respond_style_enabled:
         blockers.append("respond_style_not_enabled")

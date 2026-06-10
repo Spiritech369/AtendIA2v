@@ -1,0 +1,296 @@
+{
+  "decision": "PHASE_13C_FAILED_TRANSCRIPT_REPLAY_PASSED",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "totals": {
+    "turns": 9,
+    "answered": 9,
+    "internal_leaks": 0
+  },
+  "historical_failures": {
+    "v2_incident_replay": "silence after qualifying answer (required tool skipped)",
+    "v3_incident_replay": "internal leak: 'campo no está visible' on seniority answer"
+  },
+  "results": [
+    {
+      "replay": "v2_incident_replay",
+      "turns": [
+        {
+          "inbound": "Hola",
+          "outbound": "Hola, ¿cómo puedo ayudarte hoy?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        },
+        {
+          "inbound": "Info porfavor",
+          "outbound": "Claro, ¿qué información necesitas? Estoy aquí para ayudarte.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        },
+        {
+          "inbound": "Me pagan por transferencia",
+          "outbound": "Entiendo que te pagan por transferencia. Para poder ayudarte mejor, ¿puedes decirme tu nivel de antigüedad laboral?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        },
+        {
+          "inbound": "?",
+          "outbound": "Gracias por la información. ¿Cuál es tu nivel de antigüedad laboral?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "Hola",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Hola, ¿cómo puedo ayudarte hoy?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "Info porfavor",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Claro, ¿qué información necesitas? Estoy aquí para ayudarte.",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "Me pagan por transferencia",
+          "timestamp": null,
+          "message_id": "in-3",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Entiendo que te pagan por transferencia. Para poder ayudarte mejor, ¿puedes decirme tu nivel de antigüedad laboral?",
+          "timestamp": null,
+          "message_id": "sim-out-3",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "?",
+          "timestamp": null,
+          "message_id": "in-4",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Gracias por la información. ¿Cuál es tu nivel de antigüedad laboral?",
+          "timestamp": null,
+          "message_id": "sim-out-4",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "replay-v2_incident_replay",
+        "turns": 4,
+        "simulated_outbound_count": 4,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "replay": "v3_incident_replay",
+      "turns": [
+        {
+          "inbound": "hola",
+          "outbound": "¡Hola! ¿Cómo puedo ayudarte hoy?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        },
+        {
+          "inbound": "info porfavor",
+          "outbound": "Claro, ¿qué tipo de información necesitas? Estoy aquí para ayudarte.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {}
+        },
+        {
+          "inbound": "15 meses",
+          "outbound": "Entiendo que tienes 15 meses de experiencia laboral. ¿Cuál es tu tipo de ingreso?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {
+            "employment_seniority": "15 meses"
+          }
+        },
+        {
+          "inbound": "me pagan por transferencia",
+          "outbound": "Gracias por la información. Dices que te pagan por transferencia. Esto sugiere que tu tipo de ingreso es \"transferencia\". ¿Es correcto? Si es así, puedo ayudarte a encontrar opciones adecuadas.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [],
+          "field_writes": {
+            "income_type": "transferencia"
+          }
+        },
+        {
+          "inbound": "?",
+          "outbound": "Perfecto, con 15 meses de experiencia laboral y un ingreso por transferencia, tienes acceso a un plan estándar. Para proceder, necesitarás algunos documentos: identificación válida, comprobante de domicilio y prueba de ingresos reciente si es aplicable. ¿Te gustaría saber más sobre las opciones disponibles?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "answered": true,
+          "internal_leak": false,
+          "tools": [
+            {
+              "tool_name": "eligibility_plan.resolve",
+              "status": "succeeded"
+            },
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded"
+            }
+          ],
+          "field_writes": {}
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "¡Hola! ¿Cómo puedo ayudarte hoy?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "info porfavor",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Claro, ¿qué tipo de información necesitas? Estoy aquí para ayudarte.",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "15 meses",
+          "timestamp": null,
+          "message_id": "in-3",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Entiendo que tienes 15 meses de experiencia laboral. ¿Cuál es tu tipo de ingreso?",
+          "timestamp": null,
+          "message_id": "sim-out-3",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "me pagan por transferencia",
+          "timestamp": null,
+          "message_id": "in-4",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Gracias por la información. Dices que te pagan por transferencia. Esto sugiere que tu tipo de ingreso es \"transferencia\". ¿Es correcto? Si es así, puedo ayudarte a encontrar opciones adecuadas.",
+          "timestamp": null,
+          "message_id": "sim-out-4",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "?",
+          "timestamp": null,
+          "message_id": "in-5",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Perfecto, con 15 meses de experiencia laboral y un ingreso por transferencia, tienes acceso a un plan estándar. Para proceder, necesitarás algunos documentos: identificación válida, comprobante de domicilio y prueba de ingresos reciente si es aplicable. ¿Te gustaría saber más sobre las opciones disponibles?",
+          "timestamp": null,
+          "message_id": "sim-out-5",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {
+        "employment_seniority": "15 meses",
+        "income_type": "transferencia"
+      },
+      "summary": {
+        "conversation_id": "replay-v3_incident_replay",
+        "turns": 5,
+        "simulated_outbound_count": 5,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    }
+  ],
+  "side_effects": {
+    "outbox": false,
+    "workflows": false,
+    "actions": false,
+    "delivery": false
+  }
+}

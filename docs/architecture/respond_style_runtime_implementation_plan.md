@@ -411,3 +411,27 @@ Evidence: `reports/respond_style_phase_12_docker_e2e_hard_block_2026_06_09.md`.
 Next: Phase 13 — Publish Control gates on the hard-block battery, resolver
 flip behind per-deployment opt-in in shadow, failed V2/V3 transcript replay
 through the direct route, live-candidate parity gate.
+
+## Phase 13 — Publish Gates, Inbound Shadow, Replay, Parity (2026-06-09)
+
+Status: `PHASE_13_PUBLISH_CONTROL_AND_INBOUND_SHADOW_PARITY_READY`
+
+- 13A: Publish Control now adds blockers for respond_style deployments
+  unless the kill-map import audit is clean AND the latest direct Test Lab
+  run passed. Audit logic centralized in `respond_style_route_audit.py`.
+- 13B: opt-in inbound shadow (`respond_style_inbound_shadow_enabled`) runs
+  the direct route no-send per inbound and logs evidence; fail-safe step 2c
+  in the pipeline. Docker harness PASSED (real DB + OpenAI; outbox 0).
+  Resolver fix: accepts `published_no_send` (DB's published state).
+- 13C: failed V2/V3 transcripts replayed through the direct route with real
+  OpenAI: 9/9 answered, 0 internal leaks, 0 silent turns. Both historical
+  failure modes do not reproduce.
+- 13D: parity gate proves no_send Test Lab mode and simulated
+  live-candidate mode are the same code path with the send-policy label as
+  the only difference; schema-locked legacy_path_used=False + import audit.
+
+Evidence: `reports/respond_style_phase_13_publish_shadow_parity_2026_06_09.md`.
+
+Path to live from here: shadow-soak on a pilot deployment, human review of
+shadow candidates, then controlled live-candidate smoke gated by parity +
+publish gates + rollback packet.

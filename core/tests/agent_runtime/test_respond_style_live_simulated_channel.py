@@ -355,6 +355,7 @@ async def test_summary_reports_zero_outbox_writes() -> None:
     record = channel.records[0]
     assert record.send_policy == {
         "send_mode": "no_send",
+        "send_policy_label": "no_send",
         "delivery": "simulated",
         "outbound_outbox_writes": 0,
     }

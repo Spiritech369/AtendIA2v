@@ -8,10 +8,6 @@ source: not by convention, but by import graph and by output structure.
 
 from __future__ import annotations
 
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 
 from atendia.agent_runtime import (
@@ -25,43 +21,7 @@ from atendia.agent_runtime import (
     RespondStyleToolLoop,
 )
 from atendia.agent_runtime.respond_style_llm_provider import blocked_provider_decision
-
-DIRECT_ROUTE_MODULES = [
-    "atendia.agent_runtime.respond_style_turn_contract",
-    "atendia.agent_runtime.respond_style_turn_validator",
-    "atendia.agent_runtime.respond_style_llm_provider",
-    "atendia.agent_runtime.respond_style_tool_loop",
-    "atendia.agent_runtime.respond_style_context_builder",
-    "atendia.agent_runtime.respond_style_product_agent_runtime",
-    "atendia.agent_runtime.respond_style_product_agent_config_adapter",
-    "atendia.agent_runtime.respond_style_live_simulated_channel",
-    "atendia.agent_runtime.respond_style_test_lab_direct",
-    "atendia.agent_runtime.respond_style_deployment_resolver",
-    "atendia.agent_runtime.respond_style_dry_facts_executor",
-]
-
-# Legacy customer-copy sources from the kill map. If ANY of these modules
-# gets imported (even transitively) by the direct route, the route can
-# reach a code path that authors or rewrites visible text.
-FORBIDDEN_MODULE_FRAGMENTS = [
-    "runner.conversation_runner",
-    "runner.composer_prompts",
-    "runner.composer_openai",
-    "runner.response_contract",
-    "runner.response_frame",
-    "agent_runtime.human_response_composer",
-    "agent_runtime.advisor_pipeline",  # StructuredRuntimeComposer lives here
-    "agent_runtime.validated_response_plan",
-    "agent_runtime.conversation_progress",  # ConversationProgressGuard rewrites
-    "agent_runtime.quote_safety",  # QuoteSafetyGuard rewrites
-    "agent_runtime.mandatory_tools",  # MandatoryToolGuard fallback selection
-    "agent_runtime.model_provider",  # SafeFallbackAgentProvider canned copy
-    "agent_runtime.send_adapter",
-    "agent_runtime.agent_service",
-    "runner.outbound_dispatcher",
-    "queue.outbox",
-    "workflows.engine",
-]
+from atendia.agent_runtime.respond_style_route_audit import audit_direct_route_imports
 
 # Canned legacy copy that must never be authored by the direct route.
 LEGACY_CANNED_PHRASES = [
@@ -80,26 +40,9 @@ def test_published_product_agent_route_never_imports_legacy_copy_sources() -> No
 
     Transitive import-graph proof: importing the WHOLE direct route in a
     fresh interpreter must not load any legacy copy-producing module.
+    Shared with Publish Control via respond_style_route_audit.
     """
-    code = (
-        "import importlib, sys\n"
-        + "\n".join(f"importlib.import_module('{m}')" for m in DIRECT_ROUTE_MODULES)
-        + "\nloaded = sorted(m for m in sys.modules if m.startswith('atendia'))\n"
-        + "print('\\n'.join(loaded))\n"
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        cwd=str(Path("core").resolve()),
-        check=True,
-    )
-    loaded_modules = result.stdout.splitlines()
-    violations = [
-        module
-        for module in loaded_modules
-        if any(fragment in module for fragment in FORBIDDEN_MODULE_FRAGMENTS)
-    ]
+    violations = audit_direct_route_imports()
     assert violations == [], (
         "Direct route transitively imports legacy copy sources: " f"{violations}"
     )

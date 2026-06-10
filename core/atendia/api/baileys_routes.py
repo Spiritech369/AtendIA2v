@@ -609,6 +609,18 @@ async def _run_inbound_pipeline(
         session, tenant_id=tenant_id, conversation_id=conversation_id
     )
 
+    # 2c. Respond-Style inbound shadow (Phase 13B): for deployments that
+    #     explicitly opt in, ALSO run the direct route in no-send shadow and
+    #     log the evidence. Observation only; swallows every failure.
+    from atendia.product_agents.inbound_shadow import run_inbound_shadow_safely
+
+    await run_inbound_shadow_safely(
+        session,
+        tenant_id=tenant_id,
+        conversation_id=conversation_id,
+        inbound_text=text_body,
+    )
+
     # 3. Live notification (best-effort).
     try:
         redis = _Redis.from_url(settings.redis_url)
