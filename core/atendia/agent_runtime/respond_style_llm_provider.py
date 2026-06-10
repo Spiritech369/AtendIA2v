@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -26,6 +28,34 @@ class RespondStyleLLMTurnProviderConfig:
     temperature: float = 0.2
     max_output_tokens: int = 900
     max_llm_retries: int = 1
+    # F18: transient API errors (429/timeouts/5xx) retry with exponential
+    # backoff + jitter, honoring Retry-After. Schema/validation errors are
+    # NEVER treated as transient.
+    max_transient_retries: int = 4
+    backoff_base_seconds: float = 1.0
+    backoff_max_seconds: float = 30.0
+
+
+_TRANSIENT_ERROR_NAMES = frozenset(
+    {
+        "RateLimitError",
+        "APITimeoutError",
+        "APIConnectionError",
+        "InternalServerError",
+        "ServiceUnavailableError",
+    }
+)
+_TRANSIENT_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+class TransientAPIBudgetExhaustedError(Exception):
+    """Raised when transient retries are exhausted; carries a fail-closed
+    reason code (api_rate_limited / api_transient_failure)."""
+
+    def __init__(self, reason_code: str, last_error: str) -> None:
+        self.reason_code = reason_code
+        self.last_error = last_error
+        super().__init__(f"{reason_code}: {last_error}")
 
 
 class RespondStyleLLMTurnProvider:
@@ -54,6 +84,11 @@ class RespondStyleLLMTurnProvider:
         self.retry_count = 0
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
+        # F18 transient-retry observability.
+        self.transient_retry_count = 0
+        self.total_backoff_wait_ms = 0
+        self.last_transient_error: str | None = None
+        self.last_backoff_delays: list[float] = []
 
     async def generate(
         self,
@@ -73,11 +108,17 @@ class RespondStyleLLMTurnProvider:
                 context=context,
                 exc=exc,
             )
-            return _force_no_live_send(retry_decision)
+            return self._finalize(retry_decision)
+        except TransientAPIBudgetExhaustedError as exc:
+            return self._finalize(
+                blocked_provider_decision(exc.reason_code, exc.last_error)
+            )
         except Exception as exc:
-            return blocked_provider_decision(
-                "llm_turn_provider_failed",
-                type(exc).__name__,
+            return self._finalize(
+                blocked_provider_decision(
+                    "llm_turn_provider_failed",
+                    type(exc).__name__,
+                )
             )
         decision = self._validator.validate(output=output, context=context, attempt_number=1)
 
@@ -92,10 +133,16 @@ class RespondStyleLLMTurnProvider:
             self.last_messages = retry_messages
             try:
                 retry_output = await self._complete_structured_turn(retry_messages)
+            except TransientAPIBudgetExhaustedError as exc:
+                return self._finalize(
+                    blocked_provider_decision(exc.reason_code, exc.last_error)
+                )
             except Exception as exc:
-                return blocked_provider_decision(
-                    "llm_turn_provider_retry_failed",
-                    type(exc).__name__,
+                return self._finalize(
+                    blocked_provider_decision(
+                        "llm_turn_provider_retry_failed",
+                        type(exc).__name__,
+                    )
                 )
             decision = self._validator.validate(
                 output=retry_output,
@@ -103,7 +150,21 @@ class RespondStyleLLMTurnProvider:
                 attempt_number=2,
             )
 
-        return _force_no_live_send(decision)
+        return self._finalize(decision)
+
+    def _finalize(self, decision: FinalTurnDecision) -> FinalTurnDecision:
+        decision = _force_no_live_send(decision)
+        meta = dict(decision.trace_metadata)
+        provider_meta = dict(meta.get("respond_style_llm_provider") or {})
+        provider_meta.update(
+            {
+                "transient_retries_total": self.transient_retry_count,
+                "validator_retries_total": self.retry_count,
+                "backoff_wait_ms_total": self.total_backoff_wait_ms,
+            }
+        )
+        meta["respond_style_llm_provider"] = provider_meta
+        return decision.model_copy(update={"trace_metadata": meta})
 
     async def _retry_after_parse_error(
         self,
@@ -141,6 +202,8 @@ class RespondStyleLLMTurnProvider:
         self.last_messages = retry_messages
         try:
             retry_output = await self._complete_structured_turn(retry_messages)
+        except TransientAPIBudgetExhaustedError as retry_exc:
+            return blocked_provider_decision(retry_exc.reason_code, retry_exc.last_error)
         except Exception as retry_exc:
             return blocked_provider_decision(
                 "llm_turn_provider_retry_failed",
@@ -156,16 +219,7 @@ class RespondStyleLLMTurnProvider:
         self,
         messages: list[dict[str, str]],
     ) -> LLMAgentTurnOutput:
-        response = await self._client.chat.completions.create(
-            model=self._config.model,
-            messages=messages,
-            response_format={
-                "type": "json_schema",
-                "json_schema": respond_style_llm_json_schema(),
-            },
-            temperature=self._config.temperature,
-            max_tokens=self._config.max_output_tokens,
-        )
+        response = await self._create_with_transient_retry(messages)
         self.llm_calls += 1
         usage = getattr(response, "usage", None)
         if usage is not None:
@@ -176,6 +230,81 @@ class RespondStyleLLMTurnProvider:
         raw = _completion_text(response)
         self.last_raw_output = raw
         return parse_llm_agent_turn_output_json(raw)
+
+    async def _create_with_transient_retry(self, messages: list[dict[str, str]]) -> Any:
+        """F18: retries ONLY transient API errors (429/timeouts/5xx) with
+        exponential backoff + jitter, honoring Retry-After. Never retries
+        schema/validation errors; exhaustion raises a fail-closed sentinel."""
+        attempt = 0
+        while True:
+            try:
+                return await self._client.chat.completions.create(
+                    model=self._config.model,
+                    messages=messages,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": respond_style_llm_json_schema(),
+                    },
+                    temperature=self._config.temperature,
+                    max_tokens=self._config.max_output_tokens,
+                )
+            except Exception as exc:
+                if not _is_transient_api_error(exc):
+                    raise
+                error_name = type(exc).__name__
+                self.last_transient_error = error_name
+                if attempt >= self._config.max_transient_retries:
+                    reason = (
+                        "api_rate_limited"
+                        if _is_rate_limit_error(exc)
+                        else "api_transient_failure"
+                    )
+                    raise TransientAPIBudgetExhaustedError(reason, error_name) from exc
+                delay = _retry_after_seconds(exc)
+                if delay is None:
+                    delay = min(
+                        self._config.backoff_base_seconds * (2**attempt),
+                        self._config.backoff_max_seconds,
+                    ) * (0.5 + random.random())
+                self.transient_retry_count += 1
+                self.last_backoff_delays.append(round(delay, 4))
+                self.total_backoff_wait_ms += int(delay * 1000)
+                await asyncio.sleep(delay)
+                attempt += 1
+
+
+def _is_transient_api_error(exc: Exception) -> bool:
+    if isinstance(exc, ValueError):
+        return False
+    if type(exc).__name__ in _TRANSIENT_ERROR_NAMES:
+        return True
+    status = getattr(exc, "status_code", None)
+    return status in _TRANSIENT_STATUS_CODES
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    return (
+        type(exc).__name__ == "RateLimitError"
+        or getattr(exc, "status_code", None) == 429
+    )
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    value = None
+    try:
+        value = headers.get("retry-after") or headers.get("Retry-After")
+    except Exception:
+        return None
+    if value is None:
+        return None
+    try:
+        return max(float(value), 0.0)
+    except (TypeError, ValueError):
+        return None
 
 
 def build_respond_style_messages(
@@ -425,6 +554,13 @@ def respond_style_system_prompt() -> str:
             "immediate next step, and ask for at most one detail at a time.",
             "If a workflow applies, propose a workflow event using an allowed binding.",
             "Do not invent prices, requirements, approval, availability, or policy.",
+            "Every factual claim you state must carry source_refs in one of these",
+            "exact forms: tool:<tool_name> (a succeeded tool_result from this turn),",
+            "kb:<source_id> (a knowledge snippet shown to you),",
+            "contact_field:<field_key> (a known contact value),",
+            "transcript:latest_customer_message (what the customer just said).",
+            "Never invent a source_ref. If you cannot cite a valid one, do not",
+            "state the fact: request the tool or ask for the missing detail instead.",
             "If the customer corrects a previously given value, the correction wins:",
             "propose the corrected value and never restate the old one.",
             "Never ask for a value the customer already provided in this conversation.",

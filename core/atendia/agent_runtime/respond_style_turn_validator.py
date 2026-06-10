@@ -421,13 +421,34 @@ def _claim_errors(
 
 
 def _available_source_refs(context: AgentContextPackage) -> set[str]:
+    """Accepts both bare ids (back-compat) and the F19 prefixed forms:
+    tool:<tool_name>, kb:<source_id>, contact_field:<field_key>,
+    simulated_field:<field_key>, transcript:latest_customer_message."""
     refs: set[str] = set()
     for item in context.tool_results:
-        refs.update(_ids_from_item(item, keys=("tool_name", "name", "tool_id", "id")))
+        for value in _ids_from_item(item, keys=("tool_name", "name", "tool_id", "id")):
+            refs.add(value)
+            refs.add(f"tool:{value}")
     for item in context.retrieved_context:
-        refs.update(_ids_from_item(item, keys=("source_id", "id", "title")))
+        for value in _ids_from_item(item, keys=("source_id", "id", "title")):
+            refs.add(value)
+            refs.add(f"kb:{value}")
     for item in context.knowledge_bindings:
-        refs.update(_ids_from_item(item, keys=("source_id", "id", "name")))
+        for value in _ids_from_item(item, keys=("source_id", "id", "name")):
+            refs.add(value)
+            refs.add(f"kb:{value}")
+    for item in context.field_policies:
+        if isinstance(item, dict):
+            key = item.get("field_key") or item.get("key")
+            if key:
+                refs.add(f"contact_field:{key}")
+                refs.add(f"simulated_field:{key}")
+    contact_state = context.agent_identity.get("contact_state") or {}
+    if isinstance(contact_state, dict):
+        for key in contact_state:
+            refs.add(f"contact_field:{key}")
+            refs.add(f"simulated_field:{key}")
+    refs.add("transcript:latest_customer_message")
     policy_id = context.send_policy.get("policy_id") or context.agent_identity.get("policy_id")
     if policy_id:
         refs.add(str(policy_id))

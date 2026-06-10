@@ -1,0 +1,1092 @@
+{
+  "decision_context": "MANUAL_LIVE_SIMULATOR_NO_SEND",
+  "run_label": "2026_06_10_0151_r6o_conv05",
+  "agent": {
+    "tenant_id": "manual-review-tenant",
+    "agent_id": "moto-credit-agent",
+    "agent_version_id": "v1"
+  },
+  "mode": "no_send",
+  "turns": [
+    {
+      "turn_number": 1,
+      "inbound_text": "hola",
+      "final_message_candidate": "¡Hola! Soy tu asesor de motos por WhatsApp. ¿En qué puedo ayudarte hoy?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 1,
+          "validator_retries_total": 0,
+          "backoff_wait_ms_total": 2000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 2,
+      "inbound_text": "quiero la metro a crédito",
+      "final_message_candidate": "La moto Metro es una excelente opción. Para avanzar con el crédito, necesito saber un poco más sobre ti. ¿Cuánto tiempo llevas en tu empleo actual?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "selected_model",
+            "value": "metro-city",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente mencionó que quiere la moto Metro a crédito."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "catalog.search",
+          "status": "succeeded",
+          "facts": {
+            "models": [
+              {
+                "model_id": "dnm-25",
+                "label": "DNM2.5",
+                "category": "trabajo",
+                "colors": [
+                  "negro",
+                  "rojo"
+                ],
+                "price_tier": "media"
+              },
+              {
+                "model_id": "metro-city",
+                "label": "Metro",
+                "category": "urbana",
+                "colors": [
+                  "rojo",
+                  "azul"
+                ],
+                "price_tier": "economica"
+              },
+              {
+                "model_id": "rx-sport",
+                "label": "RX Sport",
+                "category": "deportiva",
+                "colors": [
+                  "negro"
+                ],
+                "price_tier": "alta"
+              }
+            ]
+          },
+          "citations": [
+            "catalog.search-dry-source"
+          ],
+          "source_refs": [
+            "catalog.search"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "selected_model",
+          "value": "metro-city",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente mencionó que quiere la moto Metro a crédito."
+        }
+      ],
+      "simulated_field_writes": {
+        "selected_model": "metro-city"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 4,
+          "validator_retries_total": 0,
+          "backoff_wait_ms_total": 6000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "catalog.search",
+              "status": "succeeded",
+              "facts": {
+                "models": [
+                  {
+                    "model_id": "dnm-25",
+                    "label": "DNM2.5",
+                    "category": "trabajo",
+                    "colors": [
+                      "negro",
+                      "rojo"
+                    ],
+                    "price_tier": "media"
+                  },
+                  {
+                    "model_id": "metro-city",
+                    "label": "Metro",
+                    "category": "urbana",
+                    "colors": [
+                      "rojo",
+                      "azul"
+                    ],
+                    "price_tier": "economica"
+                  },
+                  {
+                    "model_id": "rx-sport",
+                    "label": "RX Sport",
+                    "category": "deportiva",
+                    "colors": [
+                      "negro"
+                    ],
+                    "price_tier": "alta"
+                  }
+                ]
+              },
+              "citations": [
+                "catalog.search-dry-source"
+              ],
+              "source_refs": [
+                "catalog.search"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 3,
+      "inbound_text": "tengo 4 años trabajando por mi cuenta",
+      "final_message_candidate": "Perfecto, con 4 años trabajando por tu cuenta, puedes acceder al **plan semanal estándar**. Este plan requiere un enganche del 30% y los pagos son semanales. \n\nPara avanzar, necesitarás:\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi estás dado de alta en el SAT, podrías acceder a un enganche más bajo del 20%. ¿Te gustaría que revisemos eso o tienes alguna otra pregunta?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "employment_seniority",
+            "value": "4 años",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 1.0,
+            "reason": "El cliente mencionó su antigüedad laboral."
+          },
+          {
+            "field_key": "income_type",
+            "value": "trabajo por cuenta propia (freelance)",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente indicó que trabaja por su cuenta."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded",
+          "facts": {
+            "plan": "plan semanal estandar",
+            "down_payment_percent": 30,
+            "payment_frequency": "semanal",
+            "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+            "income_type": "trabajo por cuenta propia (freelance)",
+            "employment_seniority": "4 años"
+          },
+          "citations": [
+            "credit_plan.resolve-dry-source"
+          ],
+          "source_refs": [
+            "credit_plan.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        },
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded",
+          "facts": {
+            "requirements": [
+              "identificacion oficial vigente",
+              "comprobante de domicilio reciente",
+              "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+            ],
+            "income_type": "trabajo por cuenta propia (freelance)"
+          },
+          "citations": [
+            "requirements.lookup-dry-source"
+          ],
+          "source_refs": [
+            "requirements.lookup"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "employment_seniority",
+          "value": "4 años",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 1.0,
+          "reason": "El cliente mencionó su antigüedad laboral."
+        },
+        {
+          "field_key": "income_type",
+          "value": "trabajo por cuenta propia (freelance)",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente indicó que trabaja por su cuenta."
+        }
+      ],
+      "simulated_field_writes": {
+        "employment_seniority": "4 años",
+        "income_type": "trabajo por cuenta propia (freelance)"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 10,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 13000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 2,
+          "blocked": null,
+          "provisional_field_keys": [
+            "employment_seniority",
+            "income_type"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "succeeded",
+              "facts": {
+                "plan": "plan semanal estandar",
+                "down_payment_percent": 30,
+                "payment_frequency": "semanal",
+                "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+                "income_type": "trabajo por cuenta propia (freelance)",
+                "employment_seniority": "4 años"
+              },
+              "citations": [
+                "credit_plan.resolve-dry-source"
+              ],
+              "source_refs": [
+                "credit_plan.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            },
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded",
+              "facts": {
+                "requirements": [
+                  "identificacion oficial vigente",
+                  "comprobante de domicilio reciente",
+                  "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+                ],
+                "income_type": "trabajo por cuenta propia (freelance)"
+              },
+              "citations": [
+                "requirements.lookup-dry-source"
+              ],
+              "source_refs": [
+                "requirements.lookup"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 4,
+      "inbound_text": "soy comerciante",
+      "final_message_candidate": "Con 4 años trabajando por tu cuenta como comerciante, puedes acceder al **plan semanal estándar**. Este plan requiere un enganche del 30% y los pagos son semanales. Si estás dado de alta en el SAT, podrías optar por un enganche más bajo del 20%. \n\n¿Te gustaría que revisemos más detalles o tienes alguna otra pregunta?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "income_type",
+            "value": "comerciante independiente (negocio propio)",
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente mencionó que es comerciante."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded",
+          "facts": {
+            "plan": "plan semanal estandar",
+            "down_payment_percent": 30,
+            "payment_frequency": "semanal",
+            "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+            "income_type": "comerciante independiente (negocio propio)",
+            "employment_seniority": "4 años"
+          },
+          "citations": [
+            "credit_plan.resolve-dry-source"
+          ],
+          "source_refs": [
+            "credit_plan.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "income_type",
+          "value": "comerciante independiente (negocio propio)",
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente mencionó que es comerciante."
+        }
+      ],
+      "simulated_field_writes": {
+        "income_type": "comerciante independiente (negocio propio)"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 12,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 17000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [
+            "income_type"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "succeeded",
+              "facts": {
+                "plan": "plan semanal estandar",
+                "down_payment_percent": 30,
+                "payment_frequency": "semanal",
+                "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+                "income_type": "comerciante independiente (negocio propio)",
+                "employment_seniority": "4 años"
+              },
+              "citations": [
+                "credit_plan.resolve-dry-source"
+              ],
+              "source_refs": [
+                "credit_plan.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 5,
+      "inbound_text": "sí estoy dado de alta en SAT",
+      "final_message_candidate": "Perfecto, al estar dado de alta en el SAT, puedes acceder al **plan semanal estándar** con un enganche del 20%. Los pagos son semanales. \n\nSi necesitas más información o quieres avanzar con el proceso, avísame. Estoy aquí para ayudarte.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "has_tax_registration",
+            "value": true,
+            "evidence": [
+              "transcript:latest_customer_message"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente confirmó que está dado de alta en SAT."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded",
+          "facts": {
+            "plan": "plan semanal estandar",
+            "down_payment_percent": 30,
+            "payment_frequency": "semanal",
+            "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+            "income_type": "comerciante independiente (negocio propio)",
+            "employment_seniority": "4 años"
+          },
+          "citations": [
+            "credit_plan.resolve-dry-source"
+          ],
+          "source_refs": [
+            "credit_plan.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "has_tax_registration",
+          "value": true,
+          "evidence": [
+            "transcript:latest_customer_message"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente confirmó que está dado de alta en SAT."
+        }
+      ],
+      "simulated_field_writes": {
+        "has_tax_registration": true
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 14,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 21000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [
+            "has_tax_registration"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "succeeded",
+              "facts": {
+                "plan": "plan semanal estandar",
+                "down_payment_percent": 30,
+                "payment_frequency": "semanal",
+                "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+                "income_type": "comerciante independiente (negocio propio)",
+                "employment_seniority": "4 años"
+              },
+              "citations": [
+                "credit_plan.resolve-dry-source"
+              ],
+              "source_refs": [
+                "credit_plan.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 6,
+      "inbound_text": "qué me pides",
+      "final_message_candidate": "Para avanzar con el crédito de la moto Metro, necesitarás:\n\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi tienes alguna otra pregunta o necesitas más ayuda, aquí estoy para apoyarte.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded",
+          "facts": {
+            "requirements": [
+              "identificacion oficial vigente",
+              "comprobante de domicilio reciente",
+              "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+            ],
+            "income_type": "comerciante independiente (negocio propio)"
+          },
+          "citations": [
+            "requirements.lookup-dry-source"
+          ],
+          "source_refs": [
+            "requirements.lookup"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 17,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 25000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded",
+              "facts": {
+                "requirements": [
+                  "identificacion oficial vigente",
+                  "comprobante de domicilio reciente",
+                  "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+                ],
+                "income_type": "comerciante independiente (negocio propio)"
+              },
+              "citations": [
+                "requirements.lookup-dry-source"
+              ],
+              "source_refs": [
+                "requirements.lookup"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 7,
+      "inbound_text": "cuánto queda",
+      "final_message_candidate": "La moto Metro tiene un precio de $32,500 MXN. Con el plan que calificas, el enganche es de $9,750 MXN. Los pagos semanales serían de $689 MXN durante 52 semanas.\n\nSi tienes más preguntas o quieres avanzar, aquí estoy para ayudarte.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "quote.resolve",
+          "status": "succeeded",
+          "facts": {
+            "price": 32500,
+            "currency": "MXN",
+            "down_payment": 9750,
+            "weekly_payment": 689,
+            "term_weeks": 52,
+            "selected_model": "metro-city"
+          },
+          "citations": [
+            "quote.resolve-dry-source"
+          ],
+          "source_refs": [
+            "quote.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send",
+          "transient_retries_total": 21,
+          "validator_retries_total": 1,
+          "backoff_wait_ms_total": 32000
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded",
+              "facts": {
+                "price": 32500,
+                "currency": "MXN",
+                "down_payment": 9750,
+                "weekly_payment": 689,
+                "term_weeks": 52,
+                "selected_model": "metro-city"
+              },
+              "citations": [
+                "quote.resolve-dry-source"
+              ],
+              "source_refs": [
+                "quote.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "role": "customer",
+      "text": "hola",
+      "timestamp": null,
+      "message_id": "in-1",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "¡Hola! Soy tu asesor de motos por WhatsApp. ¿En qué puedo ayudarte hoy?",
+      "timestamp": null,
+      "message_id": "sim-out-1",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "quiero la metro a crédito",
+      "timestamp": null,
+      "message_id": "in-2",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "La moto Metro es una excelente opción. Para avanzar con el crédito, necesito saber un poco más sobre ti. ¿Cuánto tiempo llevas en tu empleo actual?",
+      "timestamp": null,
+      "message_id": "sim-out-2",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "tengo 4 años trabajando por mi cuenta",
+      "timestamp": null,
+      "message_id": "in-3",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Perfecto, con 4 años trabajando por tu cuenta, puedes acceder al **plan semanal estándar**. Este plan requiere un enganche del 30% y los pagos son semanales. \n\nPara avanzar, necesitarás:\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi estás dado de alta en el SAT, podrías acceder a un enganche más bajo del 20%. ¿Te gustaría que revisemos eso o tienes alguna otra pregunta?",
+      "timestamp": null,
+      "message_id": "sim-out-3",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "soy comerciante",
+      "timestamp": null,
+      "message_id": "in-4",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Con 4 años trabajando por tu cuenta como comerciante, puedes acceder al **plan semanal estándar**. Este plan requiere un enganche del 30% y los pagos son semanales. Si estás dado de alta en el SAT, podrías optar por un enganche más bajo del 20%. \n\n¿Te gustaría que revisemos más detalles o tienes alguna otra pregunta?",
+      "timestamp": null,
+      "message_id": "sim-out-4",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "sí estoy dado de alta en SAT",
+      "timestamp": null,
+      "message_id": "in-5",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Perfecto, al estar dado de alta en el SAT, puedes acceder al **plan semanal estándar** con un enganche del 20%. Los pagos son semanales. \n\nSi necesitas más información o quieres avanzar con el proceso, avísame. Estoy aquí para ayudarte.",
+      "timestamp": null,
+      "message_id": "sim-out-5",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "qué me pides",
+      "timestamp": null,
+      "message_id": "in-6",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Para avanzar con el crédito de la moto Metro, necesitarás:\n\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina)\n\nSi tienes alguna otra pregunta o necesitas más ayuda, aquí estoy para apoyarte.",
+      "timestamp": null,
+      "message_id": "sim-out-6",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "cuánto queda",
+      "timestamp": null,
+      "message_id": "in-7",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "La moto Metro tiene un precio de $32,500 MXN. Con el plan que calificas, el enganche es de $9,750 MXN. Los pagos semanales serían de $689 MXN durante 52 semanas.\n\nSi tienes más preguntas o quieres avanzar, aquí estoy para ayudarte.",
+      "timestamp": null,
+      "message_id": "sim-out-7",
+      "attachments": []
+    }
+  ],
+  "simulated_fields_final": {
+    "selected_model": "metro-city",
+    "employment_seniority": "4 años",
+    "income_type": "comerciante independiente (negocio propio)",
+    "has_tax_registration": true
+  },
+  "failures": [],
+  "summary": {
+    "conversation_id": "manual-sim-0",
+    "turns": 7,
+    "simulated_outbound_count": 7,
+    "blocked_turns": 0,
+    "outbound_outbox_writes": 0,
+    "side_effects": {
+      "delivery": false,
+      "workflows": false,
+      "actions": false,
+      "field_writes": false
+    }
+  }
+}
