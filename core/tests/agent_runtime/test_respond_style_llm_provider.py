@@ -12,6 +12,7 @@ from atendia.agent_runtime import (
     AgentContextPackage,
     AgentTurnInput,
     RespondStyleLLMTurnProvider,
+    RespondStyleLLMTurnProviderConfig,
 )
 from atendia.agent_runtime.respond_style_llm_provider import (
     build_respond_style_messages,
@@ -223,8 +224,11 @@ def test_manual_runner_reads_atendia_v2_key_from_env_file(
 
 
 @pytest.mark.asyncio
-async def test_provider_blocks_schema_errors_as_no_send() -> None:
-    provider = RespondStyleLLMTurnProvider(client=_FakeOpenAIClient(["not-json"]))
+async def test_provider_blocks_schema_errors_as_no_send_when_retries_disabled() -> None:
+    provider = RespondStyleLLMTurnProvider(
+        client=_FakeOpenAIClient(["not-json"]),
+        config=RespondStyleLLMTurnProviderConfig(max_llm_retries=0),
+    )
 
     decision = await provider.generate(turn_input=_turn_input("hello"), context=_context())
 
@@ -303,3 +307,65 @@ def _load_manual_runner():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.asyncio
+async def test_provider_retries_with_feedback_on_schema_parse_error() -> None:
+    """A contract-shape error (e.g. empty field-write evidence) must trigger
+    one feedback retry instead of failing closed on the first attempt."""
+    invalid = _json_output(
+        final_message="Anotado tu interes.",
+        field_write_proposals=[
+            {
+                "field_key": "selected_option",
+                "value": "standard",
+                "evidence": [],
+                "confidence": 1,
+                "reason": "customer stated interest",
+            }
+        ],
+    )
+    valid = _json_output(
+        final_message="Anotado tu interes en la opcion.",
+        field_write_proposals=[
+            {
+                "field_key": "selected_option",
+                "value": "standard",
+                "evidence": ["me interesa la opcion estandar"],
+                "confidence": 0.9,
+                "reason": "customer stated interest",
+            }
+        ],
+    )
+    client = _FakeOpenAIClient([invalid, valid])
+    provider = RespondStyleLLMTurnProvider(client=client)
+
+    decision = await provider.generate(
+        turn_input=_turn_input("me interesa la opcion estandar"),
+        context=_context(
+            field_policies=[{"field_key": "selected_option", "writable": True}]
+        ),
+    )
+
+    assert decision.send_decision == "no_send"
+    assert decision.final_message == "Anotado tu interes en la opcion."
+    assert len(decision.accepted_field_writes) == 1
+    # The retry request carried the parse feedback to the model.
+    second_call = client.chat.completions.calls[1]
+    assert "output_parse_error" in str(second_call["messages"])
+
+
+@pytest.mark.asyncio
+async def test_provider_blocks_when_parse_retry_also_fails() -> None:
+    client = _FakeOpenAIClient(["not json at all", "still not json"])
+    provider = RespondStyleLLMTurnProvider(client=client)
+
+    decision = await provider.generate(
+        turn_input=_turn_input("hola"),
+        context=_context(),
+    )
+
+    assert decision.send_decision == "no_send"
+    assert decision.validation is not None
+    assert decision.validation.status == "blocked"
+    assert decision.validation.blocked_reason == "llm_turn_provider_retry_failed"

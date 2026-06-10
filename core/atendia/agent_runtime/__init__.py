@@ -92,6 +92,29 @@ _LAZY_EXPORTS = {
     "ProductAgentRuntimeSnapshotAdapter": (
         "atendia.agent_runtime.respond_style_product_agent_runtime"
     ),
+    "ConversationStateSnapshot": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "ConversationStateSource": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "ProductAgentConfigSnapshotAdapter": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "ProductAgentConfigSource": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "ProductAgentPublishedConfig": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "published_config_from_version_payload": (
+        "atendia.agent_runtime.respond_style_product_agent_config_adapter"
+    ),
+    "LiveSimulatedChannel": "atendia.agent_runtime.respond_style_live_simulated_channel",
+    "SimulatedChannelSummary": (
+        "atendia.agent_runtime.respond_style_live_simulated_channel"
+    ),
+    "SimulatedTurnRecord": "atendia.agent_runtime.respond_style_live_simulated_channel",
     "HardPolicy": "atendia.agent_runtime.respond_style_turn_validator",
     "RespondStyleTurnValidator": "atendia.agent_runtime.respond_style_turn_validator",
     "RespondStyleTurnValidatorConfig": "atendia.agent_runtime.respond_style_turn_validator",

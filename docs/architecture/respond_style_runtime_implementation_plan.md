@@ -315,3 +315,28 @@ sequential/refining tool needs.
 
 Next phase: Phase 9 — DB-backed read-only snapshot adapter from published
 Product Agent config + Test Lab routed through this same direct path.
+
+## Phase 9 + 9.5 — Config Adapter & Live Simulated Channel (2026-06-09)
+
+Status: `PHASE_9_5_LIVE_SIMULATED_CHANNEL_ANALYSIS_READY`
+
+- Phase 9: `respond_style_product_agent_config_adapter.py` — pure read-only
+  mapper from ProductAgentPublishedConfig (AgentVersion-shaped payload
+  supported via `published_config_from_version_payload`) + conversation
+  state to RespondStyleContextSnapshot. Always no-send; malformed config
+  fails closed.
+- Phase 9.5: `respond_style_live_simulated_channel.py` — WhatsApp-shaped
+  harness over the SAME direct runtime path; simulated delivery and
+  in-memory state only; `outbound_outbox_writes` is Literal[0]; no
+  outbox/delivery imports (test-enforced).
+- Real OpenAI run: 7 scenarios / 10 turns; 9 simulated outbounds; 1 correct
+  fail-closed; all no_send; zero side effects.
+- Defect found & fixed: provider now retries contract-shape parse errors
+  once with `output_parse_error` feedback (was failing closed on first
+  attempt; empty field-write evidence was the trigger).
+- Findings for Phase 10: (F1) same-turn field proposals are invisible to
+  the same turn's tool executor — compound first messages fail closed;
+  (F2) missing_fields exposure biases the model toward form-filling over
+  satisfiable tools.
+
+Evidence: `reports/live_simulated_channel_no_send_2026_06_09.md`.

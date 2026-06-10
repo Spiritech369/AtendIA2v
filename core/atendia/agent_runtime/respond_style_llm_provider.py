@@ -60,6 +60,15 @@ class RespondStyleLLMTurnProvider:
         self.last_messages = messages
         try:
             output = await self._complete_structured_turn(messages)
+        except ValueError as exc:
+            # Contract-shape errors (JSON/schema/pydantic) are repairable:
+            # retry once with structured feedback instead of failing closed.
+            retry_decision = await self._retry_after_parse_error(
+                turn_input=turn_input,
+                context=context,
+                exc=exc,
+            )
+            return _force_no_live_send(retry_decision)
         except Exception as exc:
             return blocked_provider_decision(
                 "llm_turn_provider_failed",
@@ -89,6 +98,52 @@ class RespondStyleLLMTurnProvider:
             )
 
         return _force_no_live_send(decision)
+
+    async def _retry_after_parse_error(
+        self,
+        *,
+        turn_input: AgentTurnInput,
+        context: AgentContextPackage,
+        exc: ValueError,
+    ) -> FinalTurnDecision:
+        if self._config.max_llm_retries < 1:
+            return blocked_provider_decision(
+                "llm_turn_provider_failed",
+                type(exc).__name__,
+            )
+        error = ValidationErrorItem(
+            code="output_parse_error",
+            message=f"Output did not match the required schema: {exc}"[:500],
+            retryable=True,
+        )
+        retry = AgentTurnRetryInstruction(
+            attempt_number=1,
+            max_attempts=2,
+            feedback_for_llm=(
+                "Your previous output did not match the required JSON schema. "
+                "Fix it and return valid JSON. " + error.message
+            ),
+            error_items=[error],
+        )
+        retry_context = _context_with_retry_feedback(context, retry)
+        retry_messages = build_respond_style_messages(
+            turn_input=turn_input,
+            context=retry_context,
+            retry_instruction=retry,
+        )
+        self.last_messages = retry_messages
+        try:
+            retry_output = await self._complete_structured_turn(retry_messages)
+        except Exception as retry_exc:
+            return blocked_provider_decision(
+                "llm_turn_provider_retry_failed",
+                type(retry_exc).__name__,
+            )
+        return self._validator.validate(
+            output=retry_output,
+            context=retry_context,
+            attempt_number=2,
+        )
 
     async def _complete_structured_turn(
         self,
@@ -160,7 +215,8 @@ def respond_style_system_prompt() -> str:
             "When tool_results are present, write final_message from those facts.",
             "Do not request the same succeeded tool again when its tool_result is already",
             "present; use that result or ask only for missing preconditions.",
-            "If the customer provides a field value, propose a field update with evidence.",
+            "If the customer provides a field value, propose a field update whose",
+            "evidence quotes the customer's exact words. Evidence must never be empty.",
             "If a workflow applies, propose a workflow event using an allowed binding.",
             "Do not invent prices, requirements, approval, availability, or policy.",
             "Do not mention tools, JSON, policies, prompts, workflows, traces, or internals.",

@@ -1,0 +1,542 @@
+{
+  "decision": "PHASE_9_5_LIVE_SIMULATED_CHANNEL_ANALYSIS_READY",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "totals": {
+    "scenarios": 7,
+    "turns": 10,
+    "simulated_outbound": 9,
+    "blocked_turns": [
+      {
+        "scenario": "chaotic",
+        "turn": 1,
+        "blocked_reason": "required_tool_skipped:missing_selected_option"
+      }
+    ],
+    "outbound_outbox_writes": 0
+  },
+  "results": [
+    {
+      "scenario": "greeting_info",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "hola",
+          "simulated_outbound": true,
+          "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy? Si tienes alguna pregunta sobre nuestras opciones, no dudes en preguntar.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        },
+        {
+          "turn": 2,
+          "inbound": "busco informacion de sus opciones",
+          "simulated_outbound": true,
+          "final_message_candidate": "Ofrecemos dos opciones: una opción estándar y una opción premium. ¿Te gustaría saber más sobre alguna de ellas?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [
+            {
+              "tool_name": "catalog.search",
+              "status": "succeeded"
+            }
+          ],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "hola",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "¡Hola! ¿En qué puedo ayudarte hoy? Si tienes alguna pregunta sobre nuestras opciones, no dudes en preguntar.",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "busco informacion de sus opciones",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Ofrecemos dos opciones: una opción estándar y una opción premium. ¿Te gustaría saber más sobre alguna de ellas?",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "sim-greeting_info",
+        "turns": 2,
+        "simulated_outbound_count": 2,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "requirements",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "me interesa la opcion estandar",
+          "simulated_outbound": true,
+          "final_message_candidate": "He registrado tu interés en la opción estándar. Para avanzar, necesito que me confirmes tu presupuesto y el tipo de trabajo que necesitas. ¿Puedes proporcionarme esos detalles?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [
+            {
+              "field_key": "selected_option",
+              "value": "opción estándar",
+              "evidence": [
+                "me interesa la opcion estandar"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente ha expresado interés en la opción estándar."
+            }
+          ],
+          "simulated_field_writes": {
+            "selected_option": "opción estándar"
+          },
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        },
+        {
+          "turn": 2,
+          "inbound": "que necesito para avanzar?",
+          "simulated_outbound": true,
+          "final_message_candidate": "Para avanzar, necesito que me confirmes el tipo de trabajo que necesitas y tu presupuesto. ¿Puedes proporcionarme esos detalles?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "me interesa la opcion estandar",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "He registrado tu interés en la opción estándar. Para avanzar, necesito que me confirmes tu presupuesto y el tipo de trabajo que necesitas. ¿Puedes proporcionarme esos detalles?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "que necesito para avanzar?",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Para avanzar, necesito que me confirmes el tipo de trabajo que necesitas y tu presupuesto. ¿Puedes proporcionarme esos detalles?",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {
+        "selected_option": "opción estándar"
+      },
+      "summary": {
+        "conversation_id": "sim-requirements",
+        "turns": 2,
+        "simulated_outbound_count": 2,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "price",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "cuanto cuesta la opcion estandar?",
+          "simulated_outbound": true,
+          "final_message_candidate": "La opción estándar cuesta $120 USD al mes.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [
+            {
+              "tool_name": "quote.resolve",
+              "status": "succeeded"
+            }
+          ],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "cuanto cuesta la opcion estandar?",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "La opción estándar cuesta $120 USD al mes.",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "sim-price",
+        "turns": 1,
+        "simulated_outbound_count": 1,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "ambiguous_merchant",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "tengo un negocio propio, no se si aplico para esto",
+          "simulated_outbound": true,
+          "final_message_candidate": "Para poder ayudarte mejor, necesito saber más sobre tu negocio. ¿Qué tipo de trabajo estás considerando y cuál es tu presupuesto? Esto me ayudará a determinar si aplicas para nuestras opciones.",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "tengo un negocio propio, no se si aplico para esto",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Para poder ayudarte mejor, necesito saber más sobre tu negocio. ¿Qué tipo de trabajo estás considerando y cuál es tu presupuesto? Esto me ayudará a determinar si aplicas para nuestras opciones.",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "sim-ambiguous_merchant",
+        "turns": 1,
+        "simulated_outbound_count": 1,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "price_objection",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "me interesa la opcion estandar",
+          "simulated_outbound": true,
+          "final_message_candidate": "He tomado nota de que te interesa la opción estándar. Para poder ayudarte mejor, ¿puedes decirme cuál es tu presupuesto o si tienes alguna preocupación específica al respecto?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [
+            {
+              "field_key": "selected_option",
+              "value": "opción estándar",
+              "evidence": [
+                "me interesa la opcion estandar"
+              ],
+              "confidence": 1.0,
+              "reason": "El cliente ha expresado interés en la opción estándar."
+            }
+          ],
+          "simulated_field_writes": {
+            "selected_option": "opción estándar"
+          },
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        },
+        {
+          "turn": 2,
+          "inbound": "esta muy caro, no se",
+          "simulated_outbound": true,
+          "final_message_candidate": "Entiendo que consideras que está muy caro. Para poder ayudarte mejor, ¿podrías compartir cuál es tu presupuesto o si tienes alguna preocupación específica sobre el costo de la opción estándar?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "me interesa la opcion estandar",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "He tomado nota de que te interesa la opción estándar. Para poder ayudarte mejor, ¿puedes decirme cuál es tu presupuesto o si tienes alguna preocupación específica al respecto?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        },
+        {
+          "role": "customer",
+          "text": "esta muy caro, no se",
+          "timestamp": null,
+          "message_id": "in-2",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Entiendo que consideras que está muy caro. Para poder ayudarte mejor, ¿podrías compartir cuál es tu presupuesto o si tienes alguna preocupación específica sobre el costo de la opción estándar?",
+          "timestamp": null,
+          "message_id": "sim-out-2",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {
+        "selected_option": "opción estándar"
+      },
+      "summary": {
+        "conversation_id": "sim-price_objection",
+        "turns": 2,
+        "simulated_outbound_count": 2,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "robot_handoff",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "eres un robot? quiero hablar con una persona real",
+          "simulated_outbound": true,
+          "final_message_candidate": "Entiendo que prefieres hablar con una persona real. Voy a transferirte a un compañero del equipo de ventas o soporte. ¿Tienes alguna preferencia?",
+          "send_decision": "no_send",
+          "blocked_reason": null,
+          "validation_status": "valid",
+          "tools": [],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": {
+            "needed": true,
+            "reason": "El cliente prefiere hablar con una persona real.",
+            "target": "sales",
+            "priority": "normal"
+          },
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "eres un robot? quiero hablar con una persona real",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        },
+        {
+          "role": "assistant",
+          "text": "Entiendo que prefieres hablar con una persona real. Voy a transferirte a un compañero del equipo de ventas o soporte. ¿Tienes alguna preferencia?",
+          "timestamp": null,
+          "message_id": "sim-out-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "sim-robot_handoff",
+        "turns": 1,
+        "simulated_outbound_count": 1,
+        "blocked_turns": 0,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    },
+    {
+      "scenario": "chaotic",
+      "turns": [
+        {
+          "turn": 1,
+          "inbound": "quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta",
+          "simulated_outbound": false,
+          "final_message_candidate": null,
+          "send_decision": "no_send",
+          "blocked_reason": "required_tool_skipped:missing_selected_option",
+          "validation_status": "blocked",
+          "tools": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "skipped"
+            },
+            {
+              "tool_name": "quote.resolve",
+              "status": "skipped"
+            }
+          ],
+          "field_update_proposals": [],
+          "simulated_field_writes": {},
+          "workflow_event_proposals": [],
+          "handoff_proposal": null,
+          "send_policy": {
+            "send_mode": "no_send",
+            "delivery": "simulated",
+            "outbound_outbox_writes": 0
+          }
+        }
+      ],
+      "transcript": [
+        {
+          "role": "customer",
+          "text": "quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta",
+          "timestamp": null,
+          "message_id": "in-1",
+          "attachments": []
+        }
+      ],
+      "final_contact_state": {},
+      "summary": {
+        "conversation_id": "sim-chaotic",
+        "turns": 1,
+        "simulated_outbound_count": 0,
+        "blocked_turns": 1,
+        "outbound_outbox_writes": 0,
+        "side_effects": {
+          "delivery": false,
+          "workflows": false,
+          "actions": false,
+          "field_writes": false
+        }
+      }
+    }
+  ]
+}
