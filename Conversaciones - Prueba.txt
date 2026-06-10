@@ -1,0 +1,122 @@
+# Conversaciones manuales para probar el simulador
+
+## 1. Flujo normal de crédito
+
+hola
+busco una moto a crédito
+tengo 15 meses trabajando
+me pagan por transferencia (revisar ambiguedad)
+no me dan nomina
+me interesa la DNM2.5
+qué ocupo para avanzar
+cuánto doy de enganche?
+/save
+/exit
+
+## 2. Cliente caótico desde el primer mensaje
+
+hola
+quiero la opcion estandar trabajo por mi cuenta que necesito y cuanto cuesta
+y si no tengo comprobantes?
+está algo caro
+entonces qué me conviene
+/save
+/exit
+
+## 3. Cliente que pregunta requisitos antes de dar datos
+
+hola
+qué ocupo para sacar una moto
+pero dime los papeles primero
+tengo como 2 años trabajando
+me pagan por nómina
+quiero una económica
+/save
+/exit
+
+## 4. Comerciante ambiguo
+
+buenas
+quiero crédito para una moto
+tengo negocio (revisar ambiguedad)
+vendo comida desde mi casa
+tengo 3 años con el negocio
+qué papeles ocupo
+cuánto tendría que dar
+/save
+/exit
+
+## 5. Comerciante con aclaración SAT
+
+hola
+quiero la metro a crédito
+tengo 4 años trabajando por mi cuenta
+soy comerciante
+sí estoy dado de alta en SAT
+qué me pides
+cuánto queda
+/save
+/exit
+
+## 6. Objeción de precio
+
+hola
+busco una moto barata
+tengo 18 meses trabajando
+me pagan por transferencia
+me gusta la opción estándar
+cuánto me queda
+está muy caro
+hay una más barata?
+/save
+/exit
+
+## 7. Cliente frustrado
+
+hola
+qué ocupo
+ya te dije que quiero crédito no?
+tengo 15 meses
+me pagan por fuera
+entonces qué sigue
+eres robot?
+/save
+/exit
+
+## 8. Cambio de datos a media conversación
+
+hola
+quiero sacar una moto
+tengo 15 meses trabajando
+no, perdón, tengo 10 meses
+me pagan por nómina
+bueno, realmente me pagan por transferencia sin recibos
+qué plan sería
+/save
+/exit
+
+## 9. Modelo ambiguo
+
+hola
+quiero una moto a crédito
+tengo 2 años trabajando
+me pagan por transferencia
+quiero la roja que vi en el anuncio
+no sé el nombre
+algo económico para moverme al trabajo
+qué opciones hay
+/save
+/exit
+
+## 10. Handoff humano
+
+hola
+quiero una moto
+tengo 22 años trabajando
+me pagan por nómina
+me interesa la metro
+qué ocupo
+prefiero que me atienda una persona
+me puedes pasar con alguien?
+/save
+/exit

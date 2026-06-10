@@ -266,6 +266,10 @@ async def main() -> int:
         "--script",
         help="non-interactive input: messages/commands separated by '||'",
     )
+    parser.add_argument(
+        "--label",
+        help="suffix for the report run label (avoids collisions in batch runs)",
+    )
     args = parser.parse_args()
 
     api_key, env_source = _api_key_from_env()
@@ -275,6 +279,8 @@ async def main() -> int:
 
     config = _load_config(args)
     run_label = datetime.now().strftime("%Y_%m_%d_%H%M")
+    if args.label:
+        run_label = f"{run_label}_{args.label}"
     simulator = ManualLiveSimulator(
         config=config,
         tool_loop_factory=lambda: RespondStyleToolLoop(
