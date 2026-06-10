@@ -288,3 +288,30 @@ runner `tools/run_respond_style_context_builder_no_send_2026_06_09.py`
 Next phase: Phase 8 — ProductAgentRuntime direct path no-send (deployment
 resolver + snapshot adapter from Product Agent config + tool executor
 fact-only + the amended provider/tool loop/validator, end to end, no send).
+
+## Phase 8 — ProductAgentRuntime Direct Path no-send (2026-06-09)
+
+Status: `PHASE_8_PRODUCT_AGENT_RUNTIME_DIRECT_PATH_NO_SEND_READY`
+
+File: `core/atendia/agent_runtime/respond_style_product_agent_runtime.py`
+
+Pipeline: `ProductAgentRuntimeInput -> ProductAgentRuntimeSnapshotAdapter
+(protocol, owns I/O) -> RespondStyleContextPackageBuilder ->
+RespondStyleToolLoop -> ProductAgentRuntimeResult`.
+
+- `requested_mode` is schema-locked to `no_send`; live snapshots, adapter
+  failures, and malformed config all fail closed with structured reasons.
+- Result model refuses `send_decision != no_send` and
+  `side_effects_allowed != false` at the pydantic layer.
+- Field/workflow/action/handoff outputs are proposals only — nothing is
+  executed or persisted. `FinalTurnDecision.accepted_handoff` added
+  (additive contract change) so handoff proposals propagate.
+- Evidence: `reports/product_agent_runtime_direct_no_send_2026_06_09.md`
+  (real OpenAI, 3 generic tenants, 103/103 tests, ruff clean).
+
+Known limitation carried forward: the tool loop implements a single
+fact-only round; multi-round (2-3 with budget) is required before live for
+sequential/refining tool needs.
+
+Next phase: Phase 9 — DB-backed read-only snapshot adapter from published
+Product Agent config + Test Lab routed through this same direct path.

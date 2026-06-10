@@ -304,6 +304,7 @@ class FinalTurnDecision(BaseModel):
     accepted_field_writes: list[LLMFieldUpdateProposal] = Field(default_factory=list)
     accepted_actions: list[LLMActionProposal] = Field(default_factory=list)
     accepted_workflow_events: list[LLMWorkflowEventProposal] = Field(default_factory=list)
+    accepted_handoff: LLMHandoffProposal | None = None
     retry_instruction: AgentTurnRetryInstruction | None = None
     trace_metadata: JsonDict = Field(default_factory=dict)
 

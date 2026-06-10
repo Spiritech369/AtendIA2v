@@ -1,0 +1,78 @@
+{
+  "decision": "PHASE_8_PRODUCT_AGENT_RUNTIME_DIRECT_PATH_NO_SEND_READY",
+  "mode": "no_send",
+  "env_source": ".env:ATENDIA_V2_OPENAI_API_KEY",
+  "results": [
+    {
+      "scenario": "generic_sales_requirements",
+      "send_decision": "no_send",
+      "side_effects_allowed": false,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      },
+      "blocked_reason": null,
+      "tools_executed": [
+        "requirements.lookup"
+      ],
+      "tool_results_count": 1,
+      "final_message": "Para la opción estándar, necesitas: \n- identificación válida \n- comprobante de domicilio.",
+      "validation_status": "valid",
+      "field_update_proposals": [],
+      "workflow_event_proposals": [],
+      "handoff_proposal": null,
+      "runtime_path": "respond_style_no_send_direct"
+    },
+    {
+      "scenario": "generic_scheduling_availability",
+      "send_decision": "no_send",
+      "side_effects_allowed": false,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      },
+      "blocked_reason": null,
+      "tools_executed": [
+        "availability.lookup"
+      ],
+      "tool_results_count": 1,
+      "final_message": "Para una consulta general, tenemos los siguientes horarios disponibles para el próximo día hábil:\n- 10:00\n- 12:30\n- 16:00\n\n¿Te gustaría reservar uno de estos horarios?",
+      "validation_status": "valid",
+      "field_update_proposals": [],
+      "workflow_event_proposals": [],
+      "handoff_proposal": null,
+      "runtime_path": "respond_style_no_send_direct"
+    },
+    {
+      "scenario": "generic_support_faq",
+      "send_decision": "no_send",
+      "side_effects_allowed": false,
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      },
+      "blocked_reason": null,
+      "tools_executed": [],
+      "tool_results_count": 0,
+      "final_message": "Para resolver problemas de acceso a tu cuenta, primero necesitamos confirmar tu identidad. Por favor, sigue las instrucciones que recibirás para verificar tu identidad. Si tienes más preguntas, no dudes en preguntar.",
+      "validation_status": "valid",
+      "field_update_proposals": [],
+      "workflow_event_proposals": [],
+      "handoff_proposal": null,
+      "runtime_path": "respond_style_no_send_direct"
+    }
+  ],
+  "side_effects": {
+    "outbox": false,
+    "workflows": false,
+    "actions": false,
+    "delivery": false,
+    "db_writes": false
+  }
+}

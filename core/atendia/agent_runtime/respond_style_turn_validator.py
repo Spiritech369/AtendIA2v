@@ -73,17 +73,20 @@ def default_hard_policies(config: RespondStyleTurnValidatorConfig) -> tuple[Hard
         ),
         HardPolicy(
             policy_id="default_requirements_support",
-            description="requirement listings require a requirements tool result or a cited knowledge source",
+            description=(
+                "requirement listings require a requirements tool result "
+                "or a cited knowledge source"
+            ),
             trigger_patterns=(
                 r"\b(?:requisitos?|requirements?)\b",
                 r"\b(?:documentos?|papeles?)\b[^.?!]*\b(?:necesitas?|ocupas?|requieres?|"
                 r"necesarios?|requeridos?|pedimos|need|required)\b",
                 r"\b(?:necesitas?|ocupas?|need|required)\b[^.?!]*\b(?:documentos?|papeles?)\b",
             ),
-            requires_any=tuple(
-                f"tool:{name}" for name in config.requirements_tool_names
-            )
-            + ("basis:knowledge_source",),
+            requires_any=(
+                *(f"tool:{name}" for name in config.requirements_tool_names),
+                "basis:knowledge_source",
+            ),
             error_code="missing_requirements_tool",
         ),
     )
@@ -125,6 +128,11 @@ class RespondStyleTurnValidator:
                 accepted_workflow_events=list(output.workflow_event_proposals),
                 send_decision=send_decision,
             )
+            accepted_handoff = (
+                output.handoff_proposal
+                if output.handoff_proposal is not None and output.handoff_proposal.needed
+                else None
+            )
             return FinalTurnDecision(
                 final_message=output.final_message,
                 send_decision=send_decision,
@@ -132,6 +140,7 @@ class RespondStyleTurnValidator:
                 accepted_field_writes=list(output.field_write_proposals),
                 accepted_actions=list(output.action_proposals),
                 accepted_workflow_events=list(output.workflow_event_proposals),
+                accepted_handoff=accepted_handoff,
                 trace_metadata={
                     "respond_style_validator": {
                         "status": "valid",

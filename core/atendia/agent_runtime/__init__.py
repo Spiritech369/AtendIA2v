@@ -86,6 +86,12 @@ _LAZY_EXPORTS = {
     "RespondStyleContextPackageBuilder": "atendia.agent_runtime.respond_style_context_builder",
     "RespondStyleContextSnapshot": "atendia.agent_runtime.respond_style_context_builder",
     "TranscriptMessage": "atendia.agent_runtime.respond_style_context_builder",
+    "ProductAgentRuntime": "atendia.agent_runtime.respond_style_product_agent_runtime",
+    "ProductAgentRuntimeInput": "atendia.agent_runtime.respond_style_product_agent_runtime",
+    "ProductAgentRuntimeResult": "atendia.agent_runtime.respond_style_product_agent_runtime",
+    "ProductAgentRuntimeSnapshotAdapter": (
+        "atendia.agent_runtime.respond_style_product_agent_runtime"
+    ),
     "HardPolicy": "atendia.agent_runtime.respond_style_turn_validator",
     "RespondStyleTurnValidator": "atendia.agent_runtime.respond_style_turn_validator",
     "RespondStyleTurnValidatorConfig": "atendia.agent_runtime.respond_style_turn_validator",
