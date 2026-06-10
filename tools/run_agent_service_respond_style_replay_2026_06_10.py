@@ -216,19 +216,14 @@ async def _seed(session):
         name="phase14 replay",
     )
     session.add(customer)
-    await session.flush()
-    conversation = Conversation(
-        id=uuid4(), tenant_id=tenant_id, customer_id=customer.id, channel="whatsapp"
-    )
-    session.add(conversation)
     await session.commit()
-    return tenant_id, conversation.id
+    return tenant_id, customer.id
 
 
 async def main() -> int:
     factory = _get_factory()
     async with factory() as session:
-        tenant_id, conversation_id = await _seed(session)
+        tenant_id, customer_id = await _seed(session)
         outbox_before = (
             await session.execute(text("SELECT COUNT(*) FROM outbound_outbox"))
         ).scalar()
@@ -237,6 +232,17 @@ async def main() -> int:
         results = []
         turn_number = 0
         for name, turns in REPLAYS:
+            # Fresh conversation per replay: shadow state must not leak
+            # between independent replays.
+            conversation = Conversation(
+                id=uuid4(),
+                tenant_id=tenant_id,
+                customer_id=customer_id,
+                channel="whatsapp",
+            )
+            session.add(conversation)
+            await session.flush()
+            conversation_id = conversation.id
             for inbound in turns:
                 turn_number += 1
                 session.add(

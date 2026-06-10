@@ -448,3 +448,26 @@ class AgentPublishEvent(Base):
     actor_user_id: Mapped[UUID | None] = mapped_column()
     safety_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RespondStyleShadowFields(Base):
+    """Shadow contact-field state for the Respond-Style direct route.
+
+    No-send/shadow only: nothing in the legacy runner or live commercial
+    state reads or writes this table. ``audit_log`` accumulates the
+    validated field-application entries per turn.
+    """
+
+    __tablename__ = "respond_style_shadow_fields"
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    tenant_id: Mapped[UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    field_values: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    audit_log: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

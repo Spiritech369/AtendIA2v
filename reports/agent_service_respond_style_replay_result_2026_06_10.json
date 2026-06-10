@@ -3,7 +3,7 @@
   "mode": "no_send",
   "checks": {
     "turns": 9,
-    "answered": 8,
+    "answered": 9,
     "all_direct_route": true,
     "legacy_path_used_false": true,
     "all_send_blocked": true,
@@ -29,7 +29,7 @@
     {
       "replay": "v2_incident",
       "inbound": "Info porfavor",
-      "candidate": "En general, se requiere identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas. ¿Puedes decirme qué tipo de ingreso recibes?",
+      "candidate": "En general, se pide identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas. ¿Podrías decirme qué tipo de ingreso recibes?",
       "blocked_reason": null,
       "route": "respond_style_agent_service_no_send",
       "legacy_path_used": false,
@@ -41,7 +41,7 @@
     {
       "replay": "v2_incident",
       "inbound": "Me pagan por transferencia",
-      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual. ¿Puedes decirme tu antigüedad laboral?",
+      "candidate": "Si te pagan por transferencia, necesitarás presentar los siguientes documentos:\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses.",
       "blocked_reason": null,
       "route": "respond_style_agent_service_no_send",
       "legacy_path_used": false,
@@ -50,15 +50,15 @@
       "leak": false,
       "tools": [
         {
-          "tool_name": "eligibility_plan.resolve",
-          "status": "skipped"
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
         }
       ]
     },
     {
       "replay": "v2_incident",
       "inbound": "?",
-      "candidate": "¿En qué puedo ayudarte hoy? Si necesitas información sobre requisitos o algún otro tema, por favor dime.",
+      "candidate": "¿En qué puedo ayudarte hoy? Si necesitas información sobre requisitos, precios o algún otro tema, házmelo saber.",
       "blocked_reason": null,
       "route": "respond_style_agent_service_no_send",
       "legacy_path_used": false,
@@ -82,7 +82,7 @@
     {
       "replay": "v3_incident",
       "inbound": "info porfavor",
-      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual y qué tipo de ingreso recibes. ¿Puedes proporcionarme esos detalles?",
+      "candidate": "En general, se requiere identificación oficial vigente, comprobante de domicilio y alguna forma de demostrar ingresos. La lista exacta depende del tipo de ingreso que tengas.",
       "blocked_reason": null,
       "route": "respond_style_agent_service_no_send",
       "legacy_path_used": false,
@@ -94,41 +94,7 @@
     {
       "replay": "v3_incident",
       "inbound": "15 meses",
-      "candidate": null,
-      "blocked_reason": "tool_round_limit_reached",
-      "route": "respond_style_agent_service_no_send",
-      "legacy_path_used": false,
-      "send_allowed": false,
-      "outbox_write_attempted": false,
-      "leak": false,
-      "tools": [
-        {
-          "tool_name": "eligibility_plan.resolve",
-          "status": "skipped"
-        }
-      ]
-    },
-    {
-      "replay": "v3_incident",
-      "inbound": "me pagan por transferencia",
-      "candidate": "Entiendo que te pagan por transferencia. Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual. ¿Puedes decirme tu antigüedad laboral?",
-      "blocked_reason": null,
-      "route": "respond_style_agent_service_no_send",
-      "legacy_path_used": false,
-      "send_allowed": false,
-      "outbox_write_attempted": false,
-      "leak": false,
-      "tools": [
-        {
-          "tool_name": "eligibility_plan.resolve",
-          "status": "skipped"
-        }
-      ]
-    },
-    {
-      "replay": "v3_incident",
-      "inbound": "?",
-      "candidate": "Para poder ayudarte mejor, necesito saber cuántos años llevas trabajando en tu empleo actual y qué tipo de ingreso recibes. ¿Puedes proporcionarme esos detalles?",
+      "candidate": "Entiendo que tienes 15 meses de antigüedad laboral. ¿Cómo recibes tus ingresos? Esto me ayudará a darte la información que necesitas.",
       "blocked_reason": null,
       "route": "respond_style_agent_service_no_send",
       "legacy_path_used": false,
@@ -136,6 +102,40 @@
       "outbox_write_attempted": false,
       "leak": false,
       "tools": []
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "me pagan por transferencia",
+      "candidate": "Para ingresos por transferencia de fondos, necesitas presentar los siguientes documentos:\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses.",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ]
+    },
+    {
+      "replay": "v3_incident",
+      "inbound": "?",
+      "candidate": "Para ingresos por transferencia de fondos, necesitas presentar los siguientes documentos:\n- Identificación oficial vigente\n- Comprobante de domicilio reciente\n- Comprobante de ingresos de los últimos 3 meses.",
+      "blocked_reason": null,
+      "route": "respond_style_agent_service_no_send",
+      "legacy_path_used": false,
+      "send_allowed": false,
+      "outbox_write_attempted": false,
+      "leak": false,
+      "tools": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded"
+        }
+      ]
     }
   ]
 }

@@ -481,3 +481,24 @@ route. Suite 206 tests, ruff clean.
 
 Next phase: validated field-proposal persistence for the direct route,
 live no_send->handoff policy, multi-deployment resolution.
+
+## Phase 15 — Shadow Field State, no_send Policy, Multi-Deployment (2026-06-10)
+
+Status: `PHASE_15_RESPOND_STYLE_FIELD_STATE_AND_NO_SEND_HANDOFF_READY`
+
+- 15A: validated/audited shadow field application
+  (`respond_style_field_state.py`) persisted in the NEW isolated table
+  `respond_style_shadow_fields` (migration 069) — never the legacy
+  `conversation_state.extracted_data`. Field memory survives turns in the
+  AgentService no-send route; rejected proposals never write; full audit
+  (prev/new/evidence/reason, shadow_only=true) rides the trace.
+- 15B: `derive_no_send_followup` declares the internal operator policy for
+  blocked/silent turns (handoff_internal_needed + notify_operator), with
+  customer_copy_sent=false and executed=false in this phase.
+- 15C: deployment resolution fails closed on ambiguity
+  (respond_style_deployment_ambiguous); one deployment selects, none →
+  legacy path.
+- E2E acceptance met: V2/V3 replay through real AgentService — 9/9
+  answered, NO seniority re-ask after "15 meses", final "?" resolved
+  requirements using income_type from shadow state persisted two turns
+  earlier. Outbox delta 0, 0 leaks. Suite 211 tests, ruff clean.

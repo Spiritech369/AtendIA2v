@@ -240,6 +240,8 @@ def _respond_style_agent_service_result(
             "handoff_proposal": (
                 result.handoff_proposal if result is not None else None
             ),
+            "field_state": getattr(outcome, "field_state", {}),
+            "no_send_followup": getattr(outcome, "no_send_followup", {}),
             "side_effects": (
                 result.side_effects
                 if result is not None
