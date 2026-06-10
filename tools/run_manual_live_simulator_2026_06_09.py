@@ -270,6 +270,11 @@ async def main() -> int:
         "--label",
         help="suffix for the report run label (avoids collisions in batch runs)",
     )
+    parser.add_argument(
+        "--model",
+        default="gpt-4o-mini",
+        help="OpenAI model for the turn provider (default gpt-4o-mini)",
+    )
     args = parser.parse_args()
 
     api_key, env_source = _api_key_from_env()
@@ -281,10 +286,18 @@ async def main() -> int:
     run_label = datetime.now().strftime("%Y_%m_%d_%H%M")
     if args.label:
         run_label = f"{run_label}_{args.label}"
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        RespondStyleLLMTurnProviderConfig,
+    )
+
+    provider = RespondStyleLLMTurnProvider(
+        api_key=api_key,
+        config=RespondStyleLLMTurnProviderConfig(model=args.model),
+    )
     simulator = ManualLiveSimulator(
         config=config,
         tool_loop_factory=lambda: RespondStyleToolLoop(
-            provider=RespondStyleLLMTurnProvider(api_key=api_key),
+            provider=provider,
             executor=DryFactsToolExecutor(config.tool_bindings),
             config=RespondStyleToolLoopConfig(
                 max_tool_rounds=3, max_elapsed_seconds=120.0
@@ -318,6 +331,18 @@ async def main() -> int:
                 for path in simulator.save_report():
                     print(f"  saved: {path}")
             break
+    print(
+        "usage_summary: "
+        + json.dumps(
+            {
+                "model": args.model,
+                "llm_calls": provider.llm_calls,
+                "retries": provider.retry_count,
+                "prompt_tokens": provider.total_prompt_tokens,
+                "completion_tokens": provider.total_completion_tokens,
+            }
+        )
+    )
     return 0
 
 

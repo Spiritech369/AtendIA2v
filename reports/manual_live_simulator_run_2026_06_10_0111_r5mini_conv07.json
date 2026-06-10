@@ -1,0 +1,790 @@
+{
+  "decision_context": "MANUAL_LIVE_SIMULATOR_NO_SEND",
+  "run_label": "2026_06_10_0111_r5mini_conv07",
+  "agent": {
+    "tenant_id": "manual-review-tenant",
+    "agent_id": "moto-credit-agent",
+    "agent_version_id": "v1"
+  },
+  "mode": "no_send",
+  "turns": [
+    {
+      "turn_number": 1,
+      "inbound_text": "hola",
+      "final_message_candidate": "¡Hola! ¿En qué puedo ayudarte hoy con respecto a motos?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 2,
+      "inbound_text": "qué ocupo",
+      "final_message_candidate": null,
+      "simulated_outbound": false,
+      "send_decision": "no_send",
+      "blocked_reason": "hard_policy_unsupported:requirements_require_support",
+      "validation_result": {
+        "status": "blocked",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [
+          {
+            "code": "hard_policy_unsupported:requirements_require_support",
+            "message": "hard policy 'requirements_require_support' requires fact support: listas de requisitos/papeles requieren tool o fuente citada",
+            "path": "final_message",
+            "retryable": true,
+            "metadata": {}
+          }
+        ],
+        "send_decision": "no_send",
+        "blocked_reason": "hard_policy_unsupported:requirements_require_support"
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "skipped",
+          "facts": {},
+          "citations": [],
+          "source_refs": [],
+          "error_code": "missing_precondition:income_type",
+          "is_required": true,
+          "can_support_claims": false
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "blocked"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "skipped",
+              "facts": {},
+              "citations": [],
+              "source_refs": [],
+              "error_code": "missing_precondition:income_type",
+              "is_required": true,
+              "can_support_claims": false
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 3,
+      "inbound_text": "ya te dije que quiero crédito no?",
+      "final_message_candidate": "Entiendo que quieres crédito para una moto. Para poder ayudarte mejor, necesito saber un par de cosas: ¿cuánto tiempo llevas trabajando (antigüedad laboral) y cómo recibes tus ingresos (nómina, transferencia, efectivo o negocio propio)? Esto me ayudará a encontrar el plan adecuado para ti.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 4,
+      "inbound_text": "tengo 15 meses",
+      "final_message_candidate": "Perfecto, ya tengo tu antigüedad laboral de 15 meses. Ahora, ¿cómo recibes tus ingresos? ¿Es por nómina, transferencia, efectivo o tienes un negocio propio?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "employment_seniority",
+            "value": "15 meses",
+            "evidence": [
+              "tengo 15 meses"
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente ha proporcionado su antigüedad laboral."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "skipped",
+          "facts": {},
+          "citations": [],
+          "source_refs": [],
+          "error_code": "missing_precondition:income_type",
+          "is_required": true,
+          "can_support_claims": false
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "employment_seniority",
+          "value": "15 meses",
+          "evidence": [
+            "tengo 15 meses"
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente ha proporcionado su antigüedad laboral."
+        }
+      ],
+      "simulated_field_writes": {
+        "employment_seniority": "15 meses"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [
+            "employment_seniority"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "skipped",
+              "facts": {},
+              "citations": [],
+              "source_refs": [],
+              "error_code": "missing_precondition:income_type",
+              "is_required": true,
+              "can_support_claims": false
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 5,
+      "inbound_text": "me pagan por fuera",
+      "final_message_candidate": "Con tus 15 meses de antigüedad laboral y al recibir ingresos en efectivo, el plan de crédito que aplica para ti es el plan semanal estándar, con un enganche del 30%. Los pagos serán semanales. Si tienes alguna pregunta o necesitas más información, ¡dímelo!",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [
+          {
+            "field_key": "income_type",
+            "value": "efectivo",
+            "evidence": [
+              "El cliente mencionó que le pagan por fuera."
+            ],
+            "confidence": 0.9,
+            "reason": "El cliente indicó cómo recibe sus ingresos."
+          }
+        ],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "credit_plan.resolve",
+          "status": "succeeded",
+          "facts": {
+            "plan": "plan semanal estandar",
+            "down_payment_percent": 30,
+            "payment_frequency": "semanal",
+            "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+            "income_type": "efectivo",
+            "employment_seniority": "15 meses"
+          },
+          "citations": [
+            "credit_plan.resolve-dry-source"
+          ],
+          "source_refs": [
+            "credit_plan.resolve"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [
+        {
+          "field_key": "income_type",
+          "value": "efectivo",
+          "evidence": [
+            "El cliente mencionó que le pagan por fuera."
+          ],
+          "confidence": 0.9,
+          "reason": "El cliente indicó cómo recibe sus ingresos."
+        }
+      ],
+      "simulated_field_writes": {
+        "income_type": "efectivo"
+      },
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [
+            "income_type"
+          ],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "credit_plan.resolve",
+              "status": "succeeded",
+              "facts": {
+                "plan": "plan semanal estandar",
+                "down_payment_percent": 30,
+                "payment_frequency": "semanal",
+                "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%",
+                "income_type": "efectivo",
+                "employment_seniority": "15 meses"
+              },
+              "citations": [
+                "credit_plan.resolve-dry-source"
+              ],
+              "source_refs": [
+                "credit_plan.resolve"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 6,
+      "inbound_text": "entonces qué sigue",
+      "final_message_candidate": "Para continuar con tu crédito, necesitarás presentar algunos documentos. Estos son:\n\n1. Identificación oficial vigente.\n2. Comprobante de domicilio reciente.\n3. Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina).\n\nUna vez que tengas estos documentos, podemos avanzar al siguiente paso. ¿Tienes en mente algún modelo de moto que te gustaría? O si necesitas opciones, puedo ayudarte a buscar.",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [
+        {
+          "tool_name": "requirements.lookup",
+          "status": "succeeded",
+          "facts": {
+            "requirements": [
+              "identificacion oficial vigente",
+              "comprobante de domicilio reciente",
+              "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+            ],
+            "income_type": "efectivo"
+          },
+          "citations": [
+            "requirements.lookup-dry-source"
+          ],
+          "source_refs": [
+            "requirements.lookup"
+          ],
+          "error_code": null,
+          "is_required": true,
+          "can_support_claims": true
+        }
+      ],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": null,
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 1,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [
+            {
+              "tool_name": "requirements.lookup",
+              "status": "succeeded",
+              "facts": {
+                "requirements": [
+                  "identificacion oficial vigente",
+                  "comprobante de domicilio reciente",
+                  "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
+                ],
+                "income_type": "efectivo"
+              },
+              "citations": [
+                "requirements.lookup-dry-source"
+              ],
+              "source_refs": [
+                "requirements.lookup"
+              ],
+              "error_code": null,
+              "is_required": true,
+              "can_support_claims": true
+            }
+          ],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    },
+    {
+      "turn_number": 7,
+      "inbound_text": "eres robot?",
+      "final_message_candidate": "Soy un asistente digital, aquí para ayudarte con la información sobre motos y créditos. Si prefieres hablar con un asesor humano, puedo conectarte con uno en cualquier momento. ¿Te gustaría que lo hiciera?",
+      "simulated_outbound": true,
+      "send_decision": "no_send",
+      "blocked_reason": null,
+      "validation_result": {
+        "status": "valid",
+        "retryable": false,
+        "feedback_for_llm": null,
+        "accepted_tool_requests": [],
+        "accepted_field_writes": [],
+        "accepted_actions": [],
+        "accepted_workflow_events": [],
+        "blocked_items": [],
+        "send_decision": "no_send",
+        "blocked_reason": null
+      },
+      "tool_results": [],
+      "field_update_proposals": [],
+      "simulated_field_writes": {},
+      "workflow_event_proposals": [],
+      "action_proposals": [],
+      "handoff_proposal": {
+        "needed": true,
+        "reason": "El cliente prefiere hablar con un humano.",
+        "target": "ventas",
+        "priority": "normal"
+      },
+      "retry_instruction": null,
+      "send_policy": {
+        "send_mode": "no_send",
+        "send_policy_label": "no_send",
+        "delivery": "simulated",
+        "outbound_outbox_writes": 0
+      },
+      "trace": {
+        "respond_style_product_agent_runtime": {
+          "mode": "no_send",
+          "runtime_path": "respond_style_no_send_direct",
+          "agent_version_id": "v1",
+          "deployment_id": "no-send-deployment"
+        },
+        "respond_style_validator": {
+          "status": "valid",
+          "turn_kind": "final_response"
+        },
+        "respond_style_llm_provider": {
+          "mode": "no_send"
+        },
+        "respond_style_tool_loop": {
+          "mode": "no_send",
+          "tool_rounds": 0,
+          "blocked": null,
+          "provisional_field_keys": [],
+          "dropped_tool_requests": [],
+          "tool_results": [],
+          "side_effects": {
+            "delivery": false,
+            "workflows": false,
+            "actions": false
+          }
+        }
+      },
+      "side_effects": {
+        "delivery": false,
+        "workflows": false,
+        "actions": false,
+        "field_writes": false
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "role": "customer",
+      "text": "hola",
+      "timestamp": null,
+      "message_id": "in-1",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "¡Hola! ¿En qué puedo ayudarte hoy con respecto a motos?",
+      "timestamp": null,
+      "message_id": "sim-out-1",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "qué ocupo",
+      "timestamp": null,
+      "message_id": "in-2",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "ya te dije que quiero crédito no?",
+      "timestamp": null,
+      "message_id": "in-3",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Entiendo que quieres crédito para una moto. Para poder ayudarte mejor, necesito saber un par de cosas: ¿cuánto tiempo llevas trabajando (antigüedad laboral) y cómo recibes tus ingresos (nómina, transferencia, efectivo o negocio propio)? Esto me ayudará a encontrar el plan adecuado para ti.",
+      "timestamp": null,
+      "message_id": "sim-out-3",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "tengo 15 meses",
+      "timestamp": null,
+      "message_id": "in-4",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Perfecto, ya tengo tu antigüedad laboral de 15 meses. Ahora, ¿cómo recibes tus ingresos? ¿Es por nómina, transferencia, efectivo o tienes un negocio propio?",
+      "timestamp": null,
+      "message_id": "sim-out-4",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "me pagan por fuera",
+      "timestamp": null,
+      "message_id": "in-5",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Con tus 15 meses de antigüedad laboral y al recibir ingresos en efectivo, el plan de crédito que aplica para ti es el plan semanal estándar, con un enganche del 30%. Los pagos serán semanales. Si tienes alguna pregunta o necesitas más información, ¡dímelo!",
+      "timestamp": null,
+      "message_id": "sim-out-5",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "entonces qué sigue",
+      "timestamp": null,
+      "message_id": "in-6",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Para continuar con tu crédito, necesitarás presentar algunos documentos. Estos son:\n\n1. Identificación oficial vigente.\n2. Comprobante de domicilio reciente.\n3. Comprobante de ingresos de los últimos 3 meses (pueden ser estados de cuenta si no tienes recibos de nómina).\n\nUna vez que tengas estos documentos, podemos avanzar al siguiente paso. ¿Tienes en mente algún modelo de moto que te gustaría? O si necesitas opciones, puedo ayudarte a buscar.",
+      "timestamp": null,
+      "message_id": "sim-out-6",
+      "attachments": []
+    },
+    {
+      "role": "customer",
+      "text": "eres robot?",
+      "timestamp": null,
+      "message_id": "in-7",
+      "attachments": []
+    },
+    {
+      "role": "assistant",
+      "text": "Soy un asistente digital, aquí para ayudarte con la información sobre motos y créditos. Si prefieres hablar con un asesor humano, puedo conectarte con uno en cualquier momento. ¿Te gustaría que lo hiciera?",
+      "timestamp": null,
+      "message_id": "sim-out-7",
+      "attachments": []
+    }
+  ],
+  "simulated_fields_final": {
+    "employment_seniority": "15 meses",
+    "income_type": "efectivo"
+  },
+  "failures": [
+    {
+      "turn": 2,
+      "inbound": "qué ocupo",
+      "no_send_reason": "hard_policy_unsupported:requirements_require_support"
+    }
+  ],
+  "summary": {
+    "conversation_id": "manual-sim-0",
+    "turns": 7,
+    "simulated_outbound_count": 6,
+    "blocked_turns": 1,
+    "outbound_outbox_writes": 0,
+    "side_effects": {
+      "delivery": false,
+      "workflows": false,
+      "actions": false,
+      "field_writes": false
+    }
+  }
+}

@@ -49,6 +49,11 @@ class RespondStyleLLMTurnProvider:
         self._validator = validator or RespondStyleTurnValidator()
         self.last_raw_output: str | None = None
         self.last_messages: list[dict[str, str]] = []
+        # Observability counters (cumulative across generate() calls).
+        self.llm_calls = 0
+        self.retry_count = 0
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
 
     async def generate(
         self,
@@ -77,6 +82,7 @@ class RespondStyleLLMTurnProvider:
         decision = self._validator.validate(output=output, context=context, attempt_number=1)
 
         if decision.retry_instruction is not None and self._config.max_llm_retries > 0:
+            self.retry_count += 1
             retry_context = _context_with_retry_feedback(context, decision.retry_instruction)
             retry_messages = build_respond_style_messages(
                 turn_input=turn_input,
@@ -111,6 +117,7 @@ class RespondStyleLLMTurnProvider:
                 "llm_turn_provider_failed",
                 type(exc).__name__,
             )
+        self.retry_count += 1
         error = ValidationErrorItem(
             code="output_parse_error",
             message=f"Output did not match the required schema: {exc}"[:500],
@@ -159,6 +166,13 @@ class RespondStyleLLMTurnProvider:
             temperature=self._config.temperature,
             max_tokens=self._config.max_output_tokens,
         )
+        self.llm_calls += 1
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            self.total_prompt_tokens += getattr(usage, "prompt_tokens", 0) or 0
+            self.total_completion_tokens += (
+                getattr(usage, "completion_tokens", 0) or 0
+            )
         raw = _completion_text(response)
         self.last_raw_output = raw
         return parse_llm_agent_turn_output_json(raw)
@@ -267,10 +281,15 @@ def _render_capabilities_section(context: AgentContextPackage) -> str:
                 )
     handoff = context.handoff_policy
     if handoff.get("enabled"):
-        targets = ", ".join(str(t) for t in handoff.get("targets") or []) or "team"
+        targets = [str(t) for t in handoff.get("targets") or []]
+        target_text = (
+            "target must be EXACTLY one of: " + ", ".join(targets)
+            if targets
+            else "any team"
+        )
         lines.append("")
         lines.append(
-            f"## Handoff: available to {targets}. When the customer asks for a "
+            f"## Handoff ({target_text}). When the customer asks for a "
             "human, use handoff_proposal (NOT a workflow event) and include a "
             "short visible message telling them you are connecting them."
         )
