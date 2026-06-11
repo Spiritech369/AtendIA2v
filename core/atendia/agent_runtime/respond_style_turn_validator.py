@@ -3,6 +3,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from atendia.agent_runtime.respond_style_field_state import (
+    _canonical_allowed_value,
+)
 from atendia.agent_runtime.respond_style_turn_contract import (
     AgentContextPackage,
     AgentTurnRetryInstruction,
@@ -562,14 +565,15 @@ def _field_write_errors(
     output: LLMAgentTurnOutput,
     context: AgentContextPackage,
 ) -> list[ValidationErrorItem]:
-    allowed_fields = {
-        str(item.get("field_key") or item.get("key"))
+    policies_by_key = {
+        str(item.get("field_key") or item.get("key")): item
         for item in context.field_policies
         if isinstance(item, dict) and item.get("writable", True) is not False
     }
     errors: list[ValidationErrorItem] = []
     for index, proposal in enumerate(output.field_write_proposals):
-        if proposal.field_key not in allowed_fields:
+        policy = policies_by_key.get(proposal.field_key)
+        if policy is None:
             errors.append(
                 _error(
                     "field_policy_missing",
@@ -583,6 +587,28 @@ def _field_write_errors(
                     "field_write_without_evidence",
                     "field write requires evidence",
                     path=f"field_write_proposals[{index}].evidence",
+                )
+            )
+        # W5-A: canonical-vocabulary fields repair IN the turn — a retryable
+        # error feeds the allowed list back so the model re-proposes the
+        # clean value instead of an annotated one. The application layer's
+        # enforcement remains the backstop.
+        allowed_values = (policy or {}).get("allowed_values")
+        if (
+            policy is not None
+            and isinstance(allowed_values, list)
+            and allowed_values
+            and _canonical_allowed_value(proposal.value, allowed_values) is None
+        ):
+            values = ", ".join(str(item) for item in allowed_values)
+            errors.append(
+                _error(
+                    "field_value_not_allowed",
+                    (
+                        f"value for {proposal.field_key} must be EXACTLY one "
+                        f"of: {values} — no annotations or combinations"
+                    ),
+                    path=f"field_write_proposals[{index}].value",
                 )
             )
     return errors

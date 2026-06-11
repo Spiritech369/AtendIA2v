@@ -69,6 +69,8 @@ class ContactFieldState(BaseModel):
     write_policy: str | None = None
     evidence_required: bool = True
     allowed_sources: list[str] = Field(default_factory=list)
+    # W5-A: canonical vocabulary; runtime + validator reject anything else.
+    allowed_values: list[Any] = Field(default_factory=list)
     confidence: float | None = None
     last_evidence: list[str] = Field(default_factory=list)
 
@@ -107,6 +109,8 @@ class RespondStyleContextSnapshot(BaseModel):
     contact_fields: list[ContactFieldState] = Field(default_factory=list)
     # Phase 17: corrected-away previous values, keyed by field_key.
     corrected_fields: JsonDict = Field(default_factory=dict)
+    # W5-B: a handoff was proposed recently and no human has joined yet.
+    handoff_pending: bool = False
     conversation_stage: str | None = None
     agent_name: str = ""
     agent_persona: str = ""
@@ -249,6 +253,7 @@ def _agent_identity(snapshot: RespondStyleContextSnapshot) -> JsonDict:
         "conversation_stage": snapshot.conversation_stage,
         "contact_state": known_fields,
         "corrected_fields": dict(snapshot.corrected_fields),
+        "handoff_pending": snapshot.handoff_pending,
         "missing_fields": missing_fields,
         # Declarative contract for the LLM: fields are captured when the
         # customer provides them, never collected as a questionnaire.
@@ -360,6 +365,7 @@ def _field_policy(field: ContactFieldState) -> JsonDict:
         "write_policy": field.write_policy,
         "evidence_required": field.evidence_required,
         "allowed_sources": list(field.allowed_sources),
+        "allowed_values": list(field.allowed_values),
         "confidence": field.confidence,
         "last_evidence": list(field.last_evidence),
         "can_propose_update": field.writable,

@@ -1327,3 +1327,146 @@ def test_w4_prompt_contract_lines() -> None:
     assert "Earlier handoffs in the transcript do not make handoff the" in prompt
     # W4-C: media ack applies to bare placeholders.
     assert "even" in prompt and "when the message is ONLY the placeholder" in prompt
+
+
+# --- W5 fixes -----------------------------------------------------------------
+
+
+def test_w5a_annotated_value_is_retryable_and_canonical_passes() -> None:
+    """Annotated values ('nomina (tarjeta)') trigger an IN-TURN retryable
+    error listing the allowed vocabulary; canonical values pass."""
+    from atendia.agent_runtime import (
+        LLMAgentTurnOutput,
+        LLMFieldUpdateProposal,
+        RespondStyleTurnValidator,
+    )
+
+    context = AgentContextPackage(
+        field_policies=[
+            {
+                "field_key": "income_type",
+                "writable": True,
+                "allowed_values": ["nomina", "transferencia"],
+            }
+        ]
+    )
+
+    def _output(value):
+        return LLMAgentTurnOutput(
+            final_message="Perfecto, seguimos.",
+            field_write_proposals=[
+                LLMFieldUpdateProposal(
+                    field_key="income_type",
+                    value=value,
+                    evidence=["me pagan asi"],
+                    confidence=0.9,
+                    reason="capture",
+                )
+            ],
+            confidence=0.8,
+        )
+
+    annotated = RespondStyleTurnValidator().validate(
+        output=_output("nomina (tarjeta)"), context=context
+    )
+    assert annotated.send_decision == "no_send"
+    assert annotated.retry_instruction is not None
+    items = annotated.retry_instruction.error_items
+    assert any(item.code == "field_value_not_allowed" for item in items)
+    assert any("nomina, transferencia" in item.message for item in items)
+
+    accented_canonical = RespondStyleTurnValidator().validate(
+        output=_output("Nómina"), context=context
+    )
+    assert accented_canonical.send_decision == "send"
+
+
+@pytest.mark.asyncio
+async def test_w5b_handoff_pending_flows_to_prompt(monkeypatch) -> None:
+    from atendia.agent_runtime import (
+        ConversationStateSnapshot,
+        ProductAgentPublishedConfig,
+    )
+    from atendia.agent_runtime.respond_style_context_builder import (
+        RespondStyleContextPackageBuilder,
+    )
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        build_respond_style_messages,
+    )
+    from atendia.agent_runtime.respond_style_product_agent_config_adapter import (
+        ProductAgentConfigSnapshotAdapter,
+    )
+
+    config = ProductAgentPublishedConfig(
+        tenant_id="t",
+        agent_id="a",
+        agent_version_id="v",
+        publish_state="published_no_send",
+        agent_name="generic",
+        persona="generic advisor",
+        instructions="help",
+    )
+    state = ConversationStateSnapshot(handoff_pending=True)
+
+    class _Sources:
+        def load_config(self, runtime_input):
+            return config
+
+        def load_state(self, runtime_input):
+            return state
+
+    adapter = ProductAgentConfigSnapshotAdapter(
+        config_source=_Sources(), state_source=_Sources()
+    )
+    snapshot = adapter.load_snapshot(
+        SimpleNamespace(
+            conversation_id="c",
+            contact_id=None,
+            channel="test",
+            inbound_text="hola",
+            inbound_event_id=None,
+            attachments=[],
+            trace_context={},
+        )
+    )
+    built = RespondStyleContextPackageBuilder().build(snapshot)
+    assert built.context_package.agent_identity["handoff_pending"] is True
+
+    messages = build_respond_style_messages(
+        turn_input=built.turn_input, context=built.context_package
+    )
+    rendered = " ".join(m["content"] for m in messages)
+    assert "Handoff status" in rendered
+    assert "Do NOT propose handoff again unless the" in rendered
+
+
+@pytest.mark.asyncio
+async def test_w5b_bridge_detects_pending_handoff_from_recent_traces() -> None:
+    import json as _json
+
+    from atendia.product_agents.agent_service_bridge import _recent_handoff_pending
+
+    class _Rows:
+        def scalars(self):
+            return [
+                _json.dumps({"handoff_proposal": None}),
+                _json.dumps({"handoff_proposal": {"target": "ventas"}}),
+            ]
+
+    class _Session:
+        async def execute(self, query):
+            return _Rows()
+
+    assert await _recent_handoff_pending(_Session(), conversation_id=str(uuid4())) is True
+
+    class _NoHandoffRows:
+        def scalars(self):
+            return [_json.dumps({"handoff_proposal": None})]
+
+    class _Session2:
+        async def execute(self, query):
+            return _NoHandoffRows()
+
+    assert (
+        await _recent_handoff_pending(_Session2(), conversation_id=str(uuid4())) is False
+    )

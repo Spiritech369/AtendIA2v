@@ -508,6 +508,14 @@ def _render_dynamic_context(
             else:
                 known_lines.append(f"- {key}: {value}")
         sections.append("\n".join(known_lines))
+    if identity.get("handoff_pending"):
+        sections.append(
+            "## Handoff status\n"
+            "A handoff to a human was ALREADY offered and is pending. Keep "
+            "helping normally until the human joins — answer questions, "
+            "qualify, use tools. Do NOT propose handoff again unless the "
+            "customer asks for a person."
+        )
     missing = identity.get("missing_fields") or []
     if missing:
         sections.append(

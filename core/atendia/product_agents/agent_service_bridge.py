@@ -175,10 +175,14 @@ async def _handle_opted_in_turn(
     shadow_values, corrected_fields = await _load_shadow_state(
         session, conversation_id=conversation_id
     )
+    handoff_pending = await _recent_handoff_pending(
+        session, conversation_id=conversation_id
+    )
     state = ConversationStateSnapshot(
         recent_messages=transcript,
         field_values=shadow_values,
         corrected_fields=corrected_fields,
+        handoff_pending=handoff_pending,
     )
     model_override = (deployment.metadata_json or {}).get("respond_style_model")
     runtime = ProductAgentRuntime(
@@ -252,6 +256,42 @@ def derive_no_send_followup(
             "executed": False,
         }
     return {"action": "none", "notify_operator": False, "executed": False}
+
+
+async def _recent_handoff_pending(session: Any, *, conversation_id: str) -> bool:
+    """W5-B: a handoff proposed in a recent shadow turn with no human having
+    joined yet. In shadow nothing resolves a handoff, so without this signal
+    the model keeps 're-connecting' forever; in live this same state is where
+    bot-pause / human-takeover attaches."""
+    try:
+        from sqlalchemy import select
+
+        from atendia.db.models.turn_trace import TurnTrace
+
+        rows = await session.execute(
+            select(TurnTrace.raw_llm_response)
+            .where(
+                TurnTrace.conversation_id == UUID(str(conversation_id)),
+                TurnTrace.router_trigger == "respond_style_inbound_shadow_auto",
+            )
+            .order_by(TurnTrace.created_at.desc())
+            .limit(3)
+        )
+        import json as _json
+
+        for raw in rows.scalars():
+            if not raw:
+                continue
+            try:
+                summary = _json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if summary.get("handoff_proposal"):
+                return True
+        return False
+    except Exception:
+        logger.debug("respond_style_handoff_pending_check_failed", exc_info=True)
+        return False
 
 
 async def _load_shadow_fields(session: Any, *, conversation_id: str) -> dict[str, Any]:

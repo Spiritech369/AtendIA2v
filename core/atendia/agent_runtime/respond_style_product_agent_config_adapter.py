@@ -61,6 +61,8 @@ class ConversationStateSnapshot(BaseModel):
     # the corrected-away PREVIOUS value. Lets the context mark the current
     # value as canonical over older transcript mentions.
     corrected_fields: JsonDict = Field(default_factory=dict)
+    # W5-B: a handoff was proposed recently and no human has joined yet.
+    handoff_pending: bool = False
     conversation_stage: str | None = None
 
 
@@ -117,6 +119,7 @@ class ProductAgentConfigSnapshotAdapter:
             recent_messages=list(state.recent_messages),
             contact_fields=_merge_field_state(config.field_definitions, state.field_values),
             corrected_fields=dict(state.corrected_fields),
+            handoff_pending=state.handoff_pending,
             conversation_stage=state.conversation_stage,
             agent_name=config.agent_name,
             agent_persona=config.persona,
@@ -219,6 +222,7 @@ def _merge_field_state(
                 allowed_sources=[
                     str(item) for item in definition.get("allowed_sources") or []
                 ],
+                allowed_values=list(definition.get("allowed_values") or []),
                 confidence=definition.get("confidence"),
                 last_evidence=[
                     str(item) for item in definition.get("last_evidence") or []
