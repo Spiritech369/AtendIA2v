@@ -1221,3 +1221,37 @@ def test_f27_prompt_renders_allowed_values_and_f30_d_lines() -> None:
     )
     rendered = " ".join(m["content"] for m in messages)
     assert "ONLY these values are accepted: alpha-1, Beta" in rendered
+
+
+def test_f27_allowed_values_match_is_accent_insensitive_both_ways() -> None:
+    """W3-A: customers rarely type accents ('nomina'), and models often add
+    them ('nómina') — both directions must land on the canonical value."""
+    from atendia.agent_runtime.respond_style_field_state import apply_field_proposals
+
+    policies = [
+        {"field_key": "income_type", "allowed_values": ["nomina", "transferencia"]},
+        {"field_key": "categoria", "allowed_values": ["económica", "deportiva"]},
+    ]
+
+    accented_proposal = apply_field_proposals(
+        [{"field_key": "income_type", "value": "Nómina", "evidence": ["me pagan por nómina"]}],
+        field_policies=policies,
+        current_values={},
+    )
+    assert accented_proposal.new_values == {"income_type": "nomina"}
+    assert accented_proposal.rejected_count == 0
+
+    unaccented_proposal = apply_field_proposals(
+        [{"field_key": "categoria", "value": "ECONOMICA", "evidence": ["la economica"]}],
+        field_policies=policies,
+        current_values={},
+    )
+    assert unaccented_proposal.new_values == {"categoria": "económica"}
+
+    still_rejects_unknown = apply_field_proposals(
+        [{"field_key": "income_type", "value": "criptomonedas", "evidence": ["x"]}],
+        field_policies=policies,
+        current_values={},
+    )
+    assert still_rejects_unknown.rejected_count == 1
+    assert still_rejects_unknown.audit[0].reason == "value_not_allowed"

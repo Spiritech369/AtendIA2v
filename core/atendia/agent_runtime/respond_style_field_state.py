@@ -9,6 +9,7 @@ never writes commercial/live contact state (``shadow_only`` is structural).
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -39,15 +40,22 @@ class FieldApplicationResult(BaseModel):
 
 
 def _canonical_allowed_value(value: Any, allowed_values: list[Any]) -> Any | None:
-    """Case/whitespace-insensitive match; returns the CANONICAL allowed entry
-    (so accepted values are normalized), or None when not allowed."""
-    normalized = str(value).strip().casefold()
+    """Case/whitespace/ACCENT-insensitive match in both directions ('nómina'
+    matches allowed 'nomina' and vice versa — customers rarely type
+    accents). Returns the CANONICAL allowed entry so accepted values are
+    normalized, or None when not allowed."""
+    normalized = _fold(value)
     if not normalized:
         return None
     for candidate in allowed_values:
-        if str(candidate).strip().casefold() == normalized:
+        if _fold(candidate) == normalized:
             return candidate
     return None
+
+
+def _fold(value: Any) -> str:
+    text = unicodedata.normalize("NFD", str(value).strip().casefold())
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
 
 
 def apply_field_proposals(
