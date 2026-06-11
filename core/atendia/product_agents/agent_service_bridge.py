@@ -233,6 +233,17 @@ async def _handle_opted_in_turn(
         from atendia.product_agents.real_tool_facts import load_real_tool_facts
 
         real_facts = await load_real_tool_facts(session, tenant_id=str(tenant_id))
+        # The PROMPT vocabulary must match the REAL catalog too: any
+        # referent-checked field gets its allowed_values rebuilt from the
+        # real models — harness/demo names can never leak into visible copy
+        # via the field vocabulary.
+        config = config.model_copy(
+            update={
+                "field_definitions": _real_allowed_values_for_fields(
+                    config.field_definitions, real_facts
+                )
+            }
+        )
 
     state = ConversationStateSnapshot(
         recent_messages=transcript,
@@ -518,6 +529,33 @@ async def _save_shadow_fields(
         row.field_values = application.new_values
         row.audit_log = [*list(row.audit_log or []), *audit_entries]
     await session.flush()
+
+
+def _real_allowed_values_for_fields(
+    field_definitions: list[dict[str, Any]],
+    real_facts: dict[str, Any],
+) -> list[dict[str, Any]]:
+    models = list(real_facts.get("models") or [])
+    if not models:
+        return field_definitions
+    real_groups = [
+        {
+            "value": model.get("model_id"),
+            "aliases": [
+                str(alias)
+                for alias in [model.get("label"), *(model.get("aliases") or [])]
+                if alias
+            ],
+        }
+        for model in models
+    ]
+    updated: list[dict[str, Any]] = []
+    for definition in field_definitions:
+        if isinstance(definition, dict) and definition.get("referent_check") is True:
+            updated.append({**definition, "allowed_values": real_groups})
+        else:
+            updated.append(definition)
+    return updated
 
 
 def build_tool_loop(

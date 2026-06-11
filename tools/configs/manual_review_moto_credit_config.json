@@ -210,6 +210,7 @@
       ],
       "requires_any": [
         "tool:quote.resolve",
+        "tool:catalog.search",
         "tool:credit_plan.resolve",
         "basis:knowledge_source"
       ]
@@ -237,6 +238,18 @@
       ],
       "requires_any": [
         "tool:requirements.lookup",
+        "basis:knowledge_source"
+      ]
+    },
+    {
+      "policy_id": "catalog_claims_require_support",
+      "description": "afirmaciones sobre modelos disponibles/manejados requieren catalog.search o fuente citada",
+      "trigger_patterns": [
+        "\b(?:tenemos|manejamos|contamos con|ofrecemos|disponibles?)\b[^.?!]*\b(?:modelos?|motos?)\b",
+        "\b(?:modelos?|motos?)\b[^.?!]*\b(?:tenemos|manejamos|disponibles?|como)\b"
+      ],
+      "requires_any": [
+        "tool:catalog.search",
         "basis:knowledge_source"
       ]
     }

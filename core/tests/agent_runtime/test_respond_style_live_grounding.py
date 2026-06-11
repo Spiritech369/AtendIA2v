@@ -139,3 +139,30 @@ def test_tool_without_real_source_skips() -> None:
     result = _call("legacy.tool")
     assert result.status == "skipped"
     assert result.error_code == "real_source_not_configured"
+
+
+def test_real_allowed_values_replace_harness_vocabulary() -> None:
+    """Visible-send turns rebuild referent-checked field vocabularies from
+    the REAL catalog so demo/harness model names never leak via the prompt."""
+    from atendia.product_agents.agent_service_bridge import (
+        _real_allowed_values_for_fields,
+    )
+
+    fields = [
+        {
+            "field_key": "selected_option",
+            "referent_check": True,
+            "allowed_values": [{"value": "demo-1", "aliases": ["Demo"]}],
+        },
+        {"field_key": "income_type", "allowed_values": ["a", "b"]},
+    ]
+    updated = _real_allowed_values_for_fields(fields, FACTS)
+    product_values = {
+        group["value"] for group in updated[0]["allowed_values"]
+    }
+    assert product_values == {"alpha-150", "beta-250"}
+    assert "Alpha 150" in updated[0]["allowed_values"][0]["aliases"]
+    # Non-referent fields untouched; empty real catalog leaves config as-is.
+    assert updated[1]["allowed_values"] == ["a", "b"]
+    untouched = _real_allowed_values_for_fields(fields, {"models": []})
+    assert untouched[0]["allowed_values"][0]["value"] == "demo-1"
