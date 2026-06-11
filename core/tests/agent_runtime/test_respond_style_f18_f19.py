@@ -465,6 +465,7 @@ def test_f26_f27_d_prompt_lines_present() -> None:
     assert "include a" in prompt and "field_write_proposal with the corrected value" in prompt
     # F27: product/model captures must be catalog-grounded.
     assert "matches an id or name present in catalog/tool facts" in prompt
-    # D: media inbounds are acknowledged, never answered with unrelated content.
-    assert "media you cannot view" in prompt
-    assert "Do NOT quote prices, list" in prompt
+    # D: media inbounds are acknowledged, never answered with unrelated content;
+    # with a document.review result, the facts are used instead.
+    assert "document.review tool result exists" in prompt
+    assert "Never quote prices, list" in prompt

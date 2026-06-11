@@ -245,12 +245,19 @@ async def _handle_opted_in_turn(
             }
         )
 
+    pretool_results = await _vision_pretool_results(
+        session,
+        inbound_message_id=inbound_message_id,
+        api_key=api_key,
+        model=metadata.get("respond_style_model") or "gpt-4o",
+    )
     state = ConversationStateSnapshot(
         recent_messages=transcript,
         field_values=shadow_values,
         corrected_fields=corrected_fields,
         handoff_pending=handoff_pending,
         visible_send_candidate=visible_send_candidate,
+        pretool_results=pretool_results,
     )
     model_override = metadata.get("respond_style_model")
     runtime = ProductAgentRuntime(
@@ -425,6 +432,53 @@ def derive_no_send_followup(
             "executed": False,
         }
     return {"action": "none", "notify_operator": False, "executed": False}
+
+
+async def _vision_pretool_results(
+    session: Any,
+    *,
+    inbound_message_id: str | None,
+    api_key: str,
+    model: str,
+) -> list[dict[str, Any]]:
+    """If the inbound message carries an image, review it with vision and
+    inject the facts as a pre-executed document.review tool result. Best
+    effort: any failure returns no results and the turn proceeds (the
+    prompt's media rule then asks the customer what the image shows)."""
+    if inbound_message_id is None:
+        return []
+    try:
+        from pathlib import Path
+
+        from atendia.agent_runtime.respond_style_vision import (
+            SUPPORTED_IMAGE_TYPES,
+            analyze_document_media,
+            vision_tool_result,
+        )
+        from atendia.db.models.message import MessageRow
+
+        message = await session.get(MessageRow, UUID(str(inbound_message_id)))
+        media = ((message.metadata_json or {}).get("media") or {}) if message else {}
+        mime_type = str(media.get("mime_type") or "")
+        url = str(media.get("url") or "")
+        if not url or mime_type not in SUPPORTED_IMAGE_TYPES:
+            return []
+        upload_dir = Path(get_settings().upload_dir)
+        relative = url.split("/uploads/", 1)[-1] if "/uploads/" in url else url
+        file_path = upload_dir / relative
+        if not file_path.exists():
+            logger.warning("respond_style_vision_media_missing %s", file_path)
+            return []
+        facts = await analyze_document_media(
+            api_key=api_key,
+            image_bytes=file_path.read_bytes(),
+            mime_type=mime_type,
+            model=model,
+        )
+        return [vision_tool_result(facts)]
+    except Exception:
+        logger.warning("respond_style_vision_pretool_failed", exc_info=True)
+        return []
 
 
 async def _recent_handoff_pending(session: Any, *, conversation_id: str) -> bool:

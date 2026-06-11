@@ -1193,8 +1193,8 @@ def test_f27_prompt_renders_allowed_values_and_f30_d_lines() -> None:
     # F30: corrections carry only the clean new value.
     assert "never a blend of" in prompt
     # D: media handling is explicit and forbids product dumps.
-    assert "acknowledge you received it" in prompt
-    assert "Do NOT quote prices, list" in prompt
+    assert "acknowledge" in prompt and "you received the media" in prompt
+    assert "Never quote prices, list" in prompt
 
     turn_input = AgentTurnInput(
         tenant_id="t",
@@ -1326,7 +1326,7 @@ def test_w4_prompt_contract_lines() -> None:
     assert "Offer a human as an OPTION only" in prompt
     assert "Earlier handoffs in the transcript do not make handoff the" in prompt
     # W4-C: media ack applies to bare placeholders.
-    assert "even" in prompt and "when the message is ONLY the placeholder" in prompt
+    assert "even" in prompt and "ONLY a placeholder" in prompt
 
 
 # --- W5 fixes -----------------------------------------------------------------

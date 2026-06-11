@@ -66,6 +66,9 @@ class ConversationStateSnapshot(BaseModel):
     # Phase 20.1: this turn could become a VISIBLE send (smoke/live) — the
     # validator must require REAL grounding (no dry facts).
     visible_send_candidate: bool = False
+    # Vision: pre-executed tool results (e.g. document.review over inbound
+    # media) injected into the turn's context before the LLM runs.
+    pretool_results: list[JsonDict] = Field(default_factory=list)
     conversation_stage: str | None = None
 
 
@@ -124,6 +127,7 @@ class ProductAgentConfigSnapshotAdapter:
             corrected_fields=dict(state.corrected_fields),
             handoff_pending=state.handoff_pending,
             visible_send_candidate=state.visible_send_candidate,
+            pretool_results=list(state.pretool_results),
             conversation_stage=state.conversation_stage,
             agent_name=config.agent_name,
             agent_persona=config.persona,

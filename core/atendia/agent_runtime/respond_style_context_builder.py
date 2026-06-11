@@ -116,6 +116,8 @@ class RespondStyleContextSnapshot(BaseModel):
     handoff_pending: bool = False
     # Phase 20.1: visible-send candidate turns require REAL grounding.
     visible_send_candidate: bool = False
+    # Vision: pre-executed tool results injected before the LLM turn.
+    pretool_results: list[JsonDict] = Field(default_factory=list)
     conversation_stage: str | None = None
     agent_name: str = ""
     agent_persona: str = ""
@@ -202,7 +204,7 @@ class RespondStyleContextPackageBuilder:
                 _tool_schema(item, index)
                 for index, item in enumerate(snapshot.tool_bindings)
             ],
-            tool_results=[],
+            tool_results=list(snapshot.pretool_results),
             field_policies=[_field_policy(field) for field in snapshot.contact_fields],
             action_schemas=[
                 _action_schema(item, index, snapshot)
