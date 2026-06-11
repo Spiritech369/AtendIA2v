@@ -127,3 +127,49 @@ Cleared by rollback or manual reset.
 `PHASE_20_SINGLE_CONTACT_SMOKE_PATH_READY`
 
 Implemented, tested and documented with send OFF, exactly as instructed.
+
+---
+
+# Phase 20.1 — Real Grounding Correction (post first-smoke block)
+
+Date: 2026-06-11
+Trigger: the first live smoke window was BLOCKED by operator review — the
+visible sends were grounded on DryFactsToolExecutor data (the $32,500
+quote was harness fixture, not the real Dinamo catalog). Correct call;
+the dry executor should have been a preflight blocker.
+
+## What changed (all four items of the correction plan)
+
+1. **Real executor.** `RealFactsToolExecutor` (pure, vertical-agnostic;
+   dispatch via the tool binding's `real_source`: catalog_search /
+   catalog_quote / knowledge_plans) grounded on data preloaded by
+   `product_agents/real_tool_facts.py` from the PUBLISHED tenant tables:
+   `catalogs/catalog_items` (34 real Dinamo models with alias groups,
+   real lista/contado prices and 10/15/20/30% plan tables) and Knowledge
+   OS `knowledge_items` of type `requisitos_plan_credito` (Nómina
+   Tarjeta/Recibos, Pensionados, Negocio SAT, Sin Comprobantes, Guardia).
+   The bridge selects it ONLY for visible-send-candidate turns; shadow
+   and Test Lab keep DryFacts.
+2. **Dry facts can never reach a customer.** ToolExecutionResult gains
+   `source_kind` (dry executor marks `dry_facts`); the validator blocks
+   any visible-send-candidate turn containing dry-facts results with
+   non-retryable `live_claim_source_not_real` (fail closed → operator
+   paged). Defense in depth: even a mis-wired executor cannot leak
+   fixture data.
+3. **Canonical send columns.** `evaluate_smoke_send` now ALSO requires
+   the deployment's boolean columns (`send_enabled`, `outbox_enabled`,
+   `live_send_enabled`, `single_contact_smoke_enabled`) — metadata alone
+   never arms sends (`canonical_send_columns_disabled`). Activation tool
+   sets them; rollback clears them; preflight checks them plus
+   `real_catalog_models_present`, `real_requirement_plans_present` and
+   `tool_bindings_have_real_source`.
+4. **Handoff-pending tone.** The context note now instructs not to
+   mention the pending human/wait in every reply (the takeover pause
+   itself had already worked correctly in live).
+
+## End state
+
+Send remains OFF (rollback active, canonical columns false, scope
+no_send). 270 tests passing, ruff clean. Re-activation requires:
+re-arm with the real_source config through the publish gate, preflight
+PASSED (now 18 checks), and Felipe's literal approval text again.

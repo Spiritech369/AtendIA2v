@@ -63,6 +63,9 @@ class ConversationStateSnapshot(BaseModel):
     corrected_fields: JsonDict = Field(default_factory=dict)
     # W5-B: a handoff was proposed recently and no human has joined yet.
     handoff_pending: bool = False
+    # Phase 20.1: this turn could become a VISIBLE send (smoke/live) — the
+    # validator must require REAL grounding (no dry facts).
+    visible_send_candidate: bool = False
     conversation_stage: str | None = None
 
 
@@ -120,6 +123,7 @@ class ProductAgentConfigSnapshotAdapter:
             contact_fields=_merge_field_state(config.field_definitions, state.field_values),
             corrected_fields=dict(state.corrected_fields),
             handoff_pending=state.handoff_pending,
+            visible_send_candidate=state.visible_send_candidate,
             conversation_stage=state.conversation_stage,
             agent_name=config.agent_name,
             agent_persona=config.persona,

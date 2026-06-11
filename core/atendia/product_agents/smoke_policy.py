@@ -79,12 +79,30 @@ def legacy_send_suppressed_for_smoke(
     return smoke_flags_active(metadata) and phone_in_smoke_allowlist(metadata, phone)
 
 
+CANONICAL_SEND_COLUMNS = (
+    "send_enabled",
+    "outbox_enabled",
+    "live_send_enabled",
+    "single_contact_smoke_enabled",
+)
+
+
+def canonical_columns_enabled(deployment: Any) -> bool:
+    """Metadata alone must never arm visible sends: the deployment's
+    canonical boolean COLUMNS must also be true."""
+    return all(
+        getattr(deployment, column, False) is True
+        for column in CANONICAL_SEND_COLUMNS
+    )
+
+
 def evaluate_smoke_send(
     *,
     metadata: dict[str, Any] | None,
     from_phone: str | None,
     result: Any,
     takeover_pending: bool,
+    deployment: Any | None = None,
 ) -> SmokeEvaluation:
     """Runtime gate for a single turn. ``result`` is the
     ProductAgentRuntimeResult of the validated direct-route turn."""
@@ -93,6 +111,8 @@ def evaluate_smoke_send(
         return SmokeEvaluation(active=False, allowed=False, reasons=["smoke_inactive"])
 
     reasons: list[str] = []
+    if deployment is None or not canonical_columns_enabled(deployment):
+        reasons.append("canonical_send_columns_disabled")
     scope = str(meta.get("respond_style_send_scope") or "")
     if scope != APPROVED_SCOPE or scope in FORBIDDEN_SCOPES:
         reasons.append("send_scope_unsafe")

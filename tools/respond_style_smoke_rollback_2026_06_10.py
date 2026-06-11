@@ -44,6 +44,10 @@ async def main() -> int:
             }
         )
         deployment.metadata_json = metadata
+        deployment.send_enabled = False
+        deployment.outbox_enabled = False
+        deployment.live_send_enabled = False
+        deployment.single_contact_smoke_enabled = False
         # Clear takeover markers so post-rollback shadow observation resumes.
         await session.execute(
             text(

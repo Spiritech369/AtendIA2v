@@ -42,6 +42,11 @@ async def main() -> int:
             }
         )
         deployment.metadata_json = metadata
+        # Canonical columns: metadata alone never arms sends (Phase 20.1).
+        deployment.send_enabled = True
+        deployment.outbox_enabled = True
+        deployment.live_send_enabled = True
+        deployment.single_contact_smoke_enabled = True
         await session.commit()
         print(
             json.dumps(

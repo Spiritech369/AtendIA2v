@@ -69,7 +69,8 @@
             "price_tier": "alta"
           }
         ]
-      }
+      },
+      "real_source": "catalog_search"
     },
     {
       "name": "credit_plan.resolve",
@@ -83,7 +84,8 @@
         "down_payment_percent": 30,
         "payment_frequency": "semanal",
         "notes": "aplica para ingresos por transferencia o nomina con 12+ meses de antiguedad; negocio propio con alta en SAT accede a enganche del 20%"
-      }
+      },
+      "real_source": "knowledge_plans"
     },
     {
       "name": "requirements.lookup",
@@ -97,7 +99,8 @@
           "comprobante de domicilio reciente",
           "comprobante de ingresos de los ultimos 3 meses (estados de cuenta sirven si no hay recibos de nomina)"
         ]
-      }
+      },
+      "real_source": "knowledge_plans"
     },
     {
       "name": "quote.resolve",
@@ -111,7 +114,8 @@
         "down_payment": 9750,
         "weekly_payment": 689,
         "term_weeks": 52
-      }
+      },
+      "real_source": "catalog_quote"
     }
   ],
   "field_definitions": [

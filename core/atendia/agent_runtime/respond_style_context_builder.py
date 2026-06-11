@@ -114,6 +114,8 @@ class RespondStyleContextSnapshot(BaseModel):
     corrected_fields: JsonDict = Field(default_factory=dict)
     # W5-B: a handoff was proposed recently and no human has joined yet.
     handoff_pending: bool = False
+    # Phase 20.1: visible-send candidate turns require REAL grounding.
+    visible_send_candidate: bool = False
     conversation_stage: str | None = None
     agent_name: str = ""
     agent_persona: str = ""
@@ -470,6 +472,7 @@ def _handoff_policy(snapshot: RespondStyleContextSnapshot) -> JsonDict:
 
 def _send_policy(snapshot: RespondStyleContextSnapshot) -> JsonDict:
     return {
+        "visible_send_candidate": snapshot.visible_send_candidate,
         "runtime_mode": snapshot.runtime_mode,
         "send_mode": snapshot.send_mode,
         "publish_state": snapshot.publish_state,

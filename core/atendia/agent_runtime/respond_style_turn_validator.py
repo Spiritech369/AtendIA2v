@@ -316,6 +316,7 @@ class RespondStyleTurnValidator:
             errors.extend(_claim_errors(output.claims, context))
             errors.extend(self._hard_policy_errors(output, context))
             errors.extend(_stale_corrected_value_errors(output, context))
+            errors.extend(_live_grounding_errors(context))
 
         errors.extend(_field_write_errors(output, context))
         errors.extend(_workflow_errors(output, context))
@@ -549,6 +550,37 @@ def _alnum_fold(text: str) -> str:
 
     folded = unicodedata.normalize("NFD", text.casefold())
     return "".join(ch for ch in folded if ch.isalnum())
+
+
+def _live_grounding_errors(context: AgentContextPackage) -> list[ValidationErrorItem]:
+    """Phase 20.1: a turn that can become a VISIBLE send must be grounded
+    on REAL data. Any dry-facts tool result in such a turn blocks the send
+    (non-retryable -> fail closed -> operator paged). Harness/test data can
+    never reach a customer, no matter how the executor got wired."""
+    send_policy = context.send_policy or {}
+    if send_policy.get("visible_send_candidate") is not True:
+        return []
+    dry_tools = sorted(
+        {
+            str(item.get("tool_name") or item.get("name") or "?")
+            for item in context.tool_results
+            if isinstance(item, dict) and item.get("source_kind") == "dry_facts"
+        }
+    )
+    if not dry_tools:
+        return []
+    return [
+        ValidationErrorItem(
+            code="live_claim_source_not_real",
+            message=(
+                "visible send blocked: tool results from dry/test facts "
+                f"({', '.join(dry_tools)}) cannot ground customer-visible "
+                "claims; a real executor is required"
+            ),
+            path="tool_results",
+            retryable=False,
+        )
+    ]
 
 
 def _stale_corrected_value_errors(

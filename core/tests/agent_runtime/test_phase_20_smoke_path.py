@@ -46,12 +46,24 @@ def _valid_result(**overrides):
     return SimpleNamespace(**base)
 
 
-def _eval(metadata=None, result=None, phone=PHONE, takeover=False):
+def _canonical_deployment(**overrides):
+    columns = {
+        "send_enabled": True,
+        "outbox_enabled": True,
+        "live_send_enabled": True,
+        "single_contact_smoke_enabled": True,
+    }
+    columns.update(overrides)
+    return SimpleNamespace(**columns)
+
+
+def _eval(metadata=None, result=None, phone=PHONE, takeover=False, deployment=...):
     return evaluate_smoke_send(
         metadata=metadata if metadata is not None else _smoke_metadata(),
         from_phone=phone,
         result=result if result is not None else _valid_result(),
         takeover_pending=takeover,
+        deployment=_canonical_deployment() if deployment is ... else deployment,
     )
 
 
@@ -195,3 +207,90 @@ async def test_stage_smoke_send_metadata(monkeypatch) -> None:
     assert metadata["trace_id"] == "trace-1"
     assert metadata["send_scope"] == "approved_contact_only"
     assert metadata["phone_normalized"] == "8128889241"
+
+
+def test_canonical_columns_required_even_with_metadata_on() -> None:
+    """Metadata alone must never arm visible sends: the deployment's
+    canonical boolean columns are required too."""
+    for column in (
+        "send_enabled",
+        "outbox_enabled",
+        "live_send_enabled",
+        "single_contact_smoke_enabled",
+    ):
+        evaluation = _eval(deployment=_canonical_deployment(**{column: False}))
+        assert not evaluation.allowed
+        assert "canonical_send_columns_disabled" in evaluation.reasons
+    missing_deployment = _eval(deployment=None)
+    assert not missing_deployment.allowed
+    assert "canonical_send_columns_disabled" in missing_deployment.reasons
+
+
+def test_live_grounding_blocks_dry_facts_for_visible_send() -> None:
+    """Dry/test facts can never ground a customer-visible turn."""
+    from atendia.agent_runtime import (
+        AgentContextPackage,
+        LLMAgentTurnOutput,
+        RespondStyleTurnValidator,
+    )
+
+    context = AgentContextPackage(
+        send_policy={"visible_send_candidate": True},
+        tool_results=[
+            {
+                "tool_name": "catalog.search",
+                "status": "succeeded",
+                "source_kind": "dry_facts",
+            }
+        ],
+    )
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Tenemos varios modelos disponibles.",
+            confidence=0.8,
+        ),
+        context=context,
+    )
+    assert decision.send_decision == "no_send"
+    assert decision.validation is not None
+    codes = {item.code for item in decision.validation.blocked_items}
+    assert "live_claim_source_not_real" in codes
+
+    # Same turn with REAL grounding passes.
+    real_context = AgentContextPackage(
+        send_policy={"visible_send_candidate": True},
+        tool_results=[
+            {
+                "tool_name": "catalog.search",
+                "status": "succeeded",
+                "source_kind": "real_catalog",
+            }
+        ],
+    )
+    ok = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Tenemos varios modelos disponibles.",
+            confidence=0.8,
+        ),
+        context=real_context,
+    )
+    assert ok.send_decision == "send"
+
+    # Shadow turns (not visible-send candidates) keep using dry facts.
+    shadow_context = AgentContextPackage(
+        tool_results=[
+            {
+                "tool_name": "catalog.search",
+                "status": "succeeded",
+                "source_kind": "dry_facts",
+            }
+        ],
+    )
+    shadow = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Tenemos varios modelos disponibles.",
+            confidence=0.8,
+        ),
+        context=shadow_context,
+    )
+    assert shadow.send_decision == "send"

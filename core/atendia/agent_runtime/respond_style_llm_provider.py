@@ -525,7 +525,9 @@ def _render_dynamic_context(
             "A handoff to a human was ALREADY offered and is pending. Keep "
             "helping normally until the human joins — answer questions, "
             "qualify, use tools. Do NOT propose handoff again unless the "
-            "customer asks for a person."
+            "customer asks for a person, and do NOT mention the pending "
+            "human or the wait in your replies unless the customer asks "
+            "about it."
         )
     missing = identity.get("missing_fields") or []
     if missing:

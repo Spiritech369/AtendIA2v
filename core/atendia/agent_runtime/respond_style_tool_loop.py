@@ -33,6 +33,9 @@ class ToolExecutionResult(BaseModel):
     error_code: str | None = None
     is_required: bool = True
     can_support_claims: bool = True
+    # Provenance of the facts: dry_facts (test/no-send harness data),
+    # real_catalog, knowledge_os, or unspecified (older executors).
+    source_kind: str = "unspecified"
 
     @field_validator("tool_name")
     @classmethod

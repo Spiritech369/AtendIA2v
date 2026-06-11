@@ -213,16 +213,40 @@ async def _handle_opted_in_turn(
     handoff_pending = await _recent_handoff_pending(
         session, conversation_id=conversation_id
     )
+    # Phase 20.1: a turn is a VISIBLE-send candidate only when smoke flags
+    # are active, the canonical deployment columns are enabled AND the phone
+    # is allowlisted. Such turns run on the REAL facts executor (catalog +
+    # Knowledge OS) and the validator enforces real grounding; everything
+    # else stays on dry facts in shadow.
+    from atendia.product_agents.smoke_policy import (
+        canonical_columns_enabled,
+        legacy_send_suppressed_for_smoke,
+    )
+
+    metadata = dict(deployment.metadata_json or {})
+    visible_send_candidate = bool(
+        legacy_send_suppressed_for_smoke(metadata, from_phone_e164)
+        and canonical_columns_enabled(deployment)
+    )
+    real_facts: dict[str, Any] | None = None
+    if visible_send_candidate:
+        from atendia.product_agents.real_tool_facts import load_real_tool_facts
+
+        real_facts = await load_real_tool_facts(session, tenant_id=str(tenant_id))
+
     state = ConversationStateSnapshot(
         recent_messages=transcript,
         field_values=shadow_values,
         corrected_fields=corrected_fields,
         handoff_pending=handoff_pending,
+        visible_send_candidate=visible_send_candidate,
     )
-    model_override = (deployment.metadata_json or {}).get("respond_style_model")
+    model_override = metadata.get("respond_style_model")
     runtime = ProductAgentRuntime(
         snapshot_adapter=_StaticSources(config, state),
-        tool_loop=build_tool_loop(config, api_key, model=model_override),
+        tool_loop=build_tool_loop(
+            config, api_key, model=model_override, real_facts=real_facts
+        ),
     )
     result = await runtime.run_turn(
         ProductAgentRuntimeInput(
@@ -304,6 +328,7 @@ async def _maybe_stage_smoke_send(
         from_phone=from_phone_e164,
         result=result,
         takeover_pending=False,
+        deployment=deployment,
     )
     smoke_info: dict[str, Any] = {
         "active": evaluation.active,
@@ -499,18 +524,29 @@ def build_tool_loop(
     config: ProductAgentPublishedConfig,
     api_key: str,
     model: str | None = None,
+    real_facts: dict[str, Any] | None = None,
 ) -> RespondStyleToolLoop:
     provider_config = (
         RespondStyleLLMTurnProviderConfig(model=model)
         if model
         else RespondStyleLLMTurnProviderConfig()
     )
+    if real_facts is not None:
+        from atendia.agent_runtime.respond_style_real_facts_executor import (
+            RealFactsToolExecutor,
+        )
+
+        executor = RealFactsToolExecutor(config.tool_bindings, real_facts)
+    else:
+        # Dry facts are for shadow/Test Lab ONLY; the validator additionally
+        # blocks any visible-send-candidate turn grounded on dry facts.
+        executor = DryFactsToolExecutor(config.tool_bindings)
     return RespondStyleToolLoop(
         provider=RespondStyleLLMTurnProvider(
             api_key=api_key,
             config=provider_config,
         ),
-        executor=DryFactsToolExecutor(config.tool_bindings),
+        executor=executor,
         config=RespondStyleToolLoopConfig(max_tool_rounds=3, max_elapsed_seconds=120.0),
     )
 

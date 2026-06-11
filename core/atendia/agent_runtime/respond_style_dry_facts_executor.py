@@ -56,6 +56,7 @@ class DryFactsToolExecutor:
             source_refs=[tool_call.tool_name],
             is_required=tool_call.required,
             can_support_claims=True,
+            source_kind="dry_facts",
         )
 
     def _resolve_preconditions(

@@ -53,6 +53,10 @@ def _bridge_fixtures(monkeypatch, *, metadata, decisions, takeover=False):
         agent_id=uuid4(),
         active_version_id=uuid4(),
         metadata_json=metadata,
+        send_enabled=True,
+        outbox_enabled=True,
+        live_send_enabled=True,
+        single_contact_smoke_enabled=True,
     )
     version = SimpleNamespace(
         id=deployment.active_version_id,
@@ -115,11 +119,20 @@ def _bridge_fixtures(monkeypatch, *, metadata, decisions, takeover=False):
     monkeypatch.setattr(
         bridge,
         "build_tool_loop",
-        lambda config, api_key, model=None: RespondStyleToolLoop(
+        lambda config, api_key, model=None, real_facts=None: RespondStyleToolLoop(
             provider=_ScriptedProvider(decisions), executor=_NoTools()
         ),
     )
     monkeypatch.setattr(smoke_policy, "get_takeover_pending", fake_takeover)
+
+    async def fake_load_real_facts(session, *, tenant_id):
+        return {"models": [], "requirement_plans": [], "counts": {}}
+
+    from atendia.product_agents import real_tool_facts
+
+    monkeypatch.setattr(
+        real_tool_facts, "load_real_tool_facts", fake_load_real_facts
+    )
 
     staged_calls = []
 

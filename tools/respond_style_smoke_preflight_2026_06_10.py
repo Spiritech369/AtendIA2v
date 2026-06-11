@@ -35,6 +35,21 @@ async def main() -> int:
             return 1
         metadata = dict(deployment.metadata_json or {})
 
+        from atendia.db.models.product_agent import AgentVersion
+        from atendia.product_agents.real_tool_facts import load_real_tool_facts
+        from atendia.product_agents.smoke_policy import canonical_columns_enabled
+
+        real_facts = await load_real_tool_facts(
+            session, tenant_id=str(deployment.tenant_id)
+        )
+        version = await session.get(AgentVersion, deployment.active_version_id)
+        bindings = (
+            (version.tool_policy or {}).get("bindings") if version is not None else []
+        ) or []
+        bindings_have_real_source = bool(bindings) and all(
+            isinstance(b, dict) and b.get("real_source") for b in bindings
+        )
+
         outbox_pending = (
             await session.execute(
                 text(
@@ -84,6 +99,16 @@ async def main() -> int:
             "approval_text_exact": metadata.get("respond_style_smoke_approval_text")
             == EXACT_APPROVAL_TEXT,
             "rollback_tool_available": True,  # tools/respond_style_smoke_rollback
+            # Phase 20.1 real-grounding preconditions:
+            "canonical_send_columns_enabled": canonical_columns_enabled(deployment),
+            "real_catalog_models_present": real_facts["counts"]["models"] > 0,
+            "real_requirement_plans_present": real_facts["counts"][
+                "requirement_plans"
+            ]
+            > 0,
+            "tool_bindings_have_real_source": bindings_have_real_source,
+            "rollback_not_active": metadata.get("respond_style_rollback_active")
+            is not True,
         }
         all_passed = all(checks.values())
         stamped = None
