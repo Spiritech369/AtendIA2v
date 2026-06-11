@@ -468,6 +468,11 @@ class RespondStyleShadowFields(Base):
     )
     field_values: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     audit_log: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    # Phase 20: accepted-handoff takeover marker; pauses the direct route's
+    # auto-responses for this conversation during single-contact smoke.
+    takeover_pending: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

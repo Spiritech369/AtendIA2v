@@ -43,6 +43,34 @@ class RuntimeV2SendAdapter:
         output: TurnOutput | None,
         provider_fallback_detected: bool,
     ) -> SendAdapterResult:
+        # Phase 20 (single-contact smoke): while smoke is active for this
+        # tenant, the LEGACY visible reply is suppressed ONLY for the
+        # allowlisted phone — the Respond-Style direct route owns that
+        # contact's visible copy. Every other contact is untouched. With the
+        # smoke flags off (the default) this check is a no-op.
+        suppression_phone = recipient_phone_e164 or phone_e164
+        if suppression_phone and await _legacy_suppressed_for_smoke(
+            session, tenant_id=tenant_id, phone=suppression_phone
+        ):
+            from atendia.agent_runtime.send_policy import PreparedSendDecision
+
+            return SendAdapterResult(
+                mode=mode,
+                send_decision=PreparedSendDecision(
+                    status="blocked",
+                    allowed=False,
+                    dry_run=True,
+                    reason="legacy_suppressed_for_smoke",
+                    reasons=["legacy_suppressed_for_smoke"],
+                    send_scope="approved_contact_only",
+                ),
+                delivery_status={
+                    "status": "suppressed",
+                    "legacy_suppressed_for_smoke": "true",
+                    "suppression_scope": "approved_contact_only",
+                    "legacy_outbound_prevented": "true",
+                },
+            )
         if mode == "no_send":
             send_decision = evaluate_prepared_send_policy(
                 runtime_config={**runtime_config, "send_enabled": False},
@@ -194,3 +222,39 @@ def _delivery_status(
         "reason": "prepared_send_allowed_by_single_contact_policy",
         "internal_event": "runtime_v2_prepared_send_preview",
     }
+
+
+async def _legacy_suppressed_for_smoke(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    phone: str,
+) -> bool:
+    """True only when an opted-in Respond-Style deployment for this tenant
+    has single-contact smoke ACTIVE and the phone is in its allowlist.
+    Fails open to normal legacy behavior on any error: suppression must
+    never break the existing path for other contacts."""
+    try:
+        from sqlalchemy import text as _sql_text
+
+        from atendia.product_agents.smoke_policy import (
+            legacy_send_suppressed_for_smoke,
+        )
+
+        rows = (
+            await session.execute(
+                _sql_text(
+                    "SELECT metadata_json FROM agent_deployments "
+                    "WHERE tenant_id = :t AND "
+                    "metadata_json->>'respond_style_live_send_enabled' = 'true'"
+                ),
+                {"t": tenant_id},
+            )
+        ).scalars()
+        return any(
+            legacy_send_suppressed_for_smoke(metadata, phone)
+            for metadata in rows
+            if isinstance(metadata, dict)
+        )
+    except Exception:
+        return False

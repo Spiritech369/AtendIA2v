@@ -590,3 +590,19 @@ Gate to advance beyond F18:
 
 This phase is not smoke, canary, live-candidate send, outbox activation,
 workflow/action activation, or production rollout.
+
+## Phase 20 — Single-Contact Smoke Path (2026-06-10)
+
+Status: `PHASE_20_SINGLE_CONTACT_SMOKE_PATH_READY` (implemented, SEND OFF)
+
+smoke_policy.py: per-turn runtime gate (flags + exact approval text +
+preflight stamp + allowlist last-10 + safe scope only + turn validity);
+staging via the existing outbox path with idempotency rs-smoke-<inbound>;
+legacy suppression at the RuntimeV2SendAdapter choke point scoped to the
+allowlisted phone (fail-open); 15B operator paging on fail-closed smoke
+turns; handoff takeover pause (migration 070 takeover_pending) that
+short-circuits before the LLM; preflight tool (stamps only when ALL
+checks pass — live run against the real deployment correctly FAILED with
+no stamp) and rollback tool (immediate: gate reads metadata per turn).
+22 new tests; suite 262; ruff clean. Activation requires the literal
+Phase-19 approval text.

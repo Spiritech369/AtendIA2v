@@ -65,6 +65,7 @@ class RespondStyleBridgeOutcome:
         agent_version_id: str | None = None,
         field_state: dict[str, Any] | None = None,
         no_send_followup: dict[str, Any] | None = None,
+        smoke: dict[str, Any] | None = None,
     ) -> None:
         self.result = result
         self.blocked_reason = blocked_reason
@@ -72,6 +73,7 @@ class RespondStyleBridgeOutcome:
         self.deployment_id = deployment_id
         self.agent_version_id = agent_version_id
         self.field_state = field_state or {}
+        self.smoke = smoke or {"active": False, "staged": False}
         self.no_send_followup = no_send_followup or derive_no_send_followup(
             result=result, blocked_reason=blocked_reason
         )
@@ -85,6 +87,8 @@ async def maybe_handle_respond_style_turn(
     inbound_text: str,
     mode: str,
     channel: str | None = None,
+    from_phone_e164: str | None = None,
+    inbound_message_id: str | None = None,
 ) -> RespondStyleBridgeOutcome | None:
     """Returns None when no deployment opted in (previous path continues).
     Otherwise ALWAYS returns a no-send outcome — opted-in turns never fall
@@ -110,6 +114,8 @@ async def maybe_handle_respond_style_turn(
             conversation_id=conversation_id,
             inbound_text=inbound_text,
             mode=mode,
+            from_phone_e164=from_phone_e164,
+            inbound_message_id=inbound_message_id,
         )
     except Exception as exc:  # fail closed: never crash, never legacy-fallback
         logger.exception(
@@ -130,6 +136,8 @@ async def _handle_opted_in_turn(
     conversation_id: str,
     inbound_text: str,
     mode: str,
+    from_phone_e164: str | None = None,
+    inbound_message_id: str | None = None,
 ) -> RespondStyleBridgeOutcome:
     if mode != "no_send":
         return RespondStyleBridgeOutcome(
@@ -168,6 +176,30 @@ async def _handle_opted_in_turn(
             blocked_reason="respond_style_provider_unconfigured",
             deployment_id=str(deployment.id),
             agent_version_id=str(version.id),
+        )
+
+    # Phase 20: accepted-handoff takeover — once a human takeover is
+    # pending for this conversation, the direct route stops auto-responding
+    # entirely (no LLM call) until a human joins or rollback/reset clears it.
+    from atendia.product_agents.smoke_policy import get_takeover_pending
+
+    takeover_pending = await get_takeover_pending(
+        session, conversation_id=conversation_id
+    )
+    if takeover_pending:
+        return RespondStyleBridgeOutcome(
+            result=None,
+            blocked_reason="human_takeover_pending",
+            deployment_id=str(deployment.id),
+            agent_version_id=str(version.id),
+            no_send_followup={
+                "action": "human_takeover_pending",
+                "notify_operator": False,
+                "reason": "handoff accepted; waiting for human",
+                "customer_copy_sent": False,
+                "executed": False,
+            },
+            smoke={"active": False, "staged": False, "takeover_pending": True},
         )
 
     config = _config_from_version(version)
@@ -212,6 +244,16 @@ async def _handle_opted_in_turn(
             conversation_id=conversation_id,
             application=application,
         )
+    smoke_info = await _maybe_stage_smoke_send(
+        session,
+        deployment=deployment,
+        version=version,
+        tenant_id=tenant_id,
+        conversation_id=conversation_id,
+        inbound_message_id=inbound_message_id,
+        from_phone_e164=from_phone_e164,
+        result=result,
+    )
     return RespondStyleBridgeOutcome(
         result=result,
         deployment_id=str(deployment.id),
@@ -224,7 +266,92 @@ async def _handle_opted_in_turn(
             "rejected": application.rejected_count,
             "audit": [entry.model_dump(mode="json") for entry in application.audit],
         },
+        smoke=smoke_info,
     )
+
+
+async def _maybe_stage_smoke_send(
+    session: Any,
+    *,
+    deployment: AgentDeployment,
+    version: AgentVersion,
+    tenant_id: str,
+    conversation_id: str,
+    inbound_message_id: str | None,
+    from_phone_e164: str | None,
+    result: ProductAgentRuntimeResult,
+) -> dict[str, Any]:
+    """Phase 20: per-turn runtime gate for single-contact smoke. With the
+    flags off (the default and the state this phase leaves behind) this is a
+    pure no-op. With flags on, ONLY the allowlisted phone can ever stage a
+    validated final_message to the existing outbox path; every failure mode
+    fails closed and (15B) pages the operator instead of sending anything."""
+    from atendia.product_agents.smoke_policy import (
+        evaluate_smoke_send,
+        notify_operator_fail_closed,
+        set_takeover_pending,
+        stage_smoke_send,
+    )
+
+    metadata = dict(deployment.metadata_json or {})
+    evaluation = evaluate_smoke_send(
+        metadata=metadata,
+        from_phone=from_phone_e164,
+        result=result,
+        takeover_pending=False,
+    )
+    smoke_info: dict[str, Any] = {
+        "active": evaluation.active,
+        "allowed": evaluation.allowed,
+        "staged": False,
+        "scope": evaluation.scope,
+        "phone_normalized": evaluation.phone_normalized,
+        "reasons": list(evaluation.reasons),
+    }
+    if not evaluation.active:
+        return smoke_info
+    if evaluation.allowed:
+        staged = await stage_smoke_send(
+            session,
+            tenant_id=str(tenant_id),
+            deployment_id=str(deployment.id),
+            agent_version_id=str(version.id),
+            conversation_id=str(conversation_id),
+            inbound_message_id=inbound_message_id,
+            to_phone_e164=str(from_phone_e164),
+            final_message=str(result.final_message),
+            model=metadata.get("respond_style_model"),
+            trace_id=(result.trace or {}).get("turn_trace_id"),
+            send_scope=str(evaluation.scope),
+            validator_status="valid",
+        )
+        smoke_info.update(staged)
+        if evaluation.pause_after_send:
+            await set_takeover_pending(
+                session, tenant_id=str(tenant_id), conversation_id=str(conversation_id)
+            )
+            smoke_info["takeover_pending_set"] = True
+        return smoke_info
+    # Smoke is ACTIVE but this turn cannot send. For the allowlisted phone a
+    # blocked turn means the customer gets silence — 15B requires paging a
+    # human. Non-allowlisted phones simply stay in shadow (no page).
+    phone_is_target = "phone_not_allowlisted" not in evaluation.reasons
+    turn_failed = bool(result.blocked_reason) or not (result.final_message or "").strip()
+    if (
+        phone_is_target
+        and turn_failed
+        and metadata.get("respond_style_fail_closed_notify_operator") is True
+    ):
+        handoff_id = await notify_operator_fail_closed(
+            session,
+            tenant_id=str(tenant_id),
+            conversation_id=str(conversation_id),
+            reason=str(result.blocked_reason or "final_message_missing"),
+            detail={"smoke_reasons": list(evaluation.reasons)},
+        )
+        smoke_info["operator_notified"] = True
+        smoke_info["operator_handoff_id"] = handoff_id
+    return smoke_info
 
 
 def derive_no_send_followup(
