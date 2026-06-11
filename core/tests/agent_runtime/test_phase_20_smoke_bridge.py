@@ -324,3 +324,54 @@ def test_legacy_suppression_helper_in_send_adapter() -> None:
     assert "approved_contact_only" in source
     # Fails open: suppression must never break other contacts.
     assert "return False" in source
+
+
+def test_field_only_errors_drop_proposals_and_deliver_message() -> None:
+    """A bad field PROPOSAL must never block a good visible message: on the
+    final attempt the offending proposal is dropped and the message sends;
+    state safety remains with the application layer."""
+    from atendia.agent_runtime import (
+        AgentContextPackage,
+        LLMAgentTurnOutput,
+        LLMFieldUpdateProposal,
+        RespondStyleTurnValidator,
+    )
+
+    context = AgentContextPackage(
+        agent_identity={
+            "latest_customer_message": "hola",
+            "last_assistant_message": "que modelo te interesa?",
+        },
+        field_policies=[
+            {
+                "field_key": "selected_option",
+                "writable": True,
+                "allowed_values": [{"value": "prod-1", "aliases": ["Alpha"]}],
+                "referent_check": True,
+            }
+        ],
+    )
+    output = LLMAgentTurnOutput(
+        final_message="¡Hola! ¿En qué puedo ayudarte hoy?",
+        field_write_proposals=[
+            LLMFieldUpdateProposal(
+                field_key="selected_option",
+                value="prod-1",
+                evidence=["transcript:latest_customer_message"],
+                confidence=0.9,
+                reason="stale capture from history",
+            )
+        ],
+        confidence=0.8,
+    )
+    # attempt 2 == final attempt: retry budget exhausted.
+    decision = RespondStyleTurnValidator().validate(
+        output=output, context=context, attempt_number=2
+    )
+    assert decision.send_decision == "send"
+    assert decision.final_message == "¡Hola! ¿En qué puedo ayudarte hoy?"
+    assert decision.accepted_field_writes == []
+    dropped = decision.trace_metadata["respond_style_validator"][
+        "dropped_field_writes"
+    ]
+    assert dropped[0]["code"] == "field_value_referent_unverified"

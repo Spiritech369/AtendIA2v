@@ -218,6 +218,7 @@ def _summary_from_outcome(
         "no_send_followup": trace.get("no_send_followup"),
         "validator": trace.get("validator"),
         "side_effects": trace.get("side_effects"),
+        "smoke": trace.get("smoke") or {"active": False, "staged": False},
     }
 
 
