@@ -246,6 +246,11 @@ async def _legacy_suppressed_for_smoke(
                 _sql_text(
                     "SELECT metadata_json FROM agent_deployments "
                     "WHERE tenant_id = :t AND "
+                    "send_enabled = true AND "
+                    "outbox_enabled = true AND "
+                    "live_send_enabled = true AND "
+                    "single_contact_smoke_enabled = true AND "
+                    "send_scope = 'approved_contact_only' AND "
                     "metadata_json->>'respond_style_live_send_enabled' = 'true'"
                 ),
                 {"t": tenant_id},

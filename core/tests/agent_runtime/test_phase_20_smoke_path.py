@@ -52,6 +52,7 @@ def _canonical_deployment(**overrides):
         "outbox_enabled": True,
         "live_send_enabled": True,
         "single_contact_smoke_enabled": True,
+        "send_scope": "approved_contact_only",
     }
     columns.update(overrides)
     return SimpleNamespace(**columns)
@@ -224,6 +225,31 @@ def test_canonical_columns_required_even_with_metadata_on() -> None:
     missing_deployment = _eval(deployment=None)
     assert not missing_deployment.allowed
     assert "canonical_send_columns_disabled" in missing_deployment.reasons
+    assert "canonical_send_scope_unsafe" in missing_deployment.reasons
+
+
+def test_metadata_cannot_send_when_canonical_flags_are_no_send() -> None:
+    """Regression for the real smoke incident: metadata re-arm cannot stage
+    visible sends when the deployment columns still say no-send/none."""
+    deployment = _canonical_deployment(
+        send_enabled=False,
+        outbox_enabled=False,
+        live_send_enabled=False,
+        single_contact_smoke_enabled=False,
+        send_scope="none",
+    )
+    evaluation = _eval(metadata=_smoke_metadata(), deployment=deployment)
+    assert evaluation.active is True
+    assert evaluation.allowed is False
+    assert "canonical_send_columns_disabled" in evaluation.reasons
+    assert "canonical_send_scope_unsafe" in evaluation.reasons
+
+
+def test_canonical_send_scope_required_even_with_metadata_scope_on() -> None:
+    evaluation = _eval(deployment=_canonical_deployment(send_scope="none"))
+    assert evaluation.active is True
+    assert evaluation.allowed is False
+    assert "canonical_send_scope_unsafe" in evaluation.reasons
 
 
 def test_live_grounding_blocks_dry_facts_for_visible_send() -> None:

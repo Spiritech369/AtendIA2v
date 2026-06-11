@@ -99,6 +99,10 @@ def canonical_columns_enabled(deployment: Any) -> bool:
     )
 
 
+def canonical_send_scope_approved(deployment: Any) -> bool:
+    return str(getattr(deployment, "send_scope", "") or "") == APPROVED_SCOPE
+
+
 def evaluate_smoke_send(
     *,
     metadata: dict[str, Any] | None,
@@ -116,6 +120,8 @@ def evaluate_smoke_send(
     reasons: list[str] = []
     if deployment is None or not canonical_columns_enabled(deployment):
         reasons.append("canonical_send_columns_disabled")
+    if deployment is None or not canonical_send_scope_approved(deployment):
+        reasons.append("canonical_send_scope_unsafe")
     scope = str(meta.get("respond_style_send_scope") or "")
     if scope != APPROVED_SCOPE or scope in FORBIDDEN_SCOPES:
         reasons.append("send_scope_unsafe")

@@ -42,7 +42,9 @@ def _valid_decision(message, handoff=None):
     )
 
 
-def _bridge_fixtures(monkeypatch, *, metadata, decisions, takeover=False):
+def _bridge_fixtures(
+    monkeypatch, *, metadata, decisions, takeover=False, deployment_overrides=None
+):
     from atendia.product_agents import agent_service_bridge as bridge
     from atendia.product_agents import smoke_policy
 
@@ -57,7 +59,10 @@ def _bridge_fixtures(monkeypatch, *, metadata, decisions, takeover=False):
         outbox_enabled=True,
         live_send_enabled=True,
         single_contact_smoke_enabled=True,
+        send_scope="approved_contact_only",
     )
+    for key, value in dict(deployment_overrides or {}).items():
+        setattr(deployment, key, value)
     version = SimpleNamespace(
         id=deployment.active_version_id,
         tenant_id=tenant_id,
@@ -242,6 +247,39 @@ async def test_bridge_flags_off_never_touches_smoke(monkeypatch) -> None:
     )
     assert outcome.smoke["active"] is False
     assert outcome.smoke["staged"] is False
+    assert fx.staged == []
+
+
+@pytest.mark.asyncio
+async def test_bridge_metadata_live_cannot_stage_when_canonical_flags_off(
+    monkeypatch,
+) -> None:
+    fx = _bridge_fixtures(
+        monkeypatch,
+        metadata=_smoke_metadata(),
+        deployment_overrides={
+            "send_enabled": False,
+            "outbox_enabled": False,
+            "live_send_enabled": False,
+            "single_contact_smoke_enabled": False,
+            "send_scope": "none",
+        },
+        decisions=[_valid_decision("Hola.")],
+    )
+    outcome = await fx.bridge.maybe_handle_respond_style_turn(
+        fx.session,
+        tenant_id=str(fx.tenant_id),
+        conversation_id=str(uuid4()),
+        inbound_text="hola",
+        mode="no_send",
+        from_phone_e164=PHONE,
+        inbound_message_id=str(uuid4()),
+    )
+    assert outcome.smoke["active"] is True
+    assert outcome.smoke["allowed"] is False
+    assert outcome.smoke["staged"] is False
+    assert "canonical_send_columns_disabled" in outcome.smoke["reasons"]
+    assert "canonical_send_scope_unsafe" in outcome.smoke["reasons"]
     assert fx.staged == []
 
 
