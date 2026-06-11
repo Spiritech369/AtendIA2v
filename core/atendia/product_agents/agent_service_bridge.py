@@ -451,6 +451,7 @@ async def _vision_pretool_results(
         from pathlib import Path
 
         from atendia.agent_runtime.respond_style_vision import (
+            SUPPORTED_DOCUMENT_TYPES,
             SUPPORTED_IMAGE_TYPES,
             analyze_document_media,
             vision_tool_result,
@@ -461,7 +462,8 @@ async def _vision_pretool_results(
         media = ((message.metadata_json or {}).get("media") or {}) if message else {}
         mime_type = str(media.get("mime_type") or "")
         url = str(media.get("url") or "")
-        if not url or mime_type not in SUPPORTED_IMAGE_TYPES:
+        supported = (*SUPPORTED_IMAGE_TYPES, *SUPPORTED_DOCUMENT_TYPES)
+        if not url or mime_type not in supported:
             return []
         upload_dir = Path(get_settings().upload_dir)
         relative = url.split("/uploads/", 1)[-1] if "/uploads/" in url else url

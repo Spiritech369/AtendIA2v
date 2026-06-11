@@ -60,6 +60,22 @@ _JSON_SCHEMA = {
 }
 
 SUPPORTED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif")
+SUPPORTED_DOCUMENT_TYPES = ("application/pdf",)
+PDF_MAX_PAGES = 2
+
+
+def _render_pdf_pages(pdf_bytes: bytes, max_pages: int = PDF_MAX_PAGES) -> list[bytes]:
+    """Renders the first pages of a PDF to PNG bytes (an INE scan often has
+    front/back on two pages). Raises on unreadable PDFs."""
+    import fitz
+
+    images: list[bytes] = []
+    with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+        page_count = min(max_pages, document.page_count)
+        for index in range(page_count):
+            pixmap = document.load_page(index).get_pixmap(dpi=150)
+            images.append(pixmap.tobytes("png"))
+    return images
 
 
 async def analyze_document_media(
@@ -71,7 +87,27 @@ async def analyze_document_media(
 ) -> dict[str, Any]:
     """Returns vision facts, or a structured unsupported/error marker.
     Never raises: media review must not break the turn."""
-    if mime_type not in SUPPORTED_IMAGE_TYPES:
+    if mime_type in SUPPORTED_IMAGE_TYPES:
+        image_parts: list[tuple[str, bytes]] = [(mime_type, image_bytes)]
+    elif mime_type in SUPPORTED_DOCUMENT_TYPES:
+        try:
+            image_parts = [
+                ("image/png", page) for page in _render_pdf_pages(image_bytes)
+            ]
+        except Exception as exc:
+            logger.warning("respond_style_vision_pdf_failed: %s", type(exc).__name__)
+            return {
+                "reviewed": False,
+                "reason": "pdf_render_failed",
+                "mime_type": mime_type,
+            }
+        if not image_parts:
+            return {
+                "reviewed": False,
+                "reason": "pdf_has_no_pages",
+                "mime_type": mime_type,
+            }
+    else:
         return {
             "reviewed": False,
             "reason": "unsupported_media_type",
@@ -81,23 +117,24 @@ async def analyze_document_media(
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=api_key, max_retries=1)
-        encoded = base64.b64encode(image_bytes).decode("ascii")
+        content = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": (
+                        f"data:{part_mime};base64,"
+                        + base64.b64encode(part_bytes).decode("ascii")
+                    ),
+                    "detail": "high",
+                },
+            }
+            for part_mime, part_bytes in image_parts
+        ]
         response = await client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": _VISION_SYSTEM},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime_type};base64,{encoded}",
-                                "detail": "high",
-                            },
-                        }
-                    ],
-                },
+                {"role": "user", "content": content},
             ],
             response_format={"type": "json_schema", "json_schema": _JSON_SCHEMA},
             temperature=0,
@@ -134,6 +171,7 @@ def vision_tool_result(facts: dict[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
+    "SUPPORTED_DOCUMENT_TYPES",
     "SUPPORTED_IMAGE_TYPES",
     "VISION_TOOL_NAME",
     "analyze_document_media",

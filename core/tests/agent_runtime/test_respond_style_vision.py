@@ -12,13 +12,14 @@ from atendia.agent_runtime.respond_style_vision import (
 
 @pytest.mark.asyncio
 async def test_unsupported_media_returns_marker_without_calling_api() -> None:
+    docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     facts = await analyze_document_media(
-        api_key="k", image_bytes=b"x", mime_type="application/pdf"
+        api_key="k", image_bytes=b"x", mime_type=docx
     )
     assert facts == {
         "reviewed": False,
         "reason": "unsupported_media_type",
-        "mime_type": "application/pdf",
+        "mime_type": docx,
     }
     result = vision_tool_result(facts)
     assert result["status"] == "skipped"
@@ -104,3 +105,64 @@ def test_builder_injects_pretool_results_into_context() -> None:
     assert len(results) == 1
     assert results[0]["tool_name"] == "document.review"
     assert results[0]["source_kind"] == "vision"
+
+
+@pytest.mark.asyncio
+async def test_pdf_pages_render_and_review(monkeypatch) -> None:
+    """A real (tiny) PDF renders to images and goes through vision."""
+    import fitz
+    import openai
+
+    document = fitz.open()
+    document.new_page(width=200, height=100)
+    document.new_page(width=200, height=100)
+    document.new_page(width=200, height=100)  # third page must be ignored
+    pdf_bytes = document.tobytes()
+    document.close()
+
+    seen = {}
+    payload = (
+        '{"document_type": "comprobante_domicilio", "legible": true, '
+        '"summary": "Comprobante en PDF.", "visible_fields": {}, '
+        '"confidence": 0.8}'
+    )
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            seen["images"] = [
+                part
+                for message in kwargs["messages"]
+                if isinstance(message.get("content"), list)
+                for part in message["content"]
+                if part.get("type") == "image_url"
+            ]
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=payload))]
+            )
+
+    class _FakeClient:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setattr(openai, "AsyncOpenAI", _FakeClient)
+
+    facts = await analyze_document_media(
+        api_key="k", image_bytes=pdf_bytes, mime_type="application/pdf"
+    )
+    assert facts["reviewed"] is True
+    assert facts["document_type"] == "comprobante_domicilio"
+    # First two pages only, rendered as PNG data URLs.
+    assert len(seen["images"]) == 2
+    assert all(
+        part["image_url"]["url"].startswith("data:image/png;base64,")
+        for part in seen["images"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_corrupt_pdf_degrades_safely() -> None:
+    facts = await analyze_document_media(
+        api_key="k", image_bytes=b"not a pdf", mime_type="application/pdf"
+    )
+    assert facts["reviewed"] is False
+    assert facts["reason"] == "pdf_render_failed"
