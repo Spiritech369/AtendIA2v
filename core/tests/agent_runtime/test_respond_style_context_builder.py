@@ -329,7 +329,12 @@ def test_builder_source_has_no_conversational_string_literals() -> None:
 
 
 def test_builder_does_not_route_tools_by_customer_phrases() -> None:
+    # Pure passthroughs are whitelisted (assignments into turn_input or
+    # agent_identity); what the guard forbids is CONDITIONING on
+    # inbound_text — keyword-driven tool routing.
     source = BUILDER_SOURCE.read_text(encoding="utf-8")
     assert "inbound_text" not in source.replace(
         "inbound_text=snapshot.inbound_text", ""
+    ).replace(
+        '"latest_customer_message": snapshot.inbound_text,', ""
     ).replace("inbound_text: str", "").replace("inbound_text\n", "")

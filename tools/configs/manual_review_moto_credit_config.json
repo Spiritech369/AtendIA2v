@@ -149,7 +149,8 @@
         "Metro",
         "rx-sport",
         "RX Sport"
-      ]
+      ],
+      "referent_check": true
     },
     {
       "field_key": "budget_concern",

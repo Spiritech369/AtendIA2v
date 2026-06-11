@@ -223,6 +223,7 @@ def _merge_field_state(
                     str(item) for item in definition.get("allowed_sources") or []
                 ],
                 allowed_values=list(definition.get("allowed_values") or []),
+                referent_check=definition.get("referent_check", False) is True,
                 confidence=definition.get("confidence"),
                 last_evidence=[
                     str(item) for item in definition.get("last_evidence") or []

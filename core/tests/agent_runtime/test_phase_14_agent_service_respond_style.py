@@ -1470,3 +1470,131 @@ async def test_w5b_bridge_detects_pending_handoff_from_recent_traces() -> None:
     assert (
         await _recent_handoff_pending(_Session2(), conversation_id=str(uuid4())) is False
     )
+
+
+# --- W6 fixes -----------------------------------------------------------------
+
+
+def _w6_context(latest, last_assistant):
+    return AgentContextPackage(
+        agent_identity={
+            "latest_customer_message": latest,
+            "last_assistant_message": last_assistant,
+        },
+        field_policies=[
+            {
+                "field_key": "selected_option",
+                "writable": True,
+                "allowed_values": ["alpha-1", "Alpha", "beta-2", "Beta"],
+                "referent_check": True,
+            }
+        ],
+    )
+
+
+def _w6_output(value):
+    from atendia.agent_runtime import LLMAgentTurnOutput, LLMFieldUpdateProposal
+
+    return LLMAgentTurnOutput(
+        final_message="Aqui esta la informacion que pediste.",
+        field_write_proposals=[
+            LLMFieldUpdateProposal(
+                field_key="selected_option",
+                value=value,
+                evidence=["transcript:latest_customer_message"],
+                confidence=0.9,
+                reason="capture",
+            )
+        ],
+        confidence=0.8,
+    )
+
+
+def test_w6a_wrong_referent_capture_is_retryable() -> None:
+    """The window-6 t13 case: customer asked about Beta ('esa cuanto
+    queda?' after the assistant described Beta) but the model proposes
+    Alpha — a VALID allowed value with the WRONG referent."""
+    from atendia.agent_runtime import RespondStyleTurnValidator
+
+    decision = RespondStyleTurnValidator().validate(
+        output=_w6_output("alpha-1"),
+        context=_w6_context(
+            latest="esa cuanto queda?",
+            last_assistant="La Beta es ideal para uso urbano, disponible en rojo.",
+        ),
+    )
+    assert decision.send_decision == "no_send"
+    assert decision.retry_instruction is not None
+    codes = {i.code for i in decision.retry_instruction.error_items}
+    assert "field_value_referent_unverified" in codes
+
+
+def test_w6a_grounded_referents_pass() -> None:
+    from atendia.agent_runtime import RespondStyleTurnValidator
+
+    validator = RespondStyleTurnValidator()
+    # Grounded in the customer's own message (with accents/case noise).
+    in_customer = validator.validate(
+        output=_w6_output("beta-2"),
+        context=_w6_context("me interesa la BETA-2!!", "te ayudo con gusto"),
+    )
+    assert in_customer.send_decision == "send"
+    # Grounded in the assistant's previous turn (pronoun reference).
+    in_assistant = validator.validate(
+        output=_w6_output("Beta"),
+        context=_w6_context("esa cuanto queda?", "La Beta es la mas economica."),
+    )
+    assert in_assistant.send_decision == "send"
+
+
+def test_w6a_skips_fields_without_referent_check_and_legacy_contexts() -> None:
+    from atendia.agent_runtime import RespondStyleTurnValidator
+
+    # Field without referent_check: free to capture paraphrased values.
+    no_check = AgentContextPackage(
+        agent_identity={
+            "latest_customer_message": "tengo negocio",
+            "last_assistant_message": "",
+        },
+        field_policies=[
+            {
+                "field_key": "selected_option",
+                "writable": True,
+                "allowed_values": ["alpha-1", "Alpha", "beta-2", "Beta", "negocio_propio"],
+            }
+        ],
+    )
+    decision = RespondStyleTurnValidator().validate(
+        output=_w6_output("negocio_propio"), context=no_check
+    )
+    assert decision.send_decision == "send"
+
+    # Context without exchange texts (older callers): never blocks.
+    legacy = AgentContextPackage(
+        field_policies=[
+            {
+                "field_key": "selected_option",
+                "writable": True,
+                "allowed_values": ["alpha-1", "Alpha"],
+                "referent_check": True,
+            }
+        ]
+    )
+    legacy_decision = RespondStyleTurnValidator().validate(
+        output=_w6_output("alpha-1"), context=legacy
+    )
+    assert legacy_decision.send_decision == "send"
+
+
+def test_w6_prompt_contract_lines() -> None:
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        respond_style_system_prompt,
+    )
+
+    prompt = respond_style_system_prompt()
+    # W6-A: pronoun referents resolve to the most recently discussed product.
+    assert "product MOST RECENTLY" in prompt
+    assert "confirm WHICH one before quoting" in prompt
+    # W6-B: offers are questions; formal proposals need explicit request/yes.
+    assert "Offering a human is a QUESTION" in prompt
+    assert "said yes to your offer" in prompt

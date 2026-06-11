@@ -71,6 +71,9 @@ class ContactFieldState(BaseModel):
     allowed_sources: list[str] = Field(default_factory=list)
     # W5-A: canonical vocabulary; runtime + validator reject anything else.
     allowed_values: list[Any] = Field(default_factory=list)
+    # W6-A: proposals for this field must be grounded in the latest exchange
+    # (customer's last message or the previous assistant turn).
+    referent_check: bool = False
     confidence: float | None = None
     last_evidence: list[str] = Field(default_factory=list)
 
@@ -254,11 +257,26 @@ def _agent_identity(snapshot: RespondStyleContextSnapshot) -> JsonDict:
         "contact_state": known_fields,
         "corrected_fields": dict(snapshot.corrected_fields),
         "handoff_pending": snapshot.handoff_pending,
+        "latest_customer_message": snapshot.inbound_text,
+        "last_assistant_message": _last_assistant_text(snapshot),
         "missing_fields": missing_fields,
         # Declarative contract for the LLM: fields are captured when the
         # customer provides them, never collected as a questionnaire.
         "field_capture_policy": "opportunistic_never_agenda",
     }
+
+
+def _last_assistant_text(snapshot: RespondStyleContextSnapshot) -> str:
+    for message in reversed(snapshot.recent_messages):
+        role = getattr(message, "role", None) or (
+            message.get("role") if isinstance(message, dict) else None
+        )
+        if role in ("assistant", "agent", "outbound"):
+            text = getattr(message, "text", None) or (
+                message.get("text") if isinstance(message, dict) else None
+            )
+            return str(text or "")
+    return ""
 
 
 def _voice_guide(snapshot: RespondStyleContextSnapshot) -> JsonDict:
@@ -366,6 +384,7 @@ def _field_policy(field: ContactFieldState) -> JsonDict:
         "evidence_required": field.evidence_required,
         "allowed_sources": list(field.allowed_sources),
         "allowed_values": list(field.allowed_values),
+        "referent_check": field.referent_check,
         "confidence": field.confidence,
         "last_evidence": list(field.last_evidence),
         "can_propose_update": field.writable,

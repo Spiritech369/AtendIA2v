@@ -433,6 +433,27 @@ def _claim_errors(
     return errors
 
 
+def _value_grounded_in_exchange(value: object, context: AgentContextPackage) -> bool:
+    identity = context.agent_identity or {}
+    haystack = _alnum_fold(
+        str(identity.get("latest_customer_message") or "")
+        + " "
+        + str(identity.get("last_assistant_message") or "")
+    )
+    if not haystack:
+        # No exchange texts in context (older callers): do not block.
+        return True
+    needle = _alnum_fold(str(value))
+    return bool(needle) and needle in haystack
+
+
+def _alnum_fold(text: str) -> str:
+    import unicodedata
+
+    folded = unicodedata.normalize("NFD", text.casefold())
+    return "".join(ch for ch in folded if ch.isalnum())
+
+
 def _stale_corrected_value_errors(
     output: LLMAgentTurnOutput,
     context: AgentContextPackage,
@@ -593,6 +614,28 @@ def _field_write_errors(
         # error feeds the allowed list back so the model re-proposes the
         # clean value instead of an annotated one. The application layer's
         # enforcement remains the backstop.
+        # W6-A: referent-checked fields (e.g. product selection) must be
+        # grounded in the latest exchange — the customer's last message or
+        # the previous assistant turn. Catches wrong-referent captures
+        # ('esa cuanto queda?' after discussing another product) that
+        # allowed_values cannot catch because the wrong value is still valid.
+        if (
+            policy is not None
+            and policy.get("referent_check") is True
+            and not _value_grounded_in_exchange(proposal.value, context)
+        ):
+            errors.append(
+                _error(
+                    "field_value_referent_unverified",
+                    (
+                        f"value '{proposal.value}' for {proposal.field_key} does "
+                        "not appear in the customer's latest message or your "
+                        "previous turn. Use the product most recently discussed, "
+                        "or ask the customer to confirm which one they mean."
+                    ),
+                    path=f"field_write_proposals[{index}].value",
+                )
+            )
         allowed_values = (policy or {}).get("allowed_values")
         if (
             policy is not None
