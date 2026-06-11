@@ -473,7 +473,18 @@ def _render_fields_section(context: AgentContextPackage) -> str:
         writable = "writable" if policy.get("writable", True) else "read-only"
         allowed = policy.get("allowed_values")
         if isinstance(allowed, list) and allowed:
-            values = ", ".join(str(item) for item in allowed)
+            from atendia.agent_runtime.respond_style_field_state import (
+                allowed_entry_terms,
+            )
+
+            display = []
+            for item in allowed:
+                canonical, terms = allowed_entry_terms(item)
+                aliases = [t for t in terms if t != str(canonical)]
+                display.append(
+                    f"{canonical} ({', '.join(aliases)})" if aliases else str(canonical)
+                )
+            values = ", ".join(display)
             lines.append(
                 f"- {key} ({label}, {writable}; ONLY these values are "
                 f"accepted: {values})"

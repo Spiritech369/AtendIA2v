@@ -1598,3 +1598,75 @@ def test_w6_prompt_contract_lines() -> None:
     # W6-B: offers are questions; formal proposals need explicit request/yes.
     assert "Offering a human is a QUESTION" in prompt
     assert "said yes to your offer" in prompt
+
+
+# --- W7: alias groups in allowed_values ---------------------------------------
+
+
+def test_w7_alias_group_matches_and_stores_canonical() -> None:
+    from atendia.agent_runtime.respond_style_field_state import apply_field_proposals
+
+    groups = [
+        {"value": "prod-1", "aliases": ["Alpha", "la alfa"]},
+        {"value": "prod-2", "aliases": ["Beta"]},
+    ]
+    result = apply_field_proposals(
+        [{"field_key": "selected_option", "value": "ALFA", "evidence": ["la alfa"]}],
+        field_policies=[
+            {"field_key": "selected_option", "allowed_values": groups}
+        ],
+        current_values={},
+    )
+    # 'ALFA' folds to alias 'la alfa'? No: exact alias match only. 'ALFA' is
+    # not an alias; verify exact alias and canonical both work instead.
+    assert result.rejected_count == 1
+
+    by_alias = apply_field_proposals(
+        [{"field_key": "selected_option", "value": "alpha", "evidence": ["x"]}],
+        field_policies=[{"field_key": "selected_option", "allowed_values": groups}],
+        current_values={},
+    )
+    assert by_alias.new_values == {"selected_option": "prod-1"}
+
+    by_canonical = apply_field_proposals(
+        [{"field_key": "selected_option", "value": "PROD-2", "evidence": ["x"]}],
+        field_policies=[{"field_key": "selected_option", "allowed_values": groups}],
+        current_values={},
+    )
+    assert by_canonical.new_values == {"selected_option": "prod-2"}
+
+
+def test_w7_grounding_accepts_canonical_when_alias_in_exchange() -> None:
+    """The final-window t5 false positive: the model proposes the canonical
+    id while the conversation used the alias."""
+    from atendia.agent_runtime import RespondStyleTurnValidator
+
+    context = AgentContextPackage(
+        agent_identity={
+            "latest_customer_message": "esa cuanto queda?",
+            "last_assistant_message": "La Beta es ideal para uso urbano.",
+        },
+        field_policies=[
+            {
+                "field_key": "selected_option",
+                "writable": True,
+                "allowed_values": [
+                    {"value": "prod-1", "aliases": ["Alpha"]},
+                    {"value": "prod-2", "aliases": ["Beta"]},
+                ],
+                "referent_check": True,
+            }
+        ],
+    )
+    grounded = RespondStyleTurnValidator().validate(
+        output=_w6_output("prod-2"), context=context
+    )
+    assert grounded.send_decision == "send"
+
+    # The wrong product is still caught: prod-1/Alpha never appeared.
+    wrong = RespondStyleTurnValidator().validate(
+        output=_w6_output("prod-1"), context=context
+    )
+    assert wrong.send_decision == "no_send"
+    codes = {i.code for i in wrong.retry_instruction.error_items}
+    assert "field_value_referent_unverified" in codes

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from atendia.agent_runtime.respond_style_field_state import (
     _canonical_allowed_value,
+    allowed_entry_terms,
 )
 from atendia.agent_runtime.respond_style_turn_contract import (
     AgentContextPackage,
@@ -433,7 +434,11 @@ def _claim_errors(
     return errors
 
 
-def _value_grounded_in_exchange(value: object, context: AgentContextPackage) -> bool:
+def _value_grounded_in_exchange(
+    value: object,
+    allowed_values: object,
+    context: AgentContextPackage,
+) -> bool:
     identity = context.agent_identity or {}
     haystack = _alnum_fold(
         str(identity.get("latest_customer_message") or "")
@@ -443,8 +448,28 @@ def _value_grounded_in_exchange(value: object, context: AgentContextPackage) -> 
     if not haystack:
         # No exchange texts in context (older callers): do not block.
         return True
-    needle = _alnum_fold(str(value))
-    return bool(needle) and needle in haystack
+    # W7: ground against the whole alias GROUP — proposing the canonical id
+    # counts as grounded when any of its aliases appears in the exchange.
+    terms: list[str] = [str(value)]
+    if isinstance(allowed_values, list):
+        canonical = _canonical_allowed_value(value, allowed_values)
+        if canonical is not None:
+            for entry in allowed_values:
+                entry_canonical, entry_terms = allowed_entry_terms(entry)
+                if entry_canonical == canonical:
+                    terms.extend(entry_terms)
+    return any(
+        needle and needle in haystack
+        for needle in (_alnum_fold(term) for term in terms)
+    )
+
+
+def _entry_display(entry: object) -> str:
+    canonical, terms = allowed_entry_terms(entry)
+    aliases = [term for term in terms if term != str(canonical)]
+    if aliases:
+        return f"{canonical} ({', '.join(aliases)})"
+    return str(canonical)
 
 
 def _alnum_fold(text: str) -> str:
@@ -622,7 +647,9 @@ def _field_write_errors(
         if (
             policy is not None
             and policy.get("referent_check") is True
-            and not _value_grounded_in_exchange(proposal.value, context)
+            and not _value_grounded_in_exchange(
+                proposal.value, policy.get("allowed_values"), context
+            )
         ):
             errors.append(
                 _error(
@@ -643,7 +670,9 @@ def _field_write_errors(
             and allowed_values
             and _canonical_allowed_value(proposal.value, allowed_values) is None
         ):
-            values = ", ".join(str(item) for item in allowed_values)
+            values = ", ".join(
+                _entry_display(item) for item in allowed_values
+            )
             errors.append(
                 _error(
                     "field_value_not_allowed",

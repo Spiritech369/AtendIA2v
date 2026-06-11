@@ -39,17 +39,29 @@ class FieldApplicationResult(BaseModel):
     rejected_count: int = 0
 
 
+def allowed_entry_terms(entry: Any) -> tuple[Any, list[str]]:
+    """W7: an allowed_values entry is either a scalar (canonical == only
+    term) or a group dict {"value": canonical, "aliases": [...]}. Returns
+    (canonical, all terms including the canonical)."""
+    if isinstance(entry, dict):
+        canonical = entry.get("value")
+        aliases = [str(item) for item in entry.get("aliases") or []]
+        return canonical, [str(canonical), *aliases]
+    return entry, [str(entry)]
+
+
 def _canonical_allowed_value(value: Any, allowed_values: list[Any]) -> Any | None:
     """Case/whitespace/ACCENT-insensitive match in both directions ('nómina'
     matches allowed 'nomina' and vice versa — customers rarely type
-    accents). Returns the CANONICAL allowed entry so accepted values are
-    normalized, or None when not allowed."""
+    accents). W7: entries may be alias GROUPS; matching any alias returns
+    the group's CANONICAL value. Returns None when not allowed."""
     normalized = _fold(value)
     if not normalized:
         return None
-    for candidate in allowed_values:
-        if _fold(candidate) == normalized:
-            return candidate
+    for entry in allowed_values:
+        canonical, terms = allowed_entry_terms(entry)
+        if any(_fold(term) == normalized for term in terms):
+            return canonical
     return None
 
 
@@ -150,4 +162,9 @@ def apply_field_proposals(
     )
 
 
-__all__ = ["FieldApplicationResult", "FieldAuditEntry", "apply_field_proposals"]
+__all__ = [
+    "FieldApplicationResult",
+    "FieldAuditEntry",
+    "allowed_entry_terms",
+    "apply_field_proposals",
+]

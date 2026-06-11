@@ -390,10 +390,14 @@ async def _recent_transcript(
     *,
     conversation_id: Any,
 ) -> list[TranscriptMessage]:
+    # Order by sent_at (the message's real time, always distinct) with
+    # created_at as tiebreak: created_at defaults to transaction time in
+    # Postgres, so batch inserts within one transaction all tie and the
+    # transcript order scrambles.
     result = await session.execute(
         select(MessageRow)
         .where(MessageRow.conversation_id == conversation_id)
-        .order_by(MessageRow.created_at.desc())
+        .order_by(MessageRow.sent_at.desc(), MessageRow.created_at.desc())
         .limit(TRANSCRIPT_LIMIT)
     )
     rows = list(result.scalars())

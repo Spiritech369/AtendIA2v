@@ -23,7 +23,7 @@ from atendia.db.session import _get_factory
 from atendia.product_agents.inbound_shadow import run_inbound_shadow
 
 TENANT_ID = "6ad78236-1fc9-467a-858d-90d248d57ee5"
-EXPECTED_VERSION = "0cee95e8-542f-431e-ac66-5a0f046ff0b7"
+EXPECTED_VERSION = "270574ad-8313-43cb-b0bc-ebf62b1f5214"
 PHONE = "+5218128889241"
 
 MESSAGES = [

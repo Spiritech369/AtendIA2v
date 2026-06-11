@@ -143,12 +143,29 @@
       "label": "modelo elegido",
       "required": false,
       "allowed_values": [
-        "dnm-25",
-        "DNM2.5",
-        "metro-city",
-        "Metro",
-        "rx-sport",
-        "RX Sport"
+        {
+          "value": "dnm-25",
+          "aliases": [
+            "DNM2.5",
+            "DNM 2.5",
+            "dnm25"
+          ]
+        },
+        {
+          "value": "metro-city",
+          "aliases": [
+            "Metro",
+            "la metro"
+          ]
+        },
+        {
+          "value": "rx-sport",
+          "aliases": [
+            "RX Sport",
+            "rx",
+            "sport"
+          ]
+        }
       ],
       "referent_check": true
     },
