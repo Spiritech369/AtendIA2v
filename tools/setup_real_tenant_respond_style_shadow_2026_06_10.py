@@ -202,7 +202,12 @@ async def main() -> int:
             existing.active_version_id = version.id
             existing.publish_state = "published_no_send"
             existing.runtime_mode = "test_lab_no_send"
-            existing.metadata_json = metadata
+            # Fix-forward mode: improvements re-arm WITHOUT dropping live
+            # smoke flags/approval already granted — merge, never overwrite.
+            existing.metadata_json = {
+                **dict(existing.metadata_json or {}),
+                **metadata,
+            }
             deployment = existing
         else:
             deployment = AgentDeployment(
