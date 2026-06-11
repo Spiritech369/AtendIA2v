@@ -22,14 +22,17 @@ logger = logging.getLogger(__name__)
 SMOKE_SOURCE = "respond_style_single_contact_smoke"
 APPROVED_SCOPE = "approved_contact_only"
 
-# Literal human approval text from the Phase 19 packet (section 13). The
-# deployment metadata must carry EXACTLY this text for sends to be possible.
+# Literal human approval text. AMENDED 2026-06-11 by Felipe (explicit,
+# deliberate change from the Phase 19 packet text): quality failures are
+# fixed FORWARD instead of auto-rollback ("sin rollback, solo mejoras
+# hasta cumplir real"). Non-negotiable boundary kept: any send outside the
+# allowlisted phone is still an immediate kill (scope clause unchanged).
+# The deployment metadata must carry EXACTLY this text for sends.
 EXACT_APPROVAL_TEXT = (
     "Apruebo activar controlled single-contact smoke Respond-Style "
     "únicamente para el teléfono 8128889241, con "
     "send_scope=approved_contact_only, sin workflows/actions reales, sin "
-    "canary, sin production, con rollback inmediato ante cualquier criterio "
-    "de falla."
+    "canary, sin production, sin rollback, solo mejoras hasta cumplir real."
 )
 
 FORBIDDEN_SCOPES = ("all", "all_contacts", "tenant", "canary", "production", "live")
