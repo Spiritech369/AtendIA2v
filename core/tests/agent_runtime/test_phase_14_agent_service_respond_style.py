@@ -1063,7 +1063,7 @@ def test_17_prompt_and_context_mark_state_canonical() -> None:
 
     prompt = respond_style_system_prompt()
     assert "single source of truth" in prompt
-    assert "transcript is HISTORY" in prompt
+    assert "OVER THE" in prompt and "TRANSCRIPT" in prompt
 
     from atendia.agent_runtime import AgentTurnInput
 
@@ -1255,3 +1255,75 @@ def test_f27_allowed_values_match_is_accent_insensitive_both_ways() -> None:
     )
     assert still_rejects_unknown.rejected_count == 1
     assert still_rejects_unknown.audit[0].reason == "value_not_allowed"
+
+
+# --- W4 fixes -----------------------------------------------------------------
+
+
+def test_w4a_recorrection_with_field_proposal_is_not_stale_blocked() -> None:
+    """Customer re-corrects back to a previously corrected-away value: the
+    turn proposes the field write, says the new value — must NOT be blocked
+    by the stale-corrected-value check."""
+    from atendia.agent_runtime import (
+        LLMAgentTurnOutput,
+        LLMFieldUpdateProposal,
+        RespondStyleTurnValidator,
+    )
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Entendido, entonces sí tienes pago por banco. Seguimos.",
+            field_write_proposals=[
+                LLMFieldUpdateProposal(
+                    field_key="income_type",
+                    value="banco",
+                    evidence=["me pagan por banco"],
+                    confidence=0.9,
+                    reason="customer re-corrected",
+                )
+            ],
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            agent_identity={
+                "contact_state": {"income_type": "efectivo"},
+                "corrected_fields": {"income_type": "banco"},
+            },
+            field_policies=[{"field_key": "income_type", "writable": True}],
+        ),
+    )
+    assert decision.send_decision == "send"
+
+
+def test_w4a_stale_check_still_blocks_without_field_proposal() -> None:
+    from atendia.agent_runtime import LLMAgentTurnOutput, RespondStyleTurnValidator
+
+    decision = RespondStyleTurnValidator().validate(
+        output=LLMAgentTurnOutput(
+            final_message="Como recibes tu pago por banco, seguimos con eso.",
+            confidence=0.8,
+        ),
+        context=AgentContextPackage(
+            agent_identity={
+                "contact_state": {"income_type": "efectivo"},
+                "corrected_fields": {"income_type": "banco"},
+            }
+        ),
+    )
+    assert decision.send_decision == "no_send"
+
+
+def test_w4_prompt_contract_lines() -> None:
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        respond_style_system_prompt,
+    )
+
+    prompt = respond_style_system_prompt()
+    # W4-A: latest customer message outranks stored state.
+    assert "LATEST message outranks stored state" in prompt
+    assert "Never assert a" in prompt
+    # W4-B: information requests get information; handoff is an option.
+    assert "Offer a human as an OPTION only" in prompt
+    assert "Earlier handoffs in the transcript do not make handoff the" in prompt
+    # W4-C: media ack applies to bare placeholders.
+    assert "even" in prompt and "when the message is ONLY the placeholder" in prompt

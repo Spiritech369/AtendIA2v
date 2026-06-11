@@ -447,8 +447,15 @@ def _stale_corrected_value_errors(
     if not isinstance(corrected, dict) or not corrected:
         return []
     lowered = message.casefold()
+    # A turn that PROPOSES a new write for the field is updating state (the
+    # customer re-corrected): the stale check must not fight the update.
+    proposed_keys = {
+        proposal.field_key for proposal in output.field_write_proposals
+    }
     errors: list[ValidationErrorItem] = []
     for field_key, previous_value in corrected.items():
+        if field_key in proposed_keys:
+            continue
         current_value = (
             current_state.get(field_key) if isinstance(current_state, dict) else None
         )
