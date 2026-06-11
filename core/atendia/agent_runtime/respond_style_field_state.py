@@ -38,6 +38,18 @@ class FieldApplicationResult(BaseModel):
     rejected_count: int = 0
 
 
+def _canonical_allowed_value(value: Any, allowed_values: list[Any]) -> Any | None:
+    """Case/whitespace-insensitive match; returns the CANONICAL allowed entry
+    (so accepted values are normalized), or None when not allowed."""
+    normalized = str(value).strip().casefold()
+    if not normalized:
+        return None
+    for candidate in allowed_values:
+        if str(candidate).strip().casefold() == normalized:
+            return candidate
+    return None
+
+
 def apply_field_proposals(
     proposals: list[JsonDict],
     *,
@@ -47,11 +59,12 @@ def apply_field_proposals(
     """Re-validates each proposal (writable policy + non-empty evidence)
     and applies accepted ones over ``current_values``. Rejected proposals
     never modify state."""
-    writable_keys = {
-        str(item.get("field_key") or item.get("key"))
+    policy_by_key: dict[str, JsonDict] = {
+        str(item.get("field_key") or item.get("key")): item
         for item in field_policies
         if isinstance(item, dict) and item.get("writable", True) is not False
     }
+    writable_keys = set(policy_by_key)
     new_values = dict(current_values)
     audit: list[FieldAuditEntry] = []
     accepted = rejected = 0
@@ -85,6 +98,26 @@ def apply_field_proposals(
             )
             continue
         new_value = proposal.get("value")
+        # F27-ENFORCED: when the policy declares allowed_values, the runtime
+        # rejects anything outside them — no matter how confident the LLM
+        # sounded. Accepted values are normalized to the canonical entry.
+        allowed_values = policy_by_key[field_key].get("allowed_values")
+        if isinstance(allowed_values, list) and allowed_values:
+            canonical = _canonical_allowed_value(new_value, allowed_values)
+            if canonical is None:
+                rejected += 1
+                audit.append(
+                    FieldAuditEntry(
+                        field_key=field_key,
+                        status="rejected",
+                        reason="value_not_allowed",
+                        previous_value=previous_value,
+                        new_value=new_value,
+                        evidence=evidence,
+                    )
+                )
+                continue
+            new_value = canonical
         new_values[field_key] = new_value
         accepted += 1
         audit.append(

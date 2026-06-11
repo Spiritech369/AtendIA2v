@@ -466,5 +466,5 @@ def test_f26_f27_d_prompt_lines_present() -> None:
     # F27: product/model captures must be catalog-grounded.
     assert "matches an id or name present in catalog/tool facts" in prompt
     # D: media inbounds are acknowledged, never answered with unrelated content.
-    assert "image, audio, or attachment you cannot view" in prompt
-    assert "Never answer media with" in prompt
+    assert "media you cannot view" in prompt
+    assert "Do NOT quote prices, list" in prompt

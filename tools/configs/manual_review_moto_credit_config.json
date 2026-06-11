@@ -28,7 +28,9 @@
       "source_id": "general_credit_requirements",
       "title": "Requisitos generales de credito",
       "excerpt": "En general, para cualquier credito de moto se pide: identificacion oficial vigente, comprobante de domicilio reciente y alguna forma de demostrar ingresos. La lista exacta de documentos depende de como recibe sus ingresos el cliente (nomina, transferencia, efectivo o negocio propio) y del plan, y se confirma con el sistema de verificacion.",
-      "allowed_claim_types": ["general_requirements"]
+      "allowed_claim_types": [
+        "general_requirements"
+      ]
     }
   ],
   "tool_bindings": [
@@ -37,16 +39,45 @@
       "description": "Busca motos del catalogo por nombre, color, categoria o presupuesto y regresa sus model_id. Usala cuando el cliente menciona un modelo, un color o pide opciones.",
       "dry_facts": {
         "models": [
-          {"model_id": "dnm-25", "label": "DNM2.5", "category": "trabajo", "colors": ["negro", "rojo"], "price_tier": "media"},
-          {"model_id": "metro-city", "label": "Metro", "category": "urbana", "colors": ["rojo", "azul"], "price_tier": "economica"},
-          {"model_id": "rx-sport", "label": "RX Sport", "category": "deportiva", "colors": ["negro"], "price_tier": "alta"}
+          {
+            "model_id": "dnm-25",
+            "label": "DNM2.5",
+            "category": "trabajo",
+            "colors": [
+              "negro",
+              "rojo"
+            ],
+            "price_tier": "media"
+          },
+          {
+            "model_id": "metro-city",
+            "label": "Metro",
+            "category": "urbana",
+            "colors": [
+              "rojo",
+              "azul"
+            ],
+            "price_tier": "economica"
+          },
+          {
+            "model_id": "rx-sport",
+            "label": "RX Sport",
+            "category": "deportiva",
+            "colors": [
+              "negro"
+            ],
+            "price_tier": "alta"
+          }
         ]
       }
     },
     {
       "name": "credit_plan.resolve",
       "description": "Resuelve el plan de credito correcto para el cliente. Requiere saber como recibe sus ingresos (income_type) y su antiguedad laboral (employment_seniority).",
-      "preconditions": ["income_type", "employment_seniority"],
+      "preconditions": [
+        "income_type",
+        "employment_seniority"
+      ],
       "dry_facts": {
         "plan": "plan semanal estandar",
         "down_payment_percent": 30,
@@ -57,7 +88,9 @@
     {
       "name": "requirements.lookup",
       "description": "Regresa la lista exacta de papeles/requisitos para el plan del cliente. Requiere saber como recibe sus ingresos (income_type).",
-      "preconditions": ["income_type"],
+      "preconditions": [
+        "income_type"
+      ],
       "dry_facts": {
         "requirements": [
           "identificacion oficial vigente",
@@ -69,7 +102,9 @@
     {
       "name": "quote.resolve",
       "description": "Regresa el precio y enganche exactos de un modelo especifico. Requiere el modelo elegido (selected_model).",
-      "preconditions": ["selected_model"],
+      "preconditions": [
+        "selected_model"
+      ],
       "dry_facts": {
         "price": 32500,
         "currency": "MXN",
@@ -80,26 +115,82 @@
     }
   ],
   "field_definitions": [
-    {"field_key": "employment_seniority", "label": "antiguedad laboral", "required": true},
-    {"field_key": "income_type", "label": "como recibe ingresos", "required": true},
-    {"field_key": "has_tax_registration", "label": "alta en SAT", "required": false},
-    {"field_key": "selected_model", "label": "modelo elegido", "required": false},
-    {"field_key": "budget_concern", "label": "preocupacion de presupuesto", "required": false}
+    {
+      "field_key": "employment_seniority",
+      "label": "antiguedad laboral",
+      "required": true
+    },
+    {
+      "field_key": "income_type",
+      "label": "como recibe ingresos",
+      "required": true,
+      "allowed_values": [
+        "nomina",
+        "transferencia",
+        "efectivo",
+        "tarjeta",
+        "negocio_propio",
+        "sin_comprobantes"
+      ]
+    },
+    {
+      "field_key": "has_tax_registration",
+      "label": "alta en SAT",
+      "required": false
+    },
+    {
+      "field_key": "selected_model",
+      "label": "modelo elegido",
+      "required": false,
+      "allowed_values": [
+        "dnm-25",
+        "DNM2.5",
+        "metro-city",
+        "Metro",
+        "rx-sport",
+        "RX Sport"
+      ]
+    },
+    {
+      "field_key": "budget_concern",
+      "label": "preocupacion de presupuesto",
+      "required": false
+    }
   ],
   "workflow_bindings": [
     {
       "binding_name": "ready_for_handoff",
       "event_name": "lead.ready_for_handoff",
-      "required_fields": ["income_type"]
+      "required_fields": [
+        "income_type"
+      ]
     }
   ],
-  "handoff": {"enabled": true, "targets": ["ventas"], "reasons_allowed": ["customer_request", "complex_case"]},
+  "handoff": {
+    "enabled": true,
+    "targets": [
+      "ventas"
+    ],
+    "reasons_allowed": [
+      "customer_request",
+      "complex_case"
+    ]
+  },
   "hard_policies": [
     {
       "policy_id": "price_or_down_payment_requires_support",
       "description": "precios, enganches y pagos requieren tool o fuente de conocimiento citada",
-      "trigger_patterns": ["\\$\\s*\\d", "\\b\\d[\\d,.]*\\s*(?:mil\\s+)?(?:mxn|pesos?)\\b", "\\benganche\\b[^.?!]*\\d", "\\b\\d[\\d,.]*\\s*(?:a la semana|semanal(?:es)?)\\b"],
-      "requires_any": ["tool:quote.resolve", "tool:credit_plan.resolve", "basis:knowledge_source"]
+      "trigger_patterns": [
+        "\\$\\s*\\d",
+        "\\b\\d[\\d,.]*\\s*(?:mil\\s+)?(?:mxn|pesos?)\\b",
+        "\\benganche\\b[^.?!]*\\d",
+        "\\b\\d[\\d,.]*\\s*(?:a la semana|semanal(?:es)?)\\b"
+      ],
+      "requires_any": [
+        "tool:quote.resolve",
+        "tool:credit_plan.resolve",
+        "basis:knowledge_source"
+      ]
     },
     {
       "policy_id": "eligibility_claims_require_support",
@@ -109,7 +200,10 @@
         "\\b(?:revisan?|revisamos|checan?|consultan?)\\b[^.?!]*\\b(?:bur[oó]|score|historial)\\b",
         "\\b(?:est[aá]s|quedas?)\\s+aprobad[oa]\\b|\\bno\\s+(?:revisan|checan|piden)\\b"
       ],
-      "requires_any": ["tool:credit_plan.resolve", "basis:knowledge_source"]
+      "requires_any": [
+        "tool:credit_plan.resolve",
+        "basis:knowledge_source"
+      ]
     },
     {
       "policy_id": "requirements_require_support",
@@ -119,8 +213,13 @@
         "(?:requisitos?|papeles|documentos?)\\s*:",
         "\\b(?:identificaci[oó]n oficial|comprobante de domicilio|comprobante de ingresos|estados? de cuenta|recibos? de n[oó]mina)\\b"
       ],
-      "requires_any": ["tool:requirements.lookup", "basis:knowledge_source"]
+      "requires_any": [
+        "tool:requirements.lookup",
+        "basis:knowledge_source"
+      ]
     }
   ],
-  "send_scope": {"mode": "manual_simulator_no_send"}
+  "send_scope": {
+    "mode": "manual_simulator_no_send"
+  }
 }

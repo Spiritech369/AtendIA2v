@@ -1125,3 +1125,99 @@ def test_17_bridge_extracts_corrections_from_audit() -> None:
         },
     )
     assert corrected == {"employment_seniority": "15 meses"}
+
+
+# --- F27-ENFORCED / F28 / F30 -------------------------------------------------
+
+
+def test_f27_enforced_rejects_values_outside_allowed_values() -> None:
+    from atendia.agent_runtime.respond_style_field_state import apply_field_proposals
+
+    policies = [
+        {
+            "field_key": "selected_option",
+            "writable": True,
+            "allowed_values": ["alpha-1", "Beta", "gamma-3"],
+        }
+    ]
+    result = apply_field_proposals(
+        [
+            {"field_key": "selected_option", "value": "R4", "evidence": ["quiero la R4"]},
+            {"field_key": "selected_option", "value": "U2", "evidence": ["la U2"]},
+        ],
+        field_policies=policies,
+        current_values={},
+    )
+
+    # No matter how confident the LLM sounded: nothing outside allowed_values
+    # is ever written.
+    assert result.new_values == {}
+    assert result.accepted_count == 0
+    assert result.rejected_count == 2
+    assert all(e.reason == "value_not_allowed" for e in result.audit)
+
+
+def test_f27_enforced_normalizes_to_canonical_value() -> None:
+    from atendia.agent_runtime.respond_style_field_state import apply_field_proposals
+
+    result = apply_field_proposals(
+        [{"field_key": "selected_option", "value": "  beta ", "evidence": ["beta"]}],
+        field_policies=[
+            {"field_key": "selected_option", "allowed_values": ["alpha-1", "Beta"]}
+        ],
+        current_values={},
+    )
+
+    assert result.new_values == {"selected_option": "Beta"}
+    assert result.accepted_count == 1
+
+
+def test_f27_fields_without_allowed_values_keep_free_capture() -> None:
+    from atendia.agent_runtime.respond_style_field_state import apply_field_proposals
+
+    result = apply_field_proposals(
+        [{"field_key": "notes", "value": "anything goes", "evidence": ["x"]}],
+        field_policies=[{"field_key": "notes"}],
+        current_values={},
+    )
+    assert result.new_values == {"notes": "anything goes"}
+
+
+def test_f27_prompt_renders_allowed_values_and_f30_d_lines() -> None:
+    from atendia.agent_runtime.respond_style_llm_provider import (
+        build_respond_style_messages,
+        respond_style_system_prompt,
+    )
+
+    prompt = respond_style_system_prompt()
+    # F30: corrections carry only the clean new value.
+    assert "never a blend of" in prompt
+    # D: media handling is explicit and forbids product dumps.
+    assert "acknowledge you received it" in prompt
+    assert "Do NOT quote prices, list" in prompt
+
+    turn_input = AgentTurnInput(
+        tenant_id="t",
+        deployment_id="d",
+        agent_id="a",
+        agent_version_id="v",
+        runtime_mode="test_lab_no_send",
+        send_mode="no_send",
+        channel="test",
+        conversation_id="c",
+        inbound_text="hola",
+    )
+    messages = build_respond_style_messages(
+        turn_input=turn_input,
+        context=AgentContextPackage(
+            field_policies=[
+                {
+                    "field_key": "selected_option",
+                    "label": "opcion",
+                    "allowed_values": ["alpha-1", "Beta"],
+                }
+            ]
+        ),
+    )
+    rendered = " ".join(m["content"] for m in messages)
+    assert "ONLY these values are accepted: alpha-1, Beta" in rendered

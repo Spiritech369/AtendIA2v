@@ -231,6 +231,23 @@ async def main() -> int:
             print(json.dumps({"decision": "BLOCKED_BY_PUBLISH_GATES", "blockers": blockers}))
             await session.rollback()
             return 1
+        # F28 state hygiene: captured shadow fields predating the new
+        # version's validation rules are not trustworthy — reset them for
+        # the allowlisted phone's conversations before the new window.
+        cleaned = await session.execute(
+            text(
+                """DELETE FROM respond_style_shadow_fields
+                WHERE conversation_id IN (
+                    SELECT c.id FROM conversations c
+                    JOIN customers cu ON cu.id = c.customer_id
+                    WHERE c.tenant_id = :tenant
+                      AND right(regexp_replace(cu.phone_e164, '\D', '', 'g'), 10)
+                          = right(regexp_replace(:phone, '\D', '', 'g'), 10)
+                )"""
+            ),
+            {"tenant": str(tenant_id), "phone": allowed_phone},
+        )
+        print(json.dumps({"f28_shadow_state_rows_cleaned": cleaned.rowcount}))
         await session.commit()
         print(
             json.dumps(

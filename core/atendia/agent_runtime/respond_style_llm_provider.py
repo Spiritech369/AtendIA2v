@@ -471,7 +471,15 @@ def _render_fields_section(context: AgentContextPackage) -> str:
         key = policy.get("field_key")
         label = policy.get("label") or key
         writable = "writable" if policy.get("writable", True) else "read-only"
-        lines.append(f"- {key} ({label}, {writable})")
+        allowed = policy.get("allowed_values")
+        if isinstance(allowed, list) and allowed:
+            values = ", ".join(str(item) for item in allowed)
+            lines.append(
+                f"- {key} ({label}, {writable}; ONLY these values are "
+                f"accepted: {values})"
+            )
+        else:
+            lines.append(f"- {key} ({label}, {writable})")
     return "\n".join(lines)
 
 
@@ -615,13 +623,18 @@ def respond_style_system_prompt() -> str:
             "propose the corrected value and never restate the old one.",
             "A correction is not just words: in the SAME turn, include a",
             "field_write_proposal with the corrected value so state is updated.",
+            "A corrected field value must be ONLY the clean new value (one of",
+            "the accepted values when the field lists them) — never a blend of",
+            "old and new like 'old (new)'.",
             "Only capture a product/model selection as a field when the value",
             "matches an id or name present in catalog/tool facts. If the customer",
             "names a product you cannot find there, say so honestly and do NOT",
             "propose that field write.",
-            "If the inbound is an image, audio, or attachment you cannot view,",
-            "say so briefly and ask what it shows. Never answer media with",
-            "unrelated content.",
+            "If the inbound is media you cannot view — an image, audio, video,",
+            "document, or a placeholder like '[imagen]' or a file name —",
+            "acknowledge you received it, say you cannot view it, and ask what",
+            "it shows or which product it refers to. Do NOT quote prices, list",
+            "products, or guess content in response to media.",
             "The CURRENT contact state is the single source of truth. The",
             "transcript is HISTORY: when an older transcript message conflicts",
             "with a current contact value, always use the current value and",
