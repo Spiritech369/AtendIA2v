@@ -168,6 +168,7 @@ async def stage_smoke_send(
     trace_id: str | None,
     send_scope: str,
     validator_status: str,
+    reply_channel: str | None = None,
 ) -> dict[str, Any]:
     """Stages the validated final_message to the existing outbox path. The
     idempotency key is derived from the inbound message so retries can never
@@ -196,6 +197,9 @@ async def stage_smoke_send(
             "trace_id": str(trace_id) if trace_id else None,
             "smoke_session_id": smoke_session_id,
             "validator_status": validator_status,
+            # Transport routing: the worker sends via Baileys only when the
+            # outbound carries the same channel the inbound arrived on.
+            "reply_channel": reply_channel,
         },
     )
     outbox_id = await stage_outbound(session, message)

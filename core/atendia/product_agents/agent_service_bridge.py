@@ -89,6 +89,7 @@ async def maybe_handle_respond_style_turn(
     channel: str | None = None,
     from_phone_e164: str | None = None,
     inbound_message_id: str | None = None,
+    reply_channel: str | None = None,
 ) -> RespondStyleBridgeOutcome | None:
     """Returns None when no deployment opted in (previous path continues).
     Otherwise ALWAYS returns a no-send outcome — opted-in turns never fall
@@ -116,6 +117,7 @@ async def maybe_handle_respond_style_turn(
             mode=mode,
             from_phone_e164=from_phone_e164,
             inbound_message_id=inbound_message_id,
+            reply_channel=reply_channel,
         )
     except Exception as exc:  # fail closed: never crash, never legacy-fallback
         logger.exception(
@@ -138,6 +140,7 @@ async def _handle_opted_in_turn(
     mode: str,
     from_phone_e164: str | None = None,
     inbound_message_id: str | None = None,
+    reply_channel: str | None = None,
 ) -> RespondStyleBridgeOutcome:
     if mode != "no_send":
         return RespondStyleBridgeOutcome(
@@ -253,6 +256,7 @@ async def _handle_opted_in_turn(
         inbound_message_id=inbound_message_id,
         from_phone_e164=from_phone_e164,
         result=result,
+        reply_channel=reply_channel,
     )
     return RespondStyleBridgeOutcome(
         result=result,
@@ -280,6 +284,7 @@ async def _maybe_stage_smoke_send(
     inbound_message_id: str | None,
     from_phone_e164: str | None,
     result: ProductAgentRuntimeResult,
+    reply_channel: str | None = None,
 ) -> dict[str, Any]:
     """Phase 20: per-turn runtime gate for single-contact smoke. With the
     flags off (the default and the state this phase leaves behind) this is a
@@ -324,6 +329,7 @@ async def _maybe_stage_smoke_send(
             trace_id=(result.trace or {}).get("turn_trace_id"),
             send_scope=str(evaluation.scope),
             validator_status="valid",
+            reply_channel=reply_channel,
         )
         smoke_info.update(staged)
         if evaluation.pause_after_send:

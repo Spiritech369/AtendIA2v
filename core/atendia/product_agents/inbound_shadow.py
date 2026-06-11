@@ -112,6 +112,9 @@ async def run_inbound_shadow(
             mode="no_send",
             metadata={
                 "channel": deployment.channel,
+                # This function is wired into the Baileys inbound pipeline
+                # (step 2c): replies must go back on the same transport.
+                "reply_channel": "baileys",
                 "inbound_shadow": True,
                 "inbound_message_id": str(inbound_message_id)
                 if inbound_message_id is not None

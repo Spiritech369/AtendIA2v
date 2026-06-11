@@ -80,6 +80,7 @@ class AgentService:
             or (metadata or {}).get("channel"),
             from_phone_e164=(metadata or {}).get("from_phone_e164"),
             inbound_message_id=(metadata or {}).get("inbound_message_id"),
+            reply_channel=(metadata or {}).get("reply_channel"),
         )
         if respond_style is not None:
             return _respond_style_agent_service_result(
