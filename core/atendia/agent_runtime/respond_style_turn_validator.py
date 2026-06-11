@@ -153,6 +153,19 @@ class RespondStyleTurnValidator:
                 },
             )
 
+        field_only_codes = {
+            "field_value_not_allowed",
+            "field_value_referent_unverified",
+            "field_write_without_evidence",
+            "field_policy_missing",
+        }
+        if (
+            all(item.code in field_only_codes for item in errors)
+            and output.turn_kind == "final_response"
+            and (output.final_message or "").strip()
+        ):
+            return self._deliver_without_bad_field_writes(output, errors)
+
         if retryable and not blocked and attempt_number < self._config.max_retry_attempts:
             validation = AgentTurnValidationResult(
                 status="invalid_retryable",
@@ -175,69 +188,6 @@ class RespondStyleTurnValidator:
                 trace_metadata={"respond_style_validator": {"status": "retry"}},
             )
 
-        # A field PROPOSAL is not customer copy: when the only remaining
-        # errors are field-write errors (bad value, bad referent, missing
-        # evidence/policy), drop those proposals and deliver the message —
-        # the application layer still enforces state safety post-hoc.
-        # Blocking a whole visible turn over an internal proposal is wrong.
-        field_only_codes = {
-            "field_value_not_allowed",
-            "field_value_referent_unverified",
-            "field_write_without_evidence",
-            "field_policy_missing",
-        }
-        if (
-            errors
-            and all(item.code in field_only_codes for item in errors)
-            and output.turn_kind == "final_response"
-            and (output.final_message or "").strip()
-        ):
-            bad_indexes = set()
-            for item in errors:
-                path = item.path or ""
-                if path.startswith("field_write_proposals["):
-                    try:
-                        bad_indexes.add(int(path.split("[")[1].split("]")[0]))
-                    except (ValueError, IndexError):
-                        pass
-            kept_writes = [
-                proposal
-                for index, proposal in enumerate(output.field_write_proposals)
-                if index not in bad_indexes
-            ]
-            validation = AgentTurnValidationResult(
-                status="valid",
-                accepted_tool_requests=list(output.tool_requests),
-                accepted_field_writes=kept_writes,
-                accepted_actions=list(output.action_proposals),
-                accepted_workflow_events=list(output.workflow_event_proposals),
-                send_decision="send",
-            )
-            accepted_handoff = (
-                output.handoff_proposal
-                if output.handoff_proposal is not None
-                and output.handoff_proposal.needed
-                else None
-            )
-            return FinalTurnDecision(
-                final_message=output.final_message,
-                send_decision="send",
-                validation=validation,
-                accepted_field_writes=kept_writes,
-                accepted_actions=list(output.action_proposals),
-                accepted_workflow_events=list(output.workflow_event_proposals),
-                accepted_handoff=accepted_handoff,
-                trace_metadata={
-                    "respond_style_validator": {
-                        "status": "valid_with_dropped_field_writes",
-                        "dropped_field_writes": [
-                            {"code": item.code, "path": item.path, "message": item.message}
-                            for item in errors
-                        ],
-                    }
-                },
-            )
-
         blocked_reason = _blocked_reason(errors)
         validation = AgentTurnValidationResult(
             status="blocked",
@@ -250,6 +200,65 @@ class RespondStyleTurnValidator:
             send_decision="no_send",
             validation=validation,
             trace_metadata={"respond_style_validator": {"status": "blocked"}},
+        )
+
+    def _deliver_without_bad_field_writes(
+        self,
+        output: LLMAgentTurnOutput,
+        errors: list[ValidationErrorItem],
+    ) -> FinalTurnDecision:
+        """A field PROPOSAL is not customer copy: when the only errors are
+        field-write errors (bad value, bad referent, missing evidence or
+        policy), drop those proposals and deliver the message immediately —
+        no retry burned, no dependence on the model's retry behavior. State
+        safety remains enforced post-hoc by the application layer."""
+        bad_indexes = set()
+        for item in errors:
+            path = item.path or ""
+            if path.startswith("field_write_proposals["):
+                try:
+                    bad_indexes.add(int(path.split("[")[1].split("]")[0]))
+                except (ValueError, IndexError):
+                    pass
+        kept_writes = [
+            proposal
+            for index, proposal in enumerate(output.field_write_proposals)
+            if index not in bad_indexes
+        ]
+        validation = AgentTurnValidationResult(
+            status="valid",
+            accepted_tool_requests=list(output.tool_requests),
+            accepted_field_writes=kept_writes,
+            accepted_actions=list(output.action_proposals),
+            accepted_workflow_events=list(output.workflow_event_proposals),
+            send_decision="send",
+        )
+        accepted_handoff = (
+            output.handoff_proposal
+            if output.handoff_proposal is not None and output.handoff_proposal.needed
+            else None
+        )
+        return FinalTurnDecision(
+            final_message=output.final_message,
+            send_decision="send",
+            validation=validation,
+            accepted_field_writes=kept_writes,
+            accepted_actions=list(output.action_proposals),
+            accepted_workflow_events=list(output.workflow_event_proposals),
+            accepted_handoff=accepted_handoff,
+            trace_metadata={
+                "respond_style_validator": {
+                    "status": "valid_with_dropped_field_writes",
+                    "dropped_field_writes": [
+                        {
+                            "code": item.code,
+                            "path": item.path,
+                            "message": item.message,
+                        }
+                        for item in errors
+                    ],
+                }
+            },
         )
 
     def _validate_output(

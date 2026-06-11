@@ -1369,11 +1369,15 @@ def test_w5a_annotated_value_is_retryable_and_canonical_passes() -> None:
     annotated = RespondStyleTurnValidator().validate(
         output=_output("nomina (tarjeta)"), context=context
     )
-    assert annotated.send_decision == "no_send"
-    assert annotated.retry_instruction is not None
-    items = annotated.retry_instruction.error_items
-    assert any(item.code == "field_value_not_allowed" for item in items)
-    assert any("nomina, transferencia" in item.message for item in items)
+    # The message is never sacrificed for an internal proposal: it delivers
+    # with the bad write DROPPED (application layer remains the backstop).
+    assert annotated.send_decision == "send"
+    assert annotated.accepted_field_writes == []
+    dropped = annotated.trace_metadata["respond_style_validator"][
+        "dropped_field_writes"
+    ]
+    assert dropped[0]["code"] == "field_value_not_allowed"
+    assert "nomina, transferencia" in dropped[0]["message"]
 
     accented_canonical = RespondStyleTurnValidator().validate(
         output=_output("Nómina"), context=context
@@ -1523,10 +1527,13 @@ def test_w6a_wrong_referent_capture_is_retryable() -> None:
             last_assistant="La Beta es ideal para uso urbano, disponible en rojo.",
         ),
     )
-    assert decision.send_decision == "no_send"
-    assert decision.retry_instruction is not None
-    codes = {i.code for i in decision.retry_instruction.error_items}
-    assert "field_value_referent_unverified" in codes
+    # Wrong-referent capture is DROPPED; the visible message still delivers.
+    assert decision.send_decision == "send"
+    assert decision.accepted_field_writes == []
+    dropped = decision.trace_metadata["respond_style_validator"][
+        "dropped_field_writes"
+    ]
+    assert dropped[0]["code"] == "field_value_referent_unverified" 
 
 
 def test_w6a_grounded_referents_pass() -> None:
@@ -1663,10 +1670,14 @@ def test_w7_grounding_accepts_canonical_when_alias_in_exchange() -> None:
     )
     assert grounded.send_decision == "send"
 
-    # The wrong product is still caught: prod-1/Alpha never appeared.
+    # The wrong product is still caught: prod-1/Alpha never appeared — the
+    # write is dropped while the message still delivers.
     wrong = RespondStyleTurnValidator().validate(
         output=_w6_output("prod-1"), context=context
     )
-    assert wrong.send_decision == "no_send"
-    codes = {i.code for i in wrong.retry_instruction.error_items}
-    assert "field_value_referent_unverified" in codes
+    assert wrong.send_decision == "send"
+    assert wrong.accepted_field_writes == []
+    dropped = wrong.trace_metadata["respond_style_validator"][
+        "dropped_field_writes"
+    ]
+    assert dropped[0]["code"] == "field_value_referent_unverified" 

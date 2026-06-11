@@ -146,11 +146,18 @@ def test_validator_requires_field_policy_and_evidence() -> None:
         confidence=0.8,
     )
 
-    blocked = RespondStyleTurnValidator().validate(
+    no_policy = RespondStyleTurnValidator().validate(
         output=output,
         context=AgentContextPackage(field_policies=[]),
     )
-    assert "field_policy_missing" in _codes(blocked)
+    # Field-proposal problems never block the visible message: the write is
+    # DROPPED and recorded, the message delivers.
+    assert no_policy.send_decision == "send"
+    assert no_policy.accepted_field_writes == []
+    dropped = no_policy.trace_metadata["respond_style_validator"][
+        "dropped_field_writes"
+    ]
+    assert dropped[0]["code"] == "field_policy_missing"
 
     allowed = RespondStyleTurnValidator().validate(
         output=output,
