@@ -62,6 +62,7 @@ async def main() -> int:
             await session.execute(
                 text(
                     "SELECT COUNT(*) FROM human_handoffs WHERE tenant_id = :t "
+                    "AND status = 'open' "
                     "AND requested_at > now() - interval '1 hour'"
                 ),
                 {"t": str(deployment.tenant_id)},
