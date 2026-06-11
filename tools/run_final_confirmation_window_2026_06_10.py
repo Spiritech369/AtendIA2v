@@ -117,6 +117,16 @@ async def main() -> int:
             turns.append({"inbound": inbound, "media_type": media_type, **summary})
         await session.commit()
 
+        # Tombstone the harness conversation: it belongs to the REAL pilot
+        # customer, and Baileys routes inbound traffic to the newest
+        # non-deleted conversation — leaving it active would capture the
+        # customer's real WhatsApp messages into scripted context.
+        await session.execute(
+            text("UPDATE conversations SET deleted_at = now() WHERE id = :c"),
+            {"c": str(conversation.id)},
+        )
+        await session.commit()
+
         outbox_after = (
             await session.execute(text("SELECT COUNT(*) FROM outbound_outbox"))
         ).scalar()
