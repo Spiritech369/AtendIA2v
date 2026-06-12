@@ -6,7 +6,9 @@ Config: `tools/configs/manual_review_moto_credit_config.json` (tenant DATA file 
 moto-credit flavored config passed via `--config`; runtime code stays
 tenant-neutral). Model: gpt-4o-mini via the direct route, 3-round budgeted
 tool loop, DryFacts executor.
-Evidence: `reports/manual_live_simulator_run_*_conv01..conv10.{json,md}`
+Evidence: raw `reports/manual_live_simulator_run_*` files were consolidated and
+removed on 2026-06-12; see
+`reports/pre_2026_06_12_reports_consolidation.md`.
 
 ## Gate conditions
 
