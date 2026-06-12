@@ -47,6 +47,7 @@ async def main() -> int:
         deployment.outbox_enabled = True
         deployment.live_send_enabled = True
         deployment.single_contact_smoke_enabled = True
+        deployment.send_scope = APPROVED_SCOPE
         await session.commit()
         print(
             json.dumps(
