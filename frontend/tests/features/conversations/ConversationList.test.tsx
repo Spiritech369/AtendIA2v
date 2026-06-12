@@ -55,6 +55,20 @@ const server = setupServer(
       next_cursor: null,
     }),
   ),
+  http.get("/api/v1/tenants/pipeline", () =>
+    HttpResponse.json({
+      version: 1,
+      active: true,
+      created_at: "2026-05-07T10:00:00+00:00",
+      definition: {
+        stages: [
+          { id: "qualify", label: "Calificacion", color: "#2563eb" },
+          { id: "quote", label: "Cotizacion", color: "#16a34a" },
+        ],
+      },
+    }),
+  ),
+  http.get("/api/v1/tenants/inbox-config", () => HttpResponse.json({ inbox_config: {} })),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -109,8 +123,9 @@ describe("ConversationList", () => {
     expect(screen.getByText("Espérame tantito")).toBeInTheDocument();
     // Phone shown for the unnamed customer
     expect(screen.getByText("+5215552222222")).toBeInTheDocument();
-    // Stage column populated
-    expect(screen.getAllByText("qualify").length).toBeGreaterThan(0);
+    // Pipeline stage badge uses the tenant-configured label, not a hardcoded vertical.
+    expect(screen.getAllByText("Calificacion").length).toBeGreaterThan(0);
+    expect(screen.getByTitle("Etapa actual: Calificacion")).toBeInTheDocument();
   });
 
   it("shows the Handoff badge when has_pending_handoff is true", async () => {

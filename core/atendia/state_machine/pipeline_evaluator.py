@@ -548,10 +548,16 @@ async def evaluate_pipeline_rules(
     pipeline: PipelineDefinition,
     *,
     trigger_event: str = "field_updated",
+    extra_fields: dict | None = None,
 ) -> EvaluationResult:
     """Load the conversation + customer, run the evaluator, and apply the
     transition if any. Caller passes the already-loaded pipeline (the
     runner has it in scope, so we avoid a second round-trip).
+
+    ``extra_fields`` lets a caller merge in field values that live outside
+    the three persisted stores (e.g. the Respond-Style direct route's
+    validated shadow fields). They take precedence: they are the freshest
+    accepted state of the turn being evaluated.
     """
     conv = (
         await session.execute(select(Conversation).where(Conversation.id == conversation_id))
@@ -584,6 +590,11 @@ async def evaluate_pipeline_rules(
             else None
         ),
     )
+    if extra_fields:
+        fields = {
+            **fields,
+            **{k: v for k, v in extra_fields.items() if v is not None},
+        }
 
     # Selection-aware aggregate operators need the document_requirements table.
     # so we don't re-read the pipeline JSON per condition.

@@ -12,6 +12,8 @@ The hybrid strategy (design doc decision #9):
      Composer redirects ("¿podrías decirme qué modelo te interesa?").
 """
 
+from uuid import uuid4
+
 import pytest
 from sqlalchemy import text
 
@@ -288,6 +290,80 @@ async def test_alias_match_is_deterministic_with_limit(db_session) -> None:
         # And the deterministic choice should be the alphabetically-lowest sku
         # so two operators reading the runbook can predict which one wins.
         assert firsts == {"rayo-125"}
+    finally:
+        await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+        await db_session.commit()
+
+
+async def test_published_catalog_miss_falls_back_to_approved_tenant_catalog(db_session) -> None:
+    """A published commercial catalog no-match may fall back to approved tenant data."""
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t12_approved_fallback') RETURNING id")
+        )
+    ).scalar()
+    catalog_id = uuid4()
+    version_id = uuid4()
+    await db_session.execute(
+        text("""
+            INSERT INTO catalogs (id, tenant_id, name, vertical, status)
+            VALUES (:catalog_id, :t, 'Published no match', 'motorcycles', 'active')
+            """),
+        {"catalog_id": catalog_id, "t": tid},
+    )
+    await db_session.execute(
+        text("""
+            INSERT INTO catalog_versions (
+                id, tenant_id, catalog_id, version_number, status, snapshot_json
+            )
+            VALUES (
+                :version_id,
+                :t,
+                :catalog_id,
+                1,
+                'published',
+                CAST(:snapshot AS jsonb)
+            )
+            """),
+        {
+            "version_id": version_id,
+            "t": tid,
+            "catalog_id": catalog_id,
+            "snapshot": '{"items":[{"sku":"other","name":"Other","status":"active"}]}',
+        },
+    )
+    await db_session.execute(
+        text("UPDATE catalogs SET active_version_id = :version_id WHERE id = :catalog_id"),
+        {"version_id": version_id, "catalog_id": catalog_id},
+    )
+    await db_session.execute(
+        text("""
+        INSERT INTO tenant_catalogs (tenant_id, sku, name, category, attrs, active, status)
+        VALUES (:t, :sku, :name, 'Motoneta', CAST(:attrs AS jsonb), true, 'published')
+        """),
+        {
+            "t": tid,
+            "sku": "adventure_elite_150_cc",
+            "name": "Adventure Elite 150 CC",
+            "attrs": (
+                '{"alias":["adventure","adventure elite"],'
+                '"precio_contado":"29900",'
+                '"catalog_source":{"runtime_status":"approved","source_id":"approved_catalog"}}'
+            ),
+        },
+    )
+    await db_session.commit()
+    try:
+        result = await search_catalog(
+            session=db_session,
+            tenant_id=tid,
+            query="Adventure",
+            embedding=None,
+        )
+        assert isinstance(result, list)
+        assert result[0].sku == "adventure_elite_150_cc"
+        assert result[0].source["catalog_source"] == "tenant_catalogs_approved_fallback"
+        assert result[0].source["source_id"] == "approved_catalog"
     finally:
         await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
         await db_session.commit()

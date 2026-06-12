@@ -33,6 +33,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from atendia.catalog_runtime import catalog_cash_price_mxn
 from atendia.commercial_catalog_service import (
     has_published_catalogs,
+)
+from atendia.commercial_catalog_service import (
     search_catalog as search_published_catalog,
 )
 from atendia.db.models import TenantCatalogItem
@@ -40,7 +42,19 @@ from atendia.text_normalization import normalize_whatsapp_text
 from atendia.tools.base import CatalogResult, Tool, ToolNoDataResult
 
 
-def _to_result(item: TenantCatalogItem, *, score: float) -> CatalogResult:
+def _approved_catalog_source(item: TenantCatalogItem) -> dict[str, Any] | None:
+    source = (item.attrs or {}).get("catalog_source")
+    if not isinstance(source, dict) or source.get("runtime_status") != "approved":
+        return None
+    return source
+
+
+def _to_result(
+    item: TenantCatalogItem,
+    *,
+    score: float,
+    source: dict[str, Any] | None = None,
+) -> CatalogResult:
     """Project a TenantCatalogItem row into the lighter CatalogResult shape."""
     return CatalogResult(
         sku=item.sku,
@@ -50,6 +64,7 @@ def _to_result(item: TenantCatalogItem, *, score: float) -> CatalogResult:
         score=score,
         catalog_item_id=item.id,
         collection_id=item.collection_id,
+        source=source or {},
     )
 
 
@@ -115,7 +130,26 @@ async def search_catalog(
             )
         return results
     if await has_published_catalogs(session, tenant_id=tenant_id):
-        return ToolNoDataResult(hint=f"no published catalog match for {query!r}")
+        approved_hits = await _search_approved_tenant_catalog_items(
+            session=session,
+            tenant_id=tenant_id,
+            normalized_query=normalized_query,
+            limit=limit,
+            collection_ids=collection_ids,
+        )
+        if approved_hits:
+            return [
+                _to_result(
+                    item,
+                    score=1.0,
+                    source={
+                        **(_approved_catalog_source(item) or {}),
+                        "catalog_source": "tenant_catalogs_approved_fallback",
+                    },
+                )
+                for item in approved_hits
+            ]
+        return ToolNoDataResult(hint=f"no published or approved tenant catalog match for {query!r}")
 
     keyword_stmt = (
         select(TenantCatalogItem)
@@ -158,6 +192,32 @@ async def search_catalog(
     if not rows:
         return ToolNoDataResult(hint=f"no semantic match for {query!r}")
     return [_to_result(item, score=float(score)) for item, score in rows]
+
+
+async def _search_approved_tenant_catalog_items(
+    *,
+    session: AsyncSession,
+    tenant_id: UUID,
+    normalized_query: str,
+    limit: int,
+    collection_ids: list[UUID] | None,
+) -> list[TenantCatalogItem]:
+    stmt = (
+        select(TenantCatalogItem)
+        .where(
+            TenantCatalogItem.tenant_id == tenant_id,
+            TenantCatalogItem.active.is_(True),
+            text("attrs->'catalog_source'->>'runtime_status' = 'approved'"),
+            text("attrs->'alias' ?| ARRAY[:alias_q]").bindparams(
+                alias_q=normalized_query.lower()
+            ),
+        )
+        .order_by(TenantCatalogItem.sku)
+        .limit(limit)
+    )
+    if collection_ids:
+        stmt = stmt.where(TenantCatalogItem.collection_id.in_(collection_ids))
+    return list((await session.execute(stmt)).scalars().all())
 
 
 class SearchCatalogTool(Tool):  # pragma: no cover

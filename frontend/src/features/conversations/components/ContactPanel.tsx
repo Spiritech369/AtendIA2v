@@ -71,7 +71,6 @@ import {
 } from "@/features/conversations/api";
 import { AddCustomAttrDialog } from "@/features/conversations/components/AddCustomAttrDialog";
 import { EditableDetailRow } from "@/features/conversations/components/EditableDetailRow";
-import { TenantFieldPanel } from "@/features/conversations/components/TenantFieldPanel";
 import {
   useCreateNote,
   useCustomerDetail,
@@ -860,18 +859,21 @@ function ContactDetailGridSection({
           !hiddenCustomKeys.has(normalizeFieldKey(k)),
       )
     : [];
+  const tenantFields = normalizeTenantFields(conversation?.customer_fields);
+  const hasTenantFieldMetadata = hasDeclarativeTenantFields(tenantFields);
+  const hasTenantDomainContract = Boolean(conversation?.tenant_domain_contract);
+  const tenantMetadataMissing = !hasTenantFieldMetadata && hasTenantDomainContract;
+  const useLegacyCanonicalFields = !hasTenantFieldMetadata && !hasTenantDomainContract;
+  // The alias-based exclusion only makes sense while the legacy canonical
+  // cards render (they would duplicate the definition). With tenant field
+  // metadata the legacy cards are hidden, so every definition must show.
   const additionalConfiguredFields = (fieldDefinitions.data ?? []).filter((definition) => {
+    if (!useLegacyCanonicalFields) return true;
     const normalized = normalizeFieldKey(definition.key);
     return !Object.keys(CANONICAL_FIELD_ALIASES).some((canonicalKey) =>
       aliasSetFor(canonicalKey).has(normalized),
     );
   });
-  const tenantFields = normalizeTenantFields(conversation?.customer_fields);
-  const hasTenantFieldMetadata = hasDeclarativeTenantFields(tenantFields);
-  const hasTenantDomainContract = Boolean(conversation?.tenant_domain_contract);
-  const tenantSafeMode = conversation?.tenant_domain_contract?.safe_mode === true;
-  const tenantMetadataMissing = !hasTenantFieldMetadata && hasTenantDomainContract;
-  const useLegacyCanonicalFields = !hasTenantFieldMetadata && !hasTenantDomainContract;
 
   return (
     <div className="px-3 py-3 space-y-2.5">
@@ -889,7 +891,6 @@ function ContactDetailGridSection({
 
       {hasTenantFieldMetadata && (
         <>
-          <TenantFieldPanel fields={tenantFields} safeMode={tenantSafeMode} />
           <div className="grid grid-cols-2 gap-1.5">
             <EditableDetailRow
               label="Etapa"
@@ -931,10 +932,6 @@ function ContactDetailGridSection({
             />
           </div>
         </>
-      )}
-
-      {tenantMetadataMissing && (
-        <TenantFieldPanel fields={[]} safeMode={tenantSafeMode} metadataMissing />
       )}
 
       {tenantMetadataMissing && (

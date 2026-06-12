@@ -81,6 +81,7 @@ class AgentService:
             from_phone_e164=(metadata or {}).get("from_phone_e164"),
             inbound_message_id=(metadata or {}).get("inbound_message_id"),
             reply_channel=(metadata or {}).get("reply_channel"),
+            message_metadata=(metadata or {}).get("message_metadata"),
         )
         if respond_style is not None:
             return _respond_style_agent_service_result(
@@ -248,6 +249,7 @@ def _respond_style_agent_service_result(
             "field_state": getattr(outcome, "field_state", {}),
             "no_send_followup": getattr(outcome, "no_send_followup", {}),
             "smoke": getattr(outcome, "smoke", {"active": False, "staged": False}),
+            "stage": getattr(outcome, "stage", None),
             "side_effects": (
                 result.side_effects
                 if result is not None

@@ -127,6 +127,53 @@ interface StageVisual {
   label: string;
 }
 
+interface PipelineStageOption {
+  id: string;
+  label: string;
+  color?: string | null;
+  icon?: string | null;
+}
+
+function pipelineStagesFromDefinition(definition: unknown): PipelineStageOption[] {
+  const stages = (definition as { stages?: unknown } | undefined)?.stages;
+  if (!Array.isArray(stages)) return [];
+  return stages.flatMap((stage) => {
+    if (!stage || typeof stage !== "object") return [];
+    const item = stage as Record<string, unknown>;
+    if (typeof item.id !== "string" || item.id.length === 0) return [];
+    const label = typeof item.label === "string" && item.label.trim() ? item.label.trim() : item.id;
+    const color =
+      typeof item.color === "string"
+        ? item.color
+        : typeof item.stage_color === "string"
+          ? item.stage_color
+          : null;
+    const icon =
+      typeof item.icon === "string"
+        ? item.icon
+        : typeof item.stage_icon === "string"
+          ? item.stage_icon
+          : null;
+    return [{ id: item.id, label, color, icon }];
+  });
+}
+
+function stageBadgeMeta(
+  stageId: string,
+  stageLookup: Map<string, PipelineStageOption>,
+  stageRings: StageRing[],
+): { label: string; color?: string | null; icon: string; visual: StageVisual } {
+  const stage = stageLookup.get(stageId);
+  const ring = stageRings.find((item) => item.stage_id === stageId);
+  const visual = stageVisual(stageId, undefined, stageRings);
+  return {
+    label: stage?.label ?? stageId,
+    color: ring?.color ?? stage?.color ?? visual.hexColor,
+    icon: ring?.emoji ?? stage?.icon ?? visual.emoji,
+    visual,
+  };
+}
+
 function normalize(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
@@ -796,14 +843,17 @@ function ConversationRow({
   onSelect,
   onContextMenu,
   stageRings,
+  stageLookup,
 }: {
   row: ConversationListItem;
   selected: boolean;
   onSelect: (row: ConversationListItem) => void;
   onContextMenu: (e: MouseEvent, conv: ConversationListItem) => void;
   stageRings: StageRing[];
+  stageLookup: Map<string, PipelineStageOption>;
 }) {
   const visual = stageVisual(row.current_stage, row, stageRings);
+  const stageBadge = stageBadgeMeta(row.current_stage, stageLookup, stageRings);
   const tone = statusTone(row);
   const assigneeIcon = row.bot_paused || row.assigned_user_id ? PenLine : Bot;
   const AssigneeIcon = assigneeIcon;
@@ -849,6 +899,26 @@ function ConversationRow({
           ) : (
             <Bot className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
           )}
+          <Badge
+            variant="outline"
+            className={cn(
+              "h-4 max-w-28 shrink-0 gap-1 rounded-full px-1.5 text-[10px] leading-none",
+              !stageBadge.color && stageBadge.visual.chip,
+            )}
+            style={
+              stageBadge.color
+                ? {
+                    borderColor: `${stageBadge.color}66`,
+                    backgroundColor: `${stageBadge.color}1A`,
+                    color: stageBadge.color,
+                  }
+                : undefined
+            }
+            title={`Etapa actual: ${stageBadge.label}`}
+          >
+            <span aria-hidden="true">{stageBadge.icon}</span>
+            <span className="min-w-0 truncate">{stageBadge.label}</span>
+          </Badge>
           <span className="line-clamp-2">{preview}</span>
         </div>
       </div>
@@ -909,6 +979,7 @@ function ConversationListPane({
   onFetchNextPage,
   filterChips,
   stageRings,
+  stageLookup,
 }: {
   items: ConversationListItem[];
   selectedId: string | null;
@@ -928,6 +999,7 @@ function ConversationListPane({
   onFetchNextPage: () => void;
   filterChips: FilterChip[];
   stageRings: StageRing[];
+  stageLookup: Map<string, PipelineStageOption>;
 }) {
   return (
     <section
@@ -1037,6 +1109,7 @@ function ConversationListPane({
                 onSelect={onSelect}
                 onContextMenu={onContextMenu}
                 stageRings={stageRings}
+                stageLookup={stageLookup}
               />
             ))}
             {hasNextPage && (
@@ -1824,14 +1897,17 @@ export function ConversationsPage() {
     retry: false,
     staleTime: 30_000,
   });
+  const pipelineStages = useMemo(
+    () => pipelineStagesFromDefinition(movePipelineQuery.data?.definition),
+    [movePipelineQuery.data],
+  );
+  const stageLookup = useMemo(
+    () => new Map(pipelineStages.map((stage) => [stage.id, stage])),
+    [pipelineStages],
+  );
   const allStages = useMemo<Array<{ id: string; label: string }>>(() => {
     const conversationStageIds = new Set(allItems.map((item) => item.current_stage));
-    const pipelineStages = (
-      movePipelineQuery.data?.definition as
-        | { stages?: Array<{ id: string; label?: string }> }
-        | undefined
-    )?.stages;
-    if (pipelineStages && pipelineStages.length > 0) {
+    if (pipelineStages.length > 0) {
       const knownIds = new Set(pipelineStages.map((s) => s.id));
       const orphans = Array.from(conversationStageIds)
         .filter((id) => !knownIds.has(id))
@@ -1847,7 +1923,7 @@ export function ConversationsPage() {
     return Array.from(conversationStageIds)
       .sort()
       .map((id) => ({ id, label: id }));
-  }, [allItems, movePipelineQuery.data]);
+  }, [allItems, pipelineStages]);
 
   const toggleFilter = useCallback((filter: QuickFilterId) => {
     setQuickFilters((current) => {
@@ -1932,6 +2008,7 @@ export function ConversationsPage() {
           onFetchNextPage={() => void conversations.fetchNextPage()}
           filterChips={filterChips}
           stageRings={stageRings}
+          stageLookup={stageLookup}
         />
         <ConversationThread
           conversationId={selectedConversationId}

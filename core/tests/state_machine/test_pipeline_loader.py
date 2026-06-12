@@ -50,6 +50,54 @@ async def test_load_active_pipeline_returns_validated_definition(db_session):
 
 
 @pytest.mark.asyncio
+async def test_load_active_pipeline_normalizes_legacy_auto_enter_rule_lists(db_session):
+    res = await db_session.execute(
+        text("INSERT INTO tenants (name) VALUES ('test_loader_legacy_rules') RETURNING id")
+    )
+    tenant_id = res.scalar()
+
+    definition = {
+        "version": 1,
+        "stages": [
+            {
+                "id": "lead",
+                "actions_allowed": [],
+                "transitions": [{"to": "qualified", "when": "true"}],
+                "auto_enter_rules": [],
+            },
+            {
+                "id": "qualified",
+                "actions_allowed": [],
+                "transitions": [],
+                "auto_enter_rules": [
+                    {"field": "plan", "operator": "equals", "value": "premium"},
+                ],
+            },
+        ],
+        "fallback": "escalate_to_human",
+    }
+    await db_session.execute(
+        text("""
+            INSERT INTO tenant_pipelines (tenant_id, version, definition, active)
+            VALUES (:tid, 1, :def\\:\\:jsonb, true)
+        """),
+        {"tid": tenant_id, "def": json.dumps(definition)},
+    )
+    await db_session.commit()
+
+    p = await load_active_pipeline(db_session, tenant_id)
+
+    assert p.stages[0].auto_enter_rules is None
+    assert p.stages[1].auto_enter_rules is not None
+    assert p.stages[1].auto_enter_rules.enabled is True
+    assert p.stages[1].auto_enter_rules.match == "all"
+    assert p.stages[1].auto_enter_rules.conditions[0].field == "plan"
+
+    await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tenant_id})
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
 async def test_load_active_pipeline_raises_when_none_active(db_session):
     res = await db_session.execute(
         text("INSERT INTO tenants (name) VALUES ('test_no_pipeline') RETURNING id")

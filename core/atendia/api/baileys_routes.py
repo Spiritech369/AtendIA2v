@@ -623,6 +623,7 @@ async def _run_inbound_pipeline(
         inbound_text=text_body,
         inbound_message_id=message_id,
         from_phone_e164=from_phone_e164,
+        message_metadata=message_metadata or {},
     )
 
     # 3. Live notification (best-effort).

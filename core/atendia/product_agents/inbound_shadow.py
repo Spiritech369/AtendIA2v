@@ -61,6 +61,7 @@ async def run_inbound_shadow(
     inbound_text: str,
     inbound_message_id: Any | None = None,
     from_phone_e164: str | None = None,
+    message_metadata: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Runs the direct route in shadow for opted-in deployments and returns
     evidence summaries. Raises on internal errors; use the safe wrapper from
@@ -120,6 +121,7 @@ async def run_inbound_shadow(
                 if inbound_message_id is not None
                 else None,
                 "from_phone_e164": from_phone_e164,
+                "message_metadata": message_metadata or {},
             },
         )
         trace = (
@@ -156,6 +158,7 @@ async def run_inbound_shadow_safely(
     inbound_text: str,
     inbound_message_id: Any | None = None,
     from_phone_e164: str | None = None,
+    message_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Best-effort shadow execution. Swallows every exception by design."""
     try:
@@ -166,6 +169,7 @@ async def run_inbound_shadow_safely(
             inbound_text=inbound_text,
             inbound_message_id=inbound_message_id,
             from_phone_e164=from_phone_e164,
+            message_metadata=message_metadata,
         )
         if summaries:
             logger.info(
@@ -222,6 +226,7 @@ def _summary_from_outcome(
         "validator": trace.get("validator"),
         "side_effects": trace.get("side_effects"),
         "smoke": trace.get("smoke") or {"active": False, "staged": False},
+        "stage": trace.get("stage"),
     }
 
 

@@ -202,6 +202,9 @@ async def stage_smoke_send(
     """Stages the validated final_message to the existing outbox path. The
     idempotency key is derived from the inbound message so retries can never
     double-send a turn."""
+    from atendia.agent_runtime.respond_style_whatsapp_format import (
+        to_whatsapp_text,
+    )
     from atendia.channels.base import OutboundMessage
     from atendia.queue.outbox import stage_outbound
 
@@ -212,7 +215,7 @@ async def stage_smoke_send(
     message = OutboundMessage(
         tenant_id=str(tenant_id),
         to_phone_e164=to_phone_e164,
-        text=final_message,
+        text=to_whatsapp_text(final_message) or final_message,
         idempotency_key=idempotency_key,
         metadata={
             "source": SMOKE_SOURCE,

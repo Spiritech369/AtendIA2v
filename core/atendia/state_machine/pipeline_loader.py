@@ -14,6 +14,41 @@ class PipelineNotFoundError(Exception):
     """Raised when no active pipeline exists for a tenant."""
 
 
+def _normalize_legacy_auto_enter_rules(definition: dict) -> dict:
+    """Accept persisted pre-contract rule lists without weakening the model.
+
+    Older pipeline seeds stored ``stage.auto_enter_rules`` directly as a
+    condition list. The current contract stores a rule group object with
+    ``enabled``, ``match``, and ``conditions``. Normalize only that legacy
+    JSONB shape before Pydantic validation so loaded pipelines remain readable
+    while new writes keep the stricter contract.
+    """
+    stages = definition.get("stages")
+    if not isinstance(stages, list):
+        return definition
+
+    normalized_stages = []
+    changed = False
+    for stage in stages:
+        if not isinstance(stage, dict):
+            normalized_stages.append(stage)
+            continue
+        rules = stage.get("auto_enter_rules")
+        if not isinstance(rules, list):
+            normalized_stages.append(stage)
+            continue
+
+        changed = True
+        replacement = None
+        if rules:
+            replacement = {"enabled": True, "match": "all", "conditions": rules}
+        normalized_stages.append({**stage, "auto_enter_rules": replacement})
+
+    if not changed:
+        return definition
+    return {**definition, "stages": normalized_stages}
+
+
 async def load_active_pipeline(session: AsyncSession, tenant_id: UUID) -> PipelineDefinition:
     stmt = (
         select(TenantPipeline)
@@ -25,7 +60,7 @@ async def load_active_pipeline(session: AsyncSession, tenant_id: UUID) -> Pipeli
     row = result.scalar_one_or_none()
     if row is None:
         raise PipelineNotFoundError(f"no active pipeline for tenant {tenant_id}")
-    definition = dict(row.definition or {})
+    definition = _normalize_legacy_auto_enter_rules(dict(row.definition or {}))
     definition.setdefault("version", row.version)
     return PipelineDefinition.model_validate(definition)
 

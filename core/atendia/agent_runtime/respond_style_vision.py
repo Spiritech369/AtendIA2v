@@ -33,8 +33,18 @@ _VISION_SYSTEM = (
     "any clearly readable high-level fields like nombre_visible true/false, "
     "vigencia_visible true/false, fecha_aproximada string or null — NEVER "
     "transcribe full ID numbers, addresses or account numbers), and "
-    "confidence (0-1). If the image is not a document, say so via "
-    "document_type. Return ONLY the JSON object."
+    "confidence (0-1). For bank statements and payroll receipts ALSO include "
+    "in visible_fields when clearly readable: banco_o_emisor (institution "
+    "name string or null), fecha_corte_o_periodo (statement cut date or "
+    "covered period as short string, or null), periodicidad_depositos "
+    "(semanal/quincenal/catorcenal/mensual or null — judge ONLY from the "
+    "cadence of repeating salary-like deposits inside the statement, e.g. "
+    "every ~7 days = semanal, every ~14-15 days = quincenal, or from a "
+    "payroll receipt's stated period; NEVER from the statement's own "
+    "monthly cycle; null when no clear repetition), and "
+    "depositos_nomina_visibles (true/false: salary-like deposits visible). "
+    "If the image is not a document, say so via document_type. Return ONLY "
+    "the JSON object."
 )
 
 _JSON_SCHEMA = {
@@ -84,6 +94,8 @@ async def analyze_document_media(
     image_bytes: bytes,
     mime_type: str,
     model: str = "gpt-4o",
+    detail: str = "high",
+    usage_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Returns vision facts, or a structured unsupported/error marker.
     Never raises: media review must not break the turn."""
@@ -125,7 +137,7 @@ async def analyze_document_media(
                         f"data:{part_mime};base64,"
                         + base64.b64encode(part_bytes).decode("ascii")
                     ),
-                    "detail": "high",
+                    "detail": detail if detail in ("low", "high", "auto") else "high",
                 },
             }
             for part_mime, part_bytes in image_parts
@@ -139,6 +151,14 @@ async def analyze_document_media(
             response_format={"type": "json_schema", "json_schema": _JSON_SCHEMA},
             temperature=0,
             max_tokens=400,
+        )
+        from atendia.agent_runtime.llm_usage_log import record_llm_usage
+
+        record_llm_usage(
+            kind="vision",
+            model=model,
+            usage=getattr(response, "usage", None),
+            context=usage_context,
         )
         raw = response.choices[0].message.content or "{}"
         facts = json.loads(raw)

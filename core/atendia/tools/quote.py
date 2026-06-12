@@ -92,6 +92,14 @@ async def quote(
             hint = f"missing data for quote: {', '.join(str(item) for item in missing)}"
         else:
             hint = runtime_result.get("hint") or f"sku {sku!r} not found in published catalog"
+        fallback = await _approved_tenant_catalog_quote(
+            session=session,
+            tenant_id=tenant_id,
+            sku=sku,
+            plan_code=plan_code,
+        )
+        if fallback is not None:
+            return fallback
         return ToolNoDataResult(hint=str(hint))
 
     stmt = select(TenantCatalogItem).where(
@@ -179,3 +187,45 @@ def _filter_payment_options(
         ):
             return {key: value}
     return {}
+
+
+def _approved_catalog_source(item: TenantCatalogItem) -> dict[str, Any] | None:
+    source = (item.attrs or {}).get("catalog_source")
+    if not isinstance(source, dict) or source.get("runtime_status") != "approved":
+        return None
+    return source
+
+
+async def _approved_tenant_catalog_quote(
+    *,
+    session: AsyncSession,
+    tenant_id: UUID,
+    sku: str,
+    plan_code: str | None,
+) -> Quote | None:
+    stmt = select(TenantCatalogItem).where(
+        TenantCatalogItem.tenant_id == tenant_id,
+        TenantCatalogItem.sku == sku,
+        TenantCatalogItem.active.is_(True),
+    )
+    item = (await session.execute(stmt)).scalar_one_or_none()
+    if item is None:
+        return None
+    source = _approved_catalog_source(item)
+    if source is None:
+        return None
+    payment_options = catalog_payment_options(item)
+    selected_payment_options = _filter_payment_options(payment_options, plan_code)
+    return Quote(
+        sku=item.sku,
+        name=item.name,
+        category=item.category or (item.attrs or {}).get("category", ""),
+        list_price_mxn=_decimal_or_zero(catalog_list_price_mxn(item)),
+        cash_price_mxn=_decimal_or_zero(catalog_cash_price_mxn(item)),
+        payment_options=selected_payment_options or payment_options,
+        product_details=catalog_product_details(item),
+        source={
+            **source,
+            "catalog_source": "tenant_catalogs_approved_fallback",
+        },
+    )

@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     # ``mock`` is forced when ``openai_api_key`` is empty regardless of this
     # value, so dev environments without keys still work.
     kb_provider: Literal["openai", "mock"] = Field(default="openai")
+    respond_style_audio_transcription_model: str = Field(default="gpt-4o-mini-transcribe")
+    respond_style_audio_transcription_timeout_s: float = Field(default=20.0)
     # Baileys WhatsApp sidecar — see core/baileys-bridge/.
     baileys_bridge_url: str = Field(default="http://baileys-bridge:7755")
     baileys_internal_token: str = Field(default="dev-only-baileys-token-change-me")

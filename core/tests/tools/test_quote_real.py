@@ -10,6 +10,7 @@ via the autouse `db_session` fixture's session.rollback() in conftest.
 
 import json
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -135,6 +136,97 @@ async def test_quote_handles_missing_attrs_keys(db_session) -> None:
         assert result.price_contado_mxn == Decimal("0")
         assert result.planes_credito == {}
         assert result.ficha_tecnica == {}
+    finally:
+        await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
+        await db_session.commit()
+
+
+async def test_quote_published_catalog_miss_falls_back_to_approved_tenant_catalog(
+    db_session,
+) -> None:
+    """Published catalog no-match can use an approved tenant source as fallback."""
+    tid = (
+        await db_session.execute(
+            text("INSERT INTO tenants (name) VALUES ('test_t10_approved_fallback') RETURNING id")
+        )
+    ).scalar()
+    catalog_id = uuid4()
+    version_id = uuid4()
+    await db_session.execute(
+        text("""
+            INSERT INTO catalogs (id, tenant_id, name, vertical, status)
+            VALUES (:catalog_id, :t, 'Published no match', 'motorcycles', 'active')
+            """),
+        {"catalog_id": catalog_id, "t": tid},
+    )
+    await db_session.execute(
+        text("""
+            INSERT INTO catalog_versions (
+                id, tenant_id, catalog_id, version_number, status, snapshot_json
+            )
+            VALUES (
+                :version_id,
+                :t,
+                :catalog_id,
+                1,
+                'published',
+                CAST(:snapshot AS jsonb)
+            )
+            """),
+        {
+            "version_id": version_id,
+            "t": tid,
+            "catalog_id": catalog_id,
+            "snapshot": '{"items":[{"sku":"other","name":"Other","status":"active"}]}',
+        },
+    )
+    await db_session.execute(
+        text("UPDATE catalogs SET active_version_id = :version_id WHERE id = :catalog_id"),
+        {"version_id": version_id, "catalog_id": catalog_id},
+    )
+    await db_session.execute(
+        text("""
+        INSERT INTO tenant_catalogs (tenant_id, sku, name, category, attrs, active, status)
+        VALUES (:t, :sku, :name, 'Motoneta', CAST(:attrs AS jsonb), true, 'published')
+        """),
+        {
+            "t": tid,
+            "sku": "adventure_elite_150_cc",
+            "name": "Adventure Elite 150 CC",
+            "attrs": json.dumps(
+                {
+                    "alias": ["adventure", "adventure elite"],
+                    "precio_lista": "31395",
+                    "precio_contado": "29900",
+                    "planes_credito": {
+                        "10%": {
+                            "enganche_mxn": 3140,
+                            "pago_quincenal_mxn": 1247,
+                            "numero_quincenas": 72,
+                        },
+                    },
+                    "catalog_source": {
+                        "runtime_status": "approved",
+                        "source_id": "approved_catalog",
+                    },
+                }
+            ),
+        },
+    )
+    await db_session.commit()
+    try:
+        result = await quote(
+            session=db_session,
+            tenant_id=tid,
+            sku="adventure_elite_150_cc",
+            plan_code="10%",
+        )
+        assert isinstance(result, Quote)
+        assert result.sku == "adventure_elite_150_cc"
+        assert result.cash_price_mxn == Decimal("29900")
+        assert result.payment_options["10%"]["enganche_mxn"] == 3140
+        assert result.source["catalog_source"] == "tenant_catalogs_approved_fallback"
+        assert result.source["source_id"] == "approved_catalog"
     finally:
         await db_session.execute(text("DELETE FROM tenants WHERE id = :tid"), {"tid": tid})
         await db_session.commit()

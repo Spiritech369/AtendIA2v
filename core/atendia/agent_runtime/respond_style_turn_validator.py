@@ -446,10 +446,15 @@ def _tool_binding_errors(
     for index, proposal in enumerate(output.tool_requests):
         if bound_names and proposal.tool_name not in bound_names:
             errors.append(
-                _error(
-                    "tool_not_bound",
-                    "tool request requires an enabled bound tool schema",
+                ValidationErrorItem(
+                    code="tool_not_bound",
+                    message=(
+                        "tool request requires an enabled bound tool schema: "
+                        f"'{proposal.tool_name}' is not bound"
+                    ),
                     path=f"tool_requests[{index}].tool_name",
+                    retryable=True,
+                    metadata={"tool_name": proposal.tool_name},
                 )
             )
     return errors

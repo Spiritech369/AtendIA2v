@@ -260,6 +260,13 @@ class RespondStyleLLMTurnProvider:
             self.total_completion_tokens += (
                 getattr(usage, "completion_tokens", 0) or 0
             )
+            from atendia.agent_runtime.llm_usage_log import record_llm_usage
+
+            record_llm_usage(
+                kind="turn",
+                model=self._config.model,
+                usage=usage,
+            )
         raw = _completion_text(response)
         self.last_raw_output = raw
         return parse_llm_agent_turn_output_json(raw)

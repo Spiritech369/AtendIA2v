@@ -66,6 +66,7 @@ class RespondStyleBridgeOutcome:
         field_state: dict[str, Any] | None = None,
         no_send_followup: dict[str, Any] | None = None,
         smoke: dict[str, Any] | None = None,
+        stage: dict[str, Any] | None = None,
     ) -> None:
         self.result = result
         self.blocked_reason = blocked_reason
@@ -74,6 +75,7 @@ class RespondStyleBridgeOutcome:
         self.agent_version_id = agent_version_id
         self.field_state = field_state or {}
         self.smoke = smoke or {"active": False, "staged": False}
+        self.stage = stage
         self.no_send_followup = no_send_followup or derive_no_send_followup(
             result=result, blocked_reason=blocked_reason
         )
@@ -90,6 +92,7 @@ async def maybe_handle_respond_style_turn(
     from_phone_e164: str | None = None,
     inbound_message_id: str | None = None,
     reply_channel: str | None = None,
+    message_metadata: dict[str, Any] | None = None,
 ) -> RespondStyleBridgeOutcome | None:
     """Returns None when no deployment opted in (previous path continues).
     Otherwise ALWAYS returns a no-send outcome — opted-in turns never fall
@@ -118,6 +121,7 @@ async def maybe_handle_respond_style_turn(
             from_phone_e164=from_phone_e164,
             inbound_message_id=inbound_message_id,
             reply_channel=reply_channel,
+            message_metadata=message_metadata,
         )
     except Exception as exc:  # fail closed: never crash, never legacy-fallback
         logger.exception(
@@ -141,6 +145,7 @@ async def _handle_opted_in_turn(
     from_phone_e164: str | None = None,
     inbound_message_id: str | None = None,
     reply_channel: str | None = None,
+    message_metadata: dict[str, Any] | None = None,
 ) -> RespondStyleBridgeOutcome:
     if mode != "no_send":
         return RespondStyleBridgeOutcome(
@@ -249,8 +254,25 @@ async def _handle_opted_in_turn(
         session,
         inbound_message_id=inbound_message_id,
         api_key=api_key,
-        model=metadata.get("respond_style_model") or "gpt-4o",
+        # Cost lever: vision (document intake) can run on a cheaper model
+        # than the conversation; both are deployment config.
+        model=metadata.get("respond_style_vision_model")
+        or metadata.get("respond_style_model")
+        or "gpt-4o",
+        detail=str(metadata.get("respond_style_vision_detail") or "high"),
     )
+    settings = get_settings()
+    audio_results, effective_inbound_text, audio_trace = await _audio_pretool_results(
+        session,
+        inbound_message_id=inbound_message_id,
+        original_inbound_text=inbound_text,
+        message_metadata=message_metadata,
+        api_key=api_key,
+        model=metadata.get("respond_style_audio_model")
+        or getattr(settings, "respond_style_audio_transcription_model", "gpt-4o-mini-transcribe"),
+        visible_send_candidate=visible_send_candidate,
+    )
+    pretool_results.extend(audio_results)
     state = ConversationStateSnapshot(
         recent_messages=transcript,
         field_values=shadow_values,
@@ -272,9 +294,12 @@ async def _handle_opted_in_turn(
             agent_id=str(deployment.agent_id),
             conversation_id=str(conversation_id),
             channel=AGENT_SERVICE_ROUTE,
-            inbound_text=inbound_text,
+            inbound_text=effective_inbound_text,
+            trace_context={"audio": audio_trace} if audio_trace else {},
         )
     )
+    if audio_trace:
+        result.trace["respond_style_audio"] = audio_trace
     # 15A: validated, audited shadow application of the turn's field
     # proposals — survives across turns; never touches commercial state.
     application = apply_field_proposals(
@@ -300,6 +325,79 @@ async def _handle_opted_in_turn(
         result=result,
         reply_channel=reply_channel,
     )
+    # Beta: generic, flag-gated pipeline stage movement driven by the tenant
+    # pipeline's auto_enter_rules over the validated shadow field state.
+    # Runs after send staging and never blocks the turn: an evaluator error
+    # degrades to an auditable trace note, not a blocked customer reply.
+    stage_info: dict[str, Any] | None = None
+    try:
+        from atendia.product_agents.respond_style_stage_movement import (
+            maybe_move_stage,
+        )
+
+        stage_info = await maybe_move_stage(
+            session,
+            deployment=deployment,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            field_values=(
+                application.new_values if application.audit else shadow_values
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "respond_style_stage_movement_failed tenant=%s", tenant_id
+        )
+        stage_info = {"enabled": True, "moved": False, "reason": "stage_movement_error"}
+    # Beta: flag-gated mirror of accepted field writes into the canonical CRM
+    # store (customer_field_values) plus internal system chat notes for every
+    # applied/derived field and stage move. Never blocks or alters the turn.
+    canonical_info: dict[str, Any] | None = None
+    try:
+        from atendia.product_agents.respond_style_canonical_fields import (
+            persist_canonical_fields,
+            record_system_messages,
+        )
+
+        canonical_info = await persist_canonical_fields(
+            session,
+            deployment=deployment,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            audit_entries=list(application.audit),
+            runtime_values=dict(application.new_values or {}),
+        )
+        notes: list[str] = []
+        for item in (canonical_info or {}).get("applied") or []:
+            notes.append(
+                f"Sistema: {item['label']} actualizado a {item['value']}"
+            )
+        for item in (canonical_info or {}).get("derived") or []:
+            notes.append(f"Sistema: {item['label']} derivado a {item['value']}")
+        for item in (canonical_info or {}).get("docs") or []:
+            value = str(item.get("value") or "")
+            if value == "recibido":
+                notes.append(f"Sistema: {item['label']} recibido")
+            elif value.startswith("pendiente ("):
+                notes.append(f"Sistema: {item['label']} {value}")
+        if stage_info and stage_info.get("moved"):
+            notes.append(
+                "Sistema · Etapa: "
+                f"{stage_info.get('from_stage')} -> {stage_info.get('to_stage')}"
+                " · motivo: auto_rule_matched"
+            )
+        if notes:
+            await record_system_messages(
+                session,
+                tenant_id=tenant_id,
+                conversation_id=conversation_id,
+                texts=notes,
+            )
+    except Exception:
+        logger.exception(
+            "respond_style_canonical_fields_failed tenant=%s", tenant_id
+        )
+        canonical_info = {"enabled": True, "error": "canonical_fields_error"}
     return RespondStyleBridgeOutcome(
         result=result,
         deployment_id=str(deployment.id),
@@ -311,8 +409,10 @@ async def _handle_opted_in_turn(
             "accepted": application.accepted_count,
             "rejected": application.rejected_count,
             "audit": [entry.model_dump(mode="json") for entry in application.audit],
+            "canonical": canonical_info,
         },
         smoke=smoke_info,
+        stage=stage_info,
     )
 
 
@@ -440,6 +540,7 @@ async def _vision_pretool_results(
     inbound_message_id: str | None,
     api_key: str,
     model: str,
+    detail: str = "high",
 ) -> list[dict[str, Any]]:
     """If the inbound message carries an image, review it with vision and
     inject the facts as a pre-executed document.review tool result. Best
@@ -476,11 +577,104 @@ async def _vision_pretool_results(
             image_bytes=file_path.read_bytes(),
             mime_type=mime_type,
             model=model,
+            detail=detail,
+            usage_context={"message_id": str(inbound_message_id)},
         )
         return [vision_tool_result(facts)]
     except Exception:
         logger.warning("respond_style_vision_pretool_failed", exc_info=True)
         return []
+
+
+async def _audio_pretool_results(
+    session: Any,
+    *,
+    inbound_message_id: str | None,
+    original_inbound_text: str,
+    message_metadata: dict[str, Any] | None,
+    api_key: str,
+    model: str,
+    visible_send_candidate: bool,
+) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+    """Transcribe approved-contact audio before the LLM turn.
+
+    The scope is intentionally tied to ``visible_send_candidate`` so live
+    speech calls run only for the same allowlisted contact and canonical send
+    gate used by the smoke SendAdapter path. Failures are facts/trace only;
+    workflows, actions and field writes stay disabled.
+    """
+    media = (message_metadata or {}).get("media")
+    if not isinstance(media, dict) or str(media.get("type") or "") != "audio":
+        return [], original_inbound_text, {}
+    if not visible_send_candidate:
+        return [], original_inbound_text, {
+            "attempted": False,
+            "reason": "not_visible_candidate",
+        }
+    if inbound_message_id is None:
+        return [], original_inbound_text, {
+            "attempted": False,
+            "reason": "message_id_missing",
+        }
+    try:
+        from pathlib import Path
+
+        from atendia.agent_runtime.respond_style_audio import (
+            audio_tool_result,
+            transcribe_audio_media,
+        )
+        from atendia.db.models.message import MessageRow
+
+        message = await session.get(MessageRow, UUID(str(inbound_message_id)))
+        persisted_media = ((message.metadata_json or {}).get("media") or {}) if message else {}
+        media = {**media, **persisted_media}
+        mime_type = str(media.get("mime_type") or "")
+        url = str(media.get("url") or "")
+        if not url:
+            facts = {
+                "transcribed": False,
+                "reason": "audio_media_url_missing",
+                "mime_type": mime_type,
+            }
+            return [audio_tool_result(facts)], original_inbound_text, facts
+        upload_dir = Path(get_settings().upload_dir)
+        relative = url.split("/uploads/", 1)[-1] if "/uploads/" in url else url
+        file_path = upload_dir / relative
+        if not file_path.exists():
+            facts = {
+                "transcribed": False,
+                "reason": "audio_media_missing",
+                "mime_type": mime_type,
+            }
+            return [audio_tool_result(facts)], original_inbound_text, facts
+        facts = await transcribe_audio_media(
+            api_key=api_key,
+            audio_bytes=file_path.read_bytes(),
+            mime_type=mime_type,
+            model=model,
+            timeout_s=getattr(
+                get_settings(),
+                "respond_style_audio_transcription_timeout_s",
+                20.0,
+            ),
+        )
+        result = audio_tool_result(facts)
+        trace = {
+            "attempted": True,
+            "tool_name": "audio.transcribe",
+            "status": result["status"],
+            "reason": facts.get("reason"),
+            "mime_type": mime_type,
+            "model": model,
+            "transcribed": facts.get("transcribed") is True,
+        }
+        if facts.get("transcribed") is True:
+            return [result], str(facts.get("text") or original_inbound_text), trace
+        return [result], original_inbound_text, trace
+    except Exception:
+        logger.warning("respond_style_audio_pretool_failed", exc_info=True)
+        facts = {"transcribed": False, "reason": "audio_pretool_failed"}
+        return [], original_inbound_text, facts
 
 
 async def _recent_handoff_pending(session: Any, *, conversation_id: str) -> bool:

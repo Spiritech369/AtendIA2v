@@ -1,0 +1,19 @@
+Prueba: Dinamo Smoke v5 — RESULTADOS
+test_run_id: dinamo_smoke_v5_2026_06_12
+Conversacion: f3ee4c3f-a1c4-4e7f-b258-60b0b5910d1a (hola -> papeleria_completa)
+Mensajes del cliente: 13 (9 texto + 4 documentos)
+
+Requests OpenAI: 22 (18 turnos de conversacion, 4 vision)
+Input tokens: 159,634 (cached: 116,480 = 73%; no-cached: 43,154)
+Output tokens: 4,126
+
+Costo estimado (gpt-4o: $2.50/M in, $1.25/M cached, $10/M out):
+  TOTAL prueba:            $0.2947 USD
+  Por request:             $0.0134 USD
+  Por mensaje del cliente: $0.0227 USD
+  Por conversacion completa (primer mensaje -> expediente completo + formulario): $0.2947 USD
+
+Fuente: core/uploads/llm_usage/usage_2026_06_12.jsonl (1 linea JSON por request con
+input/cached/output tokens, modelo, kind turn/vision, test_run_id). Cruzar con
+OpenAI Usage filtrando por la ventana horaria de la prueba.
+Fin: 2026-06-12 05:09:13 (hora local)

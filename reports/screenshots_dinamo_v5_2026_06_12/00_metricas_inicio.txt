@@ -1,0 +1,7 @@
+Prueba: Dinamo Smoke v5
+Inicio: 2026-06-12 05:01:12 (hora local)
+Modelo: gpt-4o (deployment respond_style_model)
+Conversaciones: 1
+Mensajes cliente planeados: 9 texto + 4 documentos
+Objetivo: flujo credito completo con datos implicitos desde documentos
+test_run_id: dinamo_smoke_v5_2026_06_12
